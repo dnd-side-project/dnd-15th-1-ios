@@ -1,0 +1,220 @@
+import Domain
+import Foundation
+import ThirdParty
+
+@Reducer
+public struct AppCoordinatorFeature {
+    @ObservableState
+    public struct State: Equatable {
+        public var phase: Phase = .bootstrapping
+        public var currentUser: AuthUser?
+        public var pendingDeepLink: DeepLinkRoute?
+        public var overlay = OverlayFeature.State()
+
+        public init(
+            phase: Phase = .bootstrapping,
+            currentUser: AuthUser? = nil,
+            pendingDeepLink: DeepLinkRoute? = nil,
+            overlay: OverlayFeature.State = OverlayFeature.State()
+        ) {
+            self.phase = phase
+            self.currentUser = currentUser
+            self.pendingDeepLink = pendingDeepLink
+            self.overlay = overlay
+        }
+
+        public enum Phase: Equatable {
+            case bootstrapping
+            case loggedOut(AuthFeature.State)
+            case main(MainTabFeature.State)
+        }
+
+        public var loggedOutAuth: AuthFeature.State? {
+            get {
+                guard case let .loggedOut(auth) = phase else { return nil }
+                return auth
+            }
+            set {
+                if let newValue {
+                    phase = .loggedOut(newValue)
+                }
+            }
+        }
+
+        public var mainTab: MainTabFeature.State? {
+            get {
+                guard case let .main(tab) = phase else { return nil }
+                return tab
+            }
+            set {
+                if let newValue {
+                    phase = .main(newValue)
+                }
+            }
+        }
+    }
+
+    public enum Action: Equatable {
+        case onAppear
+        case sessionRestored(Result<AuthUser?, AuthError>)
+        case deepLinkReceived(URL)
+        case routeDeepLink(DeepLinkRoute)
+        case flushPendingDeepLink
+        case auth(AuthFeature.Action)
+        case mainTab(MainTabFeature.Action)
+        case overlay(OverlayFeature.Action)
+        case sessionExpired
+    }
+
+    @Dependency(\.authClient) var authClient
+
+    public init() {}
+
+    public var body: some ReducerOf<Self> {
+        Scope(state: \.overlay, action: \.overlay) {
+            OverlayFeature()
+        }
+        Reduce(core)
+            .ifLet(\.loggedOutAuth, action: \.auth) {
+                AuthFeature()
+            }
+            .ifLet(\.mainTab, action: \.mainTab) {
+                MainTabFeature()
+            }
+    }
+
+    private func core(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .onAppear:
+            guard case .bootstrapping = state.phase else {
+                return .none
+            }
+            return .run { [authClient] send in
+                do {
+                    let user = try await authClient.currentUser()
+                    await send(.sessionRestored(.success(user)))
+                } catch {
+                    await send(.sessionRestored(.failure(mapAuthError(error))))
+                }
+            }
+
+        case let .sessionRestored(.success(user)):
+            state.currentUser = user
+            if let user {
+                state.phase = .main(makeMainState(user: user))
+                return .send(.flushPendingDeepLink)
+            } else {
+                state.phase = .loggedOut(AuthFeature.State())
+                return .none
+            }
+
+        case .sessionRestored(.failure):
+            state.currentUser = nil
+            state.phase = .loggedOut(AuthFeature.State())
+            return .none
+
+        case let .deepLinkReceived(url):
+            guard let route = DeepLinkRouter.parse(url) else {
+                return .none
+            }
+            return .send(.routeDeepLink(route))
+
+        case let .routeDeepLink(route):
+            switch state.phase {
+            case .bootstrapping:
+                state.pendingDeepLink = route
+                return .none
+            case .loggedOut:
+                switch route {
+                case .signIn:
+                    return .none
+                case .home, .explore, .map, .myPage:
+                    state.pendingDeepLink = route
+                    return .none
+                }
+            case .main:
+                return routeInMain(state: &state, route: route)
+            }
+
+        case .flushPendingDeepLink:
+            guard let route = state.pendingDeepLink else {
+                return .none
+            }
+            state.pendingDeepLink = nil
+            return .send(.routeDeepLink(route))
+
+        case let .auth(.delegate(delegate)):
+            switch delegate {
+            case let .signInSucceeded(user):
+                state.currentUser = user
+                state.phase = .main(makeMainState(user: user))
+                return .send(.flushPendingDeepLink)
+            }
+
+        case let .mainTab(.delegate(delegate)):
+            switch delegate {
+            case .signOutSucceeded:
+                state.currentUser = nil
+                state.phase = .loggedOut(AuthFeature.State())
+                return .none
+            case .sessionExpired:
+                return .send(.sessionExpired)
+            }
+
+        case .sessionExpired:
+            state.currentUser = nil
+            state.phase = .loggedOut(AuthFeature.State())
+            return .none
+
+        case .auth, .mainTab, .overlay:
+            return .none
+        }
+    }
+
+    private func makeMainState(user: AuthUser) -> MainTabFeature.State {
+        MainTabFeature.State(
+            selectedTab: .home,
+            home: HomeFeature.State(),
+            explore: ExploreFeature.State(),
+            map: MapFeature.State(),
+            myPage: MyPageFeature.State(user: user)
+        )
+    }
+
+    private func routeInMain(
+        state: inout State,
+        route: DeepLinkRoute
+    ) -> Effect<Action> {
+        guard var main = state.phase.mainTabState else {
+            state.pendingDeepLink = route
+            return .none
+        }
+
+        switch route {
+        case .signIn:
+            return .none
+        case .home:
+            main.selectedTab = .home
+        case .explore:
+            main.selectedTab = .explore
+        case .map:
+            main.selectedTab = .map
+        case .myPage:
+            main.selectedTab = .myPage
+        }
+
+        state.phase = .main(main)
+        return .none
+    }
+}
+
+private extension AppCoordinatorFeature.State.Phase {
+    var mainTabState: MainTabFeature.State? {
+        guard case let .main(state) = self else { return nil }
+        return state
+    }
+}
+
+private func mapAuthError(_ error: Error) -> AuthError {
+    error as? AuthError ?? .unknown
+}
