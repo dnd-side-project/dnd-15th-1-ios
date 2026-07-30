@@ -1,0 +1,2 @@
+// https:/$()/... keeps // from being treated as a comment.
+API_BASE_URL = https:/$()/api.dulpick.invalid
