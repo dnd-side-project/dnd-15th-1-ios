@@ -5,6 +5,9 @@ public enum ProjectSettings {
         "SWIFT_VERSION": .string(ProjectEnvironment.swiftVersion),
         "SWIFT_STRICT_CONCURRENCY": "complete",
         "IPHONEOS_DEPLOYMENT_TARGET": .string(ProjectEnvironment.deploymentTarget),
+        // Xcode recommended settings
+        "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
+        "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
     ]
 
     public static let debug: SettingsDictionary = [
