@@ -11,7 +11,11 @@ public enum DeepLinkRouter {
         if host == "home" || firstPath == "home" { return .home }
         if host == "explore" || firstPath == "explore" { return .explore }
         if host == "map" || firstPath == "map" { return .map }
-        if host == "mypage" || host == "my-page" || firstPath == "mypage" || firstPath == "my-page" {
+        if host == "mypage"
+            || host == "my-page"
+            || firstPath == "mypage"
+            || firstPath == "my-page"
+        {
             return .myPage
         }
         if host == "profile" || firstPath == "profile" {

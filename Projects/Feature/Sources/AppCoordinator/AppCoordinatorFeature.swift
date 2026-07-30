@@ -86,89 +86,122 @@ public struct AppCoordinatorFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
-            guard case .bootstrapping = state.phase else {
-                return .none
-            }
-            return .run { [authClient] send in
-                do {
-                    let user = try await authClient.currentUser()
-                    await send(.sessionRestored(.success(user)))
-                } catch {
-                    await send(.sessionRestored(.failure(mapAuthError(error))))
-                }
-            }
+            return restoreSessionIfNeeded(state: &state)
+        case let .sessionRestored(result):
+            return applySessionRestored(state: &state, result: result)
+        case let .deepLinkReceived(url):
+            return receiveDeepLink(url)
+        case let .routeDeepLink(route):
+            return routeDeepLink(state: &state, route: route)
+        case .flushPendingDeepLink:
+            return flushPendingDeepLink(state: &state)
+        case let .auth(.delegate(delegate)):
+            return handleAuthDelegate(state: &state, delegate: delegate)
+        case let .mainTab(.delegate(delegate)):
+            return handleMainTabDelegate(state: &state, delegate: delegate)
+        case .sessionExpired:
+            return moveToLoggedOut(state: &state)
+        case .auth, .mainTab, .overlay:
+            return .none
+        }
+    }
 
-        case let .sessionRestored(.success(user)):
+    private func restoreSessionIfNeeded(state: inout State) -> Effect<Action> {
+        guard case .bootstrapping = state.phase else {
+            return .none
+        }
+        return .run { [authClient] send in
+            do {
+                let user = try await authClient.currentUser()
+                await send(.sessionRestored(.success(user)))
+            } catch {
+                await send(.sessionRestored(.failure(mapAuthError(error))))
+            }
+        }
+    }
+
+    private func applySessionRestored(
+        state: inout State,
+        result: Result<AuthUser?, AuthError>
+    ) -> Effect<Action> {
+        switch result {
+        case let .success(user):
             state.currentUser = user
             if let user {
                 state.phase = .main(makeMainState(user: user))
                 return .send(.flushPendingDeepLink)
-            } else {
-                state.phase = .loggedOut(AuthFeature.State())
-                return .none
             }
-
-        case .sessionRestored(.failure):
-            state.currentUser = nil
             state.phase = .loggedOut(AuthFeature.State())
             return .none
+        case .failure:
+            return moveToLoggedOut(state: &state)
+        }
+    }
 
-        case let .deepLinkReceived(url):
-            guard let route = DeepLinkRouter.parse(url) else {
-                return .none
-            }
-            return .send(.routeDeepLink(route))
-
-        case let .routeDeepLink(route):
-            switch state.phase {
-            case .bootstrapping:
-                state.pendingDeepLink = route
-                return .none
-            case .loggedOut:
-                switch route {
-                case .signIn:
-                    return .none
-                case .home, .explore, .map, .myPage:
-                    state.pendingDeepLink = route
-                    return .none
-                }
-            case .main:
-                return routeInMain(state: &state, route: route)
-            }
-
-        case .flushPendingDeepLink:
-            guard let route = state.pendingDeepLink else {
-                return .none
-            }
-            state.pendingDeepLink = nil
-            return .send(.routeDeepLink(route))
-
-        case let .auth(.delegate(delegate)):
-            switch delegate {
-            case let .signInSucceeded(user):
-                state.currentUser = user
-                state.phase = .main(makeMainState(user: user))
-                return .send(.flushPendingDeepLink)
-            }
-
-        case let .mainTab(.delegate(delegate)):
-            switch delegate {
-            case .signOutSucceeded:
-                state.currentUser = nil
-                state.phase = .loggedOut(AuthFeature.State())
-                return .none
-            case .sessionExpired:
-                return .send(.sessionExpired)
-            }
-
-        case .sessionExpired:
-            state.currentUser = nil
-            state.phase = .loggedOut(AuthFeature.State())
-            return .none
-
-        case .auth, .mainTab, .overlay:
+    private func receiveDeepLink(_ url: URL) -> Effect<Action> {
+        guard let route = DeepLinkRouter.parse(url) else {
             return .none
         }
+        return .send(.routeDeepLink(route))
+    }
+
+    private func routeDeepLink(
+        state: inout State,
+        route: DeepLinkRoute
+    ) -> Effect<Action> {
+        switch state.phase {
+        case .bootstrapping:
+            state.pendingDeepLink = route
+            return .none
+        case .loggedOut:
+            switch route {
+            case .signIn:
+                return .none
+            case .home, .explore, .map, .myPage:
+                state.pendingDeepLink = route
+                return .none
+            }
+        case .main:
+            return routeInMain(state: &state, route: route)
+        }
+    }
+
+    private func flushPendingDeepLink(state: inout State) -> Effect<Action> {
+        guard let route = state.pendingDeepLink else {
+            return .none
+        }
+        state.pendingDeepLink = nil
+        return .send(.routeDeepLink(route))
+    }
+
+    private func handleAuthDelegate(
+        state: inout State,
+        delegate: AuthFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case let .signInSucceeded(user):
+            state.currentUser = user
+            state.phase = .main(makeMainState(user: user))
+            return .send(.flushPendingDeepLink)
+        }
+    }
+
+    private func handleMainTabDelegate(
+        state: inout State,
+        delegate: MainTabFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .signOutSucceeded:
+            return moveToLoggedOut(state: &state)
+        case .sessionExpired:
+            return .send(.sessionExpired)
+        }
+    }
+
+    private func moveToLoggedOut(state: inout State) -> Effect<Action> {
+        state.currentUser = nil
+        state.phase = .loggedOut(AuthFeature.State())
+        return .none
     }
 
     private func makeMainState(user: AuthUser) -> MainTabFeature.State {
