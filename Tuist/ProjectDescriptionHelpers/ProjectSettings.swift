@@ -1,14 +1,16 @@
 import ProjectDescription
 
 public enum ProjectSettings {
+    public static let recommended: SettingsDictionary = [
+        "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
+        "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
+    ]
+
     public static let base: SettingsDictionary = [
         "SWIFT_VERSION": .string(ProjectEnvironment.swiftVersion),
         "SWIFT_STRICT_CONCURRENCY": "complete",
         "IPHONEOS_DEPLOYMENT_TARGET": .string(ProjectEnvironment.deploymentTarget),
-        // Xcode recommended settings
-        "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
-        "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
-    ]
+    ].merging(recommended) { _, new in new }
 
     public static let debug: SettingsDictionary = [
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG",
@@ -24,6 +26,17 @@ public enum ProjectSettings {
         "ONLY_ACTIVE_ARCH": "NO",
         "ENABLE_TESTABILITY": "NO",
     ]
+
+    /// Project-level settings. Xcode recommended settings 경고는 여기를 본다.
+    public static func project() -> Settings {
+        .settings(
+            base: recommended,
+            configurations: [
+                .debug(name: ProjectEnvironment.debugConfigName, settings: [:]),
+                .release(name: ProjectEnvironment.releaseConfigName, settings: [:]),
+            ]
+        )
+    }
 
     public static func framework(extraBase: SettingsDictionary = [:]) -> Settings {
         .settings(

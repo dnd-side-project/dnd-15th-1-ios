@@ -44,6 +44,7 @@ public enum ProjectFactory {
         return Project(
             name: name,
             organizationName: ProjectEnvironment.organizationName,
+            settings: ProjectSettings.project(),
             targets: [target],
             schemes: schemes.isEmpty ? [makeBuildScheme(name: name)] : schemes
         )
@@ -70,6 +71,7 @@ public enum ProjectFactory {
             name: module.targetName,
             organizationName: ProjectEnvironment.organizationName,
             packages: packages,
+            settings: ProjectSettings.project(),
             targets: [target],
             schemes: [makeBuildScheme(name: module.targetName)]
         )
@@ -108,6 +110,7 @@ public enum ProjectFactory {
         return Project(
             name: featureName,
             organizationName: ProjectEnvironment.organizationName,
+            settings: ProjectSettings.project(),
             targets: [featureTarget, testsTarget],
             schemes: [
                 .scheme(
@@ -144,6 +147,7 @@ public enum ProjectFactory {
         return Project(
             name: Module.app.targetName,
             organizationName: ProjectEnvironment.organizationName,
+            settings: ProjectSettings.project(),
             targets: [target],
             schemes: [
                 makeAppScheme(
