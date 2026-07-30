@@ -2,15 +2,12 @@ import ProjectDescription
 
 public enum DefaultInfoPlist {
     public static let app: InfoPlist = .extendingDefault(with: [
-        // Identity / version
         "CFBundleDisplayName": "$(APP_DISPLAY_NAME)",
         "CFBundleShortVersionString": .string(ProjectEnvironment.appVersion),
         "CFBundleVersion": .string(ProjectEnvironment.appBuildNumber),
 
-        // Runtime config from Config/*.xcconfig
         "API_BASE_URL": "$(API_BASE_URL)",
 
-        // Launch / orientation
         "UILaunchStoryboardName": "LaunchScreen",
         "UISupportedInterfaceOrientations": [
             "UIInterfaceOrientationPortrait",
@@ -20,7 +17,7 @@ public enum DefaultInfoPlist {
             "UISceneConfigurations": [:],
         ],
 
-        // Custom URL scheme for deep links: dulpick://home
+        // 딥링크용 커스텀 스킴: dulpick://home
         "CFBundleURLTypes": [
             [
                 "CFBundleTypeRole": "Editor",

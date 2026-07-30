@@ -1,2 +1,2 @@
-// https:/$()/... keeps // from being treated as a comment.
+// https:/$()/... 형태는 // 가 주석으로 파싱되지 않게 하기 위함
 API_BASE_URL = https:/$()/api.debug.dulpick.invalid

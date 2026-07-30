@@ -1,7 +1,7 @@
 import ProjectDescription
 
 /// Tuist 공통 환경 상수.
-/// build-time source of truth. runtime 값은 Config/Info.plist → AppInfo로 읽는다.
+/// 빌드 타임 기준값. 런타임 값은 Config/Info.plist → AppInfo로 읽는다.
 public enum ProjectEnvironment {
     public static let organizationName = "com.dulpick"
     public static let bundlePrefix = "com.dulpick"
