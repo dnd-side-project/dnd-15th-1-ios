@@ -26,6 +26,5 @@ graph.dot
 .derivedData/
 
 # Local config secrets (keep Example.xcconfig tracked)
-# Uncomment when real secrets are added:
-# Config/Debug.xcconfig
-# Config/Release.xcconfig
+Config/Debug.xcconfig
+Config/Release.xcconfig
