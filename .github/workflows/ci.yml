@@ -20,6 +20,11 @@ jobs:
           install: true
           cache: true
 
+      - name: Prepare local config
+        run: |
+          cp Config/Example.xcconfig Config/Debug.xcconfig
+          cp Config/Example.xcconfig Config/Release.xcconfig
+
       - name: Generate project
         run: mise exec -- tuist generate --no-open
 
@@ -37,22 +42,22 @@ jobs:
       - name: Test Feature Reducers
         run: |
           DESTINATION="$(
-            python3 - <<'PY'
-import re
-import subprocess
+            python3 -c '
+          import re
+          import subprocess
 
-output = subprocess.check_output(
-    ["xcrun", "simctl", "list", "devices", "available"],
-    text=True,
-)
-for line in output.splitlines():
-    match = re.search(r"iPhone.+?\(([A-F0-9-]{36})\)", line)
-    if match:
-        print(f"platform=iOS Simulator,id={match.group(1)}")
-        break
-else:
-    raise SystemExit("No available iPhone simulator found")
-PY
+          output = subprocess.check_output(
+              ["xcrun", "simctl", "list", "devices", "available"],
+              text=True,
+          )
+          for line in output.splitlines():
+              match = re.search(r"iPhone.+?\(([A-F0-9-]{36})\)", line)
+              if match:
+                  print(f"platform=iOS Simulator,id={match.group(1)}")
+                  break
+          else:
+              raise SystemExit("No available iPhone simulator found")
+          '
           )"
           echo "Using destination: $DESTINATION"
           xcodebuild \
