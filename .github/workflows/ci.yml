@@ -37,6 +37,7 @@ jobs:
             -workspace Dulpick.xcworkspace \
             -scheme Dulpick-Debug \
             -destination 'generic/platform=iOS Simulator' \
+            -skipMacroValidation \
             build
 
       - name: Test Feature Reducers
@@ -64,4 +65,5 @@ jobs:
             -workspace Dulpick.xcworkspace \
             -scheme Feature \
             -destination "$DESTINATION" \
+            -skipMacroValidation \
             test
