@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+          cache: true
+
+      - name: Prepare local config
+        run: |
+          cp Config/Example.xcconfig Config/Debug.xcconfig
+          cp Config/Example.xcconfig Config/Release.xcconfig
+
+      - name: Generate project
+        run: mise exec -- tuist generate --no-open
+
+      - name: SwiftLint
+        run: mise exec -- swiftlint lint --strict
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -workspace Dulpick.xcworkspace \
+            -scheme Dulpick-Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipMacroValidation \
+            build
+
+      - name: Test Feature Reducers
+        run: |
+          DESTINATION="$(
+            python3 -c '
+          import re
+          import subprocess
+
+          output = subprocess.check_output(
+              ["xcrun", "simctl", "list", "devices", "available"],
+              text=True,
+          )
+          for line in output.splitlines():
+              match = re.search(r"iPhone.+?\(([A-F0-9-]{36})\)", line)
+              if match:
+                  print(f"platform=iOS Simulator,id={match.group(1)}")
+                  break
+          else:
+              raise SystemExit("No available iPhone simulator found")
+          '
+          )"
+          echo "Using destination: $DESTINATION"
+          xcodebuild \
+            -workspace Dulpick.xcworkspace \
+            -scheme Feature \
+            -destination "$DESTINATION" \
+            -skipMacroValidation \
+            test

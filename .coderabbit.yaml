@@ -1,0 +1,115 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: ko-KR
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  poem: false
+  in_progress_fortune: false
+  collapse_walkthrough: true
+  sequence_diagrams: true
+  auto_apply_labels: false
+  auto_assign_reviewers: false
+  suggested_labels: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    base_branches:
+      - dev
+
+  path_filters:
+    - "!**/Derived/**"
+    - "!**/*.xcodeproj/**"
+    - "!**/*.xcworkspace/**"
+    - "!**/Tuist/.build/**"
+    - "!Config/**"
+    - "!**/*.xcassets/**"
+    - "!**/*.lproj/**"
+
+  path_instructions:
+    - path: "Projects/**"
+      instructions: |
+        Dulpick iOS: Tuist multi-project, Swift 6, SwiftUI, TCA.
+        세로 계층은 모듈, 가로 Feature는 폴더.
+        Domain 포트는 *Client, Data 구현은 *RepositoryImpl + *ClientFactory.
+        live 조립은 App only.
+        DO NOT: force unwrap(!), IUO.
+        상세: AGENTS.md, docs/ARCHITECTURE.md, docs/CONVENTIONS.md.
+
+    - path: "Projects/Feature/**"
+      instructions: |
+        Feature는 Domain, SharedUtils, SharedDesignSystem, ThirdParty, ThirdPartyUI 만 의존.
+        Critical: Data / Core* / ThirdPartyCore import 금지.
+        Critical: Scene 간 직접 참조/상태 수정 금지. 외부 요청은 delegate 로 상위 전달.
+        Critical: phase / selectedTab / deep link 라우팅을 Scene 에서 직접 처리 금지.
+        화면 상태는 TCA Feature reducer, View 는 렌더링 + store.send 중심.
+        Action 네이밍은 이벤트 중심 (loginButtonTapped, onAppear).
+        테스트는 Feature reducer + Domain *Client override, 메서드명 test_한글_한글.
+
+    - path: "Projects/Domain/**"
+      instructions: |
+        Domain 은 Entity, *Client, *Error 만.
+        Critical: Data / Core* / Feature import 금지.
+        Critical: DTO, API model, SDK 타입 노출 금지.
+        *Client 는 포트, 구현/live 생성 로직을 넣지 않는다.
+
+    - path: "Projects/Data/**"
+      instructions: |
+        Data 는 DTO, Datasource, *RepositoryImpl, *ClientFactory.
+        Critical: Feature import 금지.
+        Core/인프라 에러는 Domain 에러로 매핑.
+        RepositoryImpl 은 Datasource 만 주입.
+        Datasource 프로퍼티는 authLocal, authRemote 처럼 도메인 prefix.
+
+    - path: "Projects/App/**"
+      instructions: |
+        App 은 bootstrap 과 live 조립만.
+        Critical: live 조립은 App DI only. Feature/Domain 에 live 생성 로직을 흩뿌리지 않는다.
+        CompositionRoot 에서 Root store 1회 생성.
+        View / WindowGroup 안에서 store 생성 금지.
+
+    - path: "docs/**"
+      instructions: |
+        아키텍처/컨벤션 문서. 링크와 현재 구조 정합만 확인.
+        코드 스타일 nitpick 금지.
+        source of truth: docs/ARCHITECTURE.md, docs/CONVENTIONS.md.
+
+  labeling_instructions:
+    - label: feat
+      instructions: 새 기능·화면·API·Client
+    - label: fix
+      instructions: 버그 수정
+    - label: refactor
+      instructions: 동작 동일 구조 변경
+    - label: docs
+      instructions: 문서만
+    - label: chore
+      instructions: 빌드·설정·gitignore·도구
+    - label: test
+      instructions: 테스트만
+
+  finishing_touches:
+    unit_tests:
+      enabled: false
+
+  tools:
+    swiftlint:
+      enabled: true
+      config_file: .swiftlint.yml
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - AGENTS.md
+      - docs/ARCHITECTURE.md
+      - docs/CONVENTIONS.md
+  learnings:
+    scope: auto
