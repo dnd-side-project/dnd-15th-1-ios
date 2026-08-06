@@ -22,13 +22,13 @@ public extension Image {
     static var bookmarkFill: Image { Asset.bookmarkFill.swiftUIImage }
     static var bookmarkFillColor: Image { Asset.bookmarkFillColor.swiftUIImage }
     static var bookmarkStroke: Image { Asset.bookmarkStroke.swiftUIImage }
-    static var calender: Image { Asset.calender.swiftUIImage }
+    static var calendar: Image { Asset.calendar.swiftUIImage }
     static var cancel: Image { Asset.cancel.swiftUIImage }
     static var check: Image { Asset.check.swiftUIImage }
     static var checkFalse: Image { Asset.checkFalse.swiftUIImage }
     static var checkTrue: Image { Asset.checkTrue.swiftUIImage }
     static var clock: Image { Asset.clock.swiftUIImage }
-    static var dateCalender: Image { Asset.dateCalender.swiftUIImage }
+    static var dateCalendar: Image { Asset.dateCalendar.swiftUIImage }
     static var edit: Image { Asset.edit.swiftUIImage }
     static var error: Image { Asset.error.swiftUIImage }
     static var explore: Image { Asset.explore.swiftUIImage }
