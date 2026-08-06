@@ -8,6 +8,13 @@ public enum DefaultInfoPlist {
 
         "API_BASE_URL": "$(API_BASE_URL)",
 
+        "UIAppFonts": [
+            "Pretendard-Regular.otf",
+            "Pretendard-Medium.otf",
+            "Pretendard-SemiBold.otf",
+            "Pretendard-Bold.otf",
+        ],
+
         "UILaunchStoryboardName": "LaunchScreen",
         "UISupportedInterfaceOrientations": [
             "UIInterfaceOrientationPortrait",
