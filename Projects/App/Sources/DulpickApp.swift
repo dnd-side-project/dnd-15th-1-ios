@@ -1,3 +1,4 @@
+import CoreSocialAuth
 import Feature
 import SwiftUI
 import ThirdParty
@@ -13,6 +14,15 @@ struct DulpickApp: App {
     var body: some Scene {
         WindowGroup {
             CompositionRoot.rootView(store: store)
+                .onOpenURL { url in
+                    if KakaoAuthRedirectHandler.handle(url: url) {
+                        return
+                    }
+                    if GoogleAuthRedirectHandler.handle(url: url) {
+                        return
+                    }
+                    store.send(.appCoordinator(.deepLinkReceived(url)))
+                }
         }
     }
 }

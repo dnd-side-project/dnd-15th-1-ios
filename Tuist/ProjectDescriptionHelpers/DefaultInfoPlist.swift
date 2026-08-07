@@ -7,6 +7,9 @@ public enum DefaultInfoPlist {
         "CFBundleVersion": .string(ProjectEnvironment.appBuildNumber),
 
         "API_BASE_URL": "$(API_BASE_URL)",
+        "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
+        "GOOGLE_CLIENT_ID": "$(GOOGLE_CLIENT_ID)",
+        "GOOGLE_REVERSED_CLIENT_ID": "$(GOOGLE_REVERSED_CLIENT_ID)",
 
         "UILaunchStoryboardName": "LaunchScreen",
         "UISupportedInterfaceOrientations": [
@@ -17,13 +20,30 @@ public enum DefaultInfoPlist {
             "UISceneConfigurations": [:],
         ],
 
-        // 딥링크용 커스텀 스킴: dulpick://home
+        // 카카오톡 설치/실행 가능 여부 조회
+        "LSApplicationQueriesSchemes": [
+            "kakaokompassauth",
+            "kakaolink",
+            "kakaoplus",
+            "kakaotalk",
+        ],
+
         "CFBundleURLTypes": [
             [
                 "CFBundleTypeRole": "Editor",
                 "CFBundleURLName": "$(PRODUCT_BUNDLE_IDENTIFIER)",
                 "CFBundleURLSchemes": ["dulpick"],
-            ]
+            ],
+            [
+                "CFBundleTypeRole": "Editor",
+                "CFBundleURLName": "kakao",
+                "CFBundleURLSchemes": ["kakao$(KAKAO_NATIVE_APP_KEY)"],
+            ],
+            [
+                "CFBundleTypeRole": "Editor",
+                "CFBundleURLName": "google",
+                "CFBundleURLSchemes": ["$(GOOGLE_REVERSED_CLIENT_ID)"],
+            ],
         ],
     ])
 

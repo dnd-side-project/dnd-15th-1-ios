@@ -29,6 +29,18 @@ public enum AppInfo {
         return url
     }
 
+    public static var kakaoNativeAppKey: String? {
+        string(.kakaoNativeAppKey)
+    }
+
+    public static var googleClientID: String? {
+        string(.googleClientID)
+    }
+
+    public static var googleReversedClientID: String? {
+        string(.googleReversedClientID)
+    }
+
     public static func string(_ key: InfoPlistKey) -> String? {
         nonEmptyString(fromInfoDictionaryKey: key.rawValue)
     }
