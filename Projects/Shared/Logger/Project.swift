@@ -2,9 +2,8 @@ import ProjectDescription
 import ProjectDescriptionHelpers
 
 let project = ProjectFactory.framework(
-    .coreLogger,
+    .sharedLogger,
     dependencies: [
         .sharedUtils,
-        .thirdPartyCore,
     ]
 )

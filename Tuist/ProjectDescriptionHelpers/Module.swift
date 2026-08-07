@@ -5,6 +5,7 @@ import ProjectDescription
 public enum Module: String, CaseIterable {
     case sharedUtils
     case sharedDesignSystem
+    case sharedLogger
     case thirdParty
     case thirdPartyUI
     case thirdPartyCore
@@ -14,12 +15,12 @@ public enum Module: String, CaseIterable {
     case app
     case coreNetwork
     case coreStorage
-    case coreLogger
 
     public var targetName: String {
         switch self {
         case .sharedUtils: return "SharedUtils"
         case .sharedDesignSystem: return "SharedDesignSystem"
+        case .sharedLogger: return "SharedLogger"
         case .thirdParty: return "ThirdParty"
         case .thirdPartyUI: return "ThirdPartyUI"
         case .thirdPartyCore: return "ThirdPartyCore"
@@ -29,7 +30,6 @@ public enum Module: String, CaseIterable {
         case .app: return "App"
         case .coreNetwork: return "CoreNetwork"
         case .coreStorage: return "CoreStorage"
-        case .coreLogger: return "CoreLogger"
         }
     }
 
@@ -37,6 +37,7 @@ public enum Module: String, CaseIterable {
         switch self {
         case .sharedUtils: return "Projects/Shared/Util"
         case .sharedDesignSystem: return "Projects/Shared/DesignSystem"
+        case .sharedLogger: return "Projects/Shared/Logger"
         case .thirdParty: return "Projects/ThirdParty/ThirdParty"
         case .thirdPartyUI: return "Projects/ThirdParty/ThirdPartyUI"
         case .thirdPartyCore: return "Projects/ThirdParty/ThirdPartyCore"
@@ -46,7 +47,6 @@ public enum Module: String, CaseIterable {
         case .app: return "Projects/App"
         case .coreNetwork: return "Projects/Core/Network"
         case .coreStorage: return "Projects/Core/Storage"
-        case .coreLogger: return "Projects/Core/Logger"
         }
     }
 
@@ -58,6 +58,7 @@ public enum Module: String, CaseIterable {
         switch self {
         case .sharedUtils: return "shared.utils"
         case .sharedDesignSystem: return "shared.designsystem"
+        case .sharedLogger: return "shared.logger"
         case .thirdParty: return "thirdparty"
         case .thirdPartyUI: return "thirdpartyui"
         case .thirdPartyCore: return "thirdpartycore"
@@ -67,7 +68,6 @@ public enum Module: String, CaseIterable {
         case .app: return "app"
         case .coreNetwork: return "core.network"
         case .coreStorage: return "core.storage"
-        case .coreLogger: return "core.logger"
         }
     }
 
@@ -84,6 +84,7 @@ public enum Module: String, CaseIterable {
 public extension TargetDependency {
     static var sharedUtils: TargetDependency { Module.sharedUtils.dependency }
     static var sharedDesignSystem: TargetDependency { Module.sharedDesignSystem.dependency }
+    static var sharedLogger: TargetDependency { Module.sharedLogger.dependency }
     static var thirdParty: TargetDependency { Module.thirdParty.dependency }
     static var thirdPartyUI: TargetDependency { Module.thirdPartyUI.dependency }
     static var thirdPartyCore: TargetDependency { Module.thirdPartyCore.dependency }
@@ -92,5 +93,4 @@ public extension TargetDependency {
     static var feature: TargetDependency { Module.feature.dependency }
     static var coreNetwork: TargetDependency { Module.coreNetwork.dependency }
     static var coreStorage: TargetDependency { Module.coreStorage.dependency }
-    static var coreLogger: TargetDependency { Module.coreLogger.dependency }
 }
