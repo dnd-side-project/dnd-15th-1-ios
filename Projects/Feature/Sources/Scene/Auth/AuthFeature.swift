@@ -21,12 +21,12 @@ public struct AuthFeature {
     public enum Action: Equatable {
         case onAppear
         case loginButtonTapped
-        case signInResponse(Result<AuthUser, AuthError>)
+        case loginResponse(Result<AuthSession, AuthError>)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
-            case signInSucceeded(AuthUser)
+            case loginSucceeded(AuthSession)
         }
     }
 
@@ -46,18 +46,19 @@ public struct AuthFeature {
                 state.errorMessage = nil
                 return .run { [authClient] send in
                     do {
-                        let user = try await authClient.signIn()
-                        await send(.signInResponse(.success(user)))
+                        // Temporary default provider until multi-provider UI lands.
+                        let session = try await authClient.login(.kakao)
+                        await send(.loginResponse(.success(session)))
                     } catch {
-                        await send(.signInResponse(.failure(mapAuthError(error))))
+                        await send(.loginResponse(.failure(mapAuthError(error))))
                     }
                 }
 
-            case let .signInResponse(.success(user)):
+            case let .loginResponse(.success(session)):
                 state.isLoading = false
-                return .send(.delegate(.signInSucceeded(user)))
+                return .send(.delegate(.loginSucceeded(session)))
 
-            case .signInResponse(.failure):
+            case .loginResponse(.failure):
                 state.isLoading = false
                 state.errorMessage = "로그인에 실패했습니다."
                 return .none

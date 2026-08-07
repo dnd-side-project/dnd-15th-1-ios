@@ -13,8 +13,8 @@ public struct MyPageView: View {
         VStack(spacing: 12) {
             Spacer()
 
-            if let user = store.user {
-                Text(user.id)
+            if let session = store.session {
+                Text(session.userId)
                     .font(.headline)
             } else {
                 Text("마이페이지")
