@@ -6,16 +6,16 @@ import ThirdParty
 public struct MyPageFeature {
     @ObservableState
     public struct State: Equatable {
-        public var user: AuthUser?
+        public var userID: String?
         public var isLoading = false
         public var errorMessage: String?
 
         public init(
-            user: AuthUser? = nil,
+            userID: String? = nil,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
-            self.user = user
+            self.userID = userID
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
@@ -24,12 +24,12 @@ public struct MyPageFeature {
     public enum Action: Equatable {
         case onAppear
         case logoutButtonTapped
-        case signOutResponse(Result<EquatableVoid, AuthError>)
+        case logoutResponse(Result<EquatableVoid, AuthError>)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
-            case signOutSucceeded
+            case logoutSucceeded
             case sessionExpired
         }
     }
@@ -54,22 +54,22 @@ public struct MyPageFeature {
                 state.errorMessage = nil
                 return .run { [authClient] send in
                     do {
-                        try await authClient.signOut()
-                        await send(.signOutResponse(.success(EquatableVoid())))
+                        try await authClient.logout()
+                        await send(.logoutResponse(.success(EquatableVoid())))
                     } catch {
-                        await send(.signOutResponse(.failure(mapAuthError(error))))
+                        await send(.logoutResponse(.failure(mapAuthError(error))))
                     }
                 }
 
-            case .signOutResponse(.success):
+            case .logoutResponse(.success):
                 state.isLoading = false
-                state.user = nil
-                return .send(.delegate(.signOutSucceeded))
+                state.userID = nil
+                return .send(.delegate(.logoutSucceeded))
 
-            case let .signOutResponse(.failure(error)):
+            case let .logoutResponse(.failure(error)):
                 state.isLoading = false
                 state.errorMessage = "로그아웃에 실패했습니다."
-                if error == .sessionExpired {
+                if error == .unauthorized {
                     return .send(.delegate(.sessionExpired))
                 }
                 return .none

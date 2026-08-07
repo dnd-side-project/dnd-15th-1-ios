@@ -7,18 +7,18 @@ public struct AppCoordinatorFeature {
     @ObservableState
     public struct State: Equatable {
         public var phase: Phase = .bootstrapping
-        public var currentUser: AuthUser?
+        public var currentUserID: String?
         public var pendingDeepLink: DeepLinkRoute?
         public var overlay = OverlayFeature.State()
 
         public init(
             phase: Phase = .bootstrapping,
-            currentUser: AuthUser? = nil,
+            currentUserID: String? = nil,
             pendingDeepLink: DeepLinkRoute? = nil,
             overlay: OverlayFeature.State = OverlayFeature.State()
         ) {
             self.phase = phase
-            self.currentUser = currentUser
+            self.currentUserID = currentUserID
             self.pendingDeepLink = pendingDeepLink
             self.overlay = overlay
         }
@@ -56,7 +56,7 @@ public struct AppCoordinatorFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case sessionRestored(Result<AuthUser?, AuthError>)
+        case sessionRestored(Result<AuthSession?, AuthError>)
         case deepLinkReceived(URL)
         case routeDeepLink(DeepLinkRoute)
         case flushPendingDeepLink
@@ -112,8 +112,8 @@ public struct AppCoordinatorFeature {
         }
         return .run { [authClient] send in
             do {
-                let user = try await authClient.currentUser()
-                await send(.sessionRestored(.success(user)))
+                let session = try await authClient.restoreSession()
+                await send(.sessionRestored(.success(session)))
             } catch {
                 await send(.sessionRestored(.failure(mapAuthError(error))))
             }
@@ -122,13 +122,13 @@ public struct AppCoordinatorFeature {
 
     private func applySessionRestored(
         state: inout State,
-        result: Result<AuthUser?, AuthError>
+        result: Result<AuthSession?, AuthError>
     ) -> Effect<Action> {
         switch result {
-        case let .success(user):
-            state.currentUser = user
-            if let user {
-                state.phase = .main(makeMainState(user: user))
+        case let .success(session):
+            state.currentUserID = session?.userID
+            if let session {
+                state.phase = .main(makeMainState(userID: session.userID))
                 return .send(.flushPendingDeepLink)
             }
             state.phase = .loggedOut(AuthFeature.State())
@@ -179,9 +179,9 @@ public struct AppCoordinatorFeature {
         delegate: AuthFeature.Action.Delegate
     ) -> Effect<Action> {
         switch delegate {
-        case let .signInSucceeded(user):
-            state.currentUser = user
-            state.phase = .main(makeMainState(user: user))
+        case let .loginSucceeded(userID):
+            state.currentUserID = userID
+            state.phase = .main(makeMainState(userID: userID))
             return .send(.flushPendingDeepLink)
         }
     }
@@ -191,7 +191,7 @@ public struct AppCoordinatorFeature {
         delegate: MainTabFeature.Action.Delegate
     ) -> Effect<Action> {
         switch delegate {
-        case .signOutSucceeded:
+        case .logoutSucceeded:
             return moveToLoggedOut(state: &state)
         case .sessionExpired:
             return .send(.sessionExpired)
@@ -199,18 +199,18 @@ public struct AppCoordinatorFeature {
     }
 
     private func moveToLoggedOut(state: inout State) -> Effect<Action> {
-        state.currentUser = nil
+        state.currentUserID = nil
         state.phase = .loggedOut(AuthFeature.State())
         return .none
     }
 
-    private func makeMainState(user: AuthUser) -> MainTabFeature.State {
+    private func makeMainState(userID: String) -> MainTabFeature.State {
         MainTabFeature.State(
             selectedTab: .home,
             home: HomeFeature.State(),
             explore: ExploreFeature.State(),
             map: MapFeature.State(),
-            myPage: MyPageFeature.State(user: user)
+            myPage: MyPageFeature.State(userID: userID)
         )
     }
 
