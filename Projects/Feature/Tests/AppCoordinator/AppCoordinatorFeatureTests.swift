@@ -8,7 +8,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
     private let sampleSession = AuthSession(
         accessToken: "access",
         refreshToken: "refresh",
-        userId: "1"
+        userID: "1"
     )
 
     func test_세션없음_로그아웃상태복구() async {
@@ -20,7 +20,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
 
         await store.send(.onAppear)
         await store.receive(\.sessionRestored) {
-            $0.currentSession = nil
+            $0.currentUserID = nil
             $0.phase = .loggedOut(AuthFeature.State())
         }
     }
@@ -35,11 +35,11 @@ final class AppCoordinatorFeatureTests: XCTestCase {
 
         await store.send(.onAppear)
         await store.receive(\.sessionRestored) {
-            $0.currentSession = session
+            $0.currentUserID = session.userID
             $0.phase = .main(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State(session: session)
+                    myPage: MyPageFeature.State(userID: session.userID)
                 )
             )
         }
@@ -60,12 +60,12 @@ final class AppCoordinatorFeatureTests: XCTestCase {
         await store.send(.routeDeepLink(.map)) {
             $0.pendingDeepLink = .map
         }
-        await store.send(.auth(.delegate(.loginSucceeded(session)))) {
-            $0.currentSession = session
+        await store.send(.auth(.delegate(.loginSucceeded(userID: session.userID)))) {
+            $0.currentUserID = session.userID
             $0.phase = .main(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State(session: session)
+                    myPage: MyPageFeature.State(userID: session.userID)
                 )
             )
         }
@@ -76,7 +76,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
             $0.phase = .main(
                 MainTabFeature.State(
                     selectedTab: .map,
-                    myPage: MyPageFeature.State(session: session)
+                    myPage: MyPageFeature.State(userID: session.userID)
                 )
             )
         }
@@ -88,17 +88,17 @@ final class AppCoordinatorFeatureTests: XCTestCase {
             initialState: AppCoordinatorFeature.State(
                 phase: .main(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State(session: session)
+                        myPage: MyPageFeature.State(userID: session.userID)
                     )
                 ),
-                currentSession: session
+                currentUserID: session.userID
             )
         ) {
             AppCoordinatorFeature()
         }
 
-        await store.send(.unauthorized) {
-            $0.currentSession = nil
+        await store.send(.sessionExpired) {
+            $0.currentUserID = nil
             $0.phase = .loggedOut(AuthFeature.State())
         }
     }

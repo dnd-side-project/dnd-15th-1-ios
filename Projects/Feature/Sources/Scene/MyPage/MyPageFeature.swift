@@ -6,16 +6,16 @@ import ThirdParty
 public struct MyPageFeature {
     @ObservableState
     public struct State: Equatable {
-        public var session: AuthSession?
+        public var userID: String?
         public var isLoading = false
         public var errorMessage: String?
 
         public init(
-            session: AuthSession? = nil,
+            userID: String? = nil,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
-            self.session = session
+            self.userID = userID
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
@@ -30,7 +30,7 @@ public struct MyPageFeature {
         @CasePathable
         public enum Delegate: Equatable {
             case logoutSucceeded
-            case unauthorized
+            case sessionExpired
         }
     }
 
@@ -63,14 +63,14 @@ public struct MyPageFeature {
 
             case .logoutResponse(.success):
                 state.isLoading = false
-                state.session = nil
+                state.userID = nil
                 return .send(.delegate(.logoutSucceeded))
 
             case let .logoutResponse(.failure(error)):
                 state.isLoading = false
                 state.errorMessage = "로그아웃에 실패했습니다."
                 if error == .unauthorized {
-                    return .send(.delegate(.unauthorized))
+                    return .send(.delegate(.sessionExpired))
                 }
                 return .none
 

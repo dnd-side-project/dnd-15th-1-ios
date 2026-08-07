@@ -44,7 +44,7 @@ public struct MainTabFeature {
         @CasePathable
         public enum Delegate: Equatable {
             case logoutSucceeded
-            case unauthorized
+            case sessionExpired
         }
     }
 
@@ -72,8 +72,8 @@ public struct MainTabFeature {
                 switch delegate {
                 case .logoutSucceeded:
                     return .send(.delegate(.logoutSucceeded))
-                case .unauthorized:
-                    return .send(.delegate(.unauthorized))
+                case .sessionExpired:
+                    return .send(.delegate(.sessionExpired))
                 }
             case .home, .explore, .map, .myPage, .delegate:
                 return .none

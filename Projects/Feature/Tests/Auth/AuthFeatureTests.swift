@@ -9,7 +9,7 @@ final class AuthFeatureTests: XCTestCase {
         let session = AuthSession(
             accessToken: "access",
             refreshToken: "refresh",
-            userId: "1"
+            userID: "1"
         )
         let store = TestStore(initialState: AuthFeature.State()) {
             AuthFeature()

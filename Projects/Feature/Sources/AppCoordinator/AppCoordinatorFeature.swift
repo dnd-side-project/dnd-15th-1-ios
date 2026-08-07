@@ -7,18 +7,18 @@ public struct AppCoordinatorFeature {
     @ObservableState
     public struct State: Equatable {
         public var phase: Phase = .bootstrapping
-        public var currentSession: AuthSession?
+        public var currentUserID: String?
         public var pendingDeepLink: DeepLinkRoute?
         public var overlay = OverlayFeature.State()
 
         public init(
             phase: Phase = .bootstrapping,
-            currentSession: AuthSession? = nil,
+            currentUserID: String? = nil,
             pendingDeepLink: DeepLinkRoute? = nil,
             overlay: OverlayFeature.State = OverlayFeature.State()
         ) {
             self.phase = phase
-            self.currentSession = currentSession
+            self.currentUserID = currentUserID
             self.pendingDeepLink = pendingDeepLink
             self.overlay = overlay
         }
@@ -63,7 +63,7 @@ public struct AppCoordinatorFeature {
         case auth(AuthFeature.Action)
         case mainTab(MainTabFeature.Action)
         case overlay(OverlayFeature.Action)
-        case unauthorized
+        case sessionExpired
     }
 
     @Dependency(\.authClient) var authClient
@@ -99,7 +99,7 @@ public struct AppCoordinatorFeature {
             return handleAuthDelegate(state: &state, delegate: delegate)
         case let .mainTab(.delegate(delegate)):
             return handleMainTabDelegate(state: &state, delegate: delegate)
-        case .unauthorized:
+        case .sessionExpired:
             return moveToLoggedOut(state: &state)
         case .auth, .mainTab, .overlay:
             return .none
@@ -126,9 +126,9 @@ public struct AppCoordinatorFeature {
     ) -> Effect<Action> {
         switch result {
         case let .success(session):
-            state.currentSession = session
+            state.currentUserID = session?.userID
             if let session {
-                state.phase = .main(makeMainState(session: session))
+                state.phase = .main(makeMainState(userID: session.userID))
                 return .send(.flushPendingDeepLink)
             }
             state.phase = .loggedOut(AuthFeature.State())
@@ -179,9 +179,9 @@ public struct AppCoordinatorFeature {
         delegate: AuthFeature.Action.Delegate
     ) -> Effect<Action> {
         switch delegate {
-        case let .loginSucceeded(session):
-            state.currentSession = session
-            state.phase = .main(makeMainState(session: session))
+        case let .loginSucceeded(userID):
+            state.currentUserID = userID
+            state.phase = .main(makeMainState(userID: userID))
             return .send(.flushPendingDeepLink)
         }
     }
@@ -193,24 +193,24 @@ public struct AppCoordinatorFeature {
         switch delegate {
         case .logoutSucceeded:
             return moveToLoggedOut(state: &state)
-        case .unauthorized:
-            return .send(.unauthorized)
+        case .sessionExpired:
+            return .send(.sessionExpired)
         }
     }
 
     private func moveToLoggedOut(state: inout State) -> Effect<Action> {
-        state.currentSession = nil
+        state.currentUserID = nil
         state.phase = .loggedOut(AuthFeature.State())
         return .none
     }
 
-    private func makeMainState(session: AuthSession) -> MainTabFeature.State {
+    private func makeMainState(userID: String) -> MainTabFeature.State {
         MainTabFeature.State(
             selectedTab: .home,
             home: HomeFeature.State(),
             explore: ExploreFeature.State(),
             map: MapFeature.State(),
-            myPage: MyPageFeature.State(session: session)
+            myPage: MyPageFeature.State(userID: userID)
         )
     }
 

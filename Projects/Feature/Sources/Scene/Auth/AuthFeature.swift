@@ -26,7 +26,7 @@ public struct AuthFeature {
 
         @CasePathable
         public enum Delegate: Equatable {
-            case loginSucceeded(AuthSession)
+            case loginSucceeded(userID: String)
         }
     }
 
@@ -56,7 +56,7 @@ public struct AuthFeature {
 
             case let .loginResponse(.success(session)):
                 state.isLoading = false
-                return .send(.delegate(.loginSucceeded(session)))
+                return .send(.delegate(.loginSucceeded(userID: session.userID)))
 
             case .loginResponse(.failure):
                 state.isLoading = false
