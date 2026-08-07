@@ -24,16 +24,26 @@ public struct GoogleSocialAuthService: SocialAuthService {
         }
 
         do {
-            let result = try await GIDSignIn.sharedInstance.signIn(
-                withPresenting: presentingViewController
-            )
-            guard
-                let idToken = result.user.idToken?.tokenString,
-                idToken.isEmpty == false
-            else {
-                throw SocialAuthError.failed
+            return try await withCheckedThrowingContinuation { continuation in
+                GIDSignIn.sharedInstance.signIn(
+                    withPresenting: presentingViewController
+                ) { result, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+
+                    guard
+                        let idToken = result?.user.idToken?.tokenString,
+                        idToken.isEmpty == false
+                    else {
+                        continuation.resume(throwing: SocialAuthError.failed)
+                        return
+                    }
+
+                    continuation.resume(returning: idToken)
+                }
             }
-            return idToken
         } catch {
             throw mapError(error)
         }
