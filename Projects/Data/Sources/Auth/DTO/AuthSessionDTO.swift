@@ -4,29 +4,29 @@ import Foundation
 struct AuthSessionDTO: Codable, Equatable, Sendable {
     let accessToken: String
     let refreshToken: String
-    let userId: String
+    let userID: String
 
     init(_ session: AuthSession) {
         self.accessToken = session.accessToken
         self.refreshToken = session.refreshToken
-        self.userId = session.userId
+        self.userID = session.userID
     }
 
     init(
         accessToken: String,
         refreshToken: String,
-        userId: String
+        userID: String
     ) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
-        self.userId = userId
+        self.userID = userID
     }
 
     var toDomain: AuthSession {
         AuthSession(
             accessToken: accessToken,
             refreshToken: refreshToken,
-            userId: userId
+            userID: userID
         )
     }
 }

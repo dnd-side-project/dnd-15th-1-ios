@@ -9,7 +9,7 @@ public struct AuthRemoteDatasource: Sendable {
         return AuthSessionDTO(
             accessToken: "demo-access-token",
             refreshToken: "demo-refresh-token",
-            userId: "demo-user"
+            userID: "demo-user"
         )
     }
 }
