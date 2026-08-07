@@ -85,7 +85,7 @@ Domain, Data, Feature, App
 
 | 계층 | 패턴 | 예 |
 |---|---|---|
-| Domain entity | 명사 | `AuthUser` |
+| Domain entity | 명사 | `AuthSession` |
 | Domain client | `*Client` | `AuthClient` |
 | Domain error | `*Error` | `AuthError` |
 | Data DTO | `*DTO` | `AuthSessionDTO` |
@@ -246,8 +246,8 @@ public enum Action {
     case delegate(Delegate)
 
     public enum Delegate: Equatable {
-        case signInSucceeded(AuthUser)
-        case signOutSucceeded
+        case loginSucceeded(userID: String)
+        case logoutSucceeded
         case sessionExpired
     }
 }
@@ -272,8 +272,14 @@ test_로그인성공_델리게이트_전달
 
 ```swift
 withDependencies {
-    $0.authClient.currentUser = { nil }
-    $0.authClient.signIn = { AuthUser(id: "demo") }
+    $0.authClient.restoreSession = { nil }
+    $0.authClient.login = { _ in
+        AuthSession(
+            accessToken: "access",
+            refreshToken: "refresh",
+            userID: "demo"
+        )
+    }
 }
 ```
 

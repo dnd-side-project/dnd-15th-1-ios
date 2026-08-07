@@ -71,7 +71,7 @@ DulpickApp
 
 ```text
 bootstrapping
-  → authClient.currentUser()
+  → authClient.restoreSession()
   → main(Home/Explore/Map/MyPage) 또는 loggedOut(Auth)
 ```
 
