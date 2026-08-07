@@ -14,7 +14,7 @@ public struct AuthRepositoryImpl: Sendable {
         self.authLocal = authLocal
     }
 
-    public func currentUser() async throws -> AuthUser? {
+    public func restoreSession() async throws -> AuthSession? {
         do {
             return try await authLocal.loadSession()?.toDomain
         } catch {
@@ -22,9 +22,13 @@ public struct AuthRepositoryImpl: Sendable {
         }
     }
 
-    public func signIn() async throws -> AuthUser {
+    public func currentSession() async throws -> AuthSession? {
+        try await restoreSession()
+    }
+
+    public func login(provider: AuthProvider) async throws -> AuthSession {
         do {
-            let session = try await authRemote.signIn()
+            let session = try await authRemote.login(provider: provider)
             try await authLocal.saveSession(session)
             return session.toDomain
         } catch {
@@ -32,7 +36,7 @@ public struct AuthRepositoryImpl: Sendable {
         }
     }
 
-    public func signOut() async throws {
+    public func logout() async throws {
         do {
             try await authLocal.saveSession(nil)
         } catch {
@@ -47,10 +51,10 @@ private extension AuthRepositoryImpl {
             return authError
         }
         if error is KeychainError {
-            return .storageFailed
+            return .storage
         }
         if error is DecodingError {
-            return .decodingFailed
+            return .unknown
         }
         return .unknown
     }

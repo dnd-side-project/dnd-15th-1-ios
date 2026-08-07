@@ -12,14 +12,17 @@ public enum AuthClientFactory {
         )
 
         return AuthClient(
-            currentUser: {
-                try await impl.currentUser()
+            restoreSession: {
+                try await impl.restoreSession()
             },
-            signIn: {
-                try await impl.signIn()
+            login: { provider in
+                try await impl.login(provider: provider)
             },
-            signOut: {
-                try await impl.signOut()
+            logout: {
+                try await impl.logout()
+            },
+            currentSession: {
+                try await impl.currentSession()
             }
         )
     }

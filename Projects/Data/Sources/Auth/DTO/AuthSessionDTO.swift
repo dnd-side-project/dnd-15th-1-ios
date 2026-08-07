@@ -2,13 +2,31 @@ import Domain
 import Foundation
 
 struct AuthSessionDTO: Codable, Equatable, Sendable {
-    let id: String
+    let accessToken: String
+    let refreshToken: String
+    let userId: String
 
-    init(_ user: AuthUser) {
-        self.id = user.id
+    init(_ session: AuthSession) {
+        self.accessToken = session.accessToken
+        self.refreshToken = session.refreshToken
+        self.userId = session.userId
     }
 
-    var toDomain: AuthUser {
-        AuthUser(id: id)
+    init(
+        accessToken: String,
+        refreshToken: String,
+        userId: String
+    ) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.userId = userId
+    }
+
+    var toDomain: AuthSession {
+        AuthSession(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            userId: userId
+        )
     }
 }
