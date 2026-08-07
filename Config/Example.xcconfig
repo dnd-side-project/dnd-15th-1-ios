@@ -1,3 +1,12 @@
 // Debug.xcconfig / Release.xcconfig 로 복사해서 사용
 // https:/$()/... 형태는 // 가 주석으로 파싱되지 않게 하기 위함
+
+// Backend
 API_BASE_URL =
+
+// Kakao
+KAKAO_NATIVE_APP_KEY =
+
+// Google Sign-In
+GOOGLE_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID =
