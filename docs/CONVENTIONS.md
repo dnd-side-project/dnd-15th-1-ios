@@ -75,8 +75,8 @@ func getName(for user: User) -> String
 모듈:
 
 ```text
-CoreNetwork, CoreStorage, CoreLogger
-SharedUtils, SharedDesignSystem
+CoreNetwork, CoreStorage
+SharedUtils, SharedDesignSystem, SharedLogger
 ThirdParty, ThirdPartyUI, ThirdPartyCore
 Domain, Data, Feature, App
 ```
@@ -188,10 +188,10 @@ App/Sources/
 
 | 모듈 | 허용 |
 |---|---|
-| Feature | Domain, SharedUtils, SharedDesignSystem, ThirdParty, ThirdPartyUI |
+| Feature | Domain, SharedUtils, SharedDesignSystem, SharedLogger, ThirdParty, ThirdPartyUI |
 | Domain | SharedUtils, ThirdParty |
-| Data | Domain, Core*, SharedUtils, ThirdPartyCore |
-| Core | SharedUtils, ThirdPartyCore |
+| Data | Domain, Core*, SharedLogger, SharedUtils, ThirdPartyCore |
+| Core | SharedUtils, SharedLogger, ThirdPartyCore |
 | App | 조립 only |
 
 금지:
