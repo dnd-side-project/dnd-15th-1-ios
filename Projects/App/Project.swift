@@ -8,7 +8,7 @@ let project = ProjectFactory.app(
         .domain,
         .coreNetwork,
         .coreStorage,
-        .coreLogger,
+        .sharedLogger,
         .sharedUtils,
         .sharedDesignSystem,
         .thirdParty,

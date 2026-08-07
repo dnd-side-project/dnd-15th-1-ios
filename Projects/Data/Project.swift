@@ -7,7 +7,7 @@ let project = ProjectFactory.framework(
         .domain,
         .coreNetwork,
         .coreStorage,
-        .coreLogger,
+        .sharedLogger,
         .sharedUtils,
     ]
 )

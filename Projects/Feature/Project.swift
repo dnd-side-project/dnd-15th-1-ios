@@ -6,6 +6,7 @@ let project = ProjectFactory.feature(
         .domain,
         .sharedUtils,
         .sharedDesignSystem,
+        .sharedLogger,
         .thirdParty,
         .thirdPartyUI,
     ],

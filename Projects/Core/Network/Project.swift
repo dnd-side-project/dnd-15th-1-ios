@@ -5,6 +5,7 @@ let project = ProjectFactory.framework(
     .coreNetwork,
     dependencies: [
         .sharedUtils,
+        .sharedLogger,
         .thirdPartyCore,
     ]
 )
