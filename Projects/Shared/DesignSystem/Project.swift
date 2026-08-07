@@ -6,5 +6,6 @@ let project = ProjectFactory.framework(
     dependencies: [
         .sharedUtils,
     ],
-    resources: ["Resources/**"]
+    resources: ["Resources/**"],
+    product: .framework
 )

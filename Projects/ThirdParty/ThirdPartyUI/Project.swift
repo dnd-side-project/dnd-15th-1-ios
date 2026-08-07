@@ -9,5 +9,6 @@ let project = ProjectFactory.thirdParty(
     productDependencies: [
         .package(product: "Nuke"),
         .package(product: "NukeUI"),
-    ]
+    ],
+    product: .framework
 )

@@ -8,5 +8,6 @@ let project = ProjectFactory.thirdParty(
     ],
     productDependencies: [
         .package(product: "ComposableArchitecture"),
-    ]
+    ],
+    product: .framework
 )
