@@ -5,6 +5,7 @@ import UIKit
 @MainActor
 public final class AppleSocialAuthService: NSObject, SocialAuthService {
     private var continuation: CheckedContinuation<String, Error>?
+    private var authorizationController: ASAuthorizationController?
 
     override public init() {
         super.init()
@@ -28,6 +29,7 @@ public final class AppleSocialAuthService: NSObject, SocialAuthService {
             let controller = ASAuthorizationController(authorizationRequests: [request])
             controller.delegate = self
             controller.presentationContextProvider = self
+            self.authorizationController = controller
             controller.performRequests()
         }
     }
@@ -35,6 +37,7 @@ public final class AppleSocialAuthService: NSObject, SocialAuthService {
     private func finish(_ result: Result<String, Error>) {
         guard let continuation else { return }
         self.continuation = nil
+        self.authorizationController = nil
 
         switch result {
         case let .success(token):
