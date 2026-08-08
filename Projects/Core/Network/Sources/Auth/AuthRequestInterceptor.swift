@@ -67,27 +67,34 @@ public final class AuthRequestInterceptor: RequestInterceptor, @unchecked Sendab
     }
 
     private func refreshSingleFlight() async throws {
-        let existing: Task<Void, Error>? = lock.withLock { refreshTask }
-        if let existing {
-            try await existing.value
-            return
-        }
-
         let refresher = tokenRefresher
-        let task = Task {
-            do {
-                try await refresher.refresh()
-            } catch {
-                throw NetworkError.unauthorized
+        let (task, isOwner): (Task<Void, Error>, Bool) = lock.withLock {
+            if let existing = refreshTask {
+                return (existing, false)
             }
+
+            let newTask = Task {
+                do {
+                    try await refresher.refresh()
+                } catch {
+                    throw NetworkError.unauthorized
+                }
+            }
+            refreshTask = newTask
+            return (newTask, true)
         }
-        lock.withLock { refreshTask = task }
 
         do {
             try await task.value
-            lock.withLock { refreshTask = nil }
+            if isOwner {
+                // Only the creator clears. New tasks are created only while refreshTask is nil,
+                // so owner cleanup cannot wipe a newer flight.
+                lock.withLock { refreshTask = nil }
+            }
         } catch {
-            lock.withLock { refreshTask = nil }
+            if isOwner {
+                lock.withLock { refreshTask = nil }
+            }
             throw error
         }
     }
