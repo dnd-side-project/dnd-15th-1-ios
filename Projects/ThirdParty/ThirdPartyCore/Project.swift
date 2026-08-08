@@ -14,5 +14,6 @@ let project = ProjectFactory.thirdParty(
         .package(product: "KakaoSDKAuth"),
         .package(product: "KakaoSDKUser"),
         .package(product: "GoogleSignIn"),
-    ]
+    ],
+    product: .framework
 )

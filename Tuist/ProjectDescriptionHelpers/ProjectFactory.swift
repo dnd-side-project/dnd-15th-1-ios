@@ -7,7 +7,9 @@ public enum ProjectFactory {
         dependencies: [TargetDependency] = [],
         sources: SourceFilesList = ["Sources/**"],
         resources: ResourceFileElements? = nil,
-        product: Product = .staticLibrary
+        product: Product = .staticLibrary,
+        includesTests: Bool = false,
+        testsDependencies: [TargetDependency] = []
     ) -> Project {
         framework(
             name: module.targetName,
@@ -15,7 +17,9 @@ public enum ProjectFactory {
             dependencies: dependencies,
             sources: sources,
             resources: resources,
-            product: product
+            product: product,
+            includesTests: includesTests,
+            testsDependencies: testsDependencies
         )
     }
 
@@ -27,7 +31,9 @@ public enum ProjectFactory {
         sources: SourceFilesList = ["Sources/**"],
         resources: ResourceFileElements? = nil,
         product: Product = .staticLibrary,
-        schemes: [Scheme] = []
+        schemes: [Scheme] = [],
+        includesTests: Bool = false,
+        testsDependencies: [TargetDependency] = []
     ) -> Project {
         let target = Target.target(
             name: name,
@@ -41,12 +47,43 @@ public enum ProjectFactory {
             settings: ProjectSettings.framework()
         )
 
+        var targets = [target]
+        var projectSchemes = schemes
+
+        if includesTests {
+            let testsName = "\(name)Tests"
+            let testsTarget = Target.target(
+                name: testsName,
+                destinations: ProjectEnvironment.destinations,
+                product: .unitTests,
+                bundleId: ProjectEnvironment.moduleBundleId("\(bundleIdSuffix).tests"),
+                deploymentTargets: .iOS(ProjectEnvironment.deploymentTarget),
+                sources: ["Tests/**"],
+                dependencies: [
+                    .target(name: name),
+                ] + testsDependencies,
+                settings: ProjectSettings.unitTests()
+            )
+            targets.append(testsTarget)
+
+            if projectSchemes.isEmpty {
+                projectSchemes = [
+                    .scheme(
+                        name: name,
+                        shared: true,
+                        buildAction: .buildAction(targets: [.target(name)]),
+                        testAction: .targets([.testableTarget(target: .target(testsName))])
+                    )
+                ]
+            }
+        }
+
         return Project(
             name: name,
             organizationName: ProjectEnvironment.organizationName,
             settings: ProjectSettings.project(),
-            targets: [target],
-            schemes: schemes.isEmpty ? [makeBuildScheme(name: name)] : schemes
+            targets: targets,
+            schemes: projectSchemes.isEmpty ? [makeBuildScheme(name: name)] : projectSchemes
         )
     }
 

@@ -7,6 +7,7 @@ let project = ProjectFactory.app(
         .data,
         .domain,
         .coreNetwork,
+        .coreSocialAuth,
         .coreStorage,
         .sharedLogger,
         .sharedUtils,

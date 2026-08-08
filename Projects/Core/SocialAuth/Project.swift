@@ -2,11 +2,9 @@ import ProjectDescription
 import ProjectDescriptionHelpers
 
 let project = ProjectFactory.framework(
-    .coreNetwork,
+    .coreSocialAuth,
     dependencies: [
-        .sharedUtils,
         .sharedLogger,
         .thirdPartyCore,
-    ],
-    includesTests: true
+    ]
 )
