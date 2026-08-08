@@ -76,33 +76,86 @@ enum NetworkLog {
 
     static func redact(_ text: String) -> String {
         var output = text
+        output = redactBearerTokens(in: output)
+        output = redactJSONTokenFields(in: output)
+        output = redactFormTokenFields(in: output)
+        return output
+    }
 
-        if let bearerRegex = try? NSRegularExpression(
+    private static func redactBearerTokens(in text: String) -> String {
+        guard let regex = try? NSRegularExpression(
             pattern: #"Bearer\s+[A-Za-z0-9\-._~+/]+=*"#,
             options: [.caseInsensitive]
-        ) {
-            let range = NSRange(output.startIndex..<output.endIndex, in: output)
-            output = bearerRegex.stringByReplacingMatches(
-                in: output,
-                options: [],
-                range: range,
-                withTemplate: "Bearer [REDACTED]"
-            )
+        ) else {
+            return text
         }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.stringByReplacingMatches(
+            in: text,
+            options: [],
+            range: range,
+            withTemplate: "Bearer [REDACTED]"
+        )
+    }
 
-        if let fieldRegex = try? NSRegularExpression(
-            pattern: #""(accessToken|refreshToken|Authorization|identityToken)"\s*:\s*"[^"]*""#,
+    private static func redactJSONTokenFields(in text: String) -> String {
+        let keys = [
+            "accessToken",
+            "refreshToken",
+            "Authorization",
+            "identityToken",
+            "access_token",
+            "refresh_token",
+            "id_token"
+        ].joined(separator: "|")
+        let pattern = "\"(\(keys))\"\\s*:\\s*\"[^\"]*\""
+        guard let regex = try? NSRegularExpression(
+            pattern: pattern,
             options: [.caseInsensitive]
-        ) {
+        ) else {
+            return text
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.stringByReplacingMatches(
+            in: text,
+            options: [],
+            range: range,
+            withTemplate: #""$1" : "[REDACTED]""#
+        )
+    }
+
+    private static func redactFormTokenFields(in text: String) -> String {
+        let keys = [
+            "access_token",
+            "refresh_token",
+            "id_token",
+            "accessToken",
+            "refreshToken",
+            "identityToken"
+        ].joined(separator: "|")
+
+        var output = text
+        let quotedPattern = "(?i)\\b(\(keys))=\"[^\"&\\s]*\""
+        if let regex = try? NSRegularExpression(pattern: quotedPattern) {
             let range = NSRange(output.startIndex..<output.endIndex, in: output)
-            output = fieldRegex.stringByReplacingMatches(
+            output = regex.stringByReplacingMatches(
                 in: output,
                 options: [],
                 range: range,
-                withTemplate: #""$1" : "[REDACTED]""#
+                withTemplate: #"$1=[REDACTED]"#
             )
         }
 
+        let barePattern = "(?i)\\b(\(keys))=([^&\\s]+)"
+        if let regex = try? NSRegularExpression(pattern: barePattern) {
+            let range = NSRange(output.startIndex..<output.endIndex, in: output)
+            output = regex.stringByReplacingMatches(
+                in: output,
+                options: [],
+                range: range,
+                withTemplate: #"$1=[REDACTED]"#
+            )
+        }
         return output
     }
 }
