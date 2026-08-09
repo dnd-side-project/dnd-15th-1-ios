@@ -32,7 +32,7 @@ Projects/
 | ThirdParty* | 외부 패키지 진입점. ThirdPartyCore = Alamofire + 소셜 SDK 입구 |
 | Domain | Entity, `*Client`, Error |
 | Core/* | Network/Storage |
-| Data | DTO, Datasource, `*RepositoryImpl`, `*ClientFactory` |
+| Data | DTO, DataSource, `*Repository`, `*ClientFactory` |
 | Feature | Root, AppCoordinator, MainTab, Scene |
 | App | bootstrap, live 주입, root store |
 
@@ -62,7 +62,7 @@ Data    → Feature
 DulpickApp
   → CompositionRoot.makeRootStore()
       → AppBootstrap
-          → InfraContainer.live()      # AppInfo/AppConfiguration
+          → InfraContainer.make()      # AppInfo/AppConfiguration
           → Dependencies.register      # Data.*ClientFactory
       → Store(RootFeature)
   → RootView → AppCoordinatorView
@@ -128,18 +128,18 @@ dulpick://home|explore|map|mypage|auth/sign-in
 
 ```text
 Domain/<Name>/{Model,Client,Error}
-Data/<Name>/{DTO,Datasource,Repository}
-  *RepositoryImpl
+Data/<Name>/{DTO,DataSource,Endpoint,Mapper,Repository,Service}
+  *Repository
   *ClientFactory
 ```
 
 규칙:
 
 1. Domain `*Client` = 포트
-2. Data `*RepositoryImpl` = 구현
+2. Data `*Repository` = 구현
 3. Data `*ClientFactory` = Domain client 생성
-4. RepositoryImpl 은 Datasource 만 주입
-5. Datasource 프로퍼티는 `authLocal`, `authRemote`
+4. Repository 는 기본적으로 DataSource 만 주입. SDK credential provider 등은 `Service` collaborator 허용
+5. DataSource 프로퍼티는 `authLocal`, `authRemote`
 6. Core/인프라 에러는 Data 에서 Domain 에러로 매핑
 7. 여러 Client 조합은 Feature/AppCoordinator 에서 처리
 
@@ -180,7 +180,8 @@ storage namespace 는 Bundle ID 하나 재사용.
 | 계층 | 패턴 | 예 |
 |---|---|---|
 | Domain client | `*Client` | `AuthClient` |
-| Data impl | `*RepositoryImpl` | `AuthRepositoryImpl` |
+| Data repository | `*Repository` | `AuthRepository` |
+| Core default impl | `Default*` | `DefaultKeychainStorage` |
 | Data factory | `*ClientFactory` | `AuthClientFactory` |
 | Feature | `*Feature` / `*View` | `HomeFeature` |
 
@@ -195,7 +196,7 @@ CoreNetwork, SharedUtils, ThirdPartyUI ...
 ## 7. 새 기능
 
 1. Domain `{Model,Error,Client}`
-2. Data `{DTO,Datasource,RepositoryImpl,ClientFactory}`
+2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}`
 3. App `Dependencies.register`
 4. Feature `Scene/<Name>`
 5. 필요 시 AppCoordinator/MainTab/DeepLink

@@ -76,7 +76,7 @@ DulpickApp
 
 - 앱 상태 머신: `AppCoordinator` (구 AppShell 아님)
 - Domain 포트: `*Client`
-- Data 구현: `*RepositoryImpl` + `*ClientFactory`
+- Data 구현: `*Repository` + `*ClientFactory`
 - 설정 읽기: `AppInfo` → `AppConfiguration`
 
 ---
@@ -103,8 +103,8 @@ DulpickApp
 예: Wishlist
 
 1. `Domain/Sources/Wishlist/{Model,Error,Client}`
-2. `Data/Sources/Wishlist/{DTO,Datasource,Repository}`
-   - `WishlistRepositoryImpl`
+2. `Data/Sources/Wishlist/{DTO,DataSource,Repository}`
+   - `WishlistRepository`
    - `WishlistClientFactory`
 3. `App/Sources/DI/Dependencies.swift` live 등록
 4. `Feature/Sources/Scene/Wishlist/`
