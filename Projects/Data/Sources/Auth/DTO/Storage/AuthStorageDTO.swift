@@ -21,12 +21,4 @@ struct AuthSessionDTO: Codable, Equatable, Sendable {
         self.refreshToken = refreshToken
         self.userID = userID
     }
-
-    var toDomain: AuthSession {
-        AuthSession(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-            userID: userID
-        )
-    }
 }
