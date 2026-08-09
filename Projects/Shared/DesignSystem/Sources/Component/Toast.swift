@@ -1,0 +1,86 @@
+//
+//  Toast.swift
+//  Dulpick
+//
+//  Created by 이인호 on 8/9/26.
+//
+
+import SwiftUI
+
+public struct ToastState: Equatable {
+    let message: String
+    let icon: Image?
+    let actionTitle: String?
+
+    public init(
+        message: String,
+        icon: Image? = nil,
+        actionTitle: String? = nil
+    ) {
+        self.message = message
+        self.icon = icon
+        self.actionTitle = actionTitle
+    }
+}
+
+private struct ToastView: View {
+    let state: ToastState
+    let onAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let icon = state.icon {
+                icon
+                    .frame(width: 24, height: 24)
+            }
+
+            Text(state.message)
+                .typography(.body1M)
+                .foregroundStyle(Color.commonWhite)
+
+            if let actionTitle = state.actionTitle {
+                Button(action: onAction) {
+                    Text(actionTitle)
+                        .typography(.body2SB)
+                        .foregroundStyle(Color.textTertiary)
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .background(Color.gray900.opacity(0.95))
+        .clipShape(Capsule())
+    }
+}
+
+// MARK: - Presentation
+
+// 사용법: .toast(item: $store.toast) { store.send(.toastActionTapped) }
+public extension View {
+    func toast(
+        item: Binding<ToastState?>,
+        onAction: @escaping () -> Void = {}
+    ) -> some View {
+        modifier(ToastModifier(item: item, onAction: onAction))
+    }
+}
+
+private struct ToastModifier: ViewModifier {
+    @Binding var item: ToastState?
+    let onAction: () -> Void
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .bottom) {
+            if let state = item {
+                ToastView(state: state, onAction: onAction)
+                    .padding(.bottom, 7)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: state) {
+                        try? await Task.sleep(for: .seconds(3))
+                        item = nil
+                    }
+            }
+        }
+        .animation(.easeInOut, value: item)
+    }
+}
