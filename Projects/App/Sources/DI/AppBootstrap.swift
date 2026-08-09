@@ -6,11 +6,9 @@ import ThirdParty
 enum AppBootstrap {
     @MainActor
     static func run() {
-        let infra = InfraContainer.live()
-        let configuration = infra.configuration
+        let infra = InfraContainer.make()
 
-        KakaoAuthBootstrap.initializeIfNeeded(appKey: configuration.kakaoNativeAppKey)
-        GoogleAuthBootstrap.configureIfNeeded(clientID: configuration.googleClientID)
+        SocialAuthBootstrap.run(infra.socialAuthConfig)
 
         prepareDependencies {
             Dependencies.register(&$0, infra: infra)
