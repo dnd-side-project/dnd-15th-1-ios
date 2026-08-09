@@ -1,3 +1,4 @@
+import SharedDesignSystem
 import SwiftUI
 import ThirdParty
 
@@ -13,27 +14,36 @@ public struct MainTabView: View {
             NavigationStack {
                 HomeView(store: store.scope(state: \.home, action: \.home))
             }
-            .tabItem { Label("홈", systemImage: "house.fill") }
+            .tabItem { tabLabel("홈", icon: .home) }
             .tag(MainTabFeature.Tab.home)
 
             NavigationStack {
                 ExploreView(store: store.scope(state: \.explore, action: \.explore))
             }
-            .tabItem { Label("탐색", systemImage: "magnifyingglass") }
+            .tabItem { tabLabel("탐색", icon: .explore) }
             .tag(MainTabFeature.Tab.explore)
 
             NavigationStack {
                 MapView(store: store.scope(state: \.map, action: \.map))
             }
-            .tabItem { Label("지도", systemImage: "map.fill") }
+            .tabItem { tabLabel("지도", icon: .map) }
             .tag(MainTabFeature.Tab.map)
 
             NavigationStack {
                 MyPageView(store: store.scope(state: \.myPage, action: \.myPage))
                     .navigationTitle("마이페이지")
             }
-            .tabItem { Label("마이페이지", systemImage: "person.crop.circle") }
+            .tabItem { tabLabel("마이", icon: .my) }
             .tag(MainTabFeature.Tab.myPage)
+        }
+        .tint(Color.primaryPink)
+    }
+
+    private func tabLabel(_ title: String, icon: Image) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            icon.renderingMode(.template)
         }
     }
 }

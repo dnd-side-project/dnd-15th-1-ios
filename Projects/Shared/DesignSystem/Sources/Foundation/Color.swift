@@ -71,4 +71,7 @@ public extension ShapeStyle where Self == Color {
 
     // Status
     static var statusError: Color { Asset.statusError.swiftUIColor }
+
+    // Dim
+    static var dimBackground: Color { Asset.dimBackground.swiftUIColor }
 }
