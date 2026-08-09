@@ -3,40 +3,23 @@ import ThirdPartyCore
 
 public struct AFNetworkClient: NetworkClient, Sendable {
     private let session: Session
-    private let configuration: NetworkConfiguration
+    private let baseURL: URL
+    private let jsonDecoder: JSONDecoder
 
-    public init(session: Session, configuration: NetworkConfiguration) {
+    public init(
+        session: Session,
+        baseURL: URL,
+        jsonDecoder: JSONDecoder
+    ) {
         self.session = session
-        self.configuration = configuration
-    }
-
-    public static func plain(
-        configuration: NetworkConfiguration,
-        session: Session? = nil
-    ) -> AFNetworkClient {
-        let resolved = session ?? NetworkSessionFactory.plain(configuration: configuration)
-        return AFNetworkClient(session: resolved, configuration: configuration)
-    }
-
-    public static func authed(
-        configuration: NetworkConfiguration,
-        tokenProvider: any TokenProviding,
-        tokenRefresher: any TokenRefreshing
-    ) -> AFNetworkClient {
-        AFNetworkClient(
-            session: NetworkSessionFactory.authed(
-                configuration: configuration,
-                tokenProvider: tokenProvider,
-                tokenRefresher: tokenRefresher
-            ),
-            configuration: configuration
-        )
+        self.baseURL = baseURL
+        self.jsonDecoder = jsonDecoder
     }
 
     public func request<T: Decodable & Sendable>(_ endpoint: some APIEndpoint) async throws -> T {
         let data = try await perform(endpoint)
         do {
-            return try configuration.jsonDecoder.decode(T.self, from: data)
+            return try jsonDecoder.decode(T.self, from: data)
         } catch {
             NetworkLog.error(error, url: nil)
             throw NetworkError.decodingFailed
@@ -96,7 +79,7 @@ public struct AFNetworkClient: NetworkClient, Sendable {
 
     private func makeURLRequest(for endpoint: some APIEndpoint) throws -> URLRequest {
         guard var components = URLComponents(
-            url: configuration.baseURL.appendingPathComponent(normalizedPath(endpoint.path)),
+            url: baseURL.appendingPathComponent(normalizedPath(endpoint.path)),
             resolvingAgainstBaseURL: false
         ) else {
             throw NetworkError.invalidURL
@@ -110,7 +93,7 @@ public struct AFNetworkClient: NetworkClient, Sendable {
             throw NetworkError.invalidURL
         }
 
-        var request = URLRequest(url: url, timeoutInterval: configuration.timeout)
+        var request = URLRequest(url: url, timeoutInterval: session.sessionConfiguration.timeoutIntervalForRequest)
         request.httpMethod = endpoint.method.rawValue
         request.httpBody = endpoint.body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -128,7 +111,7 @@ public struct AFNetworkClient: NetworkClient, Sendable {
     }
 
     private func mapStatusCode(_ statusCode: Int, data: Data) -> NetworkError {
-        let message = try? configuration.jsonDecoder
+        let message = try? jsonDecoder
             .decode(ErrorMessageDTO.self, from: data)
             .message
         switch statusCode {
