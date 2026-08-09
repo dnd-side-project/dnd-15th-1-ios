@@ -17,14 +17,26 @@ public struct SearchView: View {
         self.store = store
     }
 
+    private let columns = [
+        GridItem(.flexible(), spacing: 11, alignment: .top),
+        GridItem(.flexible(), spacing: 11, alignment: .top),
+    ]
+
     public var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 0) {
             searchField
-            recentSection
-            Spacer()
+
+            if store.query.isEmpty {
+                recentSection
+                    .padding(.top, Spacing.s20)
+                Spacer()
+            } else {
+                resultContent
+            }
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.top, Spacing.s20)
+        .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -51,7 +63,7 @@ public struct SearchView: View {
         HStack(spacing: Spacing.s8) {
             TextField("원하는 장소를 검색해보세요", text: $store.query)
                 .typography(.body2M)
-                .foregroundStyle(Color.gray400)
+                .foregroundStyle(Color.gray900)
 
             Image.search
                 .renderingMode(.template)
@@ -88,6 +100,66 @@ public struct SearchView: View {
                 HStack(spacing: Spacing.s8) {
                     ForEach(store.recentSearches, id: \.self) { term in
                         recentChip(term)
+                    }
+                }
+            }
+        }
+    }
+
+    private var resultContent: some View {
+        VStack(alignment: .leading, spacing: Spacing.s24) {
+            segmentTabs
+
+            if store.hasResult {
+                resultList
+            } else if !store.isSearching {
+                EmptyStateView(
+                    title: "검색 결과가 없어요",
+                    message: "다른 검색어를 입력해주세요"
+                )
+            } else {
+                Spacer()
+            }
+        }
+    }
+
+    private var segmentTabs: some View {
+        HStack(spacing: Spacing.s16) {
+            ForEach(SearchFeature.Tab.allCases, id: \.self) { tab in
+                let isSelected = store.selectedTab == tab
+                Button {
+                    store.send(.tabSelected(tab))
+                } label: {
+                    Text(tab.title)
+                        .typography(.title3B)
+                        .foregroundStyle(isSelected ? Color.textPrimary : Color.textTertiary)
+                        .padding(.bottom, 6)
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(isSelected ? Color.textPrimary : Color.clear)
+                                .frame(height: 2)
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var resultList: some View {
+        ScrollView {
+            switch store.selectedTab {
+            case .post:
+                LazyVGrid(columns: columns, spacing: Spacing.s32) {
+                    ForEach(store.posts) { post in
+                        PostCard(post: post)
+                    }
+                }
+            case .place:
+                LazyVStack(spacing: Spacing.s8) {
+                    ForEach(store.places) { place in
+                        PlaceRow(place: place)
                     }
                 }
             }
