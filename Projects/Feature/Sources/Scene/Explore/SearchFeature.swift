@@ -32,8 +32,12 @@ public struct SearchFeature {
         var places: [Place] = []
         var isSearching = false
 
+        // 선택된 탭 기준으로 결과 유무 판정
         var hasResult: Bool {
-            !posts.isEmpty || !places.isEmpty
+            switch selectedTab {
+            case .post: !posts.isEmpty
+            case .place: !places.isEmpty
+            }
         }
 
         public init() {}
@@ -78,7 +82,7 @@ public struct SearchFeature {
             }
 
         case .searchSubmitted:
-            let query = state.query
+            let query = state.query.trimmingCharacters(in: .whitespaces)
             guard !query.isEmpty else { return .none }
             return .run { [recentSearchClient] send in
                 await send(.recentSearchesUpdated(recentSearchClient.add(query)))
@@ -86,12 +90,7 @@ public struct SearchFeature {
 
         case let .recentSearchTapped(term):
             state.query = term
-            return .merge(
-                debounceSearch(),
-                .run { [recentSearchClient] send in
-                    await send(.recentSearchesUpdated(recentSearchClient.add(term)))
-                }
-            )
+            return recentTapped(term)
 
         case let .recentSearchDeleted(term):
             return .run { [recentSearchClient] send in
@@ -121,6 +120,17 @@ public struct SearchFeature {
             state.isSearching = false
             return .none
         }
+    }
+
+    private func recentTapped(_ term: String) -> Effect<Action> {
+        let trimmed = term.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return debounceSearch() }
+        return .merge(
+            debounceSearch(),
+            .run { [recentSearchClient] send in
+                await send(.recentSearchesUpdated(recentSearchClient.add(trimmed)))
+            }
+        )
     }
 
     private func search(state: inout State) -> Effect<Action> {

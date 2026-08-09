@@ -56,7 +56,7 @@ struct PlaceRow: View {
     private var thumbnails: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Spacing.s4) {
-                ForEach(place.thumbnailURLs, id: \.self) { url in
+                ForEach(Array(place.thumbnailURLs.enumerated()), id: \.offset) { _, url in
                     RemoteImage(url: url)
                         .frame(width: 88, height: 88)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
