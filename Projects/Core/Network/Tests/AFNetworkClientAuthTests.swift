@@ -25,9 +25,11 @@ final class AFNetworkClientAuthTests: XCTestCase {
             tokenProvider: provider,
             tokenRefresher: refresher
         )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
         let client = AFNetworkClient(
             session: TestSessionFactory.make(interceptor: interceptor),
-            configuration: NetworkConfiguration(baseURL: baseURL)
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
         )
 
         let _: Payload = try await client.request(TestEndpoint())
@@ -46,9 +48,11 @@ final class AFNetworkClientAuthTests: XCTestCase {
             tokenProvider: provider,
             tokenRefresher: refresher
         )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
         let client = AFNetworkClient(
             session: TestSessionFactory.make(interceptor: interceptor),
-            configuration: NetworkConfiguration(baseURL: baseURL)
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
         )
 
         do {
@@ -100,9 +104,11 @@ final class AFNetworkClientAuthTests: XCTestCase {
             tokenProvider: provider,
             tokenRefresher: refresher
         )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
         let client = AFNetworkClient(
             session: TestSessionFactory.make(interceptor: interceptor),
-            configuration: NetworkConfiguration(baseURL: baseURL)
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
         )
 
         let response: Payload = try await client.request(TestEndpoint())
@@ -129,9 +135,11 @@ final class AFNetworkClientAuthTests: XCTestCase {
             tokenProvider: provider,
             tokenRefresher: refresher
         )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
         let client = AFNetworkClient(
             session: TestSessionFactory.make(interceptor: interceptor),
-            configuration: NetworkConfiguration(baseURL: baseURL)
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
         )
 
         async let first: Payload = client.request(TestEndpoint(path: "/a"))
@@ -156,9 +164,11 @@ final class AFNetworkClientAuthTests: XCTestCase {
             tokenProvider: provider,
             tokenRefresher: refresher
         )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
         let client = AFNetworkClient(
             session: TestSessionFactory.make(interceptor: interceptor),
-            configuration: NetworkConfiguration(baseURL: baseURL)
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
         )
 
         do {

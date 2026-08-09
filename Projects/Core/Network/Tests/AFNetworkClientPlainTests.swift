@@ -21,8 +21,8 @@ final class AFNetworkClientPlainTests: XCTestCase {
 
         struct Payload: Decodable, Equatable, Sendable { let ok: Bool }
         let baseURL = try XCTUnwrap(URL(string: "https://api.example.invalid"))
-        let client = AFNetworkClient.plain(
-            configuration: NetworkConfiguration(baseURL: baseURL),
+        let client = NetworkClientFactory.plain(
+            config: NetworkConfiguration(baseURL: baseURL),
             session: TestSessionFactory.make()
         )
 
