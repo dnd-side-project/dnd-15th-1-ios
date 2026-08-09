@@ -76,8 +76,13 @@ private struct ToastModifier: ViewModifier {
                     .padding(.bottom, 7)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: state) {
-                        try? await Task.sleep(for: .seconds(3))
-                        item = nil
+                        // 취소(새 토스트로 교체)면 이전 task 가 현재 토스트를 지우지 않게 함
+                        do {
+                            try await Task.sleep(for: .seconds(3))
+                            item = nil
+                        } catch {
+                            return
+                        }
                     }
             }
         }
