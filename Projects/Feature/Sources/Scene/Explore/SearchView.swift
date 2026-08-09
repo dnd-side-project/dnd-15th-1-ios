@@ -27,8 +27,10 @@ public struct SearchView: View {
             searchField
 
             if store.query.isEmpty {
-                recentSection
-                    .padding(.top, Spacing.s20)
+                if !store.recentSearches.isEmpty {
+                    recentSection
+                        .padding(.top, Spacing.s20)
+                }
                 Spacer()
             } else {
                 resultContent
@@ -36,6 +38,7 @@ public struct SearchView: View {
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.top, Spacing.s20)
+        .task { store.send(.onAppear) }
         .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -64,6 +67,8 @@ public struct SearchView: View {
             TextField("원하는 장소를 검색해보세요", text: $store.query)
                 .typography(.body2M)
                 .foregroundStyle(Color.gray900)
+                .submitLabel(.search)
+                .onSubmit { store.send(.searchSubmitted) }
 
             Image.search
                 .renderingMode(.template)
@@ -82,7 +87,7 @@ public struct SearchView: View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             HStack {
                 Text("최근 검색어")
-                    .typography(.body1SB)
+                    .typography(.title3B)
                     .foregroundStyle(Color.textPrimary)
 
                 Spacer()
@@ -96,13 +101,23 @@ public struct SearchView: View {
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Spacing.s8) {
-                    ForEach(store.recentSearches, id: \.self) { term in
-                        recentChip(term)
+            VStack(alignment: .leading, spacing: Spacing.s8) {
+                ForEach(Array(recentRows.enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: Spacing.s8) {
+                        ForEach(row, id: \.self) { term in
+                            recentChip(term)
+                        }
+                        Spacer(minLength: 0)
                     }
                 }
             }
+        }
+    }
+
+    // 3개씩 묶어 2줄로 표시
+    private var recentRows: [[String]] {
+        stride(from: 0, to: store.recentSearches.count, by: 3).map { start in
+            Array(store.recentSearches[start..<min(start + 3, store.recentSearches.count)])
         }
     }
 

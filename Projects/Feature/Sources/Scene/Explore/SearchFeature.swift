@@ -26,8 +26,7 @@ public struct SearchFeature {
     @ObservableState
     public struct State: Equatable {
         var query: String = ""
-        // 임시 최근 검색어, 나중에 UserDefaults 로 대체
-        var recentSearches: [String] = ["카페", "블루베리", "스무디"]
+        var recentSearches: [String] = []
         var selectedTab: Tab = .post
         var posts: [Post] = []
         var places: [Place] = []
@@ -42,15 +41,19 @@ public struct SearchFeature {
 
     public enum Action: Equatable, BindableAction {
         case binding(BindingAction<State>)
+        case onAppear
+        case searchSubmitted
         case recentSearchTapped(String)
         case recentSearchDeleted(String)
         case clearRecentTapped
+        case recentSearchesUpdated([String])
         case tabSelected(Tab)
         case queryChangeDebounced
         case searchResponse([Post], [Place])
     }
 
     @Dependency(\.exploreClient) var exploreClient
+    @Dependency(\.recentSearchClient) var recentSearchClient
 
     private enum CancelID { case search }
 
@@ -69,16 +72,40 @@ public struct SearchFeature {
         case .binding:
             return .none
 
+        case .onAppear:
+            return .run { [recentSearchClient] send in
+                await send(.recentSearchesUpdated(recentSearchClient.load()))
+            }
+
+        case .searchSubmitted:
+            let query = state.query
+            guard !query.isEmpty else { return .none }
+            return .run { [recentSearchClient] send in
+                await send(.recentSearchesUpdated(recentSearchClient.add(query)))
+            }
+
         case let .recentSearchTapped(term):
             state.query = term
-            return debounceSearch()
+            return .merge(
+                debounceSearch(),
+                .run { [recentSearchClient] send in
+                    await send(.recentSearchesUpdated(recentSearchClient.add(term)))
+                }
+            )
 
         case let .recentSearchDeleted(term):
-            state.recentSearches.removeAll { $0 == term }
-            return .none
+            return .run { [recentSearchClient] send in
+                await send(.recentSearchesUpdated(recentSearchClient.remove(term)))
+            }
 
         case .clearRecentTapped:
-            state.recentSearches.removeAll()
+            return .run { [recentSearchClient] send in
+                await recentSearchClient.clear()
+                await send(.recentSearchesUpdated([]))
+            }
+
+        case let .recentSearchesUpdated(terms):
+            state.recentSearches = terms
             return .none
 
         case let .tabSelected(tab):
