@@ -1,0 +1,69 @@
+import CoreNetwork
+import CoreSocialAuth
+import CoreStorage
+import Domain
+import Foundation
+
+final class StubNetworkClient: NetworkClient, @unchecked Sendable {
+    let name: String
+    var responses: [String: Any] = [:]
+    var errors: [String: Error] = [:]
+    private(set) var requestedPaths: [String] = []
+
+    init(name: String = "network") {
+        self.name = name
+    }
+
+    func request<T: Decodable & Sendable>(_ endpoint: some APIEndpoint) async throws -> T {
+        requestedPaths.append(endpoint.path)
+        if let error = errors[endpoint.path] {
+            throw error
+        }
+        guard let value = responses[endpoint.path] as? T else {
+            throw NetworkError.invalidResponse
+        }
+        return value
+    }
+
+    func request(_ endpoint: some APIEndpoint) async throws {
+        requestedPaths.append(endpoint.path)
+        if let error = errors[endpoint.path] {
+            throw error
+        }
+    }
+}
+
+struct StubSocialAuthClient: SocialAuthClient {
+    var credential: SocialAuthCredential
+    var error: Error?
+
+    func login(nonce: String) async throws -> SocialAuthCredential {
+        _ = nonce
+        if let error {
+            throw error
+        }
+        return credential
+    }
+}
+
+final class StubKeychainStorage: KeychainStorage, @unchecked Sendable {
+    private var storage: [String: Data] = [:]
+
+    func save<T: Codable & Sendable>(_ value: T, forKey key: String) async throws {
+        let data = try JSONEncoder().encode(value)
+        storage[key] = data
+    }
+
+    func get<T: Codable & Sendable>(forKey key: String) async throws -> T? {
+        guard let data = storage[key] else { return nil }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    func delete(forKey key: String) async throws {
+        storage.removeValue(forKey: key)
+    }
+
+    func deleteAll() async throws {
+        storage.removeAll()
+    }
+}
