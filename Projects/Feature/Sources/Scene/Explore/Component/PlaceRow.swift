@@ -27,23 +27,24 @@ struct PlaceRow: View {
 
                 bookmarkBadge
             }
+            .padding(.horizontal, Spacing.s20)
 
             if !place.thumbnailURLs.isEmpty {
                 thumbnails
             }
         }
-        .padding(Spacing.s16)
+        .padding(.vertical, Spacing.s16)
         .background(Color.bgSubtle)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private var bookmarkBadge: some View {
-        HStack(spacing: Spacing.s4) {
+        HStack(spacing: 2) {
             Image.bookmarkFillColor
                 .resizable()
                 .frame(width: 14, height: 14)
             Text("\(place.bookmarkCount)")
-                .typography(.caption1M)
+                .typography(.body2SB)
                 .foregroundStyle(Color.textSecondary)
         }
         .padding(.horizontal, Spacing.s8)
@@ -54,13 +55,14 @@ struct PlaceRow: View {
 
     private var thumbnails: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Spacing.s8) {
+            HStack(spacing: Spacing.s4) {
                 ForEach(place.thumbnailURLs, id: \.self) { url in
                     RemoteImage(url: url)
-                        .frame(width: 72, height: 72)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .frame(width: 88, height: 88)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
+            .padding(.horizontal, Spacing.s20)
         }
     }
 }

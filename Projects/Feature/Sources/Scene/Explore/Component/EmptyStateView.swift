@@ -13,17 +13,21 @@ struct EmptyStateView: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: Spacing.s12) {
+        VStack(spacing: Spacing.s16) {
             Image.cancel
+                .renderingMode(.template)
                 .resizable()
                 .frame(width: 40, height: 40)
-                .foregroundStyle(Color.gray300)
-            Text(title)
-                .typography(.body1SB)
-                .foregroundStyle(Color.textSecondary)
-            Text(message)
-                .typography(.caption1R)
-                .foregroundStyle(Color.textTertiary)
+                .foregroundStyle(Color.gray200)
+
+            VStack(spacing: Spacing.s4) {
+                Text(title)
+                    .typography(.title3B)
+                    .foregroundStyle(Color.textPrimary)
+                Text(message)
+                    .typography(.body1M)
+                    .foregroundStyle(Color.textTertiary)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
