@@ -12,5 +12,8 @@ enum Dependencies {
             networkConfig: infra.networkConfig,
             socialAuthClients: infra.socialAuthClients
         )
+
+        // API 연동 전 임시 mock, 나중에 ExploreClientFactory 로 교체
+        values.exploreClient = .mock
     }
 }
