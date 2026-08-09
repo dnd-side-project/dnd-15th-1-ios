@@ -11,6 +11,13 @@ public enum DefaultInfoPlist {
         "GOOGLE_CLIENT_ID": "$(GOOGLE_CLIENT_ID)",
         "GOOGLE_REVERSED_CLIENT_ID": "$(GOOGLE_REVERSED_CLIENT_ID)",
 
+        "UIAppFonts": [
+            "Pretendard-Regular.otf",
+            "Pretendard-Medium.otf",
+            "Pretendard-SemiBold.otf",
+            "Pretendard-Bold.otf",
+        ],
+
         "UILaunchStoryboardName": "LaunchScreen",
         "UISupportedInterfaceOrientations": [
             "UIInterfaceOrientationPortrait",
