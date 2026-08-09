@@ -2,23 +2,15 @@ import Foundation
 import ThirdPartyCore
 import UIKit
 
-public struct GoogleSocialAuthService: SocialAuthService {
-    private let clientID: String
+public struct GoogleSocialAuthClient: SocialAuthClient {
+    public init() {}
 
-    public init(clientID: String) {
-        self.clientID = clientID
-    }
-
-    public func login() async throws -> String {
-        try await loginOnMainActor()
+    public func login(nonce: String) async throws -> SocialAuthCredential {
+        try await loginOnMainActor(nonce: nonce)
     }
 
     @MainActor
-    private func loginOnMainActor() async throws -> String {
-        if GIDSignIn.sharedInstance.configuration == nil {
-            GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
-        }
-
+    private func loginOnMainActor(nonce: String) async throws -> SocialAuthCredential {
         guard let presentingViewController = topViewController() else {
             throw SocialAuthError.failed
         }
@@ -26,7 +18,10 @@ public struct GoogleSocialAuthService: SocialAuthService {
         do {
             return try await withCheckedThrowingContinuation { continuation in
                 GIDSignIn.sharedInstance.signIn(
-                    withPresenting: presentingViewController
+                    withPresenting: presentingViewController,
+                    hint: nil,
+                    additionalScopes: nil,
+                    nonce: nonce
                 ) { result, error in
                     if let error {
                         continuation.resume(throwing: error)
@@ -41,7 +36,12 @@ public struct GoogleSocialAuthService: SocialAuthService {
                         return
                     }
 
-                    continuation.resume(returning: idToken)
+                    continuation.resume(
+                        returning: SocialAuthCredential(
+                            idToken: idToken,
+                            authorizationCode: nil
+                        )
+                    )
                 }
             }
         } catch {

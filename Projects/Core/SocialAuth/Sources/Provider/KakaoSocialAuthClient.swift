@@ -1,10 +1,10 @@
 import Foundation
 import ThirdPartyCore
 
-public struct KakaoSocialAuthService: SocialAuthService {
+public struct KakaoSocialAuthClient: SocialAuthClient {
     public init() {}
 
-    public func login() async throws -> String {
+    public func login(nonce: String) async throws -> SocialAuthCredential {
         try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 let handler: (OAuthToken?, Error?) -> Void = { token, error in
@@ -13,19 +13,24 @@ public struct KakaoSocialAuthService: SocialAuthService {
                         return
                     }
 
-                    guard let accessToken = token?.accessToken,
-                          accessToken.isEmpty == false else {
+                    guard let idToken = token?.idToken,
+                          idToken.isEmpty == false else {
                         continuation.resume(throwing: SocialAuthError.failed)
                         return
                     }
 
-                    continuation.resume(returning: accessToken)
+                    continuation.resume(
+                        returning: SocialAuthCredential(
+                            idToken: idToken,
+                            authorizationCode: nil
+                        )
+                    )
                 }
 
                 if UserApi.isKakaoTalkLoginAvailable() {
-                    UserApi.shared.loginWithKakaoTalk(completion: handler)
+                    UserApi.shared.loginWithKakaoTalk(nonce: nonce, completion: handler)
                 } else {
-                    UserApi.shared.loginWithKakaoAccount(completion: handler)
+                    UserApi.shared.loginWithKakaoAccount(nonce: nonce, completion: handler)
                 }
             }
         }

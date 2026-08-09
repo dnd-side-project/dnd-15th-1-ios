@@ -1,21 +1,22 @@
 import AuthenticationServices
+import CryptoKit
 import Foundation
 import UIKit
 
 @MainActor
-public final class AppleSocialAuthService: NSObject, SocialAuthService {
-    private var continuation: CheckedContinuation<String, Error>?
+public final class AppleSocialAuthClient: NSObject, SocialAuthClient {
+    private var continuation: CheckedContinuation<SocialAuthCredential, Error>?
     private var authorizationController: ASAuthorizationController?
 
     override public init() {
         super.init()
     }
 
-    public nonisolated func login() async throws -> String {
-        try await loginOnMainActor()
+    public nonisolated func login(nonce: String) async throws -> SocialAuthCredential {
+        try await loginOnMainActor(nonce: nonce)
     }
 
-    private func loginOnMainActor() async throws -> String {
+    private func loginOnMainActor(nonce: String) async throws -> SocialAuthCredential {
         guard continuation == nil else {
             throw SocialAuthError.cancelled
         }
@@ -25,6 +26,9 @@ public final class AppleSocialAuthService: NSObject, SocialAuthService {
 
             let request = ASAuthorizationAppleIDProvider().createRequest()
             request.requestedScopes = [.fullName, .email]
+            if nonce.isEmpty == false {
+                request.nonce = Self.sha256(nonce)
+            }
 
             let controller = ASAuthorizationController(authorizationRequests: [request])
             controller.delegate = self
@@ -34,17 +38,22 @@ public final class AppleSocialAuthService: NSObject, SocialAuthService {
         }
     }
 
-    private func finish(_ result: Result<String, Error>) {
+    private func finish(_ result: Result<SocialAuthCredential, Error>) {
         guard let continuation else { return }
         self.continuation = nil
         self.authorizationController = nil
 
         switch result {
-        case let .success(token):
-            continuation.resume(returning: token)
+        case let .success(credential):
+            continuation.resume(returning: credential)
         case let .failure(error):
             continuation.resume(throwing: error)
         }
+    }
+
+    private static func sha256(_ value: String) -> String {
+        let digest = SHA256.hash(data: Data(value.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private static func resolvePresentationAnchor() -> ASPresentationAnchor {
@@ -59,7 +68,7 @@ public final class AppleSocialAuthService: NSObject, SocialAuthService {
     }
 }
 
-extension AppleSocialAuthService: ASAuthorizationControllerDelegate {
+extension AppleSocialAuthClient: ASAuthorizationControllerDelegate {
     public nonisolated func authorizationController(
         controller: ASAuthorizationController,
         didCompleteWithAuthorization authorization: ASAuthorization
@@ -79,7 +88,17 @@ extension AppleSocialAuthService: ASAuthorizationControllerDelegate {
                 return
             }
 
-            self.finish(.success(identityToken))
+            let authorizationCode = credential.authorizationCode
+                .flatMap { String(data: $0, encoding: .utf8) }
+
+            self.finish(
+                .success(
+                    SocialAuthCredential(
+                        idToken: identityToken,
+                        authorizationCode: authorizationCode
+                    )
+                )
+            )
         }
     }
 
@@ -97,18 +116,18 @@ extension AppleSocialAuthService: ASAuthorizationControllerDelegate {
     }
 }
 
-extension AppleSocialAuthService: ASAuthorizationControllerPresentationContextProviding {
+extension AppleSocialAuthClient: ASAuthorizationControllerPresentationContextProviding {
     public nonisolated func presentationAnchor(
         for controller: ASAuthorizationController
     ) -> ASPresentationAnchor {
         if Thread.isMainThread {
             return MainActor.assumeIsolated {
-                AppleSocialAuthService.resolvePresentationAnchor()
+                AppleSocialAuthClient.resolvePresentationAnchor()
             }
         }
         return DispatchQueue.main.sync {
             MainActor.assumeIsolated {
-                AppleSocialAuthService.resolvePresentationAnchor()
+                AppleSocialAuthClient.resolvePresentationAnchor()
             }
         }
     }
