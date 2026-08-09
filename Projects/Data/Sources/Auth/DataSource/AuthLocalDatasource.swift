@@ -1,7 +1,7 @@
 import CoreStorage
 import Foundation
 
-public struct AuthLocalDatasource: Sendable {
+public struct AuthLocalDataSource: Sendable {
     private let storage: any KeychainStorage
     private let key = "auth-session"
 
@@ -13,11 +13,11 @@ public struct AuthLocalDatasource: Sendable {
         try await storage.get(forKey: key)
     }
 
-    func saveSession(_ session: AuthSessionDTO?) async throws {
-        if let session {
-            try await storage.save(session, forKey: key)
-        } else {
-            try await storage.delete(forKey: key)
-        }
+    func saveSession(_ session: AuthSessionDTO) async throws {
+        try await storage.save(session, forKey: key)
+    }
+
+    func deleteSession() async throws {
+        try await storage.delete(forKey: key)
     }
 }
