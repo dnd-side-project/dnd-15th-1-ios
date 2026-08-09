@@ -101,6 +101,7 @@ public extension View {
                     content()
                         .padding(.horizontal, 20)
                 }
+                .accessibilityAddTraits(.isModal)
             }
         }
     }
