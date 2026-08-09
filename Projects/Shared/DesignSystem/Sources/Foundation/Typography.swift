@@ -86,7 +86,7 @@ public extension Typography {
     static let title2B = Typography(.bold, 22, 1.5, -0.02)
 
     static let title3R = Typography(.regular, 20, 1.5, -0.02)
-    static let title3B = Typography(.bold, 20, 1.5, -0.02)
+    static let title3SB = Typography(.semiBold, 20, 1.5, -0.02)
 
     static let headline = Typography(.semiBold, 18, 1.5, -0.02)
 
