@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-// 사용법: AppTextField(text: $text, placeholder: "닉네임", size: .large, style: .outlined, accessory: .clear, errorMessage: error)
+// 사용법: AppTextField(text: $text, placeholder: "닉네임", accessory: .clear, submitLabel: .search, onSubmit: { ... })
 public struct AppTextField: View {
     public enum Size {
         case large
@@ -31,6 +31,8 @@ public struct AppTextField: View {
     private let style: Style
     private let accessory: Accessory
     private let errorMessage: String?
+    private let submitLabel: SubmitLabel
+    private let onSubmit: (() -> Void)?
 
     public init(
         text: Binding<String>,
@@ -38,7 +40,9 @@ public struct AppTextField: View {
         size: Size = .large,
         style: Style = .filled,
         accessory: Accessory = .none,
-        errorMessage: String? = nil
+        errorMessage: String? = nil,
+        submitLabel: SubmitLabel = .done,
+        onSubmit: (() -> Void)? = nil
     ) {
         self._text = text
         self.placeholder = placeholder
@@ -46,6 +50,8 @@ public struct AppTextField: View {
         self.style = style
         self.accessory = accessory
         self.errorMessage = errorMessage
+        self.submitLabel = submitLabel
+        self.onSubmit = onSubmit
     }
 
     public var body: some View {
@@ -66,6 +72,8 @@ public struct AppTextField: View {
             TextField(placeholder, text: $text)
                 .typography(.body1M)
                 .foregroundStyle(Color.gray900)
+                .submitLabel(submitLabel)
+                .onSubmit { onSubmit?() }
 
             accessoryView
         }

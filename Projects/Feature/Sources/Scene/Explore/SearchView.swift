@@ -63,23 +63,13 @@ public struct SearchView: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: Spacing.s8) {
-            TextField("원하는 장소를 검색해보세요", text: $store.query)
-                .typography(.body2M)
-                .foregroundStyle(Color.gray900)
-                .submitLabel(.search)
-                .onSubmit { store.send(.searchSubmitted) }
-
-            Image.search
-                .renderingMode(.template)
-                .resizable()
-                .frame(width: 24, height: 24)
-                .foregroundStyle(Color.textTertiary)
-        }
-        .padding(.horizontal, Spacing.s20)
-        .padding(.vertical, Spacing.s16)
-        .background(Color.gray50)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        AppTextField(
+            text: $store.query,
+            placeholder: "원하는 장소를 검색해보세요",
+            accessory: .search,
+            submitLabel: .search,
+            onSubmit: { store.send(.searchSubmitted) }
+        )
         .padding(.bottom, 20)
     }
 
