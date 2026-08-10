@@ -87,7 +87,7 @@ public struct SearchView: View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             HStack {
                 Text("최근 검색어")
-                    .typography(.title3B)
+                    .typography(.title3SB)
                     .foregroundStyle(Color.textPrimary)
 
                 Spacer()
@@ -146,7 +146,7 @@ public struct SearchView: View {
                     store.send(.tabSelected(tab))
                 } label: {
                     Text(tab.title)
-                        .typography(.title3B)
+                        .typography(.title3SB)
                         .foregroundStyle(isSelected ? Color.textPrimary : Color.textTertiary)
                         .padding(.bottom, 6)
                         .overlay(alignment: .bottom) {
