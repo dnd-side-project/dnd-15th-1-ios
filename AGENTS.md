@@ -42,7 +42,7 @@ Projects/
 
 ```text
 Feature → Domain, Shared*, ThirdParty, ThirdPartyUI
-Data    → Domain, Core*, SharedUtils
+Data    → Domain, Core*, SharedLogger, SharedUtils
 Domain  → SharedUtils, ThirdParty
 App     → 조립 only
 ```
