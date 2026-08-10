@@ -178,6 +178,7 @@ public enum ProjectFactory {
             infoPlist: infoPlist,
             sources: sources,
             resources: resources,
+            entitlements: "Dulpick.entitlements",
             dependencies: dependencies,
             settings: ProjectSettings.app()
         )
