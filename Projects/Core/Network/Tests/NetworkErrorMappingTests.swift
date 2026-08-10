@@ -39,8 +39,8 @@ final class NetworkErrorMappingTests: XCTestCase {
             }
 
             let baseURL = try XCTUnwrap(URL(string: "https://api.example.invalid"))
-            let client = AFNetworkClient.plain(
-                configuration: NetworkConfiguration(baseURL: baseURL),
+            let client = NetworkClientFactory.plain(
+                config: NetworkConfiguration(baseURL: baseURL),
                 session: TestSessionFactory.make()
             )
 
@@ -63,8 +63,8 @@ final class NetworkErrorMappingTests: XCTestCase {
 
         struct Payload: Decodable, Sendable { let ok: Bool }
         let baseURL = try XCTUnwrap(URL(string: "https://api.example.invalid"))
-        let client = AFNetworkClient.plain(
-            configuration: NetworkConfiguration(baseURL: baseURL),
+        let client = NetworkClientFactory.plain(
+            config: NetworkConfiguration(baseURL: baseURL),
             session: TestSessionFactory.make()
         )
 

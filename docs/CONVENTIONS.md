@@ -17,7 +17,7 @@
 - 콜론(`:`)은 오른쪽만 공백
 - 연산자 좌우 공백 유지
 - 한 줄이 길면 파라미터/인자 기준 줄바꿈
-- 한 줄 최대: warning 100 / error 120 (`.swiftlint.yml`)
+- 한 줄 최대: warning 120 / error 140 (`.swiftlint.yml`)
 - 빈 줄에 trailing whitespace 금지
 - 파일 끝 개행 유지
 - `// MARK: -` 위아래 빈 줄
@@ -89,13 +89,15 @@ Domain, Data, Feature, App
 | Domain client | `*Client` | `AuthClient` |
 | Domain error | `*Error` | `AuthError` |
 | Data DTO | `*DTO` | `AuthSessionDTO` |
-| Data datasource | `*Datasource` | `AuthLocalDatasource` |
-| Data impl | `*RepositoryImpl` | `AuthRepositoryImpl` |
+| Data data source | `*DataSource` | `AuthLocalDataSource` |
+| Data repository | `*Repository` | `AuthRepository` |
+| Core default impl | `Default*` | `DefaultKeychainStorage` |
 | Data factory | `*ClientFactory` | `AuthClientFactory` |
+| App infra | `InfraContainer` | `InfraContainer.make()` |
 | Feature reducer | `*Feature` | `HomeFeature` |
 | Feature view | `*View` | `HomeView` |
 
-Datasource 프로퍼티:
+DataSource 프로퍼티:
 
 ```text
 authLocal
@@ -167,7 +169,8 @@ Feature/Tests/
   Auth/
 
 Domain/Sources/<Name>/{Model,Error,Client}
-Data/Sources/<Name>/{DTO,Datasource,Repository}
+Data/Sources/<Name>/{DTO,DataSource,Endpoint,Mapper,Repository,Service}
+  DTO/{Network,Storage}  # optional subfolders
 App/Sources/
   DulpickApp.swift
   CompositionRoot.swift
@@ -208,9 +211,10 @@ DI:
 2. live 조립은 App DI only
 3. bootstrap / Root store 는 `CompositionRoot` 1회
 4. View / `WindowGroup` 안에서 store 생성 금지
-5. Feature 코드에 `RepositoryImpl` / `ClientFactory` 이름 쓰지 않음
-6. Data `*ClientFactory` 가 Domain client 반환
-7. RepositoryImpl 은 Datasource 만 주입
+5. Feature 코드에 `Repository` / `ClientFactory` 이름 쓰지 않음
+6. Data `*ClientFactory.make(...)` 가 Domain client 반환 (App 진입). 내부 조립은 private `make*`
+7. `InfraContainer.make()` 로 live 인프라 조립
+8. Repository 는 DataSource 를 기본으로 주입하고, SDK credential provider 등 필요 시 Service collaborator 를 함께 주입할 수 있다
 
 ### 8. Scene 통신
 
@@ -304,7 +308,7 @@ withDependencies {
 ### 11. 새 기능 체크
 
 1. Domain `{Model,Error,Client}`
-2. Data `{DTO,Datasource,RepositoryImpl,ClientFactory}`
+2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}`
 3. App `Dependencies.register`
 4. Feature `Scene/<Name>`
 5. 필요 시 AppCoordinator / MainTab / DeepLink

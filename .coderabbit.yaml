@@ -35,7 +35,7 @@ reviews:
       instructions: |
         Dulpick iOS: Tuist multi-project, Swift 6, SwiftUI, TCA.
         세로 계층은 모듈, 가로 Feature는 폴더.
-        Domain 포트는 *Client, Data 구현은 *RepositoryImpl + *ClientFactory.
+        Domain 포트는 *Client, Data 구현은 *Repository + *ClientFactory.
         live 조립은 App only.
         DO NOT: force unwrap(!), IUO.
         상세: AGENTS.md, docs/ARCHITECTURE.md, docs/CONVENTIONS.md.
@@ -59,11 +59,11 @@ reviews:
 
     - path: "Projects/Data/**"
       instructions: |
-        Data 는 DTO, Datasource, *RepositoryImpl, *ClientFactory.
+        Data 는 DTO, DataSource, *Repository, *ClientFactory.
         Critical: Feature import 금지.
         Core/인프라 에러는 Domain 에러로 매핑.
-        RepositoryImpl 은 Datasource 만 주입.
-        Datasource 프로퍼티는 authLocal, authRemote 처럼 도메인 prefix.
+        Repository 는 DataSource 를 기본으로 주입하고, SDK credential provider 등은 Service collaborator 로 허용.
+        DataSource 프로퍼티는 authLocal, authRemote 처럼 도메인 prefix.
 
     - path: "Projects/App/**"
       instructions: |

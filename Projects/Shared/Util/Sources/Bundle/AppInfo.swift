@@ -29,12 +29,12 @@ public enum AppInfo {
         return url
     }
 
-    public static var kakaoNativeAppKey: String? {
-        string(.kakaoNativeAppKey)
+    public static var kakaoNativeAppKey: String {
+        requiredString(.kakaoNativeAppKey)
     }
 
-    public static var googleClientID: String? {
-        string(.googleClientID)
+    public static var googleClientID: String {
+        requiredString(.googleClientID)
     }
 
     public static var googleReversedClientID: String? {

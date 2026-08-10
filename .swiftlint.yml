@@ -40,16 +40,16 @@ force_cast: warning
 force_try: warning
 
 # 가이드 정합: 한 줄은 짧게 유지
-# StyleShare/일반 가이드의 99에 가깝게 초안 설정
+# 팀 합의: warning 120 / error 140
 line_length:
-  warning: 100
-  error: 120
+  warning: 120
+  error: 140
   ignores_comments: true
   ignores_urls: true
 
 function_body_length:
-  warning: 60
-  error: 100
+  warning: 90
+  error: 120
 
 type_body_length:
   warning: 250
