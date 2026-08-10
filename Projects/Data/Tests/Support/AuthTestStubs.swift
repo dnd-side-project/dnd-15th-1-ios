@@ -9,13 +9,14 @@ final class StubNetworkClient: NetworkClient, @unchecked Sendable {
     var responses: [String: Any] = [:]
     var errors: [String: Error] = [:]
     private(set) var requestedPaths: [String] = []
+    private(set) var requestedBodies: [String: Data?] = [:]
 
     init(name: String = "network") {
         self.name = name
     }
 
     func request<T: Decodable & Sendable>(_ endpoint: some APIEndpoint) async throws -> T {
-        requestedPaths.append(endpoint.path)
+        record(endpoint)
         if let error = errors[endpoint.path] {
             throw error
         }
@@ -26,10 +27,15 @@ final class StubNetworkClient: NetworkClient, @unchecked Sendable {
     }
 
     func request(_ endpoint: some APIEndpoint) async throws {
-        requestedPaths.append(endpoint.path)
+        record(endpoint)
         if let error = errors[endpoint.path] {
             throw error
         }
+    }
+
+    private func record(_ endpoint: some APIEndpoint) {
+        requestedPaths.append(endpoint.path)
+        requestedBodies[endpoint.path] = endpoint.body
     }
 }
 

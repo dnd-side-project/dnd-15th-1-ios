@@ -56,7 +56,7 @@ final class AuthRepositoryTests: XCTestCase {
         XCTAssertEqual(restored, session)
     }
 
-    func test_social_취소시_세션을_저장하지_않는다() async {
+    func test_social_취소시_세션을_저장하지_않는다() async throws {
         let network = StubNetworkClient()
         network.responses["/api/v1/auth/nonce"] = AuthNonceDTO(
             nonce: "raw-nonce",
@@ -92,9 +92,63 @@ final class AuthRepositoryTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
 
-        let restored = try? await repository.restoreSession()
+        let restored = try await repository.restoreSession()
         XCTAssertNil(restored)
         XCTAssertEqual(network.requestedPaths, ["/api/v1/auth/nonce"])
+    }
+
+    func test_apple_authorizationCode가_social_login_요청_본문에_포함된다() async throws {
+        let network = StubNetworkClient()
+        network.responses["/api/v1/auth/nonce"] = AuthNonceDTO(
+            nonce: "raw-nonce",
+            expiresAt: "2026-08-09T00:00:00"
+        )
+        network.responses["/api/v1/auth/social-login"] = SocialLoginResponseDTO(
+            memberId: 42,
+            newMember: false,
+            token: AuthTokenDTO(
+                tokenType: "Bearer",
+                accessToken: "access",
+                refreshToken: "refresh",
+                expiresIn: 900
+            )
+        )
+
+        let keychain = StubKeychainStorage()
+        let authorizationCode = "apple-auth-code"
+        let social = SocialAuthClients(
+            kakao: StubSocialAuthClient(
+                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
+            ),
+            apple: StubSocialAuthClient(
+                credential: SocialAuthCredential(
+                    idToken: "apple-id-token",
+                    authorizationCode: authorizationCode
+                )
+            ),
+            google: StubSocialAuthClient(
+                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
+            )
+        )
+
+        let repository = AuthRepository(
+            authRemote: AuthRemoteDataSource(networkClient: network),
+            authLocal: AuthLocalDataSource(storage: keychain),
+            socialAuth: SocialAuthCredentialProvider(clients: social)
+        )
+
+        _ = try await repository.login(provider: .apple)
+
+        guard let body = network.requestedBodies["/api/v1/auth/social-login"] as? Data else {
+            XCTFail("Expected social-login body")
+            return
+        }
+
+        let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        XCTAssertEqual(json?["provider"] as? String, "APPLE")
+        XCTAssertEqual(json?["idToken"] as? String, "apple-id-token")
+        XCTAssertEqual(json?["authorizationCode"] as? String, authorizationCode)
+        XCTAssertEqual(json?["nonce"] as? String, "raw-nonce")
     }
 
     func test_logout_원격_실패해도_로컬_세션을_지운다() async throws {
