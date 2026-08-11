@@ -72,7 +72,7 @@ public struct AppIntroView: View {
     private var pageScroll: some View {
         ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
-                ForEach(Array(AppIntroStep.pages.enumerated()), id: \.offset) { index, item in
+                ForEach(Array(store.pages.enumerated()), id: \.offset) { index, item in
                     page(item)
                         .containerRelativeFrame(.horizontal)
                         .id(index)
@@ -104,7 +104,7 @@ public struct AppIntroView: View {
 
     private var pageIndicator: some View {
         HStack(spacing: 8) {
-            ForEach(0..<AppIntroStep.pages.count, id: \.self) { index in
+            ForEach(0..<store.pageCount, id: \.self) { index in
                 let isActive = index == store.pageIndex
                 Capsule()
                     .fill(isActive ? Color.textPrimary : Color.borderDefault)
