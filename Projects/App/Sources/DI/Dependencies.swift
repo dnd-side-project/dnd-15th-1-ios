@@ -19,5 +19,9 @@ enum Dependencies {
         values.recentSearchClient = RecentSearchClientFactory.make(
             userDefaults: infra.userDefaults
         )
+
+        values.onboardingClient = OnboardingClientFactory.make(
+            userDefaults: infra.userDefaults
+        )
     }
 }

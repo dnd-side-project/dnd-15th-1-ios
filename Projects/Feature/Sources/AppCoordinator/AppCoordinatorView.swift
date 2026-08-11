@@ -14,6 +14,10 @@ public struct AppCoordinatorView: View {
             case .bootstrapping:
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .appIntro:
+                if let introStore = store.scope(state: \.appIntro, action: \.appIntro) {
+                    AppIntroView(store: introStore)
+                }
             case .loggedOut:
                 if let authStore = store.scope(state: \.loggedOutAuth, action: \.auth) {
                     AuthView(store: authStore)

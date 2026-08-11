@@ -25,8 +25,21 @@ public struct AppCoordinatorFeature {
 
         public enum Phase: Equatable {
             case bootstrapping
+            case appIntro(AppIntroFeature.State)
             case loggedOut(AuthFeature.State)
             case main(MainTabFeature.State)
+        }
+
+        public var appIntro: AppIntroFeature.State? {
+            get {
+                guard case let .appIntro(state) = phase else { return nil }
+                return state
+            }
+            set {
+                if let newValue {
+                    phase = .appIntro(newValue)
+                }
+            }
         }
 
         public var loggedOutAuth: AuthFeature.State? {
@@ -57,16 +70,25 @@ public struct AppCoordinatorFeature {
     public enum Action: Equatable {
         case onAppear
         case sessionRestored(Result<AuthSession?, AuthError>)
+        case bootstrapRoute(BootstrapRoute)
+        case appIntroFinished
         case deepLinkReceived(URL)
         case routeDeepLink(DeepLinkRoute)
         case flushPendingDeepLink
+        case appIntro(AppIntroFeature.Action)
         case auth(AuthFeature.Action)
         case mainTab(MainTabFeature.Action)
         case overlay(OverlayFeature.Action)
         case sessionExpired
+
+        public enum BootstrapRoute: Equatable {
+            case appIntro
+            case loggedOut
+        }
     }
 
     @Dependency(\.authClient) var authClient
+    @Dependency(\.onboardingClient) var onboardingClient
 
     public init() {}
 
@@ -75,6 +97,9 @@ public struct AppCoordinatorFeature {
             OverlayFeature()
         }
         Reduce(core)
+            .ifLet(\.appIntro, action: \.appIntro) {
+                AppIntroFeature()
+            }
             .ifLet(\.loggedOutAuth, action: \.auth) {
                 AuthFeature()
             }
@@ -89,24 +114,33 @@ public struct AppCoordinatorFeature {
             return restoreSessionIfNeeded(state: &state)
         case let .sessionRestored(result):
             return applySessionRestored(state: &state, result: result)
+        case let .bootstrapRoute(route):
+            return applyBootstrapRoute(state: &state, route: route)
+        case .appIntroFinished:
+            state.phase = .loggedOut(AuthFeature.State())
+            return .none
         case let .deepLinkReceived(url):
             return receiveDeepLink(url)
         case let .routeDeepLink(route):
             return routeDeepLink(state: &state, route: route)
         case .flushPendingDeepLink:
             return flushPendingDeepLink(state: &state)
+        case let .appIntro(.delegate(delegate)):
+            return handleAppIntroDelegate(delegate: delegate)
         case let .auth(.delegate(delegate)):
             return handleAuthDelegate(state: &state, delegate: delegate)
         case let .mainTab(.delegate(delegate)):
             return handleMainTabDelegate(state: &state, delegate: delegate)
         case .sessionExpired:
             return moveToLoggedOut(state: &state)
-        case .auth, .mainTab, .overlay:
+        case .appIntro, .auth, .mainTab, .overlay:
             return .none
         }
     }
+}
 
-    private func restoreSessionIfNeeded(state: inout State) -> Effect<Action> {
+private extension AppCoordinatorFeature {
+    func restoreSessionIfNeeded(state: inout State) -> Effect<Action> {
         guard case .bootstrapping = state.phase else {
             return .none
         }
@@ -120,7 +154,7 @@ public struct AppCoordinatorFeature {
         }
     }
 
-    private func applySessionRestored(
+    func applySessionRestored(
         state: inout State,
         result: Result<AuthSession?, AuthError>
     ) -> Effect<Action> {
@@ -131,21 +165,53 @@ public struct AppCoordinatorFeature {
                 state.phase = .main(makeMainState(userID: session.userID))
                 return .send(.flushPendingDeepLink)
             }
-            state.phase = .loggedOut(AuthFeature.State())
-            return .none
+            return resolveLoggedOutBootstrapRoute()
         case .failure:
-            return moveToLoggedOut(state: &state)
+            state.currentUserID = nil
+            return resolveLoggedOutBootstrapRoute()
         }
     }
 
-    private func receiveDeepLink(_ url: URL) -> Effect<Action> {
+    func resolveLoggedOutBootstrapRoute() -> Effect<Action> {
+        .run { [onboardingClient] send in
+            let seen = await onboardingClient.hasSeenAppIntro()
+            await send(.bootstrapRoute(seen ? .loggedOut : .appIntro))
+        }
+    }
+
+    func applyBootstrapRoute(
+        state: inout State,
+        route: Action.BootstrapRoute
+    ) -> Effect<Action> {
+        switch route {
+        case .appIntro:
+            state.phase = .appIntro(AppIntroFeature.State())
+            return .run { [onboardingClient] _ in
+                await onboardingClient.markAppIntroSeen()
+            }
+        case .loggedOut:
+            state.phase = .loggedOut(AuthFeature.State())
+            return .none
+        }
+    }
+
+    func handleAppIntroDelegate(
+        delegate: AppIntroFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .completed:
+            return .send(.appIntroFinished)
+        }
+    }
+
+    func receiveDeepLink(_ url: URL) -> Effect<Action> {
         guard let route = DeepLinkRouter.parse(url) else {
             return .none
         }
         return .send(.routeDeepLink(route))
     }
 
-    private func routeDeepLink(
+    func routeDeepLink(
         state: inout State,
         route: DeepLinkRoute
     ) -> Effect<Action> {
@@ -153,6 +219,14 @@ public struct AppCoordinatorFeature {
         case .bootstrapping:
             state.pendingDeepLink = route
             return .none
+        case .appIntro:
+            switch route {
+            case .signIn:
+                return .none
+            case .home, .explore, .map, .myPage:
+                state.pendingDeepLink = route
+                return .none
+            }
         case .loggedOut:
             switch route {
             case .signIn:
@@ -166,7 +240,7 @@ public struct AppCoordinatorFeature {
         }
     }
 
-    private func flushPendingDeepLink(state: inout State) -> Effect<Action> {
+    func flushPendingDeepLink(state: inout State) -> Effect<Action> {
         guard let route = state.pendingDeepLink else {
             return .none
         }
@@ -174,7 +248,7 @@ public struct AppCoordinatorFeature {
         return .send(.routeDeepLink(route))
     }
 
-    private func handleAuthDelegate(
+    func handleAuthDelegate(
         state: inout State,
         delegate: AuthFeature.Action.Delegate
     ) -> Effect<Action> {
@@ -186,7 +260,7 @@ public struct AppCoordinatorFeature {
         }
     }
 
-    private func handleMainTabDelegate(
+    func handleMainTabDelegate(
         state: inout State,
         delegate: MainTabFeature.Action.Delegate
     ) -> Effect<Action> {
@@ -198,13 +272,13 @@ public struct AppCoordinatorFeature {
         }
     }
 
-    private func moveToLoggedOut(state: inout State) -> Effect<Action> {
+    func moveToLoggedOut(state: inout State) -> Effect<Action> {
         state.currentUserID = nil
         state.phase = .loggedOut(AuthFeature.State())
         return .none
     }
 
-    private func makeMainState(userID: String) -> MainTabFeature.State {
+    func makeMainState(userID: String) -> MainTabFeature.State {
         MainTabFeature.State(
             selectedTab: .home,
             home: HomeFeature.State(),
@@ -214,7 +288,7 @@ public struct AppCoordinatorFeature {
         )
     }
 
-    private func routeInMain(
+    func routeInMain(
         state: inout State,
         route: DeepLinkRoute
     ) -> Effect<Action> {
@@ -239,6 +313,7 @@ public struct AppCoordinatorFeature {
         state.phase = .main(main)
         return .none
     }
+}
 }
 
 private extension AppCoordinatorFeature.State.Phase {
