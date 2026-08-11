@@ -58,9 +58,10 @@ final class AuthTokenBridgeTests: XCTestCase {
         )
 
         let restored = try await repository.restoreSession()
-        XCTAssertEqual(restored?.accessToken, "bridge-access")
-        XCTAssertEqual(restored?.refreshToken, "bridge-refresh")
-        XCTAssertEqual(restored?.userID, "42")
+        XCTAssertEqual(restored?.session.accessToken, "bridge-access")
+        XCTAssertEqual(restored?.session.refreshToken, "bridge-refresh")
+        XCTAssertEqual(restored?.session.userID, "42")
+        XCTAssertEqual(restored?.isOnboardingCompleted, true)
         XCTAssertEqual(plainNetwork.requestedPaths, ["/api/v1/auth/reissue"])
     }
 
