@@ -69,7 +69,7 @@ public struct AppCoordinatorFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case sessionRestored(Result<AuthSession?, AuthError>)
+        case sessionRestored(Result<AuthBootstrap?, AuthError>)
         case bootstrapRoute(BootstrapRoute)
         case appIntroFinished
         case deepLinkReceived(URL)
@@ -146,8 +146,8 @@ private extension AppCoordinatorFeature {
         }
         return .run { [authClient] send in
             do {
-                let session = try await authClient.restoreSession()
-                await send(.sessionRestored(.success(session)))
+                let bootstrap = try await authClient.restoreSession()
+                await send(.sessionRestored(.success(bootstrap)))
             } catch {
                 await send(.sessionRestored(.failure(mapAuthError(error))))
             }
@@ -156,13 +156,14 @@ private extension AppCoordinatorFeature {
 
     func applySessionRestored(
         state: inout State,
-        result: Result<AuthSession?, AuthError>
+        result: Result<AuthBootstrap?, AuthError>
     ) -> Effect<Action> {
         switch result {
-        case let .success(session):
-            state.currentUserID = session?.userID
-            if let session {
-                state.phase = .main(makeMainState(userID: session.userID))
+        case let .success(bootstrap):
+            state.currentUserID = bootstrap?.session.userID
+            if let bootstrap {
+                // Temporary: ignore flag until onboarding phase Cycle.
+                state.phase = .main(makeMainState(userID: bootstrap.session.userID))
                 return .send(.flushPendingDeepLink)
             }
             return resolveLoggedOutBootstrapRoute()

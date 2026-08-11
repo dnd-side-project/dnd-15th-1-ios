@@ -28,7 +28,7 @@ public struct AuthFeature {
     public enum Action: Equatable {
         case onAppear
         case loginButtonTapped(AuthProvider)
-        case loginResponse(Result<AuthSession, AuthError>)
+        case loginResponse(Result<AuthBootstrap, AuthError>)
         case termsLinkTapped(TermsType)
         case dismissTerms
         case dismissToast
@@ -79,8 +79,8 @@ private extension AuthFeature {
         state.toast = nil
         return .run { [authClient] send in
             do {
-                let session = try await authClient.login(provider)
-                await send(.loginResponse(.success(session)))
+                let bootstrap = try await authClient.login(provider)
+                await send(.loginResponse(.success(bootstrap)))
             } catch {
                 await send(.loginResponse(.failure(mapAuthError(error))))
             }
@@ -88,14 +88,14 @@ private extension AuthFeature {
     }
 
     func loginResponse(
-        _ result: Result<AuthSession, AuthError>,
+        _ result: Result<AuthBootstrap, AuthError>,
         state: inout State
     ) -> Effect<Action> {
         state.isLoading = false
         state.loadingProvider = nil
         switch result {
-        case let .success(session):
-            return .send(.delegate(.loginSucceeded(userID: session.userID)))
+        case let .success(bootstrap):
+            return .send(.delegate(.loginSucceeded(userID: bootstrap.session.userID)))
         case let .failure(error):
             state.toast = toastState(for: error)
             return .none
