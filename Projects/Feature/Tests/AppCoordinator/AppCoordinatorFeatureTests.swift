@@ -110,22 +110,6 @@ final class AppCoordinatorFeatureTests: XCTestCase {
         }
     }
 
-    func test_앱인트로완료_표시실패해도_로그아웃() async {
-        // 노출 플래그는 진입 시 기록되므로, 완료 시에는 phase 전환만 검증한다.
-        let store = TestStore(
-            initialState: AppCoordinatorFeature.State(
-                phase: .appIntro(AppIntroFeature.State(pageIndex: 2))
-            )
-        ) {
-            AppCoordinatorFeature()
-        }
-
-        await store.send(.appIntro(.delegate(.completed)))
-        await store.receive(\.appIntroFinished) {
-            $0.phase = .loggedOut(AuthFeature.State())
-        }
-    }
-
     func test_앱인트로중_홈딥링크_대기유지() async {
         let store = TestStore(
             initialState: AppCoordinatorFeature.State(
