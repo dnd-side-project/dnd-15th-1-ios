@@ -17,7 +17,23 @@ public struct AuthRepository: Sendable {
         self.socialAuth = socialAuth
     }
 
-    public func restoreSession() async throws -> AuthSession? {
+    public func restoreSession() async throws -> AuthBootstrap? {
+        do {
+            guard let session = try await authLocal.loadSession() else {
+                return nil
+            }
+            let domainSession = AuthDTOMapper.toDomain(session)
+            // Temporary: real onboarding flag arrives in a later Cycle.
+            return AuthBootstrap(
+                session: domainSession,
+                isOnboardingCompleted: true
+            )
+        } catch {
+            throw AuthErrorMapper.map(error)
+        }
+    }
+
+    public func currentSession() async throws -> AuthSession? {
         do {
             guard let session = try await authLocal.loadSession() else {
                 return nil
@@ -28,11 +44,7 @@ public struct AuthRepository: Sendable {
         }
     }
 
-    public func currentSession() async throws -> AuthSession? {
-        try await restoreSession()
-    }
-
-    public func login(provider: AuthProvider) async throws -> AuthSession {
+    public func login(provider: AuthProvider) async throws -> AuthBootstrap {
         do {
             let nonce = try await authRemote.issueNonce(provider: provider)
             let credential = try await socialAuth.login(provider: provider, nonce: nonce.nonce)
@@ -44,7 +56,12 @@ public struct AuthRepository: Sendable {
             )
             let session = AuthDTOMapper.toSessionDTO(response)
             try await authLocal.saveSession(session)
-            return AuthDTOMapper.toDomain(session)
+            let domainSession = AuthDTOMapper.toDomain(session)
+            // Temporary: real onboarding flag arrives in a later Cycle.
+            return AuthBootstrap(
+                session: domainSession,
+                isOnboardingCompleted: true
+            )
         } catch {
             throw AuthErrorMapper.map(error, isLoginPath: true)
         }

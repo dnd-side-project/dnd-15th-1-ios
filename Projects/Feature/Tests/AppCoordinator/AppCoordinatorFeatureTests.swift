@@ -71,7 +71,9 @@ final class AppCoordinatorFeatureTests: XCTestCase {
         let store = TestStore(initialState: AppCoordinatorFeature.State()) {
             AppCoordinatorFeature()
         } withDependencies: {
-            $0.authClient.restoreSession = { session }
+            $0.authClient.restoreSession = {
+                AuthBootstrap(session: session, isOnboardingCompleted: true)
+            }
             $0.onboardingClient.hasSeenAppIntro = {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
                 return false

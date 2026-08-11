@@ -84,7 +84,7 @@ final class AuthFeatureTests: XCTestCase {
         } withDependencies: {
             $0.authClient.login = { _ in
                 loginCount.withValue { $0 += 1 }
-                return session
+                return AuthBootstrap(session: session, isOnboardingCompleted: true)
             }
         }
 
@@ -116,7 +116,7 @@ final class AuthFeatureTests: XCTestCase {
         } withDependencies: {
             $0.authClient.login = { value in
                 requested.setValue(value)
-                return session
+                return AuthBootstrap(session: session, isOnboardingCompleted: true)
             }
         }
 

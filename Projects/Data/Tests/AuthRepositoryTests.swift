@@ -42,18 +42,21 @@ final class AuthRepositoryTests: XCTestCase {
             socialAuth: SocialAuthCredentialProvider(clients: social)
         )
 
-        let session = try await repository.login(provider: .kakao)
+        let bootstrap = try await repository.login(provider: .kakao)
 
-        XCTAssertEqual(session.userID, "42")
-        XCTAssertEqual(session.accessToken, "access")
-        XCTAssertEqual(session.refreshToken, "refresh")
+        XCTAssertEqual(bootstrap.session.userID, "42")
+        XCTAssertEqual(bootstrap.session.accessToken, "access")
+        XCTAssertEqual(bootstrap.session.refreshToken, "refresh")
+        XCTAssertTrue(bootstrap.isOnboardingCompleted)
         XCTAssertEqual(
             network.requestedPaths,
             ["/api/v1/auth/nonce", "/api/v1/auth/social-login"]
         )
 
         let restored = try await repository.restoreSession()
-        XCTAssertEqual(restored, session)
+        XCTAssertEqual(restored, bootstrap)
+        XCTAssertEqual(restored?.session.userID, "42")
+        XCTAssertEqual(restored?.isOnboardingCompleted, true)
     }
 
     func test_social_취소시_세션을_저장하지_않는다() async throws {
@@ -232,7 +235,8 @@ final class AuthRepositoryTests: XCTestCase {
         XCTAssertEqual(refreshed.userID, "7")
 
         let restored = try await repository.restoreSession()
-        XCTAssertEqual(restored, refreshed)
+        XCTAssertEqual(restored?.session, refreshed)
+        XCTAssertEqual(restored?.isOnboardingCompleted, true)
     }
 
     func test_logout_요청은_authed_클라이언트_경로를_사용한다() async throws {
