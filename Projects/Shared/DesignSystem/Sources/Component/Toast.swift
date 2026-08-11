@@ -8,9 +8,9 @@
 import SwiftUI
 
 public struct ToastState: Equatable {
-    let message: String
-    let icon: Image?
-    let actionTitle: String?
+    public let message: String
+    public let icon: Image?
+    public let actionTitle: String?
 
     public init(
         message: String,
@@ -20,6 +20,14 @@ public struct ToastState: Equatable {
         self.message = message
         self.icon = icon
         self.actionTitle = actionTitle
+    }
+
+    public static func == (lhs: ToastState, rhs: ToastState) -> Bool {
+        lhs.message == rhs.message && lhs.actionTitle == rhs.actionTitle
+    }
+
+    public static func error(_ message: String) -> ToastState {
+        ToastState(message: message, icon: .error)
     }
 }
 
@@ -31,6 +39,8 @@ private struct ToastView: View {
         HStack(spacing: 8) {
             if let icon = state.icon {
                 icon
+                    .resizable()
+                    .renderingMode(.original)
                     .frame(width: 24, height: 24)
             }
 
