@@ -314,7 +314,6 @@ private extension AppCoordinatorFeature {
         return .none
     }
 }
-}
 
 private extension AppCoordinatorFeature.State.Phase {
     var mainTabState: MainTabFeature.State? {
