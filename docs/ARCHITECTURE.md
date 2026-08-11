@@ -120,7 +120,8 @@ phase(AppCoordinator) → tab(MainTab) → scene local → overlay
 
 ```text
 URL → DeepLinkRouter → DeepLinkRoute → AppCoordinator
-bootstrapping/loggedOut 이면 pending, 로그인 후 flush
+bootstrapping / appIntro / loggedOut 이면 pending, 로그인 후 flush
+appIntro / loggedOut 은 home|explore|map|myPage 만 pending, signIn 은 무시
 ```
 
 현재:
