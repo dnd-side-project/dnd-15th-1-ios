@@ -81,3 +81,11 @@ public extension Image {
     static var pinShopping: Image { Asset.Pin.shopping.swiftUIImage }
     static var pinTourism: Image { Asset.Pin.tourism.swiftUIImage }
 }
+
+// MARK: - App Intro
+
+public extension Image {
+    static var appIntroShare: Image { Asset.appIntroShare.swiftUIImage }
+    static var appIntroSave: Image { Asset.appIntroSave.swiftUIImage }
+    static var appIntroPlan: Image { Asset.appIntroPlan.swiftUIImage }
+}

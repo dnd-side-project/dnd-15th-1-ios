@@ -73,7 +73,14 @@ DulpickApp
 ```text
 bootstrapping
   → authClient.restoreSession()
-  → main(Home/Explore/Map/MyPage) 또는 loggedOut(Auth)
+  → session 있음: main(...)
+  → session 없음 + !hasSeenAppIntro: appIntro
+  → session 없음 + hasSeenAppIntro: loggedOut(Auth)
+
+appIntro enter
+  → markAppIntroSeen()
+appIntro complete
+  → loggedOut(Auth)
 ```
 
 현재 세션 복구는 로컬 조회 중심. refresh/401 interceptor 는 아직 없음.
@@ -92,7 +99,7 @@ Feature/Sources/
     DeepLink/
     Overlay/
   Common/
-  Scene/{Auth,Home,Explore,Map,MyPage}
+  Scene/{Auth,Onboarding,Home,Explore,Map,MyPage}
 ```
 
 규칙:
@@ -113,7 +120,8 @@ phase(AppCoordinator) → tab(MainTab) → scene local → overlay
 
 ```text
 URL → DeepLinkRouter → DeepLinkRoute → AppCoordinator
-bootstrapping/loggedOut 이면 pending, 로그인 후 flush
+bootstrapping / appIntro / loggedOut 이면 pending, 로그인 후 flush
+appIntro / loggedOut 은 home|explore|map|myPage 만 pending, signIn 은 무시
 ```
 
 현재:
