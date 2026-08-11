@@ -12,6 +12,7 @@ let project = ProjectFactory.feature(
     ],
     testsDependencies: [
         .domain,
+        .sharedDesignSystem,
         .thirdParty,
     ]
 )
