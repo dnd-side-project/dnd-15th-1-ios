@@ -50,6 +50,14 @@ public extension Image {
     static var x: Image { Asset.x.swiftUIImage }
 }
 
+// MARK: - Social
+
+public extension Image {
+    static var socialApple: Image { Asset.Social.apple.swiftUIImage }
+    static var socialKakao: Image { Asset.Social.kakao.swiftUIImage }
+    static var socialGoogle: Image { Asset.Social.google.swiftUIImage }
+}
+
 // MARK: - Category
 
 public extension Image {
