@@ -8,39 +8,16 @@ import XCTest
 final class AuthRepositoryTests: XCTestCase {
     func test_login_성공_경로에서_세션을_저장한다() async throws {
         let network = StubNetworkClient()
-        network.responses["/api/v1/auth/nonce"] = AuthNonceDTO(
-            nonce: "raw-nonce",
-            expiresAt: "2026-08-09T00:00:00"
+        network.responses[AuthStubFixture.noncePath] = AuthStubFixture.nonce
+        network.responses[AuthStubFixture.socialLoginPath] = AuthStubFixture.socialLogin(
+            onboardingCompleted: true
         )
-        network.responses["/api/v1/auth/social-login"] = SocialLoginResponseDTO(
-            memberId: 42,
-            newMember: false,
-            token: AuthTokenDTO(
-                tokenType: "Bearer",
-                accessToken: "access",
-                refreshToken: "refresh",
-                expiresIn: 900
-            )
+        network.responses[AuthStubFixture.memberKey] = AuthStubFixture.member(
+            onboardingCompleted: true
         )
 
-        let keychain = StubKeychainStorage()
-        let social = SocialAuthClients(
-            kakao: StubSocialAuthClient(
-                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
-            ),
-            apple: StubSocialAuthClient(
-                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
-            ),
-            google: StubSocialAuthClient(
-                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
-            )
-        )
-
-        let repository = AuthRepository(
-            authRemote: AuthRemoteDataSource(networkClient: network),
-            authLocal: AuthLocalDataSource(storage: keychain),
-            socialAuth: SocialAuthCredentialProvider(clients: social)
-        )
+        let local = AuthLocalDataSource(storage: StubKeychainStorage())
+        let repository = AuthRepository.stub(plainClient: network, authLocal: local)
 
         let bootstrap = try await repository.login(provider: .kakao)
 
@@ -50,7 +27,7 @@ final class AuthRepositoryTests: XCTestCase {
         XCTAssertTrue(bootstrap.isOnboardingCompleted)
         XCTAssertEqual(
             network.requestedPaths,
-            ["/api/v1/auth/nonce", "/api/v1/auth/social-login"]
+            [AuthStubFixture.noncePath, AuthStubFixture.socialLoginPath]
         )
 
         let restored = try await repository.restoreSession()
@@ -59,31 +36,72 @@ final class AuthRepositoryTests: XCTestCase {
         XCTAssertEqual(restored?.isOnboardingCompleted, true)
     }
 
+    func test_login_응답이_온보딩_미완료면_플래그가_false다() async throws {
+        let (repository, local) = makeLoginRepository(onboardingCompleted: false)
+
+        let bootstrap = try await repository.login(provider: .kakao)
+
+        XCTAssertFalse(bootstrap.isOnboardingCompleted)
+        let stored = try await local.loadSession()
+        XCTAssertEqual(stored?.isOnboardingCompleted, false)
+    }
+
+    func test_login_응답이_온보딩_완료면_플래그가_true다() async throws {
+        let (repository, local) = makeLoginRepository(onboardingCompleted: true)
+
+        let bootstrap = try await repository.login(provider: .kakao)
+
+        XCTAssertTrue(bootstrap.isOnboardingCompleted)
+        let stored = try await local.loadSession()
+        XCTAssertEqual(stored?.isOnboardingCompleted, true)
+    }
+
+    func test_login_응답에_온보딩_필드가_없으면_미완료로_본다() async throws {
+        let (repository, local) = makeLoginRepository(onboardingCompleted: nil)
+
+        let bootstrap = try await repository.login(provider: .kakao)
+
+        XCTAssertFalse(bootstrap.isOnboardingCompleted)
+        let stored = try await local.loadSession()
+        XCTAssertNil(stored?.isOnboardingCompleted)
+    }
+
+    func test_social_login_응답에_온보딩_필드가_없어도_디코딩은_성공한다() throws {
+        let json = """
+        {
+          "memberId": 42,
+          "newMember": false,
+          "token": {
+            "tokenType": "Bearer",
+            "accessToken": "access",
+            "refreshToken": "refresh",
+            "expiresIn": 900
+          }
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(
+            SocialLoginResponseDTO.self,
+            from: Data(json.utf8)
+        )
+
+        XCTAssertEqual(decoded.memberId, 42)
+        XCTAssertNil(decoded.onboardingCompleted)
+    }
+
     func test_social_취소시_세션을_저장하지_않는다() async throws {
         let network = StubNetworkClient()
-        network.responses["/api/v1/auth/nonce"] = AuthNonceDTO(
-            nonce: "raw-nonce",
-            expiresAt: "2026-08-09T00:00:00"
-        )
+        network.responses[AuthStubFixture.noncePath] = AuthStubFixture.nonce
 
-        let keychain = StubKeychainStorage()
-        let social = SocialAuthClients(
-            kakao: StubSocialAuthClient(
-                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil),
-                error: SocialAuthError.cancelled
-            ),
-            apple: StubSocialAuthClient(
-                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
-            ),
-            google: StubSocialAuthClient(
-                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
+        let repository = AuthRepository.stub(
+            plainClient: network,
+            authLocal: AuthLocalDataSource(storage: StubKeychainStorage()),
+            socialAuth: .stub(
+                kakao: StubSocialAuthClient(
+                    credential: .stub(),
+                    error: SocialAuthError.cancelled
+                )
             )
-        )
-
-        let repository = AuthRepository(
-            authRemote: AuthRemoteDataSource(networkClient: network),
-            authLocal: AuthLocalDataSource(storage: keychain),
-            socialAuth: SocialAuthCredentialProvider(clients: social)
         )
 
         do {
@@ -97,52 +115,33 @@ final class AuthRepositoryTests: XCTestCase {
 
         let restored = try await repository.restoreSession()
         XCTAssertNil(restored)
-        XCTAssertEqual(network.requestedPaths, ["/api/v1/auth/nonce"])
+        XCTAssertEqual(network.requestedPaths, [AuthStubFixture.noncePath])
     }
 
     func test_apple_authorizationCode가_social_login_요청_본문에_포함된다() async throws {
         let network = StubNetworkClient()
-        network.responses["/api/v1/auth/nonce"] = AuthNonceDTO(
-            nonce: "raw-nonce",
-            expiresAt: "2026-08-09T00:00:00"
-        )
-        network.responses["/api/v1/auth/social-login"] = SocialLoginResponseDTO(
-            memberId: 42,
-            newMember: false,
-            token: AuthTokenDTO(
-                tokenType: "Bearer",
-                accessToken: "access",
-                refreshToken: "refresh",
-                expiresIn: 900
-            )
+        network.responses[AuthStubFixture.noncePath] = AuthStubFixture.nonce
+        network.responses[AuthStubFixture.socialLoginPath] = AuthStubFixture.socialLogin(
+            onboardingCompleted: true
         )
 
-        let keychain = StubKeychainStorage()
         let authorizationCode = "apple-auth-code"
-        let social = SocialAuthClients(
-            kakao: StubSocialAuthClient(
-                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
-            ),
-            apple: StubSocialAuthClient(
-                credential: SocialAuthCredential(
-                    idToken: "apple-id-token",
-                    authorizationCode: authorizationCode
+        let repository = AuthRepository.stub(
+            plainClient: network,
+            authLocal: AuthLocalDataSource(storage: StubKeychainStorage()),
+            socialAuth: .stub(
+                apple: StubSocialAuthClient(
+                    credential: .stub(
+                        idToken: "apple-id-token",
+                        authorizationCode: authorizationCode
+                    )
                 )
-            ),
-            google: StubSocialAuthClient(
-                credential: SocialAuthCredential(idToken: "id-token", authorizationCode: nil)
             )
-        )
-
-        let repository = AuthRepository(
-            authRemote: AuthRemoteDataSource(networkClient: network),
-            authLocal: AuthLocalDataSource(storage: keychain),
-            socialAuth: SocialAuthCredentialProvider(clients: social)
         )
 
         _ = try await repository.login(provider: .apple)
 
-        guard let body = network.requestedBodies["/api/v1/auth/social-login"] as? Data else {
+        guard let body = network.requestedBodies[AuthStubFixture.socialLoginPath] as? Data else {
             XCTFail("Expected social-login body")
             return
         }
@@ -156,35 +155,12 @@ final class AuthRepositoryTests: XCTestCase {
 
     func test_logout_원격_실패해도_로컬_세션을_지운다() async throws {
         let network = StubNetworkClient()
-        network.errors["/api/v1/auth/logout"] = NetworkError.unauthorized
+        network.errors[AuthStubFixture.logoutPath] = NetworkError.unauthorized
 
-        let keychain = StubKeychainStorage()
-        let local = AuthLocalDataSource(storage: keychain)
-        try await local.saveSession(
-            AuthSessionDTO(
-                accessToken: "access",
-                refreshToken: "refresh",
-                userID: "1"
-            )
-        )
+        let local = AuthLocalDataSource(storage: StubKeychainStorage())
+        try await local.saveStubSession(userID: "1", isOnboardingCompleted: true)
 
-        let repository = AuthRepository(
-            authRemote: AuthRemoteDataSource(networkClient: network),
-            authLocal: local,
-            socialAuth: SocialAuthCredentialProvider(
-                clients: SocialAuthClients(
-                    kakao: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    ),
-                    apple: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    ),
-                    google: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    )
-                )
-            )
-        )
+        let repository = AuthRepository.stub(plainClient: network, authLocal: local)
 
         try await repository.logout()
 
@@ -192,47 +168,35 @@ final class AuthRepositoryTests: XCTestCase {
         XCTAssertNil(restored)
     }
 
-    func test_refresh_토큰을_회전한다() async throws {
+    func test_refresh_토큰을_회전하고_온보딩_플래그를_유지한다() async throws {
         let network = StubNetworkClient()
-        network.responses["/api/v1/auth/reissue"] = AuthTokenDTO(
+        network.responses[AuthStubFixture.reissuePath] = AuthTokenDTO(
             tokenType: "Bearer",
             accessToken: "new-access",
             refreshToken: "new-refresh",
             expiresIn: 900
         )
-
-        let keychain = StubKeychainStorage()
-        let local = AuthLocalDataSource(storage: keychain)
-        try await local.saveSession(
-            AuthSessionDTO(
-                accessToken: "old-access",
-                refreshToken: "old-refresh",
-                userID: "7"
-            )
+        network.responses[AuthStubFixture.memberKey] = AuthStubFixture.member(
+            onboardingCompleted: true
         )
 
-        let repository = AuthRepository(
-            authRemote: AuthRemoteDataSource(networkClient: network),
-            authLocal: local,
-            socialAuth: SocialAuthCredentialProvider(
-                clients: SocialAuthClients(
-                    kakao: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    ),
-                    apple: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    ),
-                    google: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    )
-                )
-            )
+        let local = AuthLocalDataSource(storage: StubKeychainStorage())
+        try await local.saveStubSession(
+            accessToken: "old-access",
+            refreshToken: "old-refresh",
+            userID: "7",
+            isOnboardingCompleted: true
         )
+
+        let repository = AuthRepository.stub(plainClient: network, authLocal: local)
 
         let refreshed = try await repository.refreshSession()
         XCTAssertEqual(refreshed.accessToken, "new-access")
         XCTAssertEqual(refreshed.refreshToken, "new-refresh")
         XCTAssertEqual(refreshed.userID, "7")
+
+        let rotated = try await local.loadSession()
+        XCTAssertEqual(rotated?.isOnboardingCompleted, true)
 
         let restored = try await repository.restoreSession()
         XCTAssertEqual(restored?.session, refreshed)
@@ -243,40 +207,31 @@ final class AuthRepositoryTests: XCTestCase {
         let plainClient = StubNetworkClient(name: "plain")
         let authedClient = StubNetworkClient(name: "authed")
 
-        let keychain = StubKeychainStorage()
-        let local = AuthLocalDataSource(storage: keychain)
-        try await local.saveSession(
-            AuthSessionDTO(
-                accessToken: "access",
-                refreshToken: "refresh",
-                userID: "1"
-            )
-        )
+        let local = AuthLocalDataSource(storage: StubKeychainStorage())
+        try await local.saveStubSession(userID: "1")
 
-        let repository = AuthRepository(
-            authRemote: AuthRemoteDataSource(
-                plainClient: plainClient,
-                authedClient: authedClient
-            ),
-            authLocal: local,
-            socialAuth: SocialAuthCredentialProvider(
-                clients: SocialAuthClients(
-                    kakao: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    ),
-                    apple: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    ),
-                    google: StubSocialAuthClient(
-                        credential: SocialAuthCredential(idToken: "id", authorizationCode: nil)
-                    )
-                )
-            )
+        let repository = AuthRepository.stub(
+            plainClient: plainClient,
+            authedClient: authedClient,
+            authLocal: local
         )
 
         try await repository.logout()
 
         XCTAssertEqual(plainClient.requestedPaths, [])
-        XCTAssertEqual(authedClient.requestedPaths, ["/api/v1/auth/logout"])
+        XCTAssertEqual(authedClient.requestedPaths, [AuthStubFixture.logoutPath])
+    }
+
+    private func makeLoginRepository(
+        onboardingCompleted: Bool?
+    ) -> (AuthRepository, AuthLocalDataSource) {
+        let network = StubNetworkClient()
+        network.responses[AuthStubFixture.noncePath] = AuthStubFixture.nonce
+        network.responses[AuthStubFixture.socialLoginPath] = AuthStubFixture.socialLogin(
+            onboardingCompleted: onboardingCompleted
+        )
+
+        let local = AuthLocalDataSource(storage: StubKeychainStorage())
+        return (AuthRepository.stub(plainClient: network, authLocal: local), local)
     }
 }
