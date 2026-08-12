@@ -60,5 +60,6 @@ public struct ExploreFeature {
         .ifLet(\.$search, action: \.search) {
             SearchFeature()
         }
+        .logged(as: Self.self)
     }
 }

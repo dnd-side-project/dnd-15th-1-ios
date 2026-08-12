@@ -65,6 +65,7 @@ public struct AuthFeature {
                 return .none
             }
         }
+        .logged(as: Self.self)
     }
 }
 
