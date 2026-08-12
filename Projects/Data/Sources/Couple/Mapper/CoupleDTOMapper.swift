@@ -23,10 +23,10 @@ enum CoupleDTOMapper {
         guard dto.connected, let partner = dto.partner else {
             return nil
         }
-        // 서버 응답에 커플 식별자 필드가 없다. connectedAt 을 id 처럼 쓰면 진짜 id 로 오인되므로
-        // 빈 문자열을 넣어 잘못 쓰였을 때 눈에 보이게 깨지도록 둔다.
+        // 서버 응답에 커플 식별자 필드가 없어서 connectedAt 을 안정적인 대체 키로 쓴다.
+        // 같은 커플이면 항상 같은 값이라 Equatable 비교가 흔들리지 않는다. 진짜 서버 id 는 아니다.
         return Couple(
-            id: "",
+            id: dto.connectedAt ?? "",
             partnerNickname: partner.nickname,
             partnerIconID: partner.profileIcon
         )
