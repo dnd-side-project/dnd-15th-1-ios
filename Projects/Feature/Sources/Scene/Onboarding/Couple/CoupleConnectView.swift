@@ -1,0 +1,316 @@
+import Domain
+import SharedDesignSystem
+import SwiftUI
+import ThirdParty
+
+public struct CoupleConnectView: View {
+    // 코드 자리표시자. 로딩 시머와 실패 후 재시도 블록이 같은 치수를 쓴다
+    static let codePlaceholderWidth: CGFloat = 160
+    static let codePlaceholderHeight: CGFloat = 48
+    static let codePlaceholderRadius: CGFloat = 8
+
+    static let retryButtonRadius: CGFloat = 8
+
+    // CTA 는 위에서부터 텍스트 버튼 / 코드 공유하기 / 상대 코드로 연결하기 세 개다
+    static let toastInset = CTALayout.toastInset(
+        buttonHeights: [
+            CTALayout.textButtonHeight,
+            CTALayout.xlButtonHeight,
+            CTALayout.xlButtonHeight
+        ]
+    )
+
+    @Bindable public var store: StoreOf<CoupleConnectFeature>
+
+    private let shareButtonStyle = AppButtonStyle(variant: .outlined, size: .xl, fullWidth: true)
+
+    public init(store: StoreOf<CoupleConnectFeature>) {
+        self.store = store
+    }
+
+    public var body: some View {
+        NavigationStack(path: pathBinding) {
+            rootContent
+                .navigationTitle("커플 연결")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { backToolbar }
+                .navigationDestination(for: CoupleConnectFeature.Screen.self) { screen in
+                    destination(screen)
+                }
+                .task {
+                    store.send(.onAppear)
+                }
+        }
+        .modal(isPresented: skipConfirmBinding) {
+            ModalContent(
+                title: "다음과 같은 둘픽의 기능들을 사용할 수 없어요!",
+                content: "괜찮으신가요?",
+                image: Image.coupleConnectModal.resizable(),
+                primaryTitle: "연결할게요",
+                primaryAction: { store.send(.skipConfirmDismissed) },
+                secondaryTitle: "네",
+                secondaryAction: { store.send(.skipConfirmed) }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ screen: CoupleConnectFeature.Screen) -> some View {
+        switch screen {
+        case .codeInput:
+            CoupleCodeInputView(store: store)
+        case .complete:
+            CoupleCompleteView(store: store)
+        }
+    }
+
+    private var rootContent: some View {
+        VStack(spacing: 0) {
+            Spacer()
+                .frame(height: 65.5)
+
+            Text("커플 연결 시작하기")
+                .typography(.title1B)
+                .foregroundStyle(Color.gray900)
+                .multilineTextAlignment(.center)
+
+            Spacer()
+                .frame(height: 20)
+
+            Image.coupleConnectBefore
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 353, maxHeight: 100)
+                .padding(.horizontal, 20)
+
+            Spacer()
+                .frame(height: 60)
+
+            VStack(spacing: 8) {
+                codeChip
+                codeValue
+            }
+
+            Spacer(minLength: 0)
+
+            CTAContainer {
+                skipButton
+                shareButton
+                connectButton
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.bgDefault)
+        .toast(item: toastBinding, bottomInset: Self.toastInset)
+    }
+
+    @ToolbarContentBuilder
+    private var backToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button {
+                // 시안대로 자리만 둔다. 실제 pop 은 상위 네비게이션이 붙인다
+            } label: {
+                Image.arrowLeft
+                    .renderingMode(.original)
+                    .resizable()
+                    .frame(width: 24, height: 24)
+            }
+        }
+    }
+
+    private var codeChip: some View {
+        Text("내 코드")
+            .typography(.body1M)
+            .foregroundStyle(Color.textSecondary)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(Color.gray100)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder
+    private var codeValue: some View {
+        if let inviteCode = store.inviteCode {
+            Text(inviteCode.value)
+                .typography(.largeTitleB)
+                .foregroundStyle(Color.textPrimary)
+                .multilineTextAlignment(.center)
+        } else if let inviteCodeError = store.inviteCodeError {
+            inviteCodeFailure(inviteCodeError)
+        } else {
+            ShimmerBlock(
+                width: Self.codePlaceholderWidth,
+                height: Self.codePlaceholderHeight,
+                cornerRadius: Self.codePlaceholderRadius
+            )
+        }
+    }
+
+    // AppButtonStyle 의 .lg 는 h48 이지만 radius 가 12 라 시안(8)과 달라 토큰만 빌려 직접 그린다
+    private func inviteCodeFailure(_ message: String) -> some View {
+        VStack(spacing: 6) {
+            Button {
+                store.send(.retryInviteCodeButtonTapped)
+            } label: {
+                Text("다시 시도")
+                    .typography(.body1SB)
+                    .foregroundStyle(Color.textSecondary)
+                    .padding(.horizontal, 24)
+                    .frame(height: 48)
+                    .background(Color.commonWhite)
+                    .clipShape(RoundedRectangle(cornerRadius: Self.retryButtonRadius))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Self.retryButtonRadius)
+                            .strokeBorder(Color.borderDefault, lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+
+            Text(message)
+                .typography(.caption1M)
+                .foregroundStyle(Color.gray400)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var skipButton: some View {
+        Button {
+            store.send(.skipButtonTapped)
+        } label: {
+            Text("다음에 연결할게요")
+                .typography(.body1SB)
+                .foregroundStyle(Color.textTertiary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // 코드를 아직 못 받았으면 공유할 대상이 없어 눌리지 않는 Button 으로 모양만 유지한다
+    @ViewBuilder
+    private var shareButton: some View {
+        if let shareURL = store.inviteCode?.shareURL {
+            ShareLink(item: shareURL) {
+                Text("코드 공유하기")
+            }
+            .buttonStyle(shareButtonStyle)
+        } else if let code = store.inviteCode?.value {
+            ShareLink(item: code) {
+                Text("코드 공유하기")
+            }
+            .buttonStyle(shareButtonStyle)
+        } else {
+            Button {
+            } label: {
+                Text("코드 공유하기")
+            }
+            .buttonStyle(shareButtonStyle)
+            .disabled(true)
+        }
+    }
+
+    private var connectButton: some View {
+        AppButton("상대 코드로 연결하기", style: .dark, size: .xl, fullWidth: true) {
+            store.send(.codeInputButtonTapped)
+        }
+    }
+
+    private var pathBinding: Binding<[CoupleConnectFeature.Screen]> {
+        Binding(
+            get: { store.path },
+            set: { store.send(.pathChanged($0)) }
+        )
+    }
+
+    private var toastBinding: Binding<ToastState?> {
+        Binding(
+            get: { store.toast },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.dismissToast)
+                }
+            }
+        )
+    }
+
+    // dim 탭으로 닫혀도 되는 모달이라 false 가 들어오면 그대로 닫기 액션을 보낸다
+    private var skipConfirmBinding: Binding<Bool> {
+        Binding(
+            get: { store.isSkipConfirmPresented },
+            set: { newValue in
+                if !newValue {
+                    store.send(.skipConfirmDismissed)
+                }
+            }
+        )
+    }
+}
+
+#if DEBUG
+#Preview("코드 로딩") {
+    CoupleConnectView(
+        store: Store(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                isLoadingInviteCode: true
+            )
+        ) {
+            CoupleConnectFeature()
+        }
+    )
+}
+
+#Preview("코드 표시") {
+    CoupleConnectView(
+        store: Store(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                inviteCode: InviteCode(value: "AB12C", shareURL: nil)
+            )
+        ) {
+            CoupleConnectFeature()
+        }
+    )
+}
+
+#Preview("코드 실패 · 네트워크") {
+    CoupleConnectView(
+        store: Store(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                inviteCodeError: "네트워크 연결을 확인해 주세요"
+            )
+        ) {
+            CoupleConnectFeature()
+        }
+    )
+}
+
+#Preview("코드 실패 · 알 수 없음") {
+    CoupleConnectView(
+        store: Store(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                inviteCodeError: "잠시 후 다시 시도해 주세요"
+            )
+        ) {
+            CoupleConnectFeature()
+        }
+    )
+}
+
+#Preview("스킵 확인") {
+    CoupleConnectView(
+        store: Store(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                inviteCode: InviteCode(value: "AB12C", shareURL: nil),
+                isSkipConfirmPresented: true
+            )
+        ) {
+            CoupleConnectFeature()
+        }
+    )
+}
+#endif
