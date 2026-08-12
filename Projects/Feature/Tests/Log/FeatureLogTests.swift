@@ -3,7 +3,7 @@ import ThirdParty
 import XCTest
 
 final class FeatureLogTests: XCTestCase {
-    func test_sceneName_Feature_suffix_제거() {
+    func test_씬이름_Feature접미_제거() {
         XCTAssertEqual(FeatureLog.sceneName(from: "AuthFeature"), "Auth")
         XCTAssertEqual(FeatureLog.sceneName(from: "AppCoordinatorFeature"), "AppCoordinator")
         XCTAssertEqual(FeatureLog.sceneName(from: "MainTabFeature"), "MainTab")
@@ -11,14 +11,14 @@ final class FeatureLogTests: XCTestCase {
         XCTAssertEqual(FeatureLog.sceneName(from: "Root"), "Root")
     }
 
-    func test_operationName_Response_접미_제거() {
+    func test_오퍼레이션이름_Response접미_제거() {
         XCTAssertEqual(FeatureLog.operationName(fromActionName: "loginResponse"), "login")
         XCTAssertEqual(FeatureLog.operationName(fromActionName: "logoutResponse"), "logout")
         XCTAssertEqual(FeatureLog.operationName(fromActionName: "sessionRestored"), "restoreSession")
         XCTAssertEqual(FeatureLog.operationName(fromActionName: "popularPostsResponse"), "popularPosts")
     }
 
-    func test_message_format_action_state_navigation_error() {
+    func test_메시지형식_액션_상태_화면이동_오류() {
         XCTAssertEqual(
             FeatureLog.actionMessage(scene: "Auth", name: "loginButtonTapped", payload: "provider=apple"),
             "[Feature] [Auth] 사용자 액션: loginButtonTapped(provider=apple)"
@@ -42,7 +42,7 @@ final class FeatureLogTests: XCTestCase {
         )
     }
 
-    func test_redact_masks_tokens() {
+    func test_마스킹_토큰_가림() {
         let input = "accessToken=aaa refreshToken=bbb Authorization=Bearer ccc identityToken=ddd"
         let redacted = FeatureLog.redact(input)
         XCTAssertFalse(redacted.contains("aaa"))

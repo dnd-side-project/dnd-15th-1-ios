@@ -4,7 +4,7 @@ import XCTest
 
 final class FeatureLogReducerTests: XCTestCase {
 
-    func test_actionParser_case_and_payload() {
+    func test_액션파서_케이스이름_페이로드추출() {
         enum SampleAction {
             case loginButtonTapped(provider: String)
             case onAppear
@@ -19,7 +19,7 @@ final class FeatureLogReducerTests: XCTestCase {
         XCTAssertNil(appear.payload)
     }
 
-    func test_stateDiff_top_level_fields_only() {
+    func test_상태비교_최상위필드만() {
         struct SampleState: Equatable {
             var isLoading = false
             var count = 0
@@ -35,7 +35,7 @@ final class FeatureLogReducerTests: XCTestCase {
         XCTAssertEqual(changes.first(where: { $0.field == "isLoading" })?.to, "true")
     }
 
-    func test_normalizedFieldLabel_strips_storage_and_ignores_bookkeeping() {
+    func test_필드라벨정규화_스토리지제거_북키핑무시() {
         XCTAssertEqual(FeatureLogStateDiff.normalizedFieldLabel("isLoading"), "isLoading")
         XCTAssertEqual(FeatureLogStateDiff.normalizedFieldLabel("_isLoading"), "isLoading")
         XCTAssertEqual(FeatureLogStateDiff.normalizedFieldLabel("_phase"), "phase")
@@ -44,7 +44,7 @@ final class FeatureLogReducerTests: XCTestCase {
         XCTAssertNil(FeatureLogStateDiff.normalizedFieldLabel("_$id"))
     }
 
-    func test_stateDiff_normalizes_observableState_storage_labels() {
+    func test_상태비교_옵저버블스토리지라벨_정규화() {
         // @ObservableState stores members as `_field` + `_$...` bookkeeping.
         struct ObservableLikeState: Equatable, CustomReflectable {
             var isLoading = false
@@ -98,7 +98,7 @@ final class FeatureLogReducerTests: XCTestCase {
         XCTAssertEqual(changes.first(where: { $0.field == "toast" })?.to, "failed")
     }
 
-    func test_shouldIgnoreField_and_navigationStyle() {
+    func test_무시필드판정_화면이동유형() {
         XCTAssertTrue(FeatureLogStateDiff.shouldIgnoreField("home"))
         XCTAssertTrue(FeatureLogStateDiff.shouldIgnoreField("explore"))
         XCTAssertTrue(FeatureLogStateDiff.shouldIgnoreField("appCoordinator"))
@@ -134,7 +134,7 @@ final class FeatureLogReducerTests: XCTestCase {
         )
     }
 
-    func test_becameUserVisible_uses_public_field_names() {
+    func test_사용자노출판정_공개필드이름사용() {
         let visible = FeatureLogStateDiff.becameUserVisible(
             from: [
                 .init(field: "toast", from: "nil", to: "로그인에 실패했어요"),
@@ -157,7 +157,7 @@ final class FeatureLogReducerTests: XCTestCase {
         XCTAssertFalse(notVisible)
     }
 
-    func test_summarizeValue_enum_case_name_only() {
+    func test_값요약_이넘_케이스이름만() {
         enum Phase {
             case bootstrapping
             case loggedOut(String)
@@ -195,7 +195,7 @@ final class FeatureLogReducerTests: XCTestCase {
         XCTAssertFalse(main.contains("home"))
     }
 
-    func test_stateDiff_phase_enum_summarizes_case_only() {
+    func test_상태비교_페이즈이넘_케이스이름만() {
         enum Phase: Equatable {
             case bootstrapping
             case loggedOut(AuthLikeState)

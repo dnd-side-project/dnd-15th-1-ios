@@ -3,7 +3,7 @@ import ThirdParty
 import XCTest
 
 final class FeatureLogClassificationTests: XCTestCase {
-    func test_presentationState_unwrap_present_and_dismiss() {
+    func test_프레젠테이션상태_표시_해제_언랩() {
         struct SearchState: Equatable {
             var query = ""
         }
@@ -76,7 +76,7 @@ final class FeatureLogClassificationTests: XCTestCase {
         XCTAssertNotEqual(FeatureLog.summarizeValue(valueWrapped), "nil")
     }
 
-    func test_shouldLogAction_skips_child_scope_names() {
+    func test_액션로그판정_자식스코프이름_제외() {
         let childScopes = [
             "auth", "mainTab", "home", "explore", "map",
             "myPage", "appIntro", "overlay", "search", "delegate"
@@ -100,7 +100,7 @@ final class FeatureLogClassificationTests: XCTestCase {
         )
     }
 
-    func test_failureInfo_leaf_loginResponse_failure() {
+    func test_실패정보_리프_로그인응답실패() {
         enum SampleAction {
             case loginResponse(Result<String, SampleError>)
             case onAppear
@@ -142,7 +142,7 @@ final class FeatureLogClassificationTests: XCTestCase {
         )
     }
 
-    func test_failureInfo_nested_parent_child_action_is_not_parent_error() {
+    func test_실패정보_중첩_자식액션은_부모오류아님() {
         enum AuthAction {
             case loginResponse(Result<String, SampleError>)
             case loginButtonTapped
