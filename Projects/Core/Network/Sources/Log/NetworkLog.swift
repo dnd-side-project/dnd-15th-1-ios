@@ -5,7 +5,7 @@ enum NetworkLog {
     static func request(_ request: URLRequest) {
         let method = request.httpMethod ?? "NIL"
         let url = sanitizedURLString(request.url)
-        var message = "→ \(method) \(url)"
+        var message = "[Network] [Request] → \(method) \(url)"
 
         #if DEBUG
         if let body = request.httpBody, let bodyText = String(data: body, encoding: .utf8) {
@@ -13,7 +13,7 @@ enum NetworkLog {
         }
         #endif
 
-        Logger.shared.info(message, category: .network)
+        Logger.shared.info(message, category: .network, includeCallSite: false)
     }
 
     static func response(
@@ -23,7 +23,7 @@ enum NetworkLog {
         durationMs: Int
     ) {
         let target = sanitizedURLString(url)
-        var message = "← \(statusCode) \(target) (\(durationMs)ms, \(data.count)B)"
+        var message = "[Network] [Response] ← \(statusCode) \(target) (\(durationMs)ms, \(data.count)B)"
 
         #if DEBUG
         if let bodyText = String(data: data, encoding: .utf8), bodyText.isEmpty == false {
@@ -32,30 +32,45 @@ enum NetworkLog {
         #endif
 
         if (200...299).contains(statusCode) {
-            Logger.shared.info(message, category: .network)
+            Logger.shared.info(message, category: .network, includeCallSite: false)
         } else {
-            Logger.shared.warning(message, category: .network)
+            Logger.shared.warning(message, category: .network, includeCallSite: false)
         }
     }
 
     static func error(_ error: Error, url: URL?) {
         Logger.shared.error(
-            "✕ \(sanitizedURLString(url)) \(error.localizedDescription)",
-            category: .network
+            "[Network] [Error] ✕ \(sanitizedURLString(url)) \(error.localizedDescription)",
+            category: .network,
+            includeCallSite: false
         )
     }
 
     static func sanitizedURLString(_ url: URL?) -> String {
         guard let url else { return "nil" }
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return url.absoluteString
+            return pathOnly(from: url)
         }
+        components.scheme = nil
+        components.host = nil
+        components.port = nil
+        components.user = nil
+        components.password = nil
         components.query = nil
         components.fragment = nil
-        return components.string ?? url.absoluteString
+        let path = components.percentEncodedPath
+        if path.isEmpty == false {
+            return path
+        }
+        return pathOnly(from: url)
     }
 
-    static func formattedBody(_ text: String) -> String {
+    private static func pathOnly(from url: URL) -> String {
+        let path = url.path
+        return path.isEmpty ? "/" : path
+    }
+
+static func formattedBody(_ text: String) -> String {
         redact(prettyPrintedJSON(text) ?? text)
     }
 
