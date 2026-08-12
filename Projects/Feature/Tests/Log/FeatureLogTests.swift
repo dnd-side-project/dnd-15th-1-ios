@@ -42,6 +42,42 @@ final class FeatureLogTests: XCTestCase {
         )
     }
 
+    func test_값요약_구조체_타입이름만() {
+        struct ToastLikeState: Equatable {
+            var message = "로그인에 실패했습니다."
+            var icon: String?
+            var actionTitle: String?
+        }
+
+        final class SessionLikeBox {
+            var email = "user@example.com"
+        }
+
+        // struct: 내부 프로퍼티 dump 금지, 타입 이름만
+        let toast = FeatureLog.summarizeValue(ToastLikeState())
+        XCTAssertEqual(toast, "ToastLikeState")
+        XCTAssertFalse(toast.contains("message"))
+        XCTAssertFalse(toast.contains("로그인에 실패했습니다."))
+
+        // Optional 언래핑 후에도 타입 이름만
+        let presentToast: ToastLikeState? = ToastLikeState()
+        XCTAssertEqual(FeatureLog.summarizeValue(presentToast), "ToastLikeState")
+        XCTAssertEqual(FeatureLog.summarizeValue(ToastLikeState?.none), "nil")
+
+        // class 도 동일
+        let boxed = FeatureLog.summarizeValue(SessionLikeBox())
+        XCTAssertEqual(boxed, "SessionLikeBox")
+        XCTAssertFalse(boxed.contains("user@example.com"))
+
+        // 기존 특수 처리 유지: String / Bool / 숫자 / 컬렉션
+        XCTAssertEqual(FeatureLog.summarizeValue("cafe"), "cafe")
+        XCTAssertEqual(FeatureLog.summarizeValue(true), "true")
+        XCTAssertEqual(FeatureLog.summarizeValue(false), "false")
+        XCTAssertEqual(FeatureLog.summarizeValue(3), "3")
+        XCTAssertEqual(FeatureLog.summarizeValue([1, 2, 3]), "3 items")
+        XCTAssertEqual(FeatureLog.summarizeValue(["a": 1]), "1 items")
+    }
+
     func test_마스킹_토큰_가림() {
         let input = "accessToken=aaa refreshToken=bbb Authorization=Bearer ccc identityToken=ddd"
         let redacted = FeatureLog.redact(input)

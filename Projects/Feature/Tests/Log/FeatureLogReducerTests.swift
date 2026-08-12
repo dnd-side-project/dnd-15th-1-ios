@@ -238,4 +238,100 @@ final class FeatureLogReducerTests: XCTestCase {
         XCTAssertEqual(toLoggedOut.first(where: { $0.field == "phase" })?.to, "loggedOut")
         XCTAssertFalse((toLoggedOut.first(where: { $0.field == "phase" })?.to ?? "").contains("kakao"))
     }
+
+    // MARK: - 래퍼 회귀 (FeatureLogReducer)
+
+    @MainActor
+    func test_로그부착_상태결과_동일() async {
+        assertDebugBuild()
+
+        let plain = TestStore(initialState: LogWrapperProbeFeature.State()) {
+            LogWrapperProbeFeature()
+        }
+        let logged = TestStore(initialState: LogWrapperProbeFeature.State()) {
+            LogWrapperProbeFeature().logged(as: LogWrapperProbeFeature.self)
+        }
+
+        for store in [plain, logged] {
+            await store.send(.increment) { $0.count = 1 }
+            // 상태가 전혀 안 바뀌는 액션
+            await store.send(.noop)
+            await store.send(.load) { $0.isLoading = true }
+            await store.receive(.echoResponse("ok")) {
+                $0.isLoading = false
+                $0.lastEcho = "ok"
+            }
+            await store.send(.increment) { $0.count = 2 }
+        }
+
+        XCTAssertEqual(plain.state, logged.state)
+    }
+
+    @MainActor
+    func test_로그부착_이펙트_그대로반환() async {
+        assertDebugBuild()
+
+        let store = TestStore(initialState: LogWrapperProbeFeature.State()) {
+            LogWrapperProbeFeature().logged(as: LogWrapperProbeFeature.self)
+        }
+
+        // effect 를 반환하는 액션: base effect 가 삼켜지지 않고 그대로 전달된다.
+        await store.send(.load) { $0.isLoading = true }
+        await store.receive(.echoResponse("ok")) {
+            $0.isLoading = false
+            $0.lastEcho = "ok"
+        }
+
+        // `.none` 을 반환하는 액션: 래퍼가 없던 effect 를 만들어내지 않는다.
+        // (미수신 effect 가 남으면 TestStore 가 실패시킨다.)
+        await store.send(.increment) { $0.count = 1 }
+        await store.send(.noop)
+    }
+
+    private func assertDebugBuild() {
+        #if !DEBUG
+        XCTFail("Feature 테스트는 Debug 빌드여야 FeatureLogReducer 의 로그 경로를 통과한다")
+        #endif
+    }
+}
+
+// MARK: - 래퍼 회귀용 더미 Reducer
+
+/// `.logged(as:)` 래퍼 전용 회귀 probe.
+/// Auth / AppCoordinator 가 못 덮는 조합(effect 반환 / `.none` / 상태 무변화)을 담는다.
+private struct LogWrapperProbeFeature: Reducer {
+    struct State: Equatable {
+        var count = 0
+        var isLoading = false
+        var lastEcho: String?
+    }
+
+    enum Action: Equatable {
+        case increment
+        case load
+        case echoResponse(String)
+        case noop
+    }
+
+    func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .increment:
+            state.count += 1
+            return .none
+
+        case .load:
+            state.isLoading = true
+            return .run { send in
+                await send(.echoResponse("ok"))
+            }
+
+        case let .echoResponse(value):
+            state.isLoading = false
+            state.lastEcho = value
+            return .none
+
+        case .noop:
+            return .none
+        }
+    }
 }
