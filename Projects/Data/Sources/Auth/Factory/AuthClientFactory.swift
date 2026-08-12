@@ -1,21 +1,9 @@
-import CoreNetwork
-import CoreSocialAuth
-import CoreStorage
 import Domain
 import Foundation
 
 public enum AuthClientFactory {
-    public static func make(
-        keychain: any KeychainStorage,
-        networkConfig: NetworkConfiguration,
-        socialAuthClients: SocialAuthClients
-    ) -> AuthClient {
-        let repository = makeRepo(
-            keychain: keychain,
-            networkConfig: networkConfig,
-            socialAuthClients: socialAuthClients
-        )
-        return makeClient(repository: repository)
+    public static func make(session: AuthSessionAssembly) -> AuthClient {
+        makeClient(repository: makeRepo(session: session))
     }
 
     private static func makeClient(repository: AuthRepository) -> AuthClient {
@@ -35,36 +23,15 @@ public enum AuthClientFactory {
         )
     }
 
-    private static func makeRepo(
-        keychain: any KeychainStorage,
-        networkConfig: NetworkConfiguration,
-        socialAuthClients: SocialAuthClients
-    ) -> AuthRepository {
-        let plainClient = NetworkClientFactory.plain(config: networkConfig)
-        let authLocal = AuthLocalDataSource(storage: keychain)
-        let socialAuth = SocialAuthCredentialProvider(clients: socialAuthClients)
-        let plainRemote = AuthRemoteDataSource(
-            plainClient: plainClient,
-            authedClient: plainClient
-        )
-        let tokenBridge = AuthTokenBridge(
-            authLocal: authLocal,
-            plainRemote: plainRemote
-        )
-        let authedClient = NetworkClientFactory.authed(
-            config: networkConfig,
-            tokenProvider: tokenBridge,
-            tokenRefresher: tokenBridge
-        )
-
+    private static func makeRepo(session: AuthSessionAssembly) -> AuthRepository {
         let authRemote = AuthRemoteDataSource(
-            plainClient: plainClient,
-            authedClient: authedClient
+            plainClient: session.plainClient,
+            authedClient: session.authedClient
         )
         return AuthRepository(
             authRemote: authRemote,
-            authLocal: authLocal,
-            socialAuth: socialAuth
+            authLocal: session.authLocal,
+            socialAuth: session.socialAuth
         )
     }
 }
