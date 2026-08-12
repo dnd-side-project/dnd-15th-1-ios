@@ -89,3 +89,11 @@ public extension Image {
     static var appIntroSave: Image { Asset.appIntroSave.swiftUIImage }
     static var appIntroPlan: Image { Asset.appIntroPlan.swiftUIImage }
 }
+
+// MARK: - Couple Connect
+
+public extension Image {
+    static var coupleConnectBefore: Image { Asset.coupleConnectBefore.swiftUIImage }
+    static var coupleConnectComplete: Image { Asset.coupleConnectComplete.swiftUIImage }
+    static var coupleConnectModal: Image { Asset.coupleConnectModal.swiftUIImage }
+}
