@@ -76,9 +76,27 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let couple = try await repository.connect(inviteCode: "ABCDE")
 
-        XCTAssertEqual(couple.id, "")
+        XCTAssertEqual(couple.id, "2026-08-13T10:00:00")
         XCTAssertEqual(couple.partnerNickname, "상대방")
         XCTAssertEqual(couple.partnerIconID, 4)
+    }
+
+    func test_연결됐는데_connectedAt이_없으면_id를_빈문자열로_둔다() async throws {
+        let network = StubNetworkClient()
+        network.responses["POST \(connectPath)"] = CoupleConnectionStatusResponseDTO(
+            connected: true,
+            me: CoupleMemberProfileResponseDTO(nickname: "나", profileIcon: 1),
+            partner: CoupleMemberProfileResponseDTO(nickname: "상대방", profileIcon: 4),
+            connectedAt: nil,
+            daysTogether: nil
+        )
+
+        let repository = makeRepository(network: network)
+
+        let couple = try await repository.connect(inviteCode: "ABCDE")
+
+        XCTAssertEqual(couple.id, "")
+        XCTAssertEqual(couple.partnerNickname, "상대방")
     }
 
     func test_연결_응답이_미연결이면_unknown을_던진다() async throws {
@@ -132,6 +150,7 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let couple = try await repository.current()
 
+        XCTAssertEqual(couple?.id, "2026-08-13T10:00:00")
         XCTAssertEqual(couple?.partnerNickname, "상대방")
         XCTAssertEqual(couple?.partnerIconID, 2)
     }

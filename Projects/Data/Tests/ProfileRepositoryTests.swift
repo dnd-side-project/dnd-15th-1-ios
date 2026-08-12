@@ -9,7 +9,7 @@ final class ProfileRepositoryTests: XCTestCase {
     private let profilePath = "/api/v1/members/me/profile"
     private let datePreferencesPath = "/api/v1/members/me/date-preferences"
 
-    func test_온보딩_미완료면_POST로_초기화하고_성향에_null을_보낸다() async throws {
+    func test_온보딩_미완료면_POST로_초기화하고_성향에_빈문자열_객체를_보낸다() async throws {
         let network = StubNetworkClient()
         network.responses["GET \(memberPath)"] = MemberResponseDTO(
             memberId: 1,
@@ -47,8 +47,15 @@ final class ProfileRepositoryTests: XCTestCase {
         let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
         XCTAssertEqual(json?["nickname"] as? String, "둘픽이")
         XCTAssertEqual(json?["profileIcon"] as? Int, 2)
-        XCTAssertTrue(json?.keys.contains("datePreferences") == true)
-        XCTAssertTrue(json?["datePreferences"] is NSNull)
+        guard let preferences = json?["datePreferences"] as? [String: Any] else {
+            XCTFail("Expected datePreferences object")
+            return
+        }
+        XCTAssertEqual(preferences["indoorOutdoor"] as? String, "")
+        XCTAssertEqual(preferences["activityLevel"] as? String, "")
+        XCTAssertEqual(preferences["dateTime"] as? String, "")
+        XCTAssertEqual(preferences["dateFocus"] as? String, "")
+        XCTAssertEqual(preferences.count, 4)
     }
 
     func test_온보딩_완료면_PATCH로_수정하고_성향키를_보내지_않는다() async throws {
