@@ -70,7 +70,7 @@ enum NetworkLog {
         return path.isEmpty ? "/" : path
     }
 
-static func formattedBody(_ text: String) -> String {
+    static func formattedBody(_ text: String) -> String {
         redact(prettyPrintedJSON(text) ?? text)
     }
 
