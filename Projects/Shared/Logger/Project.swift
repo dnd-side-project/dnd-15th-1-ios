@@ -5,5 +5,6 @@ let project = ProjectFactory.framework(
     .sharedLogger,
     dependencies: [
         .sharedUtils,
-    ]
+    ],
+    product: .framework
 )
