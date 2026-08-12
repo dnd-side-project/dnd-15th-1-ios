@@ -6,7 +6,7 @@ enum ProfileEndpoint: APIEndpoint {
     case initializeProfile(
         nickname: String,
         profileIcon: Int,
-        datePreferences: DatePreferencesRequestDTO?
+        datePreferences: DatePreferencesRequestDTO
     )
     case updateProfile(nickname: String, profileIcon: Int)
     case updateDatePreferences(DatePreferencesRequestDTO)
