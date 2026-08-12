@@ -487,9 +487,9 @@ enum FeatureLogStateDiff {
             }
         }
 
-        // 최후: non-nil description 이면 presented payload 로 본다.
-        let summarized = FeatureLog.summarizeValue(value)
-        return summarized == "nil" ? nil : value
+        // 최후: Mirror 에 자식이 있으면 presented payload 로 본다.
+        // `summarizeValue` 는 struct/class 를 타입 이름으로 요약하므로 nil 판정에 쓸 수 없다.
+        return mirror.children.isEmpty ? nil : value
     }
 
     private static func optionalPayload(from value: Any) -> Any? {

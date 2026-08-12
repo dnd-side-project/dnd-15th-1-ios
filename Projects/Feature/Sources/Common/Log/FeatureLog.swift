@@ -167,6 +167,10 @@ enum FeatureLog {
             return "\(mirror.children.count) items"
         case .dictionary:
             return "\(mirror.children.count) items"
+        case .struct, .class:
+            // struct / class 는 내부 프로퍼티 dump 금지. 타입 이름만 로그.
+            // (예: ToastState, SearchState) 값 확인이 필요하면 해당 필드를 직접 로그한다.
+            return String(describing: type(of: value))
         default:
             break
         }
