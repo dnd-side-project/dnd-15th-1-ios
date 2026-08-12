@@ -6,19 +6,41 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - PretendardWeight
 
-public enum PretendardWeight: String, Sendable {
+/// PostScript 이름이자 `Resources/Fonts/` 의 `.otf` 파일명 stem. 어긋나면 등록은 되지만 조회가 안 된다.
+public enum PretendardWeight: String, CaseIterable, Sendable {
     case regular = "Pretendard-Regular"
     case medium = "Pretendard-Medium"
     case semiBold = "Pretendard-SemiBold"
     case bold = "Pretendard-Bold"
 }
 
+// MARK: - PretendardFontRegistry
+
+private enum PretendardFontRegistry {
+    static func fontName(for weight: PretendardWeight) -> String {
+        // 이 접근이 등록을 발화시킨다. 지우면 폰트가 조용히 시스템 폰트로 폴백한다.
+        _ = registerFontsOnce
+        return weight.rawValue
+    }
+
+    // 생성된 `swiftUIFont(size:)` 접근자는 실패 시 `fatalError` 라 `registerAllCustomFonts()` 만 쓴다.
+    private static let registerFontsOnce: Void = {
+        SharedDesignSystemFontFamily.registerAllCustomFonts()
+        #if DEBUG
+        let missing = PretendardWeight.allCases.filter { UIFont(name: $0.rawValue, size: 12) == nil }
+        assert(missing.isEmpty, "Pretendard 등록 실패: \(missing.map(\.rawValue))")
+        #endif
+    }()
+}
+
 public extension Font {
+    /// 프레임워크 리소스라 `UIAppFonts` 로는 등록되지 않는다. 이 호출이 앱·프리뷰·테스트 공통 등록 지점이다.
     static func pretendard(_ weight: PretendardWeight, size: CGFloat) -> Font {
-        .custom(weight.rawValue, size: size)
+        .custom(PretendardFontRegistry.fontName(for: weight), size: size)
     }
 }
 
