@@ -281,7 +281,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
         }
 
         await store.send(.completeButtonTapped)
-        await store.receive(\.delegate.connected)
+        await store.receive(.delegate(.connected(couple)))
     }
 }
 
