@@ -14,5 +14,6 @@ let project = ProjectFactory.feature(
         .domain,
         .sharedDesignSystem,
         .thirdParty,
+        .thirdPartyUI,
     ]
 )
