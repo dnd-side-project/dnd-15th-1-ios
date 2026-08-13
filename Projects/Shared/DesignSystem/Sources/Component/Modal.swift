@@ -90,19 +90,26 @@ public extension View {
         isPresented: Binding<Bool>,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        // 애니메이션 없이 즉시 뜨는 오버레이
+        // 페이드로 뜨는 오버레이. dim 은 페이드, 카드는 확대 + 페이드
         overlay {
-            if isPresented.wrappedValue {
-                ZStack {
+            ZStack {
+                if isPresented.wrappedValue {
                     Color.dimBackground
                         .ignoresSafeArea()
                         .onTapGesture { isPresented.wrappedValue = false }
+                        .transition(.opacity)
 
                     content()
                         .padding(.horizontal, 20)
+                        .transition(.scale(scale: 0.95).combined(with: .opacity))
                 }
-                .accessibilityAddTraits(.isModal)
             }
+            .accessibilityAddTraits(isPresented.wrappedValue ? .isModal : [])
         }
+        // 들어올 때보다 나갈 때를 짧게. 값이 바뀐 뒤의 상태로 평가된다
+        .animation(
+            .easeOut(duration: isPresented.wrappedValue ? 0.2 : 0.16),
+            value: isPresented.wrappedValue
+        )
     }
 }

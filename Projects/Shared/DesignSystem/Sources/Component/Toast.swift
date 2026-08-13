@@ -66,24 +66,27 @@ private struct ToastView: View {
 // MARK: - Presentation
 
 // 사용법: .toast(item: $store.toast) { store.send(.toastActionTapped) }
+// CTA 가 있는 화면: .toast(item: $store.toast, bottomInset: CTA 하단여백 + 버튼높이 + 18)
 public extension View {
     func toast(
         item: Binding<ToastState?>,
+        bottomInset: CGFloat = 6,
         onAction: @escaping () -> Void = {}
     ) -> some View {
-        modifier(ToastModifier(item: item, onAction: onAction))
+        modifier(ToastModifier(item: item, bottomInset: bottomInset, onAction: onAction))
     }
 }
 
 private struct ToastModifier: ViewModifier {
     @Binding var item: ToastState?
+    let bottomInset: CGFloat
     let onAction: () -> Void
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .bottom) {
             if let state = item {
                 ToastView(state: state, onAction: onAction)
-                    .padding(.bottom, 7)
+                    .padding(.bottom, bottomInset)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: state) {
                         // 취소(새 토스트로 교체)면 이전 task 가 현재 토스트를 지우지 않게 함

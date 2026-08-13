@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+// 사용법: ShareLink(item: url) { Text("공유") }.buttonStyle(AppButtonStyle(variant: .outlined, size: .xl, fullWidth: true))
 public struct AppButtonStyle: ButtonStyle {
     public enum Variant {
         case primary
@@ -21,9 +22,19 @@ public struct AppButtonStyle: ButtonStyle {
         case sm
     }
 
-    let variant: Variant
-    let size: Size
-    let fullWidth: Bool
+    private let variant: Variant
+    private let size: Size
+    private let fullWidth: Bool
+
+    public init(
+        variant: Variant,
+        size: Size,
+        fullWidth: Bool = false
+    ) {
+        self.variant = variant
+        self.size = size
+        self.fullWidth = fullWidth
+    }
 
     public func makeBody(configuration: Configuration) -> some View {
         StyledLabel(
