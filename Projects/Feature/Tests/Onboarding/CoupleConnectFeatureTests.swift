@@ -213,6 +213,27 @@ final class CoupleConnectFeatureTests: XCTestCase {
         }
     }
 
+    func test_화면이동시_토스트_정리() async {
+        let store = TestStore(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                path: [.codeInput],
+                code: "AB12C",
+                toast: .error("요청이 많아요. 잠시 후 다시 시도해 주세요.")
+            )
+        ) {
+            CoupleConnectFeature()
+        }
+
+        XCTAssertFalse(store.state.isConnectEnabled)
+
+        await store.send(.pathChanged([])) {
+            $0.path = []
+            $0.toast = nil
+        }
+        XCTAssertTrue(store.state.isConnectEnabled)
+    }
+
     func test_연결성공_완료화면_push() async {
         let couple = self.couple
         let requestedCode = LockIsolated<String?>(nil)
