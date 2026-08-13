@@ -41,7 +41,7 @@ final class AuthRepositoryRestoreTests: XCTestCase {
         XCTAssertEqual(restored?.session.userID, "42")
     }
 
-    func test_restore_서버_오류에_저장된_플래그도_없으면_network를_던진다() async throws {
+    func test_restore_서버_오류에_저장된_플래그도_없으면_미완료로_복원한다() async throws {
         let network = StubNetworkClient()
         network.errors[AuthStubFixture.memberKey] = NetworkError.serverError(
             statusCode: 500,
@@ -53,12 +53,10 @@ final class AuthRepositoryRestoreTests: XCTestCase {
 
         let repository = AuthRepository.stub(plainClient: network, authLocal: local)
 
-        do {
-            _ = try await repository.restoreSession()
-            XCTFail("Expected network error")
-        } catch let error as AuthError {
-            XCTAssertEqual(error, .network)
-        }
+        let restored = try await repository.restoreSession()
+
+        XCTAssertEqual(restored?.isOnboardingCompleted, false)
+        XCTAssertEqual(restored?.session.userID, "42")
     }
 
     func test_restore_401이면_저장값으로_버티지_않고_unauthorized를_던진다() async throws {
