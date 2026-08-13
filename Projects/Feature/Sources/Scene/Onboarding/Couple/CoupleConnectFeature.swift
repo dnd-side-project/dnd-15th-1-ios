@@ -165,6 +165,8 @@ private extension CoupleConnectFeature {
         state: inout State
     ) -> Effect<Action> {
         state.path = path
+        // 이전 화면에서 띄운 알림은 경로가 바뀌면 더 이상 유효하지 않다
+        state.toast = nil
         return .none
     }
 

@@ -11,15 +11,6 @@ public struct CoupleConnectView: View {
 
     static let retryButtonRadius: CGFloat = 8
 
-    // CTA 는 위에서부터 텍스트 버튼 / 코드 공유하기 / 상대 코드로 연결하기 세 개다
-    static let toastInset = CTALayout.toastInset(
-        buttonHeights: [
-            CTALayout.textButtonHeight,
-            CTALayout.xlButtonHeight,
-            CTALayout.xlButtonHeight
-        ]
-    )
-
     @Bindable public var store: StoreOf<CoupleConnectFeature>
 
     private let shareButtonStyle = AppButtonStyle(variant: .outlined, size: .xl, fullWidth: true)
@@ -101,7 +92,6 @@ public struct CoupleConnectView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.bgDefault)
-        .toast(item: toastBinding, bottomInset: Self.toastInset)
     }
 
     @ToolbarContentBuilder
@@ -220,17 +210,6 @@ public struct CoupleConnectView: View {
         Binding(
             get: { store.path },
             set: { store.send(.pathChanged($0)) }
-        )
-    }
-
-    private var toastBinding: Binding<ToastState?> {
-        Binding(
-            get: { store.toast },
-            set: { newValue in
-                if newValue == nil {
-                    store.send(.dismissToast)
-                }
-            }
         )
     }
 
