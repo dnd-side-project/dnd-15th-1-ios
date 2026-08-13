@@ -79,5 +79,6 @@ public struct MainTabFeature {
                 return .none
             }
         }
+        .logged(as: Self.self)
     }
 }

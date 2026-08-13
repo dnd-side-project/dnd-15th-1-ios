@@ -106,6 +106,7 @@ public struct AppCoordinatorFeature {
             .ifLet(\.mainTab, action: \.mainTab) {
                 MainTabFeature()
             }
+            .logged(as: Self.self)
     }
 
     private func core(state: inout State, action: Action) -> Effect<Action> {

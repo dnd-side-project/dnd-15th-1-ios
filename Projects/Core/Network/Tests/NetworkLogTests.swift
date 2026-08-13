@@ -22,4 +22,12 @@ final class NetworkLogTests: XCTestCase {
             "access_token=[REDACTED]&refresh_token=[REDACTED]&id_token=[REDACTED]"
         )
     }
+
+    func test_sanitizedURLString_path_only() {
+        let url = URL(string: "https://dulpick.omong.kr/api/v1/auth/reissue?token=secret#frag")
+        XCTAssertEqual(
+            NetworkLog.sanitizedURLString(url),
+            "/api/v1/auth/reissue"
+        )
+    }
 }

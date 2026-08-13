@@ -29,7 +29,7 @@ extension InfraContainer {
         let socialAuthClients = SocialAuthClientFactory().make()
 
         let bundleID = appConfig.bundleID
-        let userDefaults = DefaultUserDefaultsStorage(suiteName: bundleID)
+        let userDefaults = DefaultUserDefaultsStorage()
         let keychain = DefaultKeychainStorage(service: bundleID)
 
         return InfraContainer(
