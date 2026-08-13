@@ -28,6 +28,7 @@ struct CoupleCodeInputView: View {
                 isFocused: $isCodeFocused,
                 length: CoupleConnectFeature.codeLength
             )
+            .disabled(store.isConnecting)
             .padding(.horizontal, 20)
 
             Spacer(minLength: 0)
@@ -55,10 +56,7 @@ struct CoupleCodeInputView: View {
     private var backToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             Button {
-                var path = store.path
-                guard !path.isEmpty else { return }
-                path.removeLast()
-                store.send(.pathChanged(path))
+                store.send(.backButtonTapped)
             } label: {
                 Image.arrowLeft
                     .renderingMode(.original)

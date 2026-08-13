@@ -72,6 +72,7 @@ public struct CoupleConnectFeature {
         case connectButtonTapped
         case connectResponse(Result<Couple, CoupleError>)
         case completeButtonTapped
+        case backButtonTapped
         case pathChanged([Screen])
         case dismissToast
         case delegate(Delegate)
@@ -91,34 +92,21 @@ public struct CoupleConnectFeature {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case .onAppear:
-                return onAppear(state: &state)
-            case let .inviteCodeResponse(result):
-                return inviteCodeResponse(result, state: &state)
-            case .retryInviteCodeButtonTapped:
-                return retryInviteCodeButtonTapped(state: &state)
-            case .skipButtonTapped:
-                return skipButtonTapped(state: &state)
-            case .skipConfirmed:
-                return skipConfirmed(state: &state)
-            case .skipConfirmDismissed:
-                return skipConfirmDismissed(state: &state)
-            case .codeInputButtonTapped:
-                return codeInputButtonTapped(state: &state)
-            case let .codeChanged(code):
-                return codeChanged(code, state: &state)
-            case .connectButtonTapped:
-                return connectButtonTapped(state: &state)
-            case let .connectResponse(result):
-                return connectResponse(result, state: &state)
-            case .completeButtonTapped:
-                return completeButtonTapped(state: &state)
-            case let .pathChanged(path):
-                return pathChanged(path, state: &state)
-            case .dismissToast:
-                return dismissToast(state: &state)
-            case .delegate:
-                return .none
+            case .onAppear: return onAppear(state: &state)
+            case let .inviteCodeResponse(result): return inviteCodeResponse(result, state: &state)
+            case .retryInviteCodeButtonTapped: return retryInviteCodeButtonTapped(state: &state)
+            case .skipButtonTapped: return skipButtonTapped(state: &state)
+            case .skipConfirmed: return skipConfirmed(state: &state)
+            case .skipConfirmDismissed: return skipConfirmDismissed(state: &state)
+            case .codeInputButtonTapped: return codeInputButtonTapped(state: &state)
+            case let .codeChanged(code): return codeChanged(code, state: &state)
+            case .connectButtonTapped: return connectButtonTapped(state: &state)
+            case let .connectResponse(result): return connectResponse(result, state: &state)
+            case .completeButtonTapped: return completeButtonTapped(state: &state)
+            case .backButtonTapped: return backButtonTapped(state: &state)
+            case let .pathChanged(path): return pathChanged(path, state: &state)
+            case .dismissToast: return dismissToast(state: &state)
+            case .delegate: return .none
             }
         }
     }
@@ -158,6 +146,12 @@ private extension CoupleConnectFeature {
     func completeButtonTapped(state: inout State) -> Effect<Action> {
         guard let couple = state.connectedCouple else { return .none }
         return .send(.delegate(.connected(couple)))
+    }
+
+    func backButtonTapped(state: inout State) -> Effect<Action> {
+        guard !state.path.isEmpty else { return .none }
+        let path = Array(state.path.dropLast())
+        return pathChanged(path, state: &state)
     }
 
     func pathChanged(
