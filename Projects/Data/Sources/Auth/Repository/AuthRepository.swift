@@ -35,7 +35,7 @@ public struct AuthRepository: Sendable {
         }
     }
 
-    /// 서버 값이 우선. 실패하면 저장된 플래그로 버티고, 그마저 없으면 추측하지 않는다.
+    /// 서버 값이 우선. 실패하면 저장된 플래그로 버티고, 그마저 없으면 미완료로 본다.
     private func resolveOnboardingCompleted(stored session: AuthSessionDTO) async throws -> Bool {
         let completed: Bool
         do {
@@ -43,10 +43,9 @@ public struct AuthRepository: Sendable {
         } catch NetworkError.unauthorized {
             throw AuthError.unauthorized
         } catch {
-            guard let fallback = session.isOnboardingCompleted else {
-                throw AuthError.network
-            }
-            return fallback
+            // 저장값이 없는 세션은 대부분 실제로 온보딩 전이다. 미완료 사용자를 메인에 넣는 것보다
+            // 온보딩으로 보내는 쪽이 되돌릴 수 있고, 온라인으로 한 번 켜면 서버 값으로 교정된다.
+            return session.isOnboardingCompleted ?? false
         }
 
         try await authLocal.saveSession(session.with(isOnboardingCompleted: completed))
