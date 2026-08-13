@@ -20,6 +20,7 @@ public struct CoupleConnectFeature {
         public var path: [Screen]
         public var inviteCode: InviteCode?
         public var isLoadingInviteCode: Bool
+        public var hasAttemptedInviteCode: Bool
         public var inviteCodeError: String?
         public var isSkipConfirmPresented: Bool
         public var code: String
@@ -32,6 +33,7 @@ public struct CoupleConnectFeature {
             path: [Screen] = [],
             inviteCode: InviteCode? = nil,
             isLoadingInviteCode: Bool = false,
+            hasAttemptedInviteCode: Bool = false,
             inviteCodeError: String? = nil,
             isSkipConfirmPresented: Bool = false,
             code: String = "",
@@ -43,6 +45,7 @@ public struct CoupleConnectFeature {
             self.path = path
             self.inviteCode = inviteCode
             self.isLoadingInviteCode = isLoadingInviteCode
+            self.hasAttemptedInviteCode = hasAttemptedInviteCode
             self.inviteCodeError = inviteCodeError
             self.isSkipConfirmPresented = isSkipConfirmPresented
             self.code = code
@@ -171,6 +174,7 @@ private extension CoupleConnectFeature {
 
     func loadInviteCode(state: inout State) -> Effect<Action> {
         state.isLoadingInviteCode = true
+        state.hasAttemptedInviteCode = true
         state.inviteCodeError = nil
         return .run { [coupleClient] send in
             do {

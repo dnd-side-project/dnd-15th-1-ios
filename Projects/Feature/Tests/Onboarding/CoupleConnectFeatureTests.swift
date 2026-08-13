@@ -21,6 +21,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
+            $0.hasAttemptedInviteCode = true
         }
         await store.receive(\.inviteCodeResponse.success) {
             $0.isLoadingInviteCode = false
@@ -44,6 +45,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
+            $0.hasAttemptedInviteCode = true
         }
         await store.receive(\.inviteCodeResponse.failure) {
             $0.isLoadingInviteCode = false
@@ -72,6 +74,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
+            $0.hasAttemptedInviteCode = true
         }
         await store.receive(\.inviteCodeResponse.failure) {
             $0.isLoadingInviteCode = false
@@ -89,6 +92,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
+            $0.hasAttemptedInviteCode = true
         }
         await store.receive(\.inviteCodeResponse.failure) {
             $0.isLoadingInviteCode = false

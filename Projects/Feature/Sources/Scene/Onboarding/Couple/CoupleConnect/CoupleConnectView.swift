@@ -127,12 +127,16 @@ public struct CoupleConnectView: View {
                 .multilineTextAlignment(.center)
         } else if let inviteCodeError = store.inviteCodeError {
             inviteCodeFailure(inviteCodeError)
-        } else {
+            // 아직 요청 전이면 .task 가 도는 첫 프레임에 실패 UI 가 번쩍이므로 시머로 덮는다
+        } else if store.isLoadingInviteCode || !store.hasAttemptedInviteCode {
             ShimmerBlock(
                 width: Self.codePlaceholderWidth,
                 height: Self.codePlaceholderHeight,
                 cornerRadius: Self.codePlaceholderRadius
             )
+        } else {
+            // 세션 만료처럼 값도 에러도 없이 끝난 경우까지 시머가 돌지 않게 한다
+            inviteCodeFailure("코드를 불러오지 못했어요")
         }
     }
 
