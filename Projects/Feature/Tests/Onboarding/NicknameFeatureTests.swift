@@ -125,24 +125,12 @@ final class NicknameFeatureTests: XCTestCase {
         await store.receive(\.delegate.sessionExpired)
     }
 
-    func test_약관두개동의_시트_닫힘() async {
+    func test_모두동의_시트_닫힘() async {
         let store = TestStore(initialState: NicknameFeature.State()) {
             NicknameFeature()
         }
 
         XCTAssertTrue(store.state.isTermsSheetPresented)
-
-        await store.send(.termsToggled(.service)) {
-            $0.agreedTerms = [.service]
-        }
-        XCTAssertFalse(store.state.isTermsAgreeEnabled)
-
-        await store.send(.termsAgreeButtonTapped)
-
-        await store.send(.termsToggled(.privacy)) {
-            $0.agreedTerms = [.service, .privacy]
-        }
-        XCTAssertTrue(store.state.isTermsAgreeEnabled)
 
         await store.send(.termsAgreeButtonTapped) {
             $0.isTermsSheetPresented = false

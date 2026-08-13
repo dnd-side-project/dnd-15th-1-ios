@@ -281,3 +281,34 @@ final class CoupleConnectFeatureTests: XCTestCase {
         await store.receive(\.delegate.connected)
     }
 }
+
+// 위 클래스가 type_body_length 한계라 네비게이션 케이스는 따로 둔다
+@MainActor
+final class CoupleConnectNavigationTests: XCTestCase {
+    func test_뒤로가기_마지막화면_제거() async {
+        let store = TestStore(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                path: [.codeInput],
+                code: "AB12C",
+                toast: .error("요청이 많아요. 잠시 후 다시 시도해 주세요.")
+            )
+        ) {
+            CoupleConnectFeature()
+        }
+
+        await store.send(.backButtonTapped) {
+            $0.path = []
+            $0.toast = nil
+        }
+    }
+
+    func test_경로없음_뒤로가기_변화없음() async {
+        let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽")) {
+            CoupleConnectFeature()
+        }
+
+        await store.send(.backButtonTapped)
+        XCTAssertTrue(store.state.path.isEmpty)
+    }
+}
