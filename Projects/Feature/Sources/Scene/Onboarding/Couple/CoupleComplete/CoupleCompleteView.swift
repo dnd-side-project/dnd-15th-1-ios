@@ -76,7 +76,6 @@ struct CoupleCompleteView: View {
 
 #if DEBUG
 private let previewCouple = Couple(
-    id: "couple-1",
     partnerNickname: "픽둘",
     partnerIconID: 1
 )
@@ -105,7 +104,6 @@ private let previewCouple = Couple(
                     myNickname: "여섯글자닉넴",
                     path: [.codeInput, .complete],
                     connectedCouple: Couple(
-                        id: "couple-2",
                         partnerNickname: "여섯글자상대",
                         partnerIconID: 1
                     )

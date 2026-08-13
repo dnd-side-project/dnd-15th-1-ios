@@ -7,7 +7,6 @@ import XCTest
 final class CoupleConnectFeatureTests: XCTestCase {
     private let inviteCode = InviteCode(value: "AB12C", shareURL: nil)
     private let couple = Couple(
-        id: "couple-1",
         partnerNickname: "픽둘",
         partnerIconID: 1
     )
