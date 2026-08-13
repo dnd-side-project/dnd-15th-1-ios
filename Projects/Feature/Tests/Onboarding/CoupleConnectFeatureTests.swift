@@ -315,3 +315,30 @@ final class CoupleConnectNavigationTests: XCTestCase {
         XCTAssertTrue(store.state.path.isEmpty)
     }
 }
+
+// 코드 자리에 시머를 띄울지 실패를 띄울지 가르는 상태 조합만 따로 본다
+@MainActor
+final class CoupleConnectInviteCodePlaceholderTests: XCTestCase {
+    func test_세션만료로_코드도_에러도_없으면_시도완료_상태로_남는다() async {
+        let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽")) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.inviteCode = { throw CoupleError.unauthorized }
+        }
+
+        await store.send(.onAppear) {
+            $0.isLoadingInviteCode = true
+            $0.hasAttemptedInviteCode = true
+        }
+        await store.receive(\.inviteCodeResponse.failure) {
+            $0.isLoadingInviteCode = false
+        }
+        await store.receive(\.delegate.sessionExpired)
+
+        // 이 조합이면 뷰는 시머가 아니라 "코드를 불러오지 못했어요" 를 그린다
+        XCTAssertTrue(store.state.hasAttemptedInviteCode)
+        XCTAssertFalse(store.state.isLoadingInviteCode)
+        XCTAssertNil(store.state.inviteCode)
+        XCTAssertNil(store.state.inviteCodeError)
+    }
+}
