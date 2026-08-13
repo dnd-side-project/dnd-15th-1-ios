@@ -25,7 +25,6 @@ struct TermsAgreementSheet: View {
                 AppButton("모두 동의하기", style: .dark, size: .xl, fullWidth: true) {
                     store.send(.termsAgreeButtonTapped)
                 }
-                .disabled(!store.isTermsAgreeEnabled)
             }
         }
     }
@@ -53,14 +52,7 @@ struct TermsAgreementSheet: View {
 
     private func termsRow(_ terms: TermsType) -> some View {
         HStack(spacing: 0) {
-            Button {
-                store.send(.termsToggled(terms))
-            } label: {
-                checkIcon(isAgreed: store.agreedTerms.contains(terms))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+            checkIcon
 
             Text(terms.agreementTitle)
                 .typography(.body1M)
@@ -75,6 +67,8 @@ struct TermsAgreementSheet: View {
                     .resizable()
                     .frame(width: 20, height: 20)
                     .foregroundStyle(Color.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
@@ -82,12 +76,13 @@ struct TermsAgreementSheet: View {
         .padding(.horizontal, 8)
     }
 
-    private func checkIcon(isAgreed: Bool) -> some View {
-        // checkTrue 는 primaryPink 원 + 흰 체크, checkFalse 는 borderDefault 테두리 원이라 시안 그대로다
-        (isAgreed ? Image.checkTrue : Image.checkFalse)
+    // 필수 약관이라 동의는 "모두 동의하기" 하나로 끝난다. 아이콘은 항상 동의 상태를 보여준다
+    private var checkIcon: some View {
+        Image.checkTrue
             .renderingMode(.original)
             .resizable()
             .frame(width: 24, height: 24)
+            .frame(width: 44, height: 44)
     }
 }
 
@@ -102,19 +97,9 @@ private extension TermsType {
 }
 
 #if DEBUG
-#Preview("미동의") {
+#Preview("약관 동의") {
     TermsAgreementSheet(
         store: Store(initialState: NicknameFeature.State()) {
-            NicknameFeature()
-        }
-    )
-}
-
-#Preview("모두 동의") {
-    TermsAgreementSheet(
-        store: Store(
-            initialState: NicknameFeature.State(agreedTerms: [.service, .privacy])
-        ) {
             NicknameFeature()
         }
     )

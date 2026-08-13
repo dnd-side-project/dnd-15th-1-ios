@@ -8,7 +8,7 @@ public struct NicknameFeature {
     /// 시안에 프로필 아이콘 선택이 없어 서버 계약상 필요한 값만 고정으로 보낸다
     static let iconID = 1
 
-    /// 표시 순서 겸 필수 동의 항목
+    /// 시트가 그리는 필수 동의 항목과 그 표시 순서
     static let requiredTerms: [TermsType] = [.service, .privacy]
 
     @ObservableState
@@ -18,7 +18,6 @@ public struct NicknameFeature {
         public var inlineError: String?
         public var toast: ToastState?
         public var isTermsSheetPresented: Bool
-        public var agreedTerms: Set<TermsType>
         public var presentedTerms: TermsType?
 
         public init(
@@ -27,7 +26,6 @@ public struct NicknameFeature {
             inlineError: String? = nil,
             toast: ToastState? = nil,
             isTermsSheetPresented: Bool = true,
-            agreedTerms: Set<TermsType> = [],
             presentedTerms: TermsType? = nil
         ) {
             self.nickname = nickname
@@ -35,7 +33,6 @@ public struct NicknameFeature {
             self.inlineError = inlineError
             self.toast = toast
             self.isTermsSheetPresented = isTermsSheetPresented
-            self.agreedTerms = agreedTerms
             self.presentedTerms = presentedTerms
         }
 
@@ -50,10 +47,6 @@ public struct NicknameFeature {
         public var lengthError: String? {
             trimmedNickname.count > 6 ? "최대 6글자 내로 입력해주세요" : nil
         }
-
-        public var isTermsAgreeEnabled: Bool {
-            agreedTerms.isSuperset(of: NicknameFeature.requiredTerms)
-        }
     }
 
     public enum Action: Equatable {
@@ -61,7 +54,6 @@ public struct NicknameFeature {
         case nicknameChanged(String)
         case nextButtonTapped
         case updateNicknameResponse(Result<UserProfile, ProfileError>)
-        case termsToggled(TermsType)
         case termsDetailTapped(TermsType)
         case dismissTermsDetail
         case termsAgreeButtonTapped
@@ -92,15 +84,12 @@ public struct NicknameFeature {
                 return nextButtonTapped(state: &state)
             case let .updateNicknameResponse(result):
                 return updateNicknameResponse(result, state: &state)
-            case let .termsToggled(terms):
-                return termsToggled(terms, state: &state)
             case let .termsDetailTapped(terms):
                 return termsDetailTapped(terms, state: &state)
             case .dismissTermsDetail:
                 state.presentedTerms = nil
                 return .none
             case .termsAgreeButtonTapped:
-                guard state.isTermsAgreeEnabled else { return .none }
                 state.isTermsSheetPresented = false
                 return .none
             case .dismissToast:
@@ -161,18 +150,6 @@ private extension NicknameFeature {
             state.toast = .error("잠시 후 다시 시도해 주세요.")
             return .none
         }
-    }
-
-    func termsToggled(
-        _ terms: TermsType,
-        state: inout State
-    ) -> Effect<Action> {
-        if state.agreedTerms.contains(terms) {
-            state.agreedTerms.remove(terms)
-        } else {
-            state.agreedTerms.insert(terms)
-        }
-        return .none
     }
 
     func termsDetailTapped(
