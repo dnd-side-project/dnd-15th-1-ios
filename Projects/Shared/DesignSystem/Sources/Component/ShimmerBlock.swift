@@ -1,17 +1,21 @@
-import SharedDesignSystem
 import SwiftUI
 
 /// 로딩 자리표시자. 바탕색 위로 밝은 띠를 좌 → 우로 흘린다. 새 에셋 없이 그라데이션만 쓴다
 /// 크기를 안 잡고 부모가 준 자리를 채운다. 호출부에서 `.frame` 으로 치수를 준다
-struct ShimmerBlock: View {
-    var cornerRadius: CGFloat = 0
-    var baseColor: Color = .gray50
+public struct ShimmerBlock: View {
+    private let cornerRadius: CGFloat
+    private let baseColor: Color
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var phase: CGFloat = -1
 
-    var body: some View {
+    public init(cornerRadius: CGFloat = 0, baseColor: Color = .gray50) {
+        self.cornerRadius = cornerRadius
+        self.baseColor = baseColor
+    }
+
+    public var body: some View {
         RoundedRectangle(cornerRadius: cornerRadius)
             .fill(baseColor)
             .overlay {
