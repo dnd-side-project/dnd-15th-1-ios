@@ -1,10 +1,3 @@
-//
-//  PlaceClient+Mock.swift
-//  Dulpick
-//
-//  임시 mock 데이터
-//
-
 import Foundation
 import ThirdParty
 

@@ -1,13 +1,7 @@
-//
-//  CourseClient+Mock.swift
-//  Dulpick
-//
-//  임시 mock 데이터. 서버 명세가 나오면 통째로 걷어낸다
-//
-
 import Foundation
 import ThirdParty
 
+/// 임시 mock 데이터. 서버 명세가 나오면 통째로 걷어낸다
 public extension CourseClient {
     static let mock = CourseClient(
         createCourse: { scheduledAt, placeIDs in
