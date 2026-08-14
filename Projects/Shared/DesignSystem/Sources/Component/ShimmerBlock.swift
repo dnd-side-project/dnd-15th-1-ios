@@ -10,6 +10,10 @@ public struct ShimmerBlock: View {
 
     @State private var phase: CGFloat = -1
 
+    /// 시머 자리표시자를 만든다.
+    /// - Parameters:
+    ///   - cornerRadius: 모서리 반경. 기본값 `0`
+    ///   - baseColor: 띠가 흐르는 바탕색. 기본값 `gray50`. 이미지 자리에는 `gray300` 을 넘긴다
     public init(cornerRadius: CGFloat = 0, baseColor: Color = .gray50) {
         self.cornerRadius = cornerRadius
         self.baseColor = baseColor
