@@ -33,6 +33,7 @@ public struct ShimmerBlock: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .onAppear(perform: startAnimation)
+            .onChange(of: reduceMotion, handleReduceMotionChange)
     }
 
     private func band(width: CGFloat) -> some View {
@@ -50,8 +51,17 @@ public struct ShimmerBlock: View {
         .allowsHitTesting(false)
     }
 
+    /// 동작 줄이기가 꺼지면(= 애니메이션 허용) 다시 흘린다
+    private func handleReduceMotionChange(_ oldValue: Bool, _ newValue: Bool) {
+        guard !newValue else { return }
+        startAnimation()
+    }
+
     private func startAnimation() {
         guard !reduceMotion else { return }
+        // 다시 나타났을 때 `phase` 가 `1` 로 남아 있으면 값이 안 바뀌어 애니메이션이 안 걸린다
+        // 같은 트랜잭션에 묶이면 되돌리기까지 애니메이션돼 띠가 거꾸로 지나가므로 애니메이션 밖에서 되돌린다
+        phase = -1
         withAnimation(.linear(duration: 1.3).repeatForever(autoreverses: false)) {
             phase = 1
         }
