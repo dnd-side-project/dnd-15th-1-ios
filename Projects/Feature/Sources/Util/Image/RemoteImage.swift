@@ -10,6 +10,10 @@ public struct RemoteImage: View {
     private let url: URL?
     private let cornerRadius: CGFloat
 
+    /// 원격 이미지를 표시한다.
+    /// - Parameters:
+    ///   - url: 받아올 이미지 주소. `nil` 이면 실패와 같은 자리표시가 보인다
+    ///   - cornerRadius: 이미지와 자리표시에 함께 적용할 모서리 반경. 기본값 `0`
     public init(url: URL?, cornerRadius: CGFloat = 0) {
         self.url = url
         self.cornerRadius = cornerRadius
