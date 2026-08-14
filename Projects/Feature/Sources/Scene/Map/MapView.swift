@@ -1,3 +1,4 @@
+import Domain
 import SwiftUI
 import ThirdParty
 
@@ -9,8 +10,30 @@ public struct MapView: View {
     }
 
     public var body: some View {
-        Color.clear
-            .navigationTitle("지도")
-            .task { store.send(.onAppear) }
+        DulpickMapView(
+            camera: Binding(
+                get: { store.camera },
+                set: { store.send(.cameraChanged($0)) }
+            ),
+            markers: store.markers,
+            onMarkerTap: { store.send(.markerTapped($0)) }
+        )
+        .ignoresSafeArea()
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear { store.send(.onAppear) }
     }
 }
+
+#if DEBUG
+#Preview {
+    KakaoMapPreviewContainer {
+        MapView(
+            store: Store(initialState: MapFeature.State()) {
+                MapFeature()
+            } withDependencies: {
+                $0.placeClient = .mock
+            }
+        )
+    }
+}
+#endif
