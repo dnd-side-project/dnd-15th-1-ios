@@ -86,7 +86,6 @@ private let previewCouple = Couple(
             store: Store(
                 initialState: CoupleConnectFeature.State(
                     myNickname: "둘픽",
-                    path: [.codeInput, .complete],
                     connectedCouple: previewCouple
                 )
             ) {
@@ -102,7 +101,6 @@ private let previewCouple = Couple(
             store: Store(
                 initialState: CoupleConnectFeature.State(
                     myNickname: "여섯글자닉넴",
-                    path: [.codeInput, .complete],
                     connectedCouple: Couple(
                         partnerNickname: "여섯글자상대",
                         partnerIconID: 1

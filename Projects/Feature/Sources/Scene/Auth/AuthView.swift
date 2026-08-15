@@ -51,9 +51,6 @@ public struct AuthView: View {
                     .ignoresSafeArea()
             }
         }
-        .task {
-            store.send(.onAppear)
-        }
     }
 
     private var providers: [AuthProvider] { [.apple, .kakao, .google] }

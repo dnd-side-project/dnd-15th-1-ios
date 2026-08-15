@@ -8,16 +8,15 @@ public struct CoupleConnectFeature {
     /// 초대 코드 자릿수. 다 차야 CTA 가 열리고 자동 제출은 없다
     static let codeLength = 5
 
-    /// 루트 아래로 push 되는 화면. 리듀서는 하나고 이 값 배열이 네비게이션 경로다
-    public enum Screen: Hashable {
-        case codeInput
-        case complete
+    /// 영문·숫자만 남기고 대문자로 올린 뒤 자릿수만큼 자른다. 붙여넣기도 같은 경로를 탄다
+    static func normalizedCode(_ raw: String) -> String {
+        let filtered = raw.filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+        return String(filtered.uppercased().prefix(codeLength))
     }
 
     @ObservableState
     public struct State: Equatable {
         public var myNickname: String
-        public var path: [Screen]
         public var inviteCode: InviteCode?
         public var isLoadingInviteCode: Bool
         public var hasAttemptedInviteCode: Bool
@@ -30,7 +29,6 @@ public struct CoupleConnectFeature {
 
         public init(
             myNickname: String,
-            path: [Screen] = [],
             inviteCode: InviteCode? = nil,
             isLoadingInviteCode: Bool = false,
             hasAttemptedInviteCode: Bool = false,
@@ -42,7 +40,6 @@ public struct CoupleConnectFeature {
             toast: ToastState? = nil
         ) {
             self.myNickname = myNickname
-            self.path = path
             self.inviteCode = inviteCode
             self.isLoadingInviteCode = isLoadingInviteCode
             self.hasAttemptedInviteCode = hasAttemptedInviteCode
@@ -76,12 +73,15 @@ public struct CoupleConnectFeature {
         case connectResponse(Result<Couple, CoupleError>)
         case completeButtonTapped
         case backButtonTapped
-        case pathChanged([Screen])
         case dismissToast
         case delegate(Delegate)
 
+        /// 앞 세 개는 커플 구간 안에서의 화면 전환 요청이고, `connected` / `skipped` 는 구간을 벗어난다
         @CasePathable
         public enum Delegate: Equatable {
+            case showCodeInput
+            case showComplete
+            case back
             case connected(Couple)
             case skipped
             case sessionExpired
@@ -101,13 +101,12 @@ public struct CoupleConnectFeature {
             case .skipButtonTapped: return skipButtonTapped(state: &state)
             case .skipConfirmed: return skipConfirmed(state: &state)
             case .skipConfirmDismissed: return skipConfirmDismissed(state: &state)
-            case .codeInputButtonTapped: return codeInputButtonTapped(state: &state)
+            case .codeInputButtonTapped: return codeInputButtonTapped()
             case let .codeChanged(code): return codeChanged(code, state: &state)
             case .connectButtonTapped: return connectButtonTapped(state: &state)
             case let .connectResponse(result): return connectResponse(result, state: &state)
             case .completeButtonTapped: return completeButtonTapped(state: &state)
             case .backButtonTapped: return backButtonTapped(state: &state)
-            case let .pathChanged(path): return pathChanged(path, state: &state)
             case .dismissToast: return dismissToast(state: &state)
             case .delegate: return .none
             }
@@ -141,9 +140,8 @@ private extension CoupleConnectFeature {
         return .none
     }
 
-    func codeInputButtonTapped(state: inout State) -> Effect<Action> {
-        state.path.append(.codeInput)
-        return .none
+    func codeInputButtonTapped() -> Effect<Action> {
+        .send(.delegate(.showCodeInput))
     }
 
     func completeButtonTapped(state: inout State) -> Effect<Action> {
@@ -152,19 +150,9 @@ private extension CoupleConnectFeature {
     }
 
     func backButtonTapped(state: inout State) -> Effect<Action> {
-        guard !state.path.isEmpty else { return .none }
-        let path = Array(state.path.dropLast())
-        return pathChanged(path, state: &state)
-    }
-
-    func pathChanged(
-        _ path: [Screen],
-        state: inout State
-    ) -> Effect<Action> {
-        state.path = path
         // 이전 화면에서 띄운 알림은 경로가 바뀌면 더 이상 유효하지 않다
         state.toast = nil
-        return .none
+        return .send(.delegate(.back))
     }
 
     func dismissToast(state: inout State) -> Effect<Action> {
@@ -211,9 +199,13 @@ private extension CoupleConnectFeature {
         _ code: String,
         state: inout State
     ) -> Effect<Action> {
+        // 입력칸이 잠겼다 풀리면 텍스트필드가 같은 값을 그대로 돌려보낸다.
+        // 그걸 입력으로 치면 방금 띄운 실패 메시지가 바로 지워진다
+        let normalized = Self.normalizedCode(code)
+        guard normalized != state.code else { return .none }
         // 코드를 고치면 실패 메시지도 같이 사라진다
         state.toast = nil
-        state.code = normalizedCode(code)
+        state.code = normalized
         return .none
     }
 
@@ -240,8 +232,7 @@ private extension CoupleConnectFeature {
         switch result {
         case let .success(couple):
             state.connectedCouple = couple
-            state.path.append(.complete)
-            return .none
+            return .send(.delegate(.showComplete))
         case let .failure(error):
             return handleConnectFailure(error, state: &state)
         }
@@ -271,12 +262,6 @@ private extension CoupleConnectFeature {
             return .none
         }
     }
-}
-
-/// 영문·숫자만 남기고 대문자로 올린 뒤 앞 5자만 취한다. 붙여넣기도 같은 경로를 탄다
-private func normalizedCode(_ raw: String) -> String {
-    let filtered = raw.filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
-    return String(filtered.uppercased().prefix(CoupleConnectFeature.codeLength))
 }
 
 private func mapCoupleError(_ error: Error) -> CoupleError {

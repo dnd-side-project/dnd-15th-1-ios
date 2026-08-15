@@ -4,7 +4,7 @@ import SwiftUI
 import ThirdParty
 
 public struct CoupleConnectView: View {
-    // 코드 자리표시자. 로딩 시머와 실패 후 재시도 블록이 같은 치수를 쓴다
+    // 코드 placeholder. 로딩 시머와 실패 후 재시도 블록이 같은 치수를 쓴다
     static let codePlaceholderWidth: CGFloat = 160
     static let codePlaceholderHeight: CGFloat = 48
     static let codePlaceholderRadius: CGFloat = 8
@@ -20,39 +20,25 @@ public struct CoupleConnectView: View {
     }
 
     public var body: some View {
-        NavigationStack(path: pathBinding) {
-            rootContent
-                .navigationTitle("커플 연결")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { backToolbar }
-                .navigationDestination(for: CoupleConnectFeature.Screen.self) { screen in
-                    destination(screen)
-                }
-                .task {
-                    store.send(.onAppear)
-                }
-        }
-        .modal(isPresented: skipConfirmBinding) {
-            ModalContent(
-                title: "다음과 같은 둘픽의 기능들을 사용할 수 없어요!",
-                content: "괜찮으신가요?",
-                image: Image.coupleConnectModal.resizable(),
-                primaryTitle: "연결할게요",
-                primaryAction: { store.send(.skipConfirmDismissed) },
-                secondaryTitle: "네",
-                secondaryAction: { store.send(.skipConfirmed) }
-            )
-        }
-    }
-
-    @ViewBuilder
-    private func destination(_ screen: CoupleConnectFeature.Screen) -> some View {
-        switch screen {
-        case .codeInput:
-            CoupleCodeInputView(store: store)
-        case .complete:
-            CoupleCompleteView(store: store)
-        }
+        rootContent
+            .navigationTitle("커플 연결")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbar { backToolbar }
+            .onAppear {
+                store.send(.onAppear)
+            }
+            .modal(isPresented: skipConfirmBinding) {
+                ModalContent(
+                    title: "다음과 같은 둘픽의 기능들을 사용할 수 없어요!",
+                    content: "괜찮으신가요?",
+                    image: Image.coupleConnectModal.resizable(),
+                    primaryTitle: "연결할게요",
+                    primaryAction: { store.send(.skipConfirmDismissed) },
+                    secondaryTitle: "네",
+                    secondaryAction: { store.send(.skipConfirmed) }
+                )
+            }
     }
 
     private var rootContent: some View {
@@ -98,7 +84,7 @@ public struct CoupleConnectView: View {
     private var backToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             Button {
-                // 시안대로 자리만 둔다. 실제 pop 은 상위 네비게이션이 붙인다
+                store.send(.backButtonTapped)
             } label: {
                 Image.arrowLeft
                     .renderingMode(.original)
@@ -210,13 +196,6 @@ public struct CoupleConnectView: View {
         }
     }
 
-    private var pathBinding: Binding<[CoupleConnectFeature.Screen]> {
-        Binding(
-            get: { store.path },
-            set: { store.send(.pathChanged($0)) }
-        )
-    }
-
     // dim 탭으로 닫혀도 되는 모달이라 false 가 들어오면 그대로 닫기 액션을 보낸다
     private var skipConfirmBinding: Binding<Bool> {
         Binding(
@@ -232,68 +211,78 @@ public struct CoupleConnectView: View {
 
 #if DEBUG
 #Preview("코드 로딩") {
-    CoupleConnectView(
-        store: Store(
-            initialState: CoupleConnectFeature.State(
-                myNickname: "둘픽",
-                isLoadingInviteCode: true
-            )
-        ) {
-            CoupleConnectFeature()
-        }
-    )
+    NavigationStack {
+        CoupleConnectView(
+            store: Store(
+                initialState: CoupleConnectFeature.State(
+                    myNickname: "둘픽",
+                    isLoadingInviteCode: true
+                )
+            ) {
+                CoupleConnectFeature()
+            }
+        )
+    }
 }
 
 #Preview("코드 표시") {
-    CoupleConnectView(
-        store: Store(
-            initialState: CoupleConnectFeature.State(
-                myNickname: "둘픽",
-                inviteCode: InviteCode(value: "AB12C", shareURL: nil)
-            )
-        ) {
-            CoupleConnectFeature()
-        }
-    )
+    NavigationStack {
+        CoupleConnectView(
+            store: Store(
+                initialState: CoupleConnectFeature.State(
+                    myNickname: "둘픽",
+                    inviteCode: InviteCode(value: "AB12C", shareURL: nil)
+                )
+            ) {
+                CoupleConnectFeature()
+            }
+        )
+    }
 }
 
 #Preview("코드 실패 · 네트워크") {
-    CoupleConnectView(
-        store: Store(
-            initialState: CoupleConnectFeature.State(
-                myNickname: "둘픽",
-                inviteCodeError: "네트워크 연결을 확인해 주세요"
-            )
-        ) {
-            CoupleConnectFeature()
-        }
-    )
+    NavigationStack {
+        CoupleConnectView(
+            store: Store(
+                initialState: CoupleConnectFeature.State(
+                    myNickname: "둘픽",
+                    inviteCodeError: "네트워크 연결을 확인해 주세요"
+                )
+            ) {
+                CoupleConnectFeature()
+            }
+        )
+    }
 }
 
 #Preview("코드 실패 · 알 수 없음") {
-    CoupleConnectView(
-        store: Store(
-            initialState: CoupleConnectFeature.State(
-                myNickname: "둘픽",
-                inviteCodeError: "잠시 후 다시 시도해 주세요"
-            )
-        ) {
-            CoupleConnectFeature()
-        }
-    )
+    NavigationStack {
+        CoupleConnectView(
+            store: Store(
+                initialState: CoupleConnectFeature.State(
+                    myNickname: "둘픽",
+                    inviteCodeError: "잠시 후 다시 시도해 주세요"
+                )
+            ) {
+                CoupleConnectFeature()
+            }
+        )
+    }
 }
 
 #Preview("스킵 확인") {
-    CoupleConnectView(
-        store: Store(
-            initialState: CoupleConnectFeature.State(
-                myNickname: "둘픽",
-                inviteCode: InviteCode(value: "AB12C", shareURL: nil),
-                isSkipConfirmPresented: true
-            )
-        ) {
-            CoupleConnectFeature()
-        }
-    )
+    NavigationStack {
+        CoupleConnectView(
+            store: Store(
+                initialState: CoupleConnectFeature.State(
+                    myNickname: "둘픽",
+                    inviteCode: InviteCode(value: "AB12C", shareURL: nil),
+                    isSkipConfirmPresented: true
+                )
+            ) {
+                CoupleConnectFeature()
+            }
+        )
+    }
 }
 #endif
