@@ -9,7 +9,7 @@ final class ProfileRepositoryTests: XCTestCase {
     private let profilePath = "/api/v1/members/me/profile"
     private let datePreferencesPath = "/api/v1/members/me/date-preferences"
 
-    func test_온보딩_미완료면_POST로_초기화하고_성향에_빈문자열_객체를_보낸다() async throws {
+    func test_온보딩_미완료면_POST로_초기화하고_성향에_placeholder_enum을_보낸다() async throws {
         let network = StubNetworkClient()
         network.responses["GET \(memberPath)"] = MemberResponseDTO(
             memberId: 1,
@@ -51,10 +51,10 @@ final class ProfileRepositoryTests: XCTestCase {
             XCTFail("Expected datePreferences object")
             return
         }
-        XCTAssertEqual(preferences["indoorOutdoor"] as? String, "")
-        XCTAssertEqual(preferences["activityLevel"] as? String, "")
-        XCTAssertEqual(preferences["dateTime"] as? String, "")
-        XCTAssertEqual(preferences["dateFocus"] as? String, "")
+        XCTAssertEqual(preferences["indoorOutdoor"] as? String, "INDOOR")
+        XCTAssertEqual(preferences["activityLevel"] as? String, "ACTIVE")
+        XCTAssertEqual(preferences["dateTime"] as? String, "DAY")
+        XCTAssertEqual(preferences["dateFocus"] as? String, "FOOD")
         XCTAssertEqual(preferences.count, 4)
     }
 
