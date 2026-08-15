@@ -12,10 +12,12 @@ public extension PlaceClient {
 
             return Place.mocks.filter { $0.name.localizedCaseInsensitiveContains(keyword) }
         },
-        savePlace: { kakaoPlaceID, query, alias, memo in
-            let place = Place.mocks.first { $0.kakaoPlaceID == kakaoPlaceID }
-                ?? Place.mocks.first { $0.name.contains(query) }
-                ?? Place.mocks[0]
+        savePlace: { kakaoPlaceID, _, alias, memo in
+            // 못 찾으면 폴백하지 않는다. 엉뚱한 장소를 저장 성공으로 돌려주면
+            // 호출한 쪽이 요청한 장소가 저장됐다고 믿는다
+            guard let place = Place.mocks.first(where: { $0.kakaoPlaceID == kakaoPlaceID }) else {
+                throw PlaceError.notFound
+            }
 
             return SavedPlace(
                 place: place,
