@@ -197,7 +197,8 @@ public enum ProjectFactory {
                 makeAppScheme(
                     name: "Dulpick-Debug",
                     targetName: name,
-                    configuration: ProjectEnvironment.debugConfigName
+                    configuration: ProjectEnvironment.debugConfigName,
+                    launchArguments: debugLaunchArguments
                 ),
                 makeAppScheme(
                     name: "Dulpick",
@@ -216,10 +217,18 @@ public enum ProjectFactory {
         )
     }
 
+    /// DEBUG 전용 강제 진입 스위치. 기본은 꺼진 상태로 Xcode 인자 목록에만 올려둔다.
+    /// 이름은 `App/Sources/DI/DebugLaunchOverride.swift` 와 맞춘다.
+    private static let debugLaunchArguments: [LaunchArgument] = [
+        .launchArgument(name: "-forceAppIntro", isEnabled: false),
+        .launchArgument(name: "-forceOnboarding", isEnabled: false),
+    ]
+
     private static func makeAppScheme(
         name: String,
         targetName: String,
-        configuration: ConfigurationName
+        configuration: ConfigurationName,
+        launchArguments: [LaunchArgument] = []
     ) -> Scheme {
         .scheme(
             name: name,
@@ -227,7 +236,10 @@ public enum ProjectFactory {
             buildAction: .buildAction(targets: [.target(targetName)]),
             runAction: .runAction(
                 configuration: configuration,
-                executable: .target(targetName)
+                executable: .target(targetName),
+                arguments: launchArguments.isEmpty
+                    ? nil
+                    : .arguments(launchArguments: launchArguments)
             ),
             archiveAction: .archiveAction(configuration: configuration),
             profileAction: .profileAction(
