@@ -107,6 +107,7 @@ extension DulpickMapView {
             // 안 비우면 다음 엔진에 스타일을 다시 등록하지 않는다
             registeredPoiStyleIDs.removeAll()
             containerSize = nil
+            invalidateAppliedState()
         }
 
         // MARK: - 상태 반영
@@ -150,6 +151,15 @@ extension DulpickMapView {
                 drawUserLocation(map)
                 appliedUserLocation = desiredUserLocation
             }
+        }
+
+        /// 엔진이 리셋되면 레이어가 비므로 applied 캐시도 전부 무효다.
+        /// 호출 지점마다 나열하면 하나씩 빠뜨리게 돼서 여기 한곳에 모아 둔다
+        private func invalidateAppliedState() {
+            appliedCamera = nil
+            appliedMarkers = nil
+            appliedRoutes = nil
+            appliedUserLocation = nil
         }
 
         // MARK: - 레이어 그리기
@@ -305,9 +315,7 @@ extension DulpickMapView {
             applyPendingSize(to: map)
 
             isMapReady = true
-            appliedMarkers = nil
-            appliedRoutes = nil
-            appliedCamera = nil
+            invalidateAppliedState()
             render()
         }
 
