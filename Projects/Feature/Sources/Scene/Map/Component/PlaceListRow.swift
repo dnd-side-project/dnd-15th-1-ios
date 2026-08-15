@@ -41,6 +41,12 @@ private enum PlaceListRowMetric {
 /// }
 /// ```
 ///
+/// 썸네일과 우측 슬롯은 각각 없어도 된다. 넷 다 조합할 수 있다.
+///
+/// ```swift
+/// PlaceListRow(icon: .categoryCafe, name: name, address: address)
+/// ```
+///
 /// `Domain` 타입을 받지 않는다. 값만 받는다.
 public struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     private let icon: Image
@@ -49,6 +55,8 @@ public struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     private let thumbnailURLs: [URL]
     private let thumbnail: (URL) -> Thumbnail
     private let trailing: Trailing
+    /// 우측 슬롯을 둘지. `false` 면 24 칸도 그 앞 여백도 만들지 않아 장소명이 남는 폭을 다 쓴다.
+    private let hasTrailing: Bool
 
     public init(
         icon: Image,
@@ -58,12 +66,33 @@ public struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         @ViewBuilder thumbnail: @escaping (URL) -> Thumbnail,
         @ViewBuilder trailing: () -> Trailing
     ) {
+        self.init(
+            icon: icon,
+            name: name,
+            address: address,
+            thumbnailURLs: thumbnailURLs,
+            thumbnail: thumbnail,
+            trailing: trailing(),
+            hasTrailing: true
+        )
+    }
+
+    private init(
+        icon: Image,
+        name: String,
+        address: String,
+        thumbnailURLs: [URL],
+        thumbnail: @escaping (URL) -> Thumbnail,
+        trailing: Trailing,
+        hasTrailing: Bool
+    ) {
         self.icon = icon
         self.name = name
         self.address = address
         self.thumbnailURLs = thumbnailURLs
         self.thumbnail = thumbnail
-        self.trailing = trailing()
+        self.trailing = trailing
+        self.hasTrailing = hasTrailing
     }
 
     public var body: some View {
@@ -97,14 +126,17 @@ public struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
                     .lineLimit(1)
             }
 
-            Spacer(minLength: Spacing.s12)
+            // 우측 슬롯이 없는 행은 앞 여백도 두지 않는다. 빈 24 칸과 12 여백이 남으면 글자 폭만 줄어든다.
+            Spacer(minLength: hasTrailing ? Spacing.s12 : 0)
 
-            // 아이콘과 같은 높이를 확보해 장소명 줄에 맞춘다. 슬롯은 24 × 24 로 고정이다.
-            trailing
-                .frame(
-                    width: PlaceListRowMetric.iconSize,
-                    height: PlaceListRowMetric.iconSize
-                )
+            if hasTrailing {
+                // 아이콘과 같은 높이를 확보해 장소명 줄에 맞춘다. 슬롯은 24 × 24 로 고정이다.
+                trailing
+                    .frame(
+                        width: PlaceListRowMetric.iconSize,
+                        height: PlaceListRowMetric.iconSize
+                    )
+            }
         }
         .padding(.horizontal, Spacing.s20)
     }
@@ -154,6 +186,46 @@ public extension PlaceListRow where Thumbnail == EmptyView {
             thumbnailURLs: [],
             thumbnail: { _ in EmptyView() },
             trailing: trailing
+        )
+    }
+}
+
+// MARK: - 우측 슬롯 없는 행
+
+extension PlaceListRow where Trailing == EmptyView {
+    /// 배지도 버튼도 없는 행. 슬롯 자리와 그 앞 여백을 두지 않아 장소명이 남는 폭을 다 쓴다.
+    init(
+        icon: Image,
+        name: String,
+        address: String,
+        thumbnailURLs: [URL] = [],
+        @ViewBuilder thumbnail: @escaping (URL) -> Thumbnail
+    ) {
+        self.init(
+            icon: icon,
+            name: name,
+            address: address,
+            thumbnailURLs: thumbnailURLs,
+            thumbnail: thumbnail,
+            trailing: EmptyView(),
+            hasTrailing: false
+        )
+    }
+}
+
+// MARK: - 썸네일도 우측 슬롯도 없는 행
+
+extension PlaceListRow where Thumbnail == EmptyView, Trailing == EmptyView {
+    /// 아이콘 · 장소명 · 주소만 있는 가장 짧은 행.
+    init(icon: Image, name: String, address: String) {
+        self.init(
+            icon: icon,
+            name: name,
+            address: address,
+            thumbnailURLs: [],
+            thumbnail: { _ in EmptyView() },
+            trailing: EmptyView(),
+            hasTrailing: false
         )
     }
 }
@@ -314,8 +386,34 @@ private struct PlaceListRowPreviewMark: View {
             icon: .categoryTourism,
             name: "아주 긴 장소명이 들어오면 한 줄에서 잘린다 아주 긴 장소명",
             address: PlaceListRowPreview.address
+        )
+    }
+}
+
+// 우측 슬롯이 없으면 24 칸과 그 앞 여백이 사라져 장소명이 그만큼 더 나온다
+#Preview("우측 슬롯 없는 행") {
+    VStack(spacing: 0) {
+        PlaceListRow(
+            icon: .categoryTourism,
+            name: "아주 긴 장소명이 들어오면 한 줄에서 잘린다 아주 긴 장소명",
+            address: PlaceListRowPreview.address
         ) {
-            EmptyView()
+            PlaceListRowPreviewMark(number: nil)
+        }
+
+        PlaceListRow(
+            icon: .categoryTourism,
+            name: "아주 긴 장소명이 들어오면 한 줄에서 잘린다 아주 긴 장소명",
+            address: PlaceListRowPreview.address
+        )
+
+        PlaceListRow(
+            icon: .categoryFood,
+            name: PlaceListRowPreview.name,
+            address: PlaceListRowPreview.address,
+            thumbnailURLs: PlaceListRowPreview.thumbnailURLs
+        ) { url in
+            RemoteImage(url: url)
         }
     }
 }

@@ -1,10 +1,12 @@
 import SharedDesignSystem
 import SwiftUI
 
-// MARK: - PlaceSelectionState
+// MARK: - PlaceNumberBadgeState
 
-/// 코스에 담을 장소를 고른 상태. 고르면 담긴 순서가 번호로 붙는다.
-public enum PlaceSelectionState: Equatable {
+/// 배지가 어떤 모습인지. 빈 원이거나 순번이 든 원이다.
+///
+/// 화면의 선택 상태가 아니라 이 배지 하나의 모습만 가리킨다.
+enum PlaceNumberBadgeState: Equatable {
     case unselected
     case number(Int)
 }
@@ -34,9 +36,9 @@ private enum PlaceNumberBadgeMetric {
 /// }
 /// ```
 public struct PlaceNumberBadge: View {
-    private let state: PlaceSelectionState
+    private let state: PlaceNumberBadgeState
 
-    public init(state: PlaceSelectionState) {
+    init(state: PlaceNumberBadgeState) {
         self.state = state
     }
 

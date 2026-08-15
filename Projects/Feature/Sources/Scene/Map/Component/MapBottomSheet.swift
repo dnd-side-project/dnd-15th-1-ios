@@ -59,6 +59,9 @@ private enum MapBottomSheetMetric {
 /// 딤이 없고 아래층이 그대로 조작되어야 해서 `ZStack` 의 위층에 얹어 쓴다.
 /// 시트 밖 영역은 배경이 없어 터치를 가로채지 않는다.
 ///
+/// 잡이 막대 아래로 헤더 · 본문 · 푸터 세 자리를 받는다.
+/// 헤더와 푸터는 고정이고 본문만 스크롤한다. 둘 다 기본값이 있어 본문만 넘겨도 된다.
+///
 /// ```swift
 /// ZStack(alignment: .bottom) {
 ///     MapView()
@@ -67,14 +70,16 @@ private enum MapBottomSheetMetric {
 ///     }
 /// }
 /// ```
-public struct MapBottomSheet<Content: View>: View {
+struct MapBottomSheet<Header: View, Content: View, Footer: View>: View {
 
     // 내부 ScrollView 를 시트가 직접 갖는다.
     // 호출부가 scrollDisabled·onScrollGeometryChange 를 매번 붙일 필요 없이 내용만 넘기면 되기 때문이다.
     private let detents: [SheetDetent]
     @Binding private var selection: SheetDetent
     private let onHeightChange: ((CGFloat) -> Void)?
+    private let header: Header
     private let content: Content
+    private let footer: Footer
 
     @State private var dragTranslation: CGFloat = 0
     @State private var scrollOffset: CGFloat = 0
@@ -91,12 +96,16 @@ public struct MapBottomSheet<Content: View>: View {
         detents: [SheetDetent],
         selection: Binding<SheetDetent>,
         onHeightChange: ((CGFloat) -> Void)? = nil,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
     ) {
         self.detents = detents
         self._selection = selection
         self.onHeightChange = onHeightChange
+        self.header = header()
         self.content = content()
+        self.footer = footer()
     }
 
     public var body: some View {
@@ -107,14 +116,78 @@ public struct MapBottomSheet<Content: View>: View {
     }
 }
 
+// MARK: - Convenience Init
+
+// 기본값 있는 @ViewBuilder 파라미터는 제네릭 추론이 걸리지 않아 편의 이니셜라이저로 나눠 둔다.
+
+extension MapBottomSheet where Header == EmptyView, Footer == EmptyView {
+
+    init(
+        detents: [SheetDetent],
+        selection: Binding<SheetDetent>,
+        onHeightChange: ((CGFloat) -> Void)? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            detents: detents,
+            selection: selection,
+            onHeightChange: onHeightChange,
+            header: { EmptyView() },
+            content: content,
+            footer: { EmptyView() }
+        )
+    }
+}
+
+extension MapBottomSheet where Footer == EmptyView {
+
+    init(
+        detents: [SheetDetent],
+        selection: Binding<SheetDetent>,
+        onHeightChange: ((CGFloat) -> Void)? = nil,
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            detents: detents,
+            selection: selection,
+            onHeightChange: onHeightChange,
+            header: header,
+            content: content,
+            footer: { EmptyView() }
+        )
+    }
+}
+
+extension MapBottomSheet where Header == EmptyView {
+
+    init(
+        detents: [SheetDetent],
+        selection: Binding<SheetDetent>,
+        onHeightChange: ((CGFloat) -> Void)? = nil,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
+    ) {
+        self.init(
+            detents: detents,
+            selection: selection,
+            onHeightChange: onHeightChange,
+            header: { EmptyView() },
+            content: content,
+            footer: footer
+        )
+    }
+}
+
 // MARK: - Layout
 
 private extension MapBottomSheet {
 
     func sheet(in containerHeight: CGFloat) -> some View {
         VStack(spacing: 0) {
-            grabber
+            fixedTop
             scrollableContent
+            fixedBottom
         }
         .frame(height: currentHeight(in: containerHeight))
         .frame(maxWidth: .infinity)
@@ -136,6 +209,22 @@ private extension MapBottomSheet {
         } action: { height in
             onHeightChange?(height)
         }
+        .onChange(of: detents, initial: true) { _, _ in
+            snapSelectionIntoDetents()
+        }
+    }
+
+    var fixedTop: some View {
+        VStack(spacing: 0) {
+            grabber
+            header
+        }
+        .simultaneousGesture(fixedAreaMarker)
+    }
+
+    var fixedBottom: some View {
+        footer
+            .simultaneousGesture(fixedAreaMarker)
     }
 
     var grabber: some View {
@@ -197,6 +286,15 @@ private extension MapBottomSheet {
         sortedDetents.min {
             abs($0.height(in: containerHeight) - height) < abs($1.height(in: containerHeight) - height)
         } ?? selection
+    }
+
+    /// `detents` 만 갈아끼우면 `selection` 이 옛 값으로 남아 `isExpanded` 가 늘 false 가 되고
+    /// 본문 스크롤이 조용히 죽는다. 목록 밖 값이면 가장 가까운 단계로 다시 붙인다.
+    ///
+    /// 컨테이너 높이 없이 비교할 수 있게 기준 높이 `1` 을 쓴다. `height(in: 1)` 은 곧 `fraction` 이다.
+    func snapSelectionIntoDetents() {
+        guard !detents.isEmpty, !detents.contains(selection) else { return }
+        selection = nearestDetent(to: selection.fraction, in: 1)
     }
 }
 

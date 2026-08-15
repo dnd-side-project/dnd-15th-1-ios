@@ -75,9 +75,23 @@ private extension VerticalAlignment {
 ///
 /// `List` 의 `onMove` 를 쓰지 않는다. 카드 사이 간격·끄는 중 그림자를 시안대로 내려면
 /// 행 높이 81 + 간격 20 을 고정값으로 두고 직접 계산해야 한다.
+///
+/// 배열은 부품이 고치지 않는다. 끄는 동안의 오프셋만 부품이 들고 있다가
+/// 손을 뗄 때 `onMove(from:to:)` 로 확정된 자리만 올린다. 순서를 실제로 바꾸는 것은 부르는 쪽이다.
+///
+/// ```swift
+/// ReorderableList(
+///     items: store.places,
+///     onMove: { from, to in store.send(.placeMoved(from: from, to: to)) },
+///     rowTitle: \.name,
+///     rowSubtitle: \.address
+/// ) { place in
+///     deleteButton(place)
+/// }
+/// ```
 public struct ReorderableList<Item: Identifiable, Trailing: View>: View {
-    @Binding private var items: [Item]
-
+    private let items: [Item]
+    private let onMove: (Int, Int) -> Void
     private let rowTitle: (Item) -> String
     private let rowSubtitle: (Item) -> String
     private let trailing: (Item) -> Trailing
@@ -88,12 +102,14 @@ public struct ReorderableList<Item: Identifiable, Trailing: View>: View {
     @State private var dropIndex: Int = 0
 
     public init(
-        items: Binding<[Item]>,
+        items: [Item],
+        onMove: @escaping (Int, Int) -> Void,
         rowTitle: @escaping (Item) -> String,
         rowSubtitle: @escaping (Item) -> String,
         @ViewBuilder trailing: @escaping (Item) -> Trailing
     ) {
-        self._items = items
+        self.items = items
+        self.onMove = onMove
         self.rowTitle = rowTitle
         self.rowSubtitle = rowSubtitle
         self.trailing = trailing
@@ -283,18 +299,12 @@ private extension ReorderableList {
             }
             .onEnded { _ in
                 guard draggingItemID == item.id else { return }
-                guard let source = dragSourceIndex else { return }
 
-                let destination = dropIndex
-
-                // 배열 이동으로 생기는 레이아웃 변화와 수동 오프셋 해제가 같은 곡선으로 상쇄되어야
+                // 부르는 쪽의 배열 변경과 수동 오프셋 해제가 같은 곡선으로 상쇄되어야
                 // 카드가 튀지 않는다. 한 트랜잭션 안에서 같이 바꾼다.
                 withAnimation(.snappy(duration: 0.2)) {
-                    if destination != source {
-                        items.move(
-                            fromOffsets: IndexSet(integer: source),
-                            toOffset: destination > source ? destination + 1 : destination
-                        )
+                    if let move = confirmedMove(for: item) {
+                        onMove(move.from, move.to)
                     }
                     resetDragState()
                 }
@@ -383,7 +393,14 @@ private struct ReorderableListPreviewTrashButton: View {
     ]
 
     ReorderableList(
-        items: $items,
+        items: items,
+        // 부품은 배열을 안 고친다. 실제 순서 변경은 이렇게 부르는 쪽이 한다
+        onMove: { from, to in
+            items.move(
+                fromOffsets: IndexSet(integer: from),
+                toOffset: to > from ? to + 1 : to
+            )
+        },
         rowTitle: \.name,
         rowSubtitle: \.address
     ) { _ in
@@ -399,7 +416,13 @@ private struct ReorderableListPreviewTrashButton: View {
     ]
 
     ReorderableList(
-        items: $items,
+        items: items,
+        onMove: { from, to in
+            items.move(
+                fromOffsets: IndexSet(integer: from),
+                toOffset: to > from ? to + 1 : to
+            )
+        },
         rowTitle: \.name,
         rowSubtitle: \.address
     ) { _ in

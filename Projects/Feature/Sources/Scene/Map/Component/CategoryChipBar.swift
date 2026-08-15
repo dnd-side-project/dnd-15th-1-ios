@@ -17,7 +17,10 @@ private enum CategoryChipMetric {
 // MARK: - CategoryChipItem
 
 /// 칩 하나가 갖는 값. `Domain` 타입을 받지 않는다.
-public struct CategoryChipItem<ID: Hashable>: Identifiable {
+///
+/// `Equatable` 이라 리듀서 `State` 안에 그대로 담을 수 있다.
+/// `SwiftUI.Image` 자체가 `Equatable` 이므로 합성 구현이 그대로 성립한다.
+struct CategoryChipItem<ID: Hashable>: Identifiable, Equatable {
     public let id: ID
     public let icon: Image
     public let title: String
@@ -36,26 +39,32 @@ public struct CategoryChipItem<ID: Hashable>: Identifiable {
 /// 배경은 고르든 안 고르든 흰색이다. 고르면 테두리와 글자만 진해진다.
 /// 탐색 탭의 `FilterChip`(고르면 `gray900` 으로 꽉 참)과 모양이 달라 그 파일을 쓰지 않는다.
 ///
+/// 선택값은 값으로만 받고 탭은 그대로 올린다. 탐색 탭의 `FilterChip` + `store.send(...)` 와 같은 결이다.
+///
 /// ```swift
-/// CategoryChipBar(items: items, selection: $selectedCategoryID)
+/// CategoryChipBar(items: items, selection: store.selectedCategoryID) { id in
+///     store.send(.categoryTapped(id))
+/// }
 /// ```
 public struct CategoryChipBar<ID: Hashable>: View {
     private let items: [CategoryChipItem<ID>]
-    @Binding private var selection: ID?
+    private let selection: ID?
+    private let onTap: (ID) -> Void
 
-    public init(items: [CategoryChipItem<ID>], selection: Binding<ID?>) {
+    init(items: [CategoryChipItem<ID>], selection: ID?, onTap: @escaping (ID) -> Void) {
         self.items = items
-        self._selection = selection
+        self.selection = selection
+        self.onTap = onTap
     }
 
     public var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Spacing.s4) {
                 ForEach(items) { item in
+                    // 같은 칩을 다시 눌렀을 때 해제할지는 화면마다 다를 수 있어 여기서 정하지 않는다.
+                    // 누른 id 를 그대로 올리고 단일/다중·재탭 해제 규칙은 리듀서가 정한다.
                     CategoryChip(item: item, isSelected: item.id == selection) {
-                        // 시안만으로는 단일/다중 선택이 안 갈린다. 지도 핀을 한 종류로 좁히는 화면이라
-                        // 단일 선택으로 두고, 같은 칩을 다시 누르면 해제해 전체 보기로 돌아가게 했다.
-                        selection = (selection == item.id) ? nil : item.id
+                        onTap(item.id)
                     }
                 }
             }
@@ -139,13 +148,16 @@ private struct CategoryChipBarPreviewMap: View {
 // MARK: - Preview
 
 // a01 · a08: 지도 위 칩 줄. 아직 아무것도 안 고른 기본 상태
+// 재탭 해제는 부품이 아니라 부르는 쪽 규칙이라 프리뷰가 직접 구현한다
 #Preview("선택 없음") {
     @Previewable @State var selection: String?
 
     ZStack(alignment: .top) {
         CategoryChipBarPreviewMap()
 
-        CategoryChipBar(items: CategoryChipBarPreview.items, selection: $selection)
+        CategoryChipBar(items: CategoryChipBarPreview.items, selection: selection) { id in
+            selection = (selection == id) ? nil : id
+        }
     }
 }
 
@@ -156,6 +168,8 @@ private struct CategoryChipBarPreviewMap: View {
     ZStack(alignment: .top) {
         CategoryChipBarPreviewMap()
 
-        CategoryChipBar(items: CategoryChipBarPreview.items, selection: $selection)
+        CategoryChipBar(items: CategoryChipBarPreview.items, selection: selection) { id in
+            selection = (selection == id) ? nil : id
+        }
     }
 }
