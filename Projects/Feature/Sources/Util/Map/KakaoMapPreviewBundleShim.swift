@@ -31,7 +31,7 @@ enum KakaoMapPreviewBundleShim {
         installSwizzle()
     }()
 
-    // MARK: - 진단 (프리뷰 자리표시자에 스크린샷으로 읽기 위한 상태 노출)
+    // MARK: - 진단 (프리뷰 placeholder 에 스크린샷으로 읽기 위한 상태 노출)
     //
     // nonisolated(unsafe) static var 쓰기 계약: 스위즐 설치 전 초기화 경로에서만 쓴다.
     // 설치 후에는 스위즐된 메서드가 임의 스레드에서 읽으므로 읽기 전용이다.

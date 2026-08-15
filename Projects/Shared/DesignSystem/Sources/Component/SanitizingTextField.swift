@@ -22,7 +22,7 @@ public struct SanitizingTextField: UIViewRepresentable {
     let onSubmit: (() -> Void)?
 
     /// - Parameters:
-    ///   - placeholder: 빈 문자열이면 자리표시 문구를 그리지 않는다
+    ///   - placeholder: 빈 문자열이면 문구를 그리지 않는다
     ///   - keyboardType: 기본값은 `UITextField` 기본과 같다
     ///   - autocapitalization: 기본값은 `UITextField` 기본과 같다
     public init(
@@ -77,7 +77,7 @@ public struct SanitizingTextField: UIViewRepresentable {
         if uiView.markedTextRange == nil, uiView.text != text {
             uiView.text = text
         }
-        // 빈 자리표시는 UITextField 가 nil 로 되돌리므로 없는 것과 같게 본다
+        // 빈 placeholder 는 UITextField 가 nil 로 되돌리므로 없는 것과 같게 본다
         if (uiView.attributedPlaceholder?.string ?? "") != placeholder {
             uiView.attributedPlaceholder = Self.attributedPlaceholder(placeholder, typography: typography)
         }

@@ -2,7 +2,7 @@ import SharedDesignSystem
 import SwiftUI
 import ThirdPartyUI
 
-/// 원격 이미지 한 장. 로딩은 시머, 실패와 URL 없음은 같은 자리표시자로 보인다
+/// 원격 이미지 한 장. 로딩은 시머, 실패와 URL 없음은 같은 placeholder 로 보인다
 public struct RemoteImage: View {
     private static let fadeDuration: TimeInterval = 0.25
     private static let placeholderIconSize: CGFloat = 24
@@ -12,8 +12,8 @@ public struct RemoteImage: View {
 
     /// 원격 이미지를 표시한다.
     /// - Parameters:
-    ///   - url: 받아올 이미지 주소. `nil` 이면 실패와 같은 자리표시가 보인다
-    ///   - cornerRadius: 이미지와 자리표시에 함께 적용할 모서리 반경. 기본값 `0`
+    ///   - url: 받아올 이미지 주소. `nil` 이면 실패와 같은 placeholder 가 보인다
+    ///   - cornerRadius: 이미지와 placeholder 에 함께 적용할 모서리 반경. 기본값 `0`
     public init(url: URL?, cornerRadius: CGFloat = 0) {
         self.url = url
         self.cornerRadius = cornerRadius

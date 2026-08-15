@@ -1,6 +1,6 @@
 import Foundation
 
-/// `*Client+Mock` 이 쓰는 자리표시자 썸네일 URL 생성기.
+/// `*Client+Mock` 이 쓰는 placeholder 썸네일 URL 생성기.
 /// API 연동이 끝나면 mock 과 함께 사라진다
 enum MockThumbnailURL {
     static func list(_ count: Int, seed: Int) -> [URL] {
