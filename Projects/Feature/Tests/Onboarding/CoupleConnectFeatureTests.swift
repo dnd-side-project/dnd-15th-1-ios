@@ -128,7 +128,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
         await store.send(.skipConfirmDismissed) {
             $0.isSkipConfirmPresented = false
         }
-        XCTAssertTrue(store.state.path.isEmpty)
+        // 화면 이동 요청이 안 나갔다는 건 TestStore 가 미수신 델리게이트를 잡아 확인한다
     }
 
     func test_소문자입력_대문자로_변환() async {
@@ -163,7 +163,6 @@ final class CoupleConnectFeatureTests: XCTestCase {
         let store = TestStore(
             initialState: CoupleConnectFeature.State(
                 myNickname: "둘픽",
-                path: [.codeInput],
                 code: "AB12C"
             )
         ) {
@@ -182,6 +181,10 @@ final class CoupleConnectFeatureTests: XCTestCase {
         XCTAssertEqual(store.state.code, "AB12C")
         XCTAssertFalse(store.state.isConnectEnabled)
 
+        // 입력칸이 다시 열리며 텍스트필드가 같은 값을 돌려보내도 메시지는 남는다
+        await store.send(.codeChanged("AB12C"))
+        XCTAssertEqual(store.state.toast, .error("유효하지 않은 코드에요. 다시 확인해주세요"))
+
         await store.send(.codeChanged("AB12D")) {
             $0.code = "AB12D"
             $0.toast = nil
@@ -193,7 +196,6 @@ final class CoupleConnectFeatureTests: XCTestCase {
         let store = TestStore(
             initialState: CoupleConnectFeature.State(
                 myNickname: "둘픽",
-                path: [.codeInput],
                 code: "AB12C"
             )
         ) {
@@ -209,7 +211,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
             $0.isConnecting = false
             $0.toast = .error("요청이 많아요. 잠시 후 다시 시도해 주세요.")
         }
-        XCTAssertEqual(store.state.path, [.codeInput])
+        // 실패했으니 완료 화면 요청도 나가지 않는다
 
         await store.send(.dismissToast) {
             $0.toast = nil
@@ -220,7 +222,6 @@ final class CoupleConnectFeatureTests: XCTestCase {
         let store = TestStore(
             initialState: CoupleConnectFeature.State(
                 myNickname: "둘픽",
-                path: [.codeInput],
                 code: "AB12C",
                 toast: .error("요청이 많아요. 잠시 후 다시 시도해 주세요.")
             )
@@ -230,20 +231,19 @@ final class CoupleConnectFeatureTests: XCTestCase {
 
         XCTAssertFalse(store.state.isConnectEnabled)
 
-        await store.send(.pathChanged([])) {
-            $0.path = []
+        await store.send(.backButtonTapped) {
             $0.toast = nil
         }
+        await store.receive(\.delegate.back)
         XCTAssertTrue(store.state.isConnectEnabled)
     }
 
-    func test_연결성공_완료화면_push() async {
+    func test_연결성공_완료화면_델리게이트() async {
         let couple = self.couple
         let requestedCode = LockIsolated<String?>(nil)
         let store = TestStore(
             initialState: CoupleConnectFeature.State(
                 myNickname: "둘픽",
-                path: [.codeInput],
                 code: "AB12C"
             )
         ) {
@@ -261,8 +261,8 @@ final class CoupleConnectFeatureTests: XCTestCase {
         await store.receive(\.connectResponse.success) {
             $0.isConnecting = false
             $0.connectedCouple = couple
-            $0.path = [.codeInput, .complete]
         }
+        await store.receive(\.delegate.showComplete)
 
         XCTAssertEqual(requestedCode.value, "AB12C")
     }
@@ -272,7 +272,6 @@ final class CoupleConnectFeatureTests: XCTestCase {
         let store = TestStore(
             initialState: CoupleConnectFeature.State(
                 myNickname: "둘픽",
-                path: [.codeInput, .complete],
                 code: "AB12C",
                 connectedCouple: couple
             )
@@ -288,11 +287,19 @@ final class CoupleConnectFeatureTests: XCTestCase {
 // 위 클래스가 type_body_length 한계라 네비게이션 케이스는 따로 둔다
 @MainActor
 final class CoupleConnectNavigationTests: XCTestCase {
-    func test_뒤로가기_마지막화면_제거() async {
+    func test_코드입력버튼_코드입력화면_델리게이트() async {
+        let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽")) {
+            CoupleConnectFeature()
+        }
+
+        await store.send(.codeInputButtonTapped)
+        await store.receive(\.delegate.showCodeInput)
+    }
+
+    func test_뒤로가기_델리게이트_전달() async {
         let store = TestStore(
             initialState: CoupleConnectFeature.State(
                 myNickname: "둘픽",
-                path: [.codeInput],
                 code: "AB12C",
                 toast: .error("요청이 많아요. 잠시 후 다시 시도해 주세요.")
             )
@@ -301,18 +308,18 @@ final class CoupleConnectNavigationTests: XCTestCase {
         }
 
         await store.send(.backButtonTapped) {
-            $0.path = []
             $0.toast = nil
         }
+        await store.receive(\.delegate.back)
     }
 
-    func test_경로없음_뒤로가기_변화없음() async {
+    func test_토스트없는_뒤로가기_상태변화없음() async {
         let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽")) {
             CoupleConnectFeature()
         }
 
         await store.send(.backButtonTapped)
-        XCTAssertTrue(store.state.path.isEmpty)
+        await store.receive(\.delegate.back)
     }
 }
 

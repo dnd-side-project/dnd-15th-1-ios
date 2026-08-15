@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 로딩 자리표시자. 바탕색 위로 밝은 띠를 좌 → 우로 흘린다. 새 에셋 없이 그라데이션만 쓴다
+/// 로딩 placeholder. 바탕색 위로 밝은 띠를 좌 → 우로 흘린다. 새 에셋 없이 그라데이션만 쓴다
 /// 크기를 안 잡고 부모가 준 자리를 채운다. 호출부에서 `.frame` 으로 치수를 준다
 public struct ShimmerBlock: View {
     private let cornerRadius: CGFloat
@@ -10,7 +10,7 @@ public struct ShimmerBlock: View {
 
     @State private var phase: CGFloat = -1
 
-    /// 시머 자리표시자를 만든다.
+    /// 시머 placeholder 를 만든다.
     /// - Parameters:
     ///   - cornerRadius: 모서리 반경. 기본값 `0`
     ///   - baseColor: 띠가 흐르는 바탕색. 기본값 `gray50`. 이미지 자리에는 `gray300` 을 넘긴다

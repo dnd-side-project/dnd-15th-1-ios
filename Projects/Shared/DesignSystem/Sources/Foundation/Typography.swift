@@ -76,6 +76,24 @@ public struct Typography: Sendable {
     public var lineSpacing: CGFloat {
         size * (lineHeightMultiple - 1)
     }
+
+    /// UIKit 으로 그리는 입력칸이 SwiftUI 쪽과 같은 글꼴을 쓰게 하는 통로.
+    /// 등록이 실패해도 화면이 비지 않도록 시스템 폰트로 떨어진다
+    public var uiFont: UIFont {
+        UIFont(name: PretendardFontRegistry.fontName(for: weight), size: size)
+            ?? .systemFont(ofSize: size, weight: weight.uiFontWeight)
+    }
+}
+
+private extension PretendardWeight {
+    var uiFontWeight: UIFont.Weight {
+        switch self {
+        case .regular: .regular
+        case .medium: .medium
+        case .semiBold: .semibold
+        case .bold: .bold
+        }
+    }
 }
 
 // MARK: - Typography Tokens

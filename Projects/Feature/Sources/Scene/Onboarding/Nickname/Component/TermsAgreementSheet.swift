@@ -50,25 +50,29 @@ struct TermsAgreementSheet: View {
         }
     }
 
+    // 체크 아이콘을 뺀 나머지 전부가 약관 내용 보기
     private func termsRow(_ terms: TermsType) -> some View {
         HStack(spacing: 0) {
             checkIcon
 
-            Text(terms.agreementTitle)
-                .typography(.body1M)
-                .foregroundStyle(Color.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             Button {
                 store.send(.termsDetailTapped(terms))
             } label: {
-                Image.arrowRight
-                    .renderingMode(.template)
-                    .resizable()
-                    .frame(width: 20, height: 20)
-                    .foregroundStyle(Color.textSecondary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                HStack(spacing: 0) {
+                    Text(terms.agreementTitle)
+                        .typography(.body1M)
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image.arrowRight
+                        .renderingMode(.template)
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(width: 44, height: 44)
+                }
+                .frame(height: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }

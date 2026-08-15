@@ -16,7 +16,7 @@ public struct ProfileRepository: Sendable {
                 let initialized = try await profileRemote.initializeProfile(
                     nickname: nickname,
                     profileIcon: iconID,
-                    datePreferences: .empty
+                    datePreferences: .onboardingPlaceholder
                 )
                 return ProfileDTOMapper.toDomain(initialized)
             }

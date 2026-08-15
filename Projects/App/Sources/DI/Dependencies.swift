@@ -31,5 +31,9 @@ enum Dependencies {
         values.onboardingClient = OnboardingClientFactory.make(
             userDefaults: infra.userDefaults
         )
+
+        #if DEBUG
+        DebugLaunchOverride.apply(to: &values)
+        #endif
     }
 }
