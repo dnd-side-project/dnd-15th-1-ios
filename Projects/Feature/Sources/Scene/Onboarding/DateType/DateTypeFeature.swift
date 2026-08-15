@@ -101,10 +101,13 @@ public struct DateTypeFeature {
 }
 
 private extension DateTypeFeature {
+    /// 저장 요청은 누른 시점의 4축을 실어 보낸다. 응답을 기다리는 동안 선택이 바뀌면
+    /// 서버 값과 화면이 어긋나므로, 저장 중에는 선택과 건너뛰기를 받지 않는다
     func indoorOutdoorSelected(
         _ value: IndoorOutdoor,
         state: inout State
     ) -> Effect<Action> {
+        guard !state.isSubmitting else { return .none }
         state.indoorOutdoor = value
         state.isTooltipPresented = false
         return .none
@@ -114,6 +117,7 @@ private extension DateTypeFeature {
         _ value: ActivityLevel,
         state: inout State
     ) -> Effect<Action> {
+        guard !state.isSubmitting else { return .none }
         state.activityLevel = value
         state.isTooltipPresented = false
         return .none
@@ -123,6 +127,7 @@ private extension DateTypeFeature {
         _ value: DateTime,
         state: inout State
     ) -> Effect<Action> {
+        guard !state.isSubmitting else { return .none }
         state.dateTime = value
         state.isTooltipPresented = false
         return .none
@@ -132,12 +137,14 @@ private extension DateTypeFeature {
         _ value: DateFocus,
         state: inout State
     ) -> Effect<Action> {
+        guard !state.isSubmitting else { return .none }
         state.dateFocus = value
         state.isTooltipPresented = false
         return .none
     }
 
     func skipButtonTapped(state: inout State) -> Effect<Action> {
+        guard !state.isSubmitting else { return .none }
         state.isTooltipPresented = false
         return .send(.delegate(.skipped))
     }

@@ -49,6 +49,7 @@ public struct DateTypeView: View {
             header
 
             axisList
+                .disabled(store.isSubmitting)
                 .padding(.horizontal, Self.horizontalPadding)
                 .padding(.top, Self.headerBottomSpacing)
 
@@ -171,6 +172,7 @@ public struct DateTypeView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(store.isSubmitting)
     }
 
     private var saveButton: some View {
