@@ -8,7 +8,7 @@ struct CoupleCodeInputView: View {
 
     let store: StoreOf<CoupleConnectFeature>
 
-    @FocusState private var isCodeFocused: Bool
+    @State private var isCodeFocused = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,8 +47,14 @@ struct CoupleCodeInputView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar { backToolbar }
-        .onAppear {
+        // push 애니메이션 중에 준 포커스는 버려진다. 전환이 끝난 뒤에 준다
+        .task {
+            try? await Task.sleep(for: .milliseconds(400))
             isCodeFocused = true
+        }
+        // 연결 중에는 입력칸이 disabled 라 포커스가 풀린다. 끝나면 되돌린다
+        .onChange(of: store.isConnecting) { _, isConnecting in
+            isCodeFocused = !isConnecting
         }
     }
 
@@ -90,10 +96,7 @@ struct CoupleCodeInputView: View {
     NavigationStack {
         CoupleCodeInputView(
             store: Store(
-                initialState: CoupleConnectFeature.State(
-                    myNickname: "둘픽",
-                    path: [.codeInput]
-                )
+                initialState: CoupleConnectFeature.State(myNickname: "둘픽")
             ) {
                 CoupleConnectFeature()
             }
@@ -107,7 +110,6 @@ struct CoupleCodeInputView: View {
             store: Store(
                 initialState: CoupleConnectFeature.State(
                     myNickname: "둘픽",
-                    path: [.codeInput],
                     code: "AB12C"
                 )
             ) {
@@ -123,7 +125,6 @@ struct CoupleCodeInputView: View {
             store: Store(
                 initialState: CoupleConnectFeature.State(
                     myNickname: "둘픽",
-                    path: [.codeInput],
                     code: "AB12C",
                     toast: .error("유효하지 않은 코드에요. 다시 확인해주세요")
                 )
