@@ -45,6 +45,7 @@ public extension Image {
     static var plus: Image { Asset.plus.swiftUIImage }
     static var search: Image { Asset.search.swiftUIImage }
     static var setting: Image { Asset.setting.swiftUIImage }
+    static var tip: Image { Asset.tip.swiftUIImage }
     static var trash: Image { Asset.trash.swiftUIImage }
     static var walk: Image { Asset.walk.swiftUIImage }
     static var x: Image { Asset.x.swiftUIImage }
@@ -96,4 +97,18 @@ public extension Image {
     static var coupleConnectBefore: Image { Asset.coupleConnectBefore.swiftUIImage }
     static var coupleConnectComplete: Image { Asset.coupleConnectComplete.swiftUIImage }
     static var coupleConnectModal: Image { Asset.coupleConnectModal.swiftUIImage }
+}
+
+// MARK: - DateType
+
+public extension Image {
+    static var dateTypeActive: Image { Asset.DateType.active.swiftUIImage }
+    static var dateTypeDay: Image { Asset.DateType.day.swiftUIImage }
+    static var dateTypeFood: Image { Asset.DateType.food.swiftUIImage }
+    static var dateTypeIndoor: Image { Asset.DateType.indoor.swiftUIImage }
+    static var dateTypeNight: Image { Asset.DateType.night.swiftUIImage }
+    static var dateTypeOutdoor: Image { Asset.DateType.outdoor.swiftUIImage }
+    static var dateTypeSightseeing: Image { Asset.DateType.sightseeing.swiftUIImage }
+    static var dateTypeStatic: Image { Asset.DateType.`static`.swiftUIImage }
+    static var dateTypeGraphic: Image { Asset.dateTypeGraphic.swiftUIImage }
 }
