@@ -35,7 +35,9 @@ public struct TimeWheelPicker: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: WheelMetrics.areaHeight)
-        .onAppear(perform: normalizeSelection)
+        // 첫 표시(`initial`)뿐 아니라 밖에서 `selection` 을 갈아끼운 뒤에도 돌려야
+        // 휠에 보이는 값과 바인딩 값이 어긋난 채로 남지 않는다.
+        .onChange(of: selection, initial: true) { _, _ in normalizeSelection() }
     }
 
     // MARK: Binding
@@ -101,7 +103,9 @@ public struct TimeWheelPicker: View {
         return minutes.last(where: { $0 <= minute }) ?? 0
     }
 
-    /// 빈 필드나 간격에 없는 분을 들고 들어온 경우 첫 표시 시점에 밖의 값도 맞춰준다.
+    /// 빈 필드나 간격에 없는 분을 들고 들어온 경우 밖의 값도 휠이 보여주는 값으로 맞춰준다.
+    ///
+    /// 이미 맞으면 아무것도 쓰지 않아 `onChange` 가 스스로를 다시 불러 되먹임하는 일이 없다.
     private func normalizeSelection() {
         let hour = resolvedHour24
         let minute = resolvedMinute

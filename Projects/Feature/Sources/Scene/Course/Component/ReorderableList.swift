@@ -108,6 +108,14 @@ public struct ReorderableList<Item: Identifiable, Trailing: View>: View {
         .background(alignment: .topLeading) {
             connectors
         }
+        // 끄는 중에 밖에서 그 항목이 지워지면 손잡이째 사라져 `onEnded` 가 오지 않는다.
+        // 그대로 두면 없는 id 를 가리킨 채 나머지 행이 한 칸 밀린 모양으로 굳는다.
+        .onChange(of: items.map(\.id)) { _, ids in
+            guard let draggingItemID, !ids.contains(draggingItemID) else { return }
+            withAnimation(.snappy(duration: 0.2)) {
+                resetDragState()
+            }
+        }
     }
 }
 
@@ -252,6 +260,10 @@ private extension ReorderableList {
     func dragGesture(for item: Item, at index: Int) -> some Gesture {
         DragGesture(minimumDistance: 1, coordinateSpace: .global)
             .onChanged { value in
+                // 이미 다른 카드를 끄는 중이라면 이 손잡이의 이동량은 남의 카드 것이다.
+                // 막지 않으면 두 번째 손가락이 첫 번째 카드를 움직인다.
+                guard draggingItemID == nil || draggingItemID == item.id else { return }
+
                 if draggingItemID == nil {
                     draggingItemID = item.id
                     dragSourceIndex = index
@@ -270,6 +282,7 @@ private extension ReorderableList {
                 }
             }
             .onEnded { _ in
+                guard draggingItemID == item.id else { return }
                 guard let source = dragSourceIndex else { return }
 
                 let destination = dropIndex
@@ -286,6 +299,21 @@ private extension ReorderableList {
                     resetDragState()
                 }
             }
+    }
+
+    /// 손을 뗀 순간 실제로 올릴 이동. 올릴 게 없으면 `nil`.
+    ///
+    /// 끄는 도중 밖에서 `items` 가 바뀌었을 수 있어 시작할 때 잡은 인덱스를 믿지 않는다.
+    /// 지금 배열에서 다시 찾아, 항목이 사라졌거나 자리가 밀렸거나 목적지가 범위를 벗어나면
+    /// 이동을 포기한다. 확정을 건너뛰어도 상태는 풀리므로 화면은 현재 배열 그대로 돌아온다.
+    func confirmedMove(for item: Item) -> (from: Int, to: Int)? {
+        guard let source = items.firstIndex(where: { $0.id == item.id }),
+              source == dragSourceIndex,
+              items.indices.contains(dropIndex),
+              dropIndex != source
+        else { return nil }
+
+        return (source, dropIndex)
     }
 
     /// 끌지 않는 행이 비켜주는 양. 지나온 행만 한 칸씩 반대로 민다.

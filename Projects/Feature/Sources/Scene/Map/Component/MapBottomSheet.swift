@@ -47,6 +47,9 @@ private enum MapBottomSheetMetric {
     static let shadowOpacity: CGFloat = 0.08
     static let shadowOffsetY: CGFloat = -4
     static let minimumDragDistance: CGFloat = 4
+
+    /// 시트 드래그로 인정하는 세로 우세 비율. 가로 스크롤을 쓸다 시트가 딸려오는 걸 막는다.
+    static let verticalDominance: CGFloat = 1.5
 }
 
 // MARK: - MapBottomSheet
@@ -76,6 +79,13 @@ public struct MapBottomSheet<Content: View>: View {
     @State private var dragTranslation: CGFloat = 0
     @State private var scrollOffset: CGFloat = 0
     @State private var isDraggingSheet = false
+
+    /// 시트 드래그가 실제로 시작된 시점의 `translation.height`.
+    /// 제스처는 손을 댄 지점부터 누적되므로, 이 값을 빼야 시트가 한 프레임에 튀지 않는다.
+    @State private var dragBaseline: CGFloat = 0
+
+    /// 잡이 막대 · 헤더 · 푸터에서 시작한 손짓인지. 그 자리는 스크롤과 무관하게 늘 시트 드래그다.
+    @State private var isDragFromFixedArea = false
 
     public init(
         detents: [SheetDetent],
@@ -194,32 +204,63 @@ private extension MapBottomSheet {
 
 private extension MapBottomSheet {
 
+    /// 잡이 막대 · 헤더 · 푸터에 얹는 표시용 제스처. 이동량은 건드리지 않고 시작 위치만 남긴다.
+    /// `minimumDistance` 가 0 이라 시트 드래그(4pt)보다 먼저 켜진다.
+    var fixedAreaMarker: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                isDragFromFixedArea = true
+            }
+            .onEnded { _ in
+                isDragFromFixedArea = false
+            }
+    }
+
     func dragGesture(in containerHeight: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: MapBottomSheetMetric.minimumDragDistance)
             .onChanged { value in
-                guard canDragSheet else { return }
-
                 if !isDraggingSheet {
-                    // 가장 큰 단계에서 위로 미는 건 시트가 아니라 리스트 스크롤이다
-                    guard !(isExpanded && value.translation.height < 0) else { return }
+                    guard shouldBeginSheetDrag(value) else { return }
                     isDraggingSheet = true
+                    // 시작 시점의 누적 이동량을 기준으로 잡는다. 이후 이동은 전부 이 값과의 차다
+                    dragBaseline = value.translation.height
                 }
-                dragTranslation = value.translation.height
+                dragTranslation = value.translation.height - dragBaseline
             }
             .onEnded { value in
+                isDragFromFixedArea = false
                 guard isDraggingSheet else { return }
                 isDraggingSheet = false
 
                 // 이동량만 보면 살짝 튕긴 손짓을 놓친다. 속도가 섞인 예상 종점으로 붙일 단계를 고른다
-                let predictedHeight = selection.height(in: containerHeight)
-                    - value.predictedEndTranslation.height
+                let predictedTranslation = value.predictedEndTranslation.height - dragBaseline
+                let predictedHeight = selection.height(in: containerHeight) - predictedTranslation
                 let target = nearestDetent(to: predictedHeight, in: containerHeight)
+
+                dragBaseline = 0
 
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                     selection = target
                     dragTranslation = 0
                 }
             }
+    }
+
+    /// 시트 드래그를 시작할지 정한다. 한 번 시작한 뒤에는 다시 묻지 않아 손짓 중간에 끊기지 않는다.
+    func shouldBeginSheetDrag(_ value: DragGesture.Value) -> Bool {
+        let vertical = abs(value.translation.height)
+        let horizontal = abs(value.translation.width)
+
+        // 세로가 가로보다 확실히 클 때만. 썸네일 가로 스크롤에 시트가 딸려오는 걸 막는다
+        guard vertical > horizontal * MapBottomSheetMetric.verticalDominance else { return false }
+
+        // 잡이 막대 · 헤더 · 푸터는 스크롤이 없어 늘 시트 드래그다
+        guard !isDragFromFixedArea else { return true }
+
+        guard canDragSheet else { return false }
+
+        // 가장 큰 단계에서 위로 미는 건 시트가 아니라 본문 스크롤이다
+        return !(isExpanded && value.translation.height < 0)
     }
 }
 
