@@ -91,6 +91,7 @@ public extension View {
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         // 페이드로 뜨는 오버레이. dim 은 페이드, 카드는 확대 + 페이드
+        // zIndex 를 적지 않으면 닫히는 동안 카드가 dim 밑으로 내려가 한 프레임에 어두워진다
         overlay {
             ZStack {
                 if isPresented.wrappedValue {
@@ -98,18 +99,21 @@ public extension View {
                         .ignoresSafeArea()
                         .onTapGesture { isPresented.wrappedValue = false }
                         .transition(.opacity)
+                        .zIndex(0)
 
                     content()
                         .padding(.horizontal, 20)
                         .transition(.scale(scale: 0.95).combined(with: .opacity))
+                        .zIndex(1)
                 }
             }
+            // 들어올 때보다 나갈 때를 짧게. 값이 바뀐 뒤의 상태로 평가된다
+            // 오버레이 안에 둬야 애니메이션이 아래 화면까지 번지지 않는다
+            .animation(
+                .easeOut(duration: isPresented.wrappedValue ? 0.2 : 0.16),
+                value: isPresented.wrappedValue
+            )
             .accessibilityAddTraits(isPresented.wrappedValue ? .isModal : [])
         }
-        // 들어올 때보다 나갈 때를 짧게. 값이 바뀐 뒤의 상태로 평가된다
-        .animation(
-            .easeOut(duration: isPresented.wrappedValue ? 0.2 : 0.16),
-            value: isPresented.wrappedValue
-        )
     }
 }

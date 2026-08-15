@@ -1,10 +1,3 @@
-//
-//  BottomSheet.swift
-//  Dulpick
-//
-//  Created by 박주성 on 8/13/26.
-//
-
 import SwiftUI
 
 // MARK: - Presentation
@@ -18,6 +11,7 @@ public extension View {
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         // 아래에서 올라오는 오버레이. dim 은 페이드, 시트는 이동 + 페이드
+        // zIndex 를 적지 않으면 닫히는 동안 시트가 dim 밑으로 내려가 한 프레임에 어두워진다
         overlay {
             ZStack(alignment: .bottom) {
                 if isPresented.wrappedValue {
@@ -28,14 +22,17 @@ public extension View {
                             isPresented.wrappedValue = false
                         }
                         .transition(.opacity)
+                        .zIndex(0)
 
                     BottomSheetContainer(content: content)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .zIndex(1)
                 }
             }
             .accessibilityAddTraits(isPresented.wrappedValue ? .isModal : [])
         }
         // 들어올 때보다 나갈 때를 짧게. 값이 바뀐 뒤의 상태로 평가된다
+        // 바깥에 둬야 같은 값에 묶인 화면 쪽 변화도 시트와 같은 곡선으로 따라온다
         .animation(
             .easeOut(duration: isPresented.wrappedValue ? 0.3 : 0.22),
             value: isPresented.wrappedValue
