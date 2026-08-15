@@ -16,9 +16,9 @@ public enum TermsType: String, Equatable, Sendable, Identifiable {
     public var url: URL? {
         switch self {
         case .service:
-            URL(string: "https://dulpick.omong.jp/terms")
+            URL(string: "https://dulpick.omong.kr/terms")
         case .privacy:
-            URL(string: "https://dulpick.omong.jp/privacy")
+            URL(string: "https://dulpick.omong.kr/privacy")
         }
     }
 }
