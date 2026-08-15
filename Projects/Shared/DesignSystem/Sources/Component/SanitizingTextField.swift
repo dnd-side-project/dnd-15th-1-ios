@@ -81,6 +81,7 @@ public struct SanitizingTextField: UIViewRepresentable {
         if (uiView.attributedPlaceholder?.string ?? "") != placeholder {
             uiView.attributedPlaceholder = Self.attributedPlaceholder(placeholder, typography: typography)
         }
+        syncAppearance(uiView)
         syncFocus(uiView)
     }
 
@@ -97,6 +98,30 @@ public struct SanitizingTextField: UIViewRepresentable {
 
     public func makeCoordinator() -> Coordinator {
         Coordinator(self)
+    }
+
+    /// 같은 자리에서 글꼴·글자색·키보드가 바뀔 수 있다. 바뀐 값만 넣어 불필요한 갱신을 막는다
+    private func syncAppearance(_ uiView: UITextField) {
+        let font = typography.uiFont
+        if uiView.font != font {
+            uiView.font = font
+        }
+        if uiView.textColor != textColor {
+            uiView.textColor = textColor
+        }
+        var didChangeInputTraits = false
+        if uiView.keyboardType != keyboardType {
+            uiView.keyboardType = keyboardType
+            didChangeInputTraits = true
+        }
+        if uiView.autocapitalizationType != autocapitalization {
+            uiView.autocapitalizationType = autocapitalization
+            didChangeInputTraits = true
+        }
+        // 올라와 있는 키보드는 바뀐 설정을 저절로 반영하지 않는다
+        if didChangeInputTraits, uiView.isFirstResponder {
+            uiView.reloadInputViews()
+        }
     }
 
     private func syncFocus(_ uiView: UITextField) {
@@ -171,8 +196,13 @@ public struct SanitizingTextField: UIViewRepresentable {
             parent.isFocused?.wrappedValue = false
         }
 
+        /// 호출부가 준 `onSubmit` 은 그 안에서 포커스까지 정리한다. 없을 때만 여기서 키보드를 내린다
         public func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-            parent.onSubmit?()
+            if let onSubmit = parent.onSubmit {
+                onSubmit()
+            } else {
+                textField.resignFirstResponder()
+            }
             return false
         }
 
