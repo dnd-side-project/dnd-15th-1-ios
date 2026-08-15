@@ -11,7 +11,7 @@ private enum MapFloatingMetric {
     static let shadowOffsetY: CGFloat = 2
 
     /// 버튼 아래 끝과 시트 윗면 사이. a08 · b04 에서 잰 값이다.
-    static let gapAboveSheet: CGFloat = 16
+    static let gapAboveSheet = Spacing.s16
 }
 
 // MARK: - MapFloatingButton
@@ -24,7 +24,7 @@ private enum MapFloatingMetric {
 /// ```
 ///
 /// 위치는 잡지 않는다. 시트 위에 띄우려면 `MapFloatingControls` 에 담는다.
-public struct MapFloatingButton: View {
+struct MapFloatingButton: View {
 
     private enum Shape {
         case circle(icon: Image)
@@ -35,18 +35,18 @@ public struct MapFloatingButton: View {
     private let action: () -> Void
 
     /// 아이콘만 있는 원형. 흰 바탕이다 (a08 우하단 현재위치).
-    public init(icon: Image, action: @escaping () -> Void) {
+    init(icon: Image, action: @escaping () -> Void) {
         self.shape = .circle(icon: icon)
         self.action = action
     }
 
     /// 글자만 있는 알약. 빨강 바탕이다 (a08 좌하단 `데이트 코스 짜러가기`).
-    public init(title: String, action: @escaping () -> Void) {
+    init(title: String, action: @escaping () -> Void) {
         self.shape = .pill(title: title)
         self.action = action
     }
 
-    public var body: some View {
+    var body: some View {
         Button(action: action) {
             label
         }
@@ -117,7 +117,7 @@ private extension MapFloatingButton {
 ///     MapBottomSheet(detents: detents, selection: $detent) { sheetHeight = $0 } content: { ... }
 /// }
 /// ```
-public struct MapFloatingControls<Leading: View, Trailing: View>: View {
+struct MapFloatingControls<Leading: View, Trailing: View>: View {
 
     // 버튼이 아니라 이 층이 좌표를 안다.
     // 시안의 20 여백과 시트 위 16 간격이 호출부마다 흩어지지 않게 한다.
@@ -125,7 +125,7 @@ public struct MapFloatingControls<Leading: View, Trailing: View>: View {
     private let leading: Leading
     private let trailing: Trailing
 
-    public init(
+    init(
         sheetHeight: CGFloat,
         @ViewBuilder leading: () -> Leading,
         @ViewBuilder trailing: () -> Trailing
@@ -135,7 +135,7 @@ public struct MapFloatingControls<Leading: View, Trailing: View>: View {
         self.trailing = trailing()
     }
 
-    public var body: some View {
+    var body: some View {
         HStack(spacing: Spacing.s12) {
             leading
             Spacer(minLength: Spacing.s12)
@@ -147,13 +147,15 @@ public struct MapFloatingControls<Leading: View, Trailing: View>: View {
     }
 }
 
-public extension MapFloatingControls where Leading == EmptyView {
+extension MapFloatingControls where Leading == EmptyView {
 
     /// 오른쪽 버튼만 두는 경우 (b04 장소 고르기).
     init(sheetHeight: CGFloat, @ViewBuilder trailing: () -> Trailing) {
         self.init(sheetHeight: sheetHeight, leading: { EmptyView() }, trailing: trailing)
     }
 }
+
+#if DEBUG
 
 // MARK: - Preview
 
@@ -211,3 +213,5 @@ private struct MapFloatingButtonPreviewHost<Controls: View>: View {
         }
     }
 }
+
+#endif

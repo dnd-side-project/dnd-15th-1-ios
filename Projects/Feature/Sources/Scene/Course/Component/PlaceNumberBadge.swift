@@ -35,14 +35,14 @@ private enum PlaceNumberBadgeMetric {
 ///     PlaceNumberBadge(state: .number(1))
 /// }
 /// ```
-public struct PlaceNumberBadge: View {
+struct PlaceNumberBadge: View {
     private let state: PlaceNumberBadgeState
 
     init(state: PlaceNumberBadgeState) {
         self.state = state
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack {
             switch state {
             case .unselected:
@@ -69,6 +69,8 @@ public struct PlaceNumberBadge: View {
         )
     }
 }
+
+#if DEBUG
 
 // MARK: - Preview
 
@@ -110,3 +112,5 @@ public struct PlaceNumberBadge: View {
     .frame(maxWidth: .infinity)
     .background(Color.brandSurface)
 }
+
+#endif

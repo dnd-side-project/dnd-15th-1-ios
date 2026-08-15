@@ -1,6 +1,16 @@
 import SharedDesignSystem
 import SwiftUI
 
+// MARK: - DateWheelPickerMetric
+
+private enum DateWheelPickerMetric {
+    /// 열 3개(48×3) + 열 사이 간격(72×2) + 오른쪽 안쪽 여백 12.
+    static let trailingInset: CGFloat = Spacing.s12
+
+    /// 열 가운데에서 단위 상자 가운데까지. 시안 기준 연/월/일 열 190.5 → `월` 218, 310.5 → `일` 338.
+    static let unitCenterOffset: CGFloat = 27.5
+}
+
 // MARK: - DateWheelPicker
 
 /// 연 / 월 / 일 3열 휠 피커. 시안: `c09`
@@ -11,13 +21,7 @@ import SwiftUI
 ///
 /// 딤 · 하단 시트 껍데기 · `확인` 버튼은 감싸는 쪽이 만든다. 여기는 휠 영역(높이 264)까지다.
 /// `selection` 에는 `year` · `month` · `day` 만 쓴다. 나머지 필드는 받은 그대로 둔다.
-public struct DateWheelPicker: View {
-
-    /// 열 3개(48×3) + 열 사이 간격(72×2) + 오른쪽 안쪽 여백 12.
-    private static let trailingInset: CGFloat = Spacing.s12
-
-    /// 열 가운데에서 단위 상자 가운데까지. 시안 기준 연/월/일 열 190.5 → `월` 218, 310.5 → `일` 338.
-    private static let unitCenterOffset: CGFloat = 27.5
+struct DateWheelPicker: View {
 
     private static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
@@ -28,12 +32,12 @@ public struct DateWheelPicker: View {
     @Binding private var selection: DateComponents
     private let yearRange: ClosedRange<Int>
 
-    public init(selection: Binding<DateComponents>, yearRange: ClosedRange<Int>) {
+    init(selection: Binding<DateComponents>, yearRange: ClosedRange<Int>) {
         self._selection = selection
         self.yearRange = yearRange
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack {
             WheelSelectionBar()
             columns
@@ -46,15 +50,15 @@ public struct DateWheelPicker: View {
         .onChange(of: selection, initial: true) { _, _ in normalizeSelection() }
     }
 
-    // MARK: Layer
+    // MARK: - Layer
 
     private var columns: some View {
         HStack(spacing: WheelMetrics.columnSpacing) {
             WheelColumn(items: Array(yearRange), selection: yearBinding) { String($0) }
-            WheelColumn(items: Array(1...12), selection: monthBinding, title: Self.twoDigits)
-            WheelColumn(items: Array(1...dayCount), selection: dayBinding, title: Self.twoDigits)
+            WheelColumn(items: Array(1...12), selection: monthBinding, title: WheelFormat.twoDigits)
+            WheelColumn(items: Array(1...dayCount), selection: dayBinding, title: WheelFormat.twoDigits)
         }
-        .padding(.trailing, Self.trailingInset)
+        .padding(.trailing, DateWheelPickerMetric.trailingInset)
     }
 
     /// 열과 같은 가로 배치를 한 번 더 깔아 단위를 각 열 가운데 기준으로 세운다. 숫자는 단위 때문에 밀리지 않는다.
@@ -64,7 +68,7 @@ public struct DateWheelPicker: View {
             unitSlot("월")
             unitSlot("일")
         }
-        .padding(.trailing, Self.trailingInset)
+        .padding(.trailing, DateWheelPickerMetric.trailingInset)
     }
 
     private func unitSlot(_ unit: String?) -> some View {
@@ -77,12 +81,12 @@ public struct DateWheelPicker: View {
                         .foregroundStyle(Color.textSecondary)
                         .lineLimit(1)
                         .fixedSize()
-                        .offset(x: Self.unitCenterOffset)
+                        .offset(x: DateWheelPickerMetric.unitCenterOffset)
                 }
             }
     }
 
-    // MARK: Binding
+    // MARK: - Binding
 
     private var yearBinding: Binding<Int?> {
         Binding(
@@ -114,7 +118,7 @@ public struct DateWheelPicker: View {
         )
     }
 
-    // MARK: Value
+    // MARK: - Value
 
     private var resolvedYear: Int {
         min(max(selection.year ?? yearRange.lowerBound, yearRange.lowerBound), yearRange.upperBound)
@@ -173,14 +177,11 @@ public struct DateWheelPicker: View {
 
         return dayRange.count
     }
-
-    private static func twoDigits(_ value: Int) -> String {
-        String(format: "%02d", value)
-    }
 }
 
 // MARK: - Preview
 
+#if DEBUG
 // 시안: c09
 #Preview("날짜") {
     @Previewable @State var selection = DateComponents(year: 2026, month: 8, day: 22)
@@ -193,7 +194,7 @@ public struct DateWheelPicker: View {
             .foregroundStyle(Color.textSecondary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.white)
+    .background(Color.bgDefault)
 }
 
 // 윤년·월말 확인용. 1월 31일에서 월 휠을 2로 돌리면 29(2024는 윤년), 4로 돌리면 30 으로 내려간다.
@@ -209,5 +210,6 @@ public struct DateWheelPicker: View {
             .foregroundStyle(Color.textSecondary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.white)
+    .background(Color.bgDefault)
 }
+#endif

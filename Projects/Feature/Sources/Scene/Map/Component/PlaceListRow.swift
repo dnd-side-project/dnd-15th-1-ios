@@ -48,7 +48,7 @@ private enum PlaceListRowMetric {
 /// ```
 ///
 /// `Domain` 타입을 받지 않는다. 값만 받는다.
-public struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
+struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     private let icon: Image
     private let name: String
     private let address: String
@@ -58,7 +58,7 @@ public struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     /// 우측 슬롯을 둘지. `false` 면 24 칸도 그 앞 여백도 만들지 않아 장소명이 남는 폭을 다 쓴다.
     private let hasTrailing: Bool
 
-    public init(
+    init(
         icon: Image,
         name: String,
         address: String,
@@ -95,7 +95,7 @@ public struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         self.hasTrailing = hasTrailing
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s12) {
             header
 
@@ -171,7 +171,7 @@ public struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
 
 // MARK: - 썸네일 없는 행
 
-public extension PlaceListRow where Thumbnail == EmptyView {
+extension PlaceListRow where Thumbnail == EmptyView {
     /// 사진이 없는 흔한 경우. 썸네일 줄 자체가 나오지 않는다.
     init(
         icon: Image,
@@ -229,6 +229,8 @@ extension PlaceListRow where Thumbnail == EmptyView, Trailing == EmptyView {
         )
     }
 }
+
+#if DEBUG
 
 // MARK: - Preview Fixture
 
@@ -417,3 +419,5 @@ private struct PlaceListRowPreviewMark: View {
         }
     }
 }
+
+#endif

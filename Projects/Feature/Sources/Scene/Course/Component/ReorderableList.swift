@@ -33,16 +33,12 @@ private enum ReorderableListMetric {
     static let liftShadowOffsetY: CGFloat = 4
     static let liftShadowOpacity: CGFloat = 0.12
 
-    static let connectorWidth: CGFloat = 2
     /// 점선 중심 x. 카드 왼쪽 테두리 기준이다. 손잡이 중심(32) 과 다르다.
     static let connectorCenterX: CGFloat = 16
-    static let connectorDotSpacing: CGFloat = 5
-    // 점 지름 2, 주기 5. 길이 0 인 dash 를 round 캡으로 찍어 동그란 점을 만든다
-    static let connectorDash: [CGFloat] = [0.01, connectorDotSpacing]
     /// 점선이 카드에 닿지 않게 위아래로 한 주기씩 띄운다. 간격 20 안에 점 3개가 남는다.
-    static let connectorInset: CGFloat = connectorDotSpacing
+    static let connectorInset: CGFloat = DottedVerticalLine.dotSpacing
     /// 점선 경로 길이. 경로 끝에 딱 걸리는 점은 그려지지 않아서 마지막 점 뒤로 반 주기를 더 준다.
-    static let connectorLength: CGFloat = rowSpacing - connectorInset * 2 + connectorDotSpacing / 2
+    static let connectorLength: CGFloat = rowSpacing - connectorInset * 2 + DottedVerticalLine.dotSpacing / 2
 
     /// 행 하나가 차지하는 세로 거리. 드롭 위치 계산의 단위다.
     static let pitch: CGFloat = rowHeight + rowSpacing
@@ -89,7 +85,7 @@ private extension VerticalAlignment {
 ///     deleteButton(place)
 /// }
 /// ```
-public struct ReorderableList<Item: Identifiable, Trailing: View>: View {
+struct ReorderableList<Item: Identifiable, Trailing: View>: View {
     private let items: [Item]
     private let onMove: (Int, Int) -> Void
     private let rowTitle: (Item) -> String
@@ -101,7 +97,7 @@ public struct ReorderableList<Item: Identifiable, Trailing: View>: View {
     @State private var dragTranslation: CGFloat = 0
     @State private var dropIndex: Int = 0
 
-    public init(
+    init(
         items: [Item],
         onMove: @escaping (Int, Int) -> Void,
         rowTitle: @escaping (Item) -> String,
@@ -115,7 +111,7 @@ public struct ReorderableList<Item: Identifiable, Trailing: View>: View {
         self.trailing = trailing
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(spacing: ReorderableListMetric.rowSpacing) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 row(for: item, at: index)
@@ -234,37 +230,15 @@ private extension ReorderableList {
     @ViewBuilder
     var connectors: some View {
         ForEach(0 ..< max(items.count - 1, 0), id: \.self) { index in
-            ReorderableListConnectorShape()
-                .stroke(
-                    Color.borderDefault,
-                    style: StrokeStyle(
-                        lineWidth: ReorderableListMetric.connectorWidth,
-                        lineCap: .round,
-                        dash: ReorderableListMetric.connectorDash
-                    )
-                )
-                .frame(
-                    width: ReorderableListMetric.connectorWidth,
-                    height: ReorderableListMetric.connectorLength
-                )
+            DottedVerticalLine(color: .borderDefault)
+                .frame(height: ReorderableListMetric.connectorLength)
                 .offset(
-                    x: ReorderableListMetric.connectorCenterX - ReorderableListMetric.connectorWidth / 2,
+                    x: ReorderableListMetric.connectorCenterX - DottedVerticalLine.lineWidth / 2,
                     y: ReorderableListMetric.rowHeight
                         + ReorderableListMetric.connectorInset
                         + ReorderableListMetric.pitch * CGFloat(index)
                 )
         }
-    }
-}
-
-// MARK: - ReorderableListConnectorShape
-
-private struct ReorderableListConnectorShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        return path
     }
 }
 
@@ -364,6 +338,7 @@ private extension ReorderableList {
 
 // MARK: - Preview
 
+#if DEBUG
 private struct ReorderableListPreviewItem: Identifiable {
     let id = UUID()
     let name: String
@@ -430,3 +405,4 @@ private struct ReorderableListPreviewTrashButton: View {
     }
     .padding(.horizontal, Spacing.s20)
 }
+#endif

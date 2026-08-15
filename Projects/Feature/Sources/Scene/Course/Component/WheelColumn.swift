@@ -27,6 +27,16 @@ enum WheelMetrics {
     static let selectionBarHorizontalInset: CGFloat = Spacing.s20
 }
 
+// MARK: - WheelFormat
+
+/// 휠 피커 두 개가 나눠 쓰는 항목 표기.
+enum WheelFormat {
+    /// 한 자리 수도 앞에 0 을 붙여 두 자리로 맞춘다. 열 폭이 고정이라 자릿수가 흔들리면 안 된다.
+    static func twoDigits(_ value: Int) -> String {
+        String(format: "%02d", value)
+    }
+}
+
 // MARK: - WheelSelectionBar
 
 /// 세 열을 가로지르는 선택 바. 열 뒤층에 깔리고 가운데 행에 세로 중심을 맞춘다.

@@ -6,11 +6,11 @@ import SwiftUI
 /// 오전·오후 / 시 / 분 3열 휠 피커. 시안: `c10`
 ///
 /// 구조는 `DateWheelPicker` 와 같다. 치수·선택 바·열은 `WheelMetrics` · `WheelSelectionBar` ·
-/// `WheelColumn`(`WheelPicker.swift`)을 나눠 쓴다. 여기는 단위 글자가 없고 안쪽 여백도 없다.
+/// `WheelColumn`(`WheelColumn.swift`)을 나눠 쓴다. 여기는 단위 글자가 없고 안쪽 여백도 없다.
 ///
 /// 딤 · 하단 시트 껍데기 · `확인` 버튼은 감싸는 쪽이 만든다. 여기는 휠 영역(높이 264)까지다.
 /// `selection` 에는 `hour`(0...23) · `minute` 만 쓴다. 나머지 필드는 받은 그대로 둔다.
-public struct TimeWheelPicker: View {
+struct TimeWheelPicker: View {
 
     /// 12시간제 표시 순서. 12 가 맨 위다.
     private static let hours: [Int] = [12] + Array(1...11)
@@ -18,19 +18,19 @@ public struct TimeWheelPicker: View {
     @Binding private var selection: DateComponents
     private let minuteStep: Int
 
-    public init(selection: Binding<DateComponents>, minuteStep: Int) {
+    init(selection: Binding<DateComponents>, minuteStep: Int) {
         self._selection = selection
         self.minuteStep = minuteStep
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack {
             WheelSelectionBar()
 
             HStack(spacing: WheelMetrics.columnSpacing) {
                 WheelColumn(items: DayPeriod.allCases, selection: periodBinding) { $0.title }
-                WheelColumn(items: Self.hours, selection: hourBinding, title: Self.twoDigits)
-                WheelColumn(items: minutes, selection: minuteBinding, title: Self.twoDigits)
+                WheelColumn(items: Self.hours, selection: hourBinding, title: WheelFormat.twoDigits)
+                WheelColumn(items: minutes, selection: minuteBinding, title: WheelFormat.twoDigits)
             }
         }
         .frame(maxWidth: .infinity)
@@ -40,7 +40,7 @@ public struct TimeWheelPicker: View {
         .onChange(of: selection, initial: true) { _, _ in normalizeSelection() }
     }
 
-    // MARK: Binding
+    // MARK: - Binding
 
     private var periodBinding: Binding<DayPeriod?> {
         Binding(
@@ -72,7 +72,7 @@ public struct TimeWheelPicker: View {
         )
     }
 
-    // MARK: Value
+    // MARK: - Value
 
     /// 1 미만이거나 60을 넘는 간격은 1분으로 본다.
     private var resolvedStep: Int {
@@ -123,15 +123,11 @@ public struct TimeWheelPicker: View {
         components.minute = minute
         selection = components
     }
-
-    private static func twoDigits(_ value: Int) -> String {
-        String(format: "%02d", value)
-    }
 }
 
 // MARK: - DayPeriod
 
-private enum DayPeriod: Int, CaseIterable, Hashable {
+private enum DayPeriod: CaseIterable {
     case am
     case pm
 
@@ -145,6 +141,7 @@ private enum DayPeriod: Int, CaseIterable, Hashable {
 
 // MARK: - Preview
 
+#if DEBUG
 // 시안: c10
 #Preview("시간") {
     @Previewable @State var selection = DateComponents(hour: 13, minute: 10)
@@ -157,7 +154,7 @@ private enum DayPeriod: Int, CaseIterable, Hashable {
             .foregroundStyle(Color.textSecondary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.white)
+    .background(Color.bgDefault)
 }
 
 // 간격이 인자인지 확인용. 1분 간격이면 분 휠이 00...59 로 늘어난다.
@@ -172,5 +169,6 @@ private enum DayPeriod: Int, CaseIterable, Hashable {
             .foregroundStyle(Color.textSecondary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.white)
+    .background(Color.bgDefault)
 }
+#endif

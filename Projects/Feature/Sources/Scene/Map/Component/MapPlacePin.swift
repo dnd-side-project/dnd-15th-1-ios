@@ -52,7 +52,7 @@ private enum MapPlacePinMetric {
 /// - `selected`: 지도에서 고른 장소. 흰 원.
 /// - `candidate`: 코스에 담을 후보로 고른 장소. 흰 하트.
 /// - `number`: 코스에 담긴 순서. 흰 번호.
-public enum MapPlacePinContent {
+enum MapPlacePinContent {
     case selected
     case candidate
     case number(Int)
@@ -76,14 +76,14 @@ public enum MapPlacePinContent {
 /// MapPlacePin(content: .candidate)
 /// MapPlacePin(content: .number(1))
 /// ```
-public struct MapPlacePin: View {
+struct MapPlacePin: View {
     private let content: MapPlacePinContent
 
-    public init(content: MapPlacePinContent) {
+    init(content: MapPlacePinContent) {
         self.content = content
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack {
             droplet
             label
@@ -191,6 +191,8 @@ private struct MapPlacePinShape: InsettableShape {
     }
 }
 
+#if DEBUG
+
 // MARK: - Preview
 
 private struct MapPlacePinPreviewHost: View {
@@ -251,3 +253,5 @@ private struct MapPlacePinPreviewHost: View {
         )
     }
 }
+
+#endif

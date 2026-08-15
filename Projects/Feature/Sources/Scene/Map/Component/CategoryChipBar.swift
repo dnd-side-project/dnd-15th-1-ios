@@ -21,15 +21,9 @@ private enum CategoryChipMetric {
 /// `Equatable` 이라 리듀서 `State` 안에 그대로 담을 수 있다.
 /// `SwiftUI.Image` 자체가 `Equatable` 이므로 합성 구현이 그대로 성립한다.
 struct CategoryChipItem<ID: Hashable>: Identifiable, Equatable {
-    public let id: ID
-    public let icon: Image
-    public let title: String
-
-    public init(id: ID, icon: Image, title: String) {
-        self.id = id
-        self.icon = icon
-        self.title = title
-    }
+    let id: ID
+    let icon: Image
+    let title: String
 }
 
 // MARK: - CategoryChipBar
@@ -46,7 +40,7 @@ struct CategoryChipItem<ID: Hashable>: Identifiable, Equatable {
 ///     store.send(.categoryTapped(id))
 /// }
 /// ```
-public struct CategoryChipBar<ID: Hashable>: View {
+struct CategoryChipBar<ID: Hashable>: View {
     private let items: [CategoryChipItem<ID>]
     private let selection: ID?
     private let onTap: (ID) -> Void
@@ -57,7 +51,7 @@ public struct CategoryChipBar<ID: Hashable>: View {
         self.onTap = onTap
     }
 
-    public var body: some View {
+    var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Spacing.s4) {
                 ForEach(items) { item in
@@ -124,6 +118,8 @@ private struct CategoryChip<ID: Hashable>: View {
     }
 }
 
+#if DEBUG
+
 // MARK: - Preview Fixture
 
 private enum CategoryChipBarPreview {
@@ -173,3 +169,5 @@ private struct CategoryChipBarPreviewMap: View {
         }
     }
 }
+
+#endif

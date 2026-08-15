@@ -1,26 +1,10 @@
-//
-//  MapBottomSheet.swift
-//  Dulpick
-//
-//  `BottomSheet.swift` 와 따로 둔다. 이름은 닮았지만 다른 물건이다.
-//
-//  `BottomSheet` 는 `.bottomSheet(isPresented:)` 수식어다.
-//  딤을 깔고 바깥을 탭하면 닫히는 모달이고, 높이는 내용에 맞춰 고정된다.
-//
-//  `MapBottomSheet` 는 딤이 없다. 뒤에 깔린 지도를 계속 조작할 수 있어야 하고,
-//  단계 여러 개 사이를 끌어서 오간다. 떴다 사라지는 게 아니라 화면에 상주한다.
-//
-//  표시 방식(overlay + 딤 + 트랜지션)을 `BottomSheet` 가 자기가 소유하고 있어서,
-//  그걸 감싸 재사용할 수 있는 구조가 아니다. 껍데기 값(모서리 32, 잡이 막대 50 × 6)은 이미 맞춰뒀다.
-//
-
 import SharedDesignSystem
 import SwiftUI
 
 // MARK: - SheetDetent
 
 /// 바텀시트가 멈추는 단계. 담긴 컨테이너 높이 대비 비율이다.
-public enum SheetDetent: Hashable {
+enum SheetDetent: Hashable {
     case fraction(CGFloat)
 
     var fraction: CGFloat {
@@ -59,6 +43,11 @@ private enum MapBottomSheetMetric {
 /// 딤이 없고 아래층이 그대로 조작되어야 해서 `ZStack` 의 위층에 얹어 쓴다.
 /// 시트 밖 영역은 배경이 없어 터치를 가로채지 않는다.
 ///
+/// `BottomSheet.swift` 와 따로 둔다. 이름은 닮았지만 다른 물건이다.
+/// `BottomSheet` 는 `.bottomSheet(isPresented:)` 수식어로, 딤을 깔고 바깥을 탭하면 닫히는
+/// 모달이며 높이가 내용에 맞춰 고정된다. 표시 방식(overlay + 딤 + 트랜지션)을 자기가 소유해서
+/// 감싸 재사용할 수 있는 구조가 아니다. 껍데기 값(모서리 32, 잡이 막대 50 × 6)은 맞춰뒀다.
+///
 /// 잡이 막대 아래로 헤더 · 본문 · 푸터 세 자리를 받는다.
 /// 헤더와 푸터는 고정이고 본문만 스크롤한다. 둘 다 기본값이 있어 본문만 넘겨도 된다.
 ///
@@ -72,7 +61,7 @@ private enum MapBottomSheetMetric {
 /// ```
 struct MapBottomSheet<Header: View, Content: View, Footer: View>: View {
 
-    // 내부 ScrollView 를 시트가 직접 갖는다.
+    // 본문 ScrollView 를 시트가 직접 갖는다.
     // 호출부가 scrollDisabled·onScrollGeometryChange 를 매번 붙일 필요 없이 내용만 넘기면 되기 때문이다.
     private let detents: [SheetDetent]
     @Binding private var selection: SheetDetent
@@ -92,7 +81,7 @@ struct MapBottomSheet<Header: View, Content: View, Footer: View>: View {
     /// 잡이 막대 · 헤더 · 푸터에서 시작한 손짓인지. 그 자리는 스크롤과 무관하게 늘 시트 드래그다.
     @State private var isDragFromFixedArea = false
 
-    public init(
+    init(
         detents: [SheetDetent],
         selection: Binding<SheetDetent>,
         onHeightChange: ((CGFloat) -> Void)? = nil,
@@ -108,7 +97,7 @@ struct MapBottomSheet<Header: View, Content: View, Footer: View>: View {
         self.footer = footer()
     }
 
-    public var body: some View {
+    var body: some View {
         GeometryReader { proxy in
             sheet(in: proxy.size.height)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -265,12 +254,12 @@ private extension MapBottomSheet {
         sortedDetents.first ?? selection
     }
 
-    /// 가장 큰 단계에서만 내부 리스트가 스크롤된다.
+    /// 가장 큰 단계에서만 본문이 스크롤된다.
     var isExpanded: Bool {
         selection == largestDetent
     }
 
-    /// 가장 큰 단계가 아니거나, 리스트가 맨 위일 때만 시트를 끈다.
+    /// 가장 큰 단계가 아니거나, 본문이 맨 위일 때만 시트를 끈다.
     var canDragSheet: Bool {
         !isExpanded || scrollOffset <= 0
     }
@@ -364,6 +353,7 @@ private extension MapBottomSheet {
 
 // MARK: - Preview
 
+#if DEBUG
 private struct MapBottomSheetPreviewRow: View {
     let index: Int
 
@@ -448,3 +438,4 @@ private struct MapBottomSheetPreviewHost: View {
         rowCount: 50
     )
 }
+#endif

@@ -4,23 +4,11 @@ import SwiftUI
 // MARK: - CourseStop
 
 /// 코스에 담긴 한 곳. 화면에 그대로 찍히는 글자만 받는다.
-public struct CourseStop: Identifiable, Equatable {
-    public let id: String
-    public let name: String
-    public let category: String
-    public let address: String
-
-    public init(
-        id: String,
-        name: String,
-        category: String,
-        address: String
-    ) {
-        self.id = id
-        self.name = name
-        self.category = category
-        self.address = address
-    }
+struct CourseStop: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let category: String
+    let address: String
 }
 
 // MARK: - CourseLeg
@@ -29,29 +17,16 @@ public struct CourseStop: Identifiable, Equatable {
 ///
 /// 시간·거리는 이미 만들어진 글자를 받고, 긴 구간인지도 부르는 쪽이 정한다.
 /// 뷰가 분·킬로미터를 계산하거나 임계값을 판단하지 않는다.
-public struct CourseLeg: Equatable {
-    public let duration: String
-    public let distance: String
-    public let isLong: Bool
-
-    public init(
-        duration: String,
-        distance: String,
-        isLong: Bool
-    ) {
-        self.duration = duration
-        self.distance = distance
-        self.isLong = isLong
-    }
+struct CourseLeg: Equatable {
+    let duration: String
+    let distance: String
+    let isLong: Bool
 }
 
 // MARK: - CourseTimelineMetric
 
 private enum CourseTimelineMetric {
     static let railWidth: CGFloat = 24
-    static let connectorWidth: CGFloat = 2
-    // 점 지름 2, 주기 5. 길이 0 인 dash 를 round 캡으로 찍어 동그란 점을 만든다
-    static let connectorDash: [CGFloat] = [0.01, 5]
     static let walkIconSize: CGFloat = 24
     static let legContentHeight: CGFloat = 28
     /// 장소명 타이포. 배지 세로 위치를 이 줄 높이에 맞추므로 한곳에서 읽는다
@@ -73,16 +48,16 @@ private enum CourseTimelineMetric {
 /// CourseTimeline(stops: stops, legs: legs)
 ///     .padding(.horizontal, Spacing.s24)
 /// ```
-public struct CourseTimeline: View {
+struct CourseTimeline: View {
     private let stops: [CourseStop]
     private let legs: [CourseLeg]
 
-    public init(stops: [CourseStop], legs: [CourseLeg]) {
+    init(stops: [CourseStop], legs: [CourseLeg]) {
         self.stops = stops
         self.legs = legs
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
                 stopRow(stop, number: index + 1, isLast: isLast(index))
@@ -223,16 +198,7 @@ private extension CourseTimeline {
     ///
     /// 이 탐욕이 행 높이로 번지지 않는 것은 레일이 `overlay` 안에 있기 때문이다.
     var connector: some View {
-        CourseTimelineConnectorShape()
-            .stroke(
-                Color.brandPrimary,
-                style: StrokeStyle(
-                    lineWidth: CourseTimelineMetric.connectorWidth,
-                    lineCap: .round,
-                    dash: CourseTimelineMetric.connectorDash
-                )
-            )
-            .frame(width: CourseTimelineMetric.connectorWidth)
+        DottedVerticalLine(color: .brandPrimary)
             .frame(maxHeight: .infinity)
     }
 
@@ -270,19 +236,9 @@ private extension CourseTimeline {
     }
 }
 
-// MARK: - CourseTimelineConnectorShape
-
-private struct CourseTimelineConnectorShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        return path
-    }
-}
-
 // MARK: - Preview
 
+#if DEBUG
 private extension CourseStop {
     static func preview(_ index: Int) -> CourseStop {
         CourseStop(
@@ -332,3 +288,4 @@ private struct CourseTimelinePreviewHost: View {
         legs: []
     )
 }
+#endif
