@@ -94,6 +94,29 @@ final class DateTypeFeatureTests: XCTestCase {
         XCTAssertNotNil(store.state.datePreference)
     }
 
+    // 변화를 적지 않은 send 는 상태가 그대로여야 통과한다. 네 축 모두 무시되는지 본다
+    func test_저장중_축선택_무시() async {
+        let store = TestStore(initialState: DateTypeFeature.State(isSubmitting: true)) {
+            DateTypeFeature()
+        }
+
+        await store.send(.indoorOutdoorSelected(.indoor))
+        await store.send(.activityLevelSelected(.active))
+        await store.send(.dateTimeSelected(.day))
+        await store.send(.dateFocusSelected(.food))
+    }
+
+    /// 저장 응답보다 온보딩 전환이 먼저 일어나면 안 되므로 delegate 도 나가지 않는다
+    func test_저장중_건너뛰기_무시() async {
+        var state = allSelectedState
+        state.isSubmitting = true
+        let store = TestStore(initialState: state) {
+            DateTypeFeature()
+        }
+
+        await store.send(.skipButtonTapped)
+    }
+
     func test_저장성공_저장델리게이트_전달() async {
         let requestedPreference = LockIsolated<DatePreference?>(nil)
         let profile = self.profile
