@@ -1,0 +1,441 @@
+import SharedDesignSystem
+import SwiftUI
+
+// MARK: - SheetDetent
+
+/// 바텀시트가 멈추는 단계. 담긴 컨테이너 높이 대비 비율이다.
+enum SheetDetent: Hashable {
+    case fraction(CGFloat)
+
+    var fraction: CGFloat {
+        switch self {
+        case let .fraction(value):
+            return min(max(value, 0), 1)
+        }
+    }
+
+    func height(in containerHeight: CGFloat) -> CGFloat {
+        containerHeight * fraction
+    }
+}
+
+// MARK: - MapBottomSheetMetric
+
+private enum MapBottomSheetMetric {
+    static let cornerRadius: CGFloat = 32
+    static let grabberWidth: CGFloat = 50
+    static let grabberHeight: CGFloat = 6
+    static let grabberTopInset: CGFloat = 14
+    static let grabberBottomInset: CGFloat = 13
+    static let shadowRadius: CGFloat = 12
+    static let shadowOpacity: CGFloat = 0.08
+    static let shadowOffsetY: CGFloat = -4
+    static let minimumDragDistance: CGFloat = 4
+
+    /// 시트 드래그로 인정하는 세로 우세 비율. 가로 스크롤을 쓸다 시트가 딸려오는 걸 막는다.
+    static let verticalDominance: CGFloat = 1.5
+}
+
+// MARK: - MapBottomSheet
+
+/// `presentationDetents` 를 쓰지 않는 자체 바텀시트.
+///
+/// 딤이 없고 아래층이 그대로 조작되어야 해서 `ZStack` 의 위층에 얹어 쓴다.
+/// 시트 밖 영역은 배경이 없어 터치를 가로채지 않는다.
+///
+/// `BottomSheet.swift` 와 따로 둔다. 이름은 닮았지만 다른 물건이다.
+/// `BottomSheet` 는 `.bottomSheet(isPresented:)` 수식어로, 딤을 깔고 바깥을 탭하면 닫히는
+/// 모달이며 높이가 내용에 맞춰 고정된다. 표시 방식(overlay + 딤 + 트랜지션)을 자기가 소유해서
+/// 감싸 재사용할 수 있는 구조가 아니다. 껍데기 값(모서리 32, 잡이 막대 50 × 6)은 맞춰뒀다.
+///
+/// 잡이 막대 아래로 헤더 · 본문 · 푸터 세 자리를 받는다.
+/// 헤더와 푸터는 고정이고 본문만 스크롤한다. 둘 다 기본값이 있어 본문만 넘겨도 된다.
+///
+/// ```swift
+/// ZStack(alignment: .bottom) {
+///     MapView()
+///     MapBottomSheet(detents: [.fraction(0.5), .fraction(0.13)], selection: $detent) {
+///         savedPlaceList
+///     }
+/// }
+/// ```
+struct MapBottomSheet<Header: View, Content: View, Footer: View>: View {
+
+    // 본문 ScrollView 를 시트가 직접 갖는다.
+    // 호출부가 scrollDisabled·onScrollGeometryChange 를 매번 붙일 필요 없이 내용만 넘기면 되기 때문이다.
+    private let detents: [SheetDetent]
+    @Binding private var selection: SheetDetent
+    private let onHeightChange: ((CGFloat) -> Void)?
+    private let header: Header
+    private let content: Content
+    private let footer: Footer
+
+    @State private var dragTranslation: CGFloat = 0
+    @State private var scrollOffset: CGFloat = 0
+    @State private var isDraggingSheet = false
+
+    /// 시트 드래그가 실제로 시작된 시점의 `translation.height`.
+    /// 제스처는 손을 댄 지점부터 누적되므로, 이 값을 빼야 시트가 한 프레임에 튀지 않는다.
+    @State private var dragBaseline: CGFloat = 0
+
+    /// 잡이 막대 · 헤더 · 푸터에서 시작한 손짓인지. 그 자리는 스크롤과 무관하게 늘 시트 드래그다.
+    @State private var isDragFromFixedArea = false
+
+    init(
+        detents: [SheetDetent],
+        selection: Binding<SheetDetent>,
+        onHeightChange: ((CGFloat) -> Void)? = nil,
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
+    ) {
+        self.detents = detents
+        self._selection = selection
+        self.onHeightChange = onHeightChange
+        self.header = header()
+        self.content = content()
+        self.footer = footer()
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            sheet(in: proxy.size.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        }
+    }
+}
+
+// MARK: - Convenience Init
+
+// 기본값 있는 @ViewBuilder 파라미터는 제네릭 추론이 걸리지 않아 편의 이니셜라이저로 나눠 둔다.
+
+extension MapBottomSheet where Header == EmptyView, Footer == EmptyView {
+
+    init(
+        detents: [SheetDetent],
+        selection: Binding<SheetDetent>,
+        onHeightChange: ((CGFloat) -> Void)? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            detents: detents,
+            selection: selection,
+            onHeightChange: onHeightChange,
+            header: { EmptyView() },
+            content: content,
+            footer: { EmptyView() }
+        )
+    }
+}
+
+extension MapBottomSheet where Footer == EmptyView {
+
+    init(
+        detents: [SheetDetent],
+        selection: Binding<SheetDetent>,
+        onHeightChange: ((CGFloat) -> Void)? = nil,
+        @ViewBuilder header: () -> Header,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            detents: detents,
+            selection: selection,
+            onHeightChange: onHeightChange,
+            header: header,
+            content: content,
+            footer: { EmptyView() }
+        )
+    }
+}
+
+extension MapBottomSheet where Header == EmptyView {
+
+    init(
+        detents: [SheetDetent],
+        selection: Binding<SheetDetent>,
+        onHeightChange: ((CGFloat) -> Void)? = nil,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
+    ) {
+        self.init(
+            detents: detents,
+            selection: selection,
+            onHeightChange: onHeightChange,
+            header: { EmptyView() },
+            content: content,
+            footer: footer
+        )
+    }
+}
+
+// MARK: - Layout
+
+private extension MapBottomSheet {
+
+    func sheet(in containerHeight: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            fixedTop
+            scrollableContent
+            fixedBottom
+        }
+        .frame(height: currentHeight(in: containerHeight))
+        .frame(maxWidth: .infinity)
+        .background(Color.bgDefault)
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: MapBottomSheetMetric.cornerRadius,
+                topTrailingRadius: MapBottomSheetMetric.cornerRadius
+            )
+        )
+        .shadow(
+            color: Color.commonBlack.opacity(MapBottomSheetMetric.shadowOpacity),
+            radius: MapBottomSheetMetric.shadowRadius,
+            y: MapBottomSheetMetric.shadowOffsetY
+        )
+        .simultaneousGesture(dragGesture(in: containerHeight))
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+        } action: { height in
+            onHeightChange?(height)
+        }
+        .onChange(of: detents, initial: true) { _, _ in
+            snapSelectionIntoDetents()
+        }
+    }
+
+    var fixedTop: some View {
+        VStack(spacing: 0) {
+            grabber
+            header
+        }
+        .simultaneousGesture(fixedAreaMarker)
+    }
+
+    var fixedBottom: some View {
+        footer
+            .simultaneousGesture(fixedAreaMarker)
+    }
+
+    var grabber: some View {
+        Capsule()
+            .fill(Color.gray300)
+            .frame(width: MapBottomSheetMetric.grabberWidth, height: MapBottomSheetMetric.grabberHeight)
+            .frame(maxWidth: .infinity)
+            .padding(.top, MapBottomSheetMetric.grabberTopInset)
+            .padding(.bottom, MapBottomSheetMetric.grabberBottomInset)
+    }
+
+    var scrollableContent: some View {
+        ScrollView {
+            content
+        }
+        .scrollIndicators(.hidden)
+        .scrollDisabled(!isExpanded)
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in
+            scrollOffset = y
+        }
+    }
+}
+
+// MARK: - Detent
+
+private extension MapBottomSheet {
+
+    var sortedDetents: [SheetDetent] {
+        let sorted = detents.sorted { $0.fraction < $1.fraction }
+        return sorted.isEmpty ? [selection] : sorted
+    }
+
+    var largestDetent: SheetDetent {
+        sortedDetents.last ?? selection
+    }
+
+    var smallestDetent: SheetDetent {
+        sortedDetents.first ?? selection
+    }
+
+    /// 가장 큰 단계에서만 본문이 스크롤된다.
+    var isExpanded: Bool {
+        selection == largestDetent
+    }
+
+    /// 가장 큰 단계가 아니거나, 본문이 맨 위일 때만 시트를 끈다.
+    var canDragSheet: Bool {
+        !isExpanded || scrollOffset <= 0
+    }
+
+    func currentHeight(in containerHeight: CGFloat) -> CGFloat {
+        let dragged = selection.height(in: containerHeight) - dragTranslation
+        let minHeight = smallestDetent.height(in: containerHeight)
+        let maxHeight = largestDetent.height(in: containerHeight)
+        return min(max(dragged, minHeight), maxHeight)
+    }
+
+    func nearestDetent(to height: CGFloat, in containerHeight: CGFloat) -> SheetDetent {
+        sortedDetents.min {
+            abs($0.height(in: containerHeight) - height) < abs($1.height(in: containerHeight) - height)
+        } ?? selection
+    }
+
+    /// `detents` 만 갈아끼우면 `selection` 이 옛 값으로 남아 `isExpanded` 가 늘 false 가 되고
+    /// 본문 스크롤이 조용히 죽는다. 목록 밖 값이면 가장 가까운 단계로 다시 붙인다.
+    ///
+    /// 컨테이너 높이 없이 비교할 수 있게 기준 높이 `1` 을 쓴다. `height(in: 1)` 은 곧 `fraction` 이다.
+    func snapSelectionIntoDetents() {
+        guard !detents.isEmpty, !detents.contains(selection) else { return }
+        selection = nearestDetent(to: selection.fraction, in: 1)
+    }
+}
+
+// MARK: - Drag
+
+private extension MapBottomSheet {
+
+    /// 잡이 막대 · 헤더 · 푸터에 얹는 표시용 제스처. 이동량은 건드리지 않고 시작 위치만 남긴다.
+    /// `minimumDistance` 가 0 이라 시트 드래그(4pt)보다 먼저 켜진다.
+    var fixedAreaMarker: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                isDragFromFixedArea = true
+            }
+            .onEnded { _ in
+                isDragFromFixedArea = false
+            }
+    }
+
+    func dragGesture(in containerHeight: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: MapBottomSheetMetric.minimumDragDistance)
+            .onChanged { value in
+                if !isDraggingSheet {
+                    guard shouldBeginSheetDrag(value) else { return }
+                    isDraggingSheet = true
+                    // 시작 시점의 누적 이동량을 기준으로 잡는다. 이후 이동은 전부 이 값과의 차다
+                    dragBaseline = value.translation.height
+                }
+                dragTranslation = value.translation.height - dragBaseline
+            }
+            .onEnded { value in
+                isDragFromFixedArea = false
+                guard isDraggingSheet else { return }
+                isDraggingSheet = false
+
+                // 이동량만 보면 살짝 튕긴 손짓을 놓친다. 속도가 섞인 예상 종점으로 붙일 단계를 고른다
+                let predictedTranslation = value.predictedEndTranslation.height - dragBaseline
+                let predictedHeight = selection.height(in: containerHeight) - predictedTranslation
+                let target = nearestDetent(to: predictedHeight, in: containerHeight)
+
+                dragBaseline = 0
+
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    selection = target
+                    dragTranslation = 0
+                }
+            }
+    }
+
+    /// 시트 드래그를 시작할지 정한다. 한 번 시작한 뒤에는 다시 묻지 않아 손짓 중간에 끊기지 않는다.
+    func shouldBeginSheetDrag(_ value: DragGesture.Value) -> Bool {
+        let vertical = abs(value.translation.height)
+        let horizontal = abs(value.translation.width)
+
+        // 세로가 가로보다 확실히 클 때만. 썸네일 가로 스크롤에 시트가 딸려오는 걸 막는다
+        guard vertical > horizontal * MapBottomSheetMetric.verticalDominance else { return false }
+
+        // 잡이 막대 · 헤더 · 푸터는 스크롤이 없어 늘 시트 드래그다
+        guard !isDragFromFixedArea else { return true }
+
+        guard canDragSheet else { return false }
+
+        // 가장 큰 단계에서 위로 미는 건 시트가 아니라 본문 스크롤이다
+        return !(isExpanded && value.translation.height < 0)
+    }
+}
+
+// MARK: - Preview
+
+#if DEBUG
+private struct MapBottomSheetPreviewRow: View {
+    let index: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            Text("장소명 \(index + 1)")
+                .typography(.body1SB)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("경기도 안산시 모모로 145길 (뭐뭐동)")
+                .typography(.caption1R)
+                .foregroundStyle(Color.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.s20)
+        .padding(.vertical, Spacing.s12)
+    }
+}
+
+private struct MapBottomSheetPreviewHost: View {
+    let detents: [SheetDetent]
+    let rowCount: Int
+
+    @State private var selection: SheetDetent
+    @State private var sheetHeight: CGFloat = 0
+
+    init(detents: [SheetDetent], rowCount: Int = 8) {
+        self.detents = detents
+        self.rowCount = rowCount
+        _selection = State(initialValue: detents.first ?? .fraction(0.5))
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Color.gray200
+                .ignoresSafeArea()
+
+            Text("시트 높이 \(Int(sheetHeight))")
+                .typography(.caption1M)
+                .foregroundStyle(Color.textSecondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, Spacing.s32)
+
+            MapBottomSheet(
+                detents: detents,
+                selection: $selection,
+                onHeightChange: { sheetHeight = $0 }
+            ) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("저장한 장소")
+                        .typography(.title3SB)
+                        .foregroundStyle(Color.textPrimary)
+                        .padding(.horizontal, Spacing.s20)
+                        .padding(.bottom, Spacing.s12)
+
+                    ForEach(0..<rowCount, id: \.self) { index in
+                        MapBottomSheetPreviewRow(index: index)
+                        Divider()
+                            .foregroundStyle(Color.borderWeak)
+                    }
+                }
+                .padding(.bottom, Spacing.s32)
+            }
+        }
+    }
+}
+
+// a08 — 지도 위 기본 2단(50% / 13%)
+#Preview("2단 기본") {
+    MapBottomSheetPreviewHost(detents: [.fraction(0.5), .fraction(0.13)])
+}
+
+// a13 · a14 — 접힘/펼침 사이에 중간 단계를 하나 더 둔 3단
+#Preview("3단") {
+    MapBottomSheetPreviewHost(detents: [.fraction(0.9), .fraction(0.5), .fraction(0.13)])
+}
+
+// a10 · b04 · c01 — 펼친 단계에서만 리스트가 스크롤되는지 확인
+#Preview("긴 리스트 스크롤") {
+    MapBottomSheetPreviewHost(
+        detents: [.fraction(0.9), .fraction(0.5), .fraction(0.13)],
+        rowCount: 50
+    )
+}
+#endif
