@@ -114,7 +114,13 @@ private extension MapFloatingButton {
 ///     } trailing: {
 ///         MapFloatingButton(icon: .locate) { }
 ///     }
-///     MapBottomSheet(detents: detents, selection: $detent) { sheetHeight = $0 } content: { ... }
+///     MapBottomSheet(
+///         detents: detents,
+///         selection: $detent,
+///         onHeightChange: { sheetHeight = $0 }
+///     ) {
+///         savedPlaceList
+///     }
 /// }
 /// ```
 struct MapFloatingControls<Leading: View, Trailing: View>: View {
