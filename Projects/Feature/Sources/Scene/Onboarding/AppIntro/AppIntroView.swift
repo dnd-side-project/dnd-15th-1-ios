@@ -27,7 +27,7 @@ public struct AppIntroView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
 
-            VStack(spacing: 20) {
+            VStack(spacing: IndicatorMetric.topSpacing) {
                 pageScroll
                 pageIndicator
             }
@@ -51,7 +51,7 @@ public struct AppIntroView: View {
                     Image.arrowLeft
                         .renderingMode(.original)
                         .resizable()
-                        .frame(width: 24, height: 24)
+                        .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
                 }
             }
         }
@@ -87,32 +87,35 @@ public struct AppIntroView: View {
     }
 
     private func page(_ item: AppIntroPage) -> some View {
-        VStack(spacing: 40) {
+        VStack(spacing: PageMetric.titleSpacing) {
             Text(item.title)
                 .typography(.title1B)
                 .foregroundStyle(Color.textPrimary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, PageMetric.titleHorizontalPadding)
 
             item.image
                 .resizable()
                 .scaledToFit()
-                .frame(width: 340, height: 300)
+                .frame(width: PageMetric.imageWidth, height: PageMetric.imageHeight)
         }
         .frame(maxWidth: .infinity)
     }
 
     private var pageIndicator: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: IndicatorMetric.dotSpacing) {
             ForEach(0..<store.pageCount, id: \.self) { index in
                 let isActive = index == store.pageIndex
                 Capsule()
                     .fill(isActive ? Color.textPrimary : Color.borderDefault)
-                    .frame(width: isActive ? 17 : 8, height: 8)
+                    .frame(
+                        width: isActive ? IndicatorMetric.activeDotWidth : IndicatorMetric.inactiveDotWidth,
+                        height: IndicatorMetric.dotHeight
+                    )
                     .animation(.easeInOut(duration: 0.25), value: isActive)
             }
         }
-        .frame(height: 32)
+        .frame(height: IndicatorMetric.height)
         .animation(.easeInOut(duration: 0.25), value: store.pageIndex)
     }
 
@@ -120,8 +123,32 @@ public struct AppIntroView: View {
         AppButton("다음", style: .dark, size: .xl, fullWidth: true) {
             store.send(.nextButtonTapped, animation: .easeInOut(duration: 0.25))
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, NextButtonMetric.horizontalPadding)
     }
+}
+
+private enum BackButtonMetric {
+    static let iconSize: CGFloat = 24
+}
+
+private enum PageMetric {
+    static let titleSpacing: CGFloat = 40
+    static let titleHorizontalPadding: CGFloat = 20
+    static let imageWidth: CGFloat = 340
+    static let imageHeight: CGFloat = 300
+}
+
+private enum IndicatorMetric {
+    static let topSpacing: CGFloat = 20
+    static let dotSpacing: CGFloat = 8
+    static let activeDotWidth: CGFloat = 17
+    static let inactiveDotWidth: CGFloat = 8
+    static let dotHeight: CGFloat = 8
+    static let height: CGFloat = 32
+}
+
+private enum NextButtonMetric {
+    static let horizontalPadding: CGFloat = 20
 }
 
 #if DEBUG

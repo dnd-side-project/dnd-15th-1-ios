@@ -4,13 +4,6 @@ import SwiftUI
 import ThirdParty
 
 public struct CoupleConnectView: View {
-    // 코드 placeholder. 로딩 시머와 실패 후 재시도 블록이 같은 치수를 쓴다
-    static let codePlaceholderWidth: CGFloat = 160
-    static let codePlaceholderHeight: CGFloat = 48
-    static let codePlaceholderRadius: CGFloat = 8
-
-    static let retryButtonRadius: CGFloat = 8
-
     @Bindable public var store: StoreOf<CoupleConnectFeature>
 
     private let shareButtonStyle = AppButtonStyle(variant: .outlined, size: .xl, fullWidth: true)
@@ -44,7 +37,7 @@ public struct CoupleConnectView: View {
     private var rootContent: some View {
         VStack(spacing: 0) {
             Spacer()
-                .frame(height: 65.5)
+                .frame(height: TitleMetric.topSpacing)
 
             Text("커플 연결 시작하기")
                 .typography(.title1B)
@@ -52,18 +45,18 @@ public struct CoupleConnectView: View {
                 .multilineTextAlignment(.center)
 
             Spacer()
-                .frame(height: 20)
+                .frame(height: IllustrationMetric.topSpacing)
 
             Image.coupleConnectBefore
                 .resizable()
                 .scaledToFit()
-                .frame(maxWidth: 353, maxHeight: 100)
-                .padding(.horizontal, 20)
+                .frame(maxWidth: IllustrationMetric.maxWidth, maxHeight: IllustrationMetric.maxHeight)
+                .padding(.horizontal, IllustrationMetric.horizontalPadding)
 
             Spacer()
-                .frame(height: 60)
+                .frame(height: CodeMetric.topSpacing)
 
-            VStack(spacing: 8) {
+            VStack(spacing: CodeMetric.chipSpacing) {
                 codeChip
                 codeValue
             }
@@ -89,7 +82,7 @@ public struct CoupleConnectView: View {
                 Image.arrowLeft
                     .renderingMode(.original)
                     .resizable()
-                    .frame(width: 24, height: 24)
+                    .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
             }
         }
     }
@@ -98,10 +91,10 @@ public struct CoupleConnectView: View {
         Text("내 코드")
             .typography(.body1M)
             .foregroundStyle(Color.textSecondary)
-            .padding(.horizontal, 12)
-            .frame(height: 32)
+            .padding(.horizontal, CodeChipMetric.horizontalPadding)
+            .frame(height: CodeChipMetric.height)
             .background(Color.gray100)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: CodeChipMetric.cornerRadius))
     }
 
     @ViewBuilder
@@ -115,10 +108,10 @@ public struct CoupleConnectView: View {
             inviteCodeFailure(inviteCodeError)
             // 아직 요청 전이면 .task 가 도는 첫 프레임에 실패 UI 가 번쩍이므로 시머로 덮는다
         } else if store.isLoadingInviteCode || !store.hasAttemptedInviteCode {
-            ShimmerBlock(cornerRadius: Self.codePlaceholderRadius)
+            ShimmerBlock(cornerRadius: CodePlaceholderMetric.cornerRadius)
                 .frame(
-                    width: Self.codePlaceholderWidth,
-                    height: Self.codePlaceholderHeight
+                    width: CodePlaceholderMetric.width,
+                    height: CodePlaceholderMetric.height
                 )
         } else {
             // 세션 만료처럼 값도 에러도 없이 끝난 경우까지 시머가 돌지 않게 한다
@@ -128,20 +121,20 @@ public struct CoupleConnectView: View {
 
     // AppButtonStyle 의 .lg 는 h48 이지만 radius 가 12 라 시안(8)과 달라 토큰만 빌려 직접 그린다
     private func inviteCodeFailure(_ message: String) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: RetryButtonMetric.messageSpacing) {
             Button {
                 store.send(.retryInviteCodeButtonTapped)
             } label: {
                 Text("다시 시도")
                     .typography(.body1SB)
                     .foregroundStyle(Color.textSecondary)
-                    .padding(.horizontal, 24)
-                    .frame(height: 48)
+                    .padding(.horizontal, RetryButtonMetric.horizontalPadding)
+                    .frame(height: RetryButtonMetric.height)
                     .background(Color.commonWhite)
-                    .clipShape(RoundedRectangle(cornerRadius: Self.retryButtonRadius))
+                    .clipShape(RoundedRectangle(cornerRadius: RetryButtonMetric.cornerRadius))
                     .overlay {
-                        RoundedRectangle(cornerRadius: Self.retryButtonRadius)
-                            .strokeBorder(Color.borderDefault, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: RetryButtonMetric.cornerRadius)
+                            .strokeBorder(Color.borderDefault, lineWidth: RetryButtonMetric.borderWidth)
                     }
             }
             .buttonStyle(.plain)
@@ -161,7 +154,7 @@ public struct CoupleConnectView: View {
                 .typography(.body1SB)
                 .foregroundStyle(Color.textTertiary)
                 .frame(maxWidth: .infinity)
-                .frame(height: 32)
+                .frame(height: SkipButtonMetric.height)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -207,6 +200,51 @@ public struct CoupleConnectView: View {
             }
         )
     }
+}
+
+private enum BackButtonMetric {
+    static let iconSize: CGFloat = 24
+}
+
+private enum TitleMetric {
+    static let topSpacing: CGFloat = 65.5
+}
+
+private enum IllustrationMetric {
+    static let topSpacing: CGFloat = 20
+    static let maxWidth: CGFloat = 353
+    static let maxHeight: CGFloat = 100
+    static let horizontalPadding: CGFloat = 20
+}
+
+private enum CodeMetric {
+    static let topSpacing: CGFloat = 60
+    static let chipSpacing: CGFloat = 8
+}
+
+private enum CodeChipMetric {
+    static let horizontalPadding: CGFloat = 12
+    static let height: CGFloat = 32
+    static let cornerRadius: CGFloat = 8
+}
+
+// 코드 자리표시자. 로딩 시머와 실패 후 재시도 블록이 같은 치수를 쓴다
+private enum CodePlaceholderMetric {
+    static let width: CGFloat = 160
+    static let height: CGFloat = 48
+    static let cornerRadius: CGFloat = 8
+}
+
+private enum RetryButtonMetric {
+    static let messageSpacing: CGFloat = 6
+    static let horizontalPadding: CGFloat = 24
+    static let height: CGFloat = CodePlaceholderMetric.height
+    static let cornerRadius: CGFloat = CodePlaceholderMetric.cornerRadius
+    static let borderWidth: CGFloat = 1
+}
+
+private enum SkipButtonMetric {
+    static let height: CGFloat = 32
 }
 
 #if DEBUG
