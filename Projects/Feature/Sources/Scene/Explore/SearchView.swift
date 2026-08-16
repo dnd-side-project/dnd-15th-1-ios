@@ -119,6 +119,7 @@ public struct SearchView: View {
                 resultList
             } else if !store.isSearching {
                 EmptyStateView(
+                    image: .placeEmpty,
                     title: "검색 결과가 없어요",
                     message: "다른 검색어를 입력해주세요"
                 )
