@@ -14,7 +14,7 @@ public struct ImportCandidate: Equatable, Identifiable, Sendable {
     public let extractedName: String
     public let extractedAddressHint: String?
     public let place: ImportPlace?
-    public let evidence: String
+    public let evidence: String?
 
     public init(
         candidateId: Int,
@@ -22,7 +22,7 @@ public struct ImportCandidate: Equatable, Identifiable, Sendable {
         extractedName: String,
         extractedAddressHint: String?,
         place: ImportPlace?,
-        evidence: String
+        evidence: String?
     ) {
         self.candidateId = candidateId
         self.verificationStatus = verificationStatus
