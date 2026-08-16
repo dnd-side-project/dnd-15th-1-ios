@@ -79,7 +79,7 @@ final class OnboardingFlowFeatureTests: XCTestCase {
         await store.receive(\.dateType.delegate.saved)
         await store.receive(\.delegate.onboardingCompleted)
 
-        // 덮개는 코디네이터가 main 으로 갈아탄 뒤 걷는다
+        // 덮개는 RootFlow 가 mainTab 으로 갈아탄 뒤 걷는다
         XCTAssertNotNil(store.state.dateType)
     }
 
@@ -477,7 +477,7 @@ final class OnboardingFlowSessionExpiredTests: XCTestCase {
         await store.receive(\.dateType.delegate.sessionExpired)
         await store.receive(\.delegate.sessionExpired)
 
-        // 만료는 위로만 올라가고 덮개는 코디네이터가 걷는다
+        // 만료는 위로만 올라가고 덮개는 RootFlow 가 걷는다
         XCTAssertNotNil(store.state.dateType)
     }
 }

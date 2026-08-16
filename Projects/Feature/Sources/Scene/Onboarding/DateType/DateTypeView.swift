@@ -4,38 +4,6 @@ import SwiftUI
 import ThirdParty
 
 public struct DateTypeView: View {
-    static let headerTopPadding: CGFloat = 30
-    static let titleRowHeight: CGFloat = 66
-    static let titleWidth: CGFloat = 233
-    static let tipButtonWidth: CGFloat = 40
-    static let tipButtonHeight: CGFloat = 32
-    static let tipIconSize: CGFloat = 18
-
-    /// 시안: 말풍선 왼쪽 끝이 화면 왼쪽에서 42
-    static let tooltipLeadingInset: CGFloat = 42
-    /// 시안: 화살표 뾰족한 끝이 tip 버튼 하단에서 4 아래
-    static let tooltipArrowGap: CGFloat = 4
-
-    /// tip 버튼의 화면 기준 x. 제목 폭이 고정이라 화면 폭과 무관하다
-    static let tipButtonLeadingX: CGFloat = horizontalPadding + titleWidth
-    static let tipButtonTrailingX: CGFloat = tipButtonLeadingX + tipButtonWidth
-    static let tipButtonCenterX: CGFloat = tipButtonLeadingX + tipButtonWidth / 2
-
-    /// 말풍선은 tip 버튼 오른쪽 끝에 트레일링 정렬된다. 시안 위치까지 그만큼 오른쪽으로 민다
-    static let tooltipTrailingOffset: CGFloat =
-        tooltipLeadingInset + DateTypeTooltip.width - tipButtonTrailingX
-    /// overlay 의 y 원점은 tip 버튼 상단이고, 화살표 끝은 말풍선 상단보다 arrowProtrusion 만큼 위다
-    static let tooltipTopOffset: CGFloat =
-        tipButtonHeight + tooltipArrowGap + DateTypeTooltip.arrowProtrusion
-    /// 말풍선 왼쪽 끝이 42 로 고정이므로, 화살표가 tip 버튼 가운데를 가리키는 위치도 여기서 정해진다
-    static let tooltipArrowTrailingInset: CGFloat =
-        tooltipLeadingInset + DateTypeTooltip.width - tipButtonCenterX
-
-    static let headerBottomSpacing: CGFloat = 41
-    static let axisSpacing: CGFloat = 32
-    static let horizontalPadding: CGFloat = 20
-    static let ctaSpacing: CGFloat = 10
-
     static let tooltipText = "탐색 추천 알고리즘에 선호하시는 유형의 장소를\n우선 추천 하는데 사용되며 그렇지 않은\n데이트 장소도 추천 됩니다."
 
     @Bindable public var store: StoreOf<DateTypeFeature>
@@ -50,13 +18,13 @@ public struct DateTypeView: View {
 
             axisList
                 .disabled(store.isSubmitting)
-                .padding(.horizontal, Self.horizontalPadding)
-                .padding(.top, Self.headerBottomSpacing)
+                .padding(.horizontal, AxisListMetric.horizontalPadding)
+                .padding(.top, HeaderMetric.bottomSpacing)
 
             Spacer(minLength: 0)
 
             CTAContainer {
-                VStack(spacing: Self.ctaSpacing) {
+                VStack(spacing: CTAMetric.spacing) {
                     skipButton
                     saveButton
                 }
@@ -84,7 +52,7 @@ public struct DateTypeView: View {
                 .scaledToFit()
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.top, Self.headerTopPadding)
+        .padding(.top, HeaderMetric.topPadding)
         .frame(maxWidth: .infinity)
         .background(Color.primaryPink.ignoresSafeArea(edges: .top))
     }
@@ -94,14 +62,14 @@ public struct DateTypeView: View {
             Text("선호하는 데이트 방식을\n저장하면 장소를 추천드려요")
                 .typography(.title2B)
                 .foregroundStyle(Color.commonWhite)
-                .frame(width: Self.titleWidth, alignment: .leading)
+                .frame(width: TitleRowMetric.width, alignment: .leading)
 
             tipButton
 
             Spacer(minLength: 0)
         }
-        .frame(height: Self.titleRowHeight, alignment: .bottom)
-        .padding(.horizontal, Self.horizontalPadding)
+        .frame(height: TitleRowMetric.height, alignment: .bottom)
+        .padding(.horizontal, TitleRowMetric.horizontalPadding)
     }
 
     private var tipButton: some View {
@@ -112,24 +80,29 @@ public struct DateTypeView: View {
                 .resizable()
                 .renderingMode(.template)
                 .foregroundStyle(Color.commonWhite)
-                .frame(width: Self.tipIconSize, height: Self.tipIconSize)
-                .frame(width: Self.tipButtonWidth, height: Self.tipButtonHeight)
+                .frame(width: TipButtonMetric.iconSize, height: TipButtonMetric.iconSize)
+                .frame(width: TipButtonMetric.width, height: TipButtonMetric.height)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .overlay(alignment: .topTrailing) {
             if store.isTooltipPresented {
+                let placement = DateTypeTooltip.placement(
+                    tipButtonTrailingX: TipButtonMetric.trailingX,
+                    tipButtonCenterX: TipButtonMetric.centerX,
+                    tipButtonHeight: TipButtonMetric.height
+                )
                 DateTypeTooltip(
                     text: Self.tooltipText,
-                    arrowTrailingInset: Self.tooltipArrowTrailingInset
+                    arrowTrailingInset: placement.arrowTrailingInset
                 )
-                .offset(x: Self.tooltipTrailingOffset, y: Self.tooltipTopOffset)
+                .offset(x: placement.trailingOffset, y: placement.topOffset)
             }
         }
     }
 
     private var axisList: some View {
-        VStack(spacing: Self.axisSpacing) {
+        VStack(spacing: AxisListMetric.spacing) {
             DateTypeAxisRow(
                 leading: .init(value: IndoorOutdoor.indoor, title: "실내", icon: .dateTypeIndoor),
                 trailing: .init(value: IndoorOutdoor.outdoor, title: "실외", icon: .dateTypeOutdoor),
@@ -168,7 +141,7 @@ public struct DateTypeView: View {
                 .typography(.body1SB)
                 .foregroundStyle(Color.textTertiary)
                 // 터치 범위는 글자 크기까지만. 폭을 늘리면 화면 전체가 눌린다
-                .padding(.vertical, 4)
+                .padding(.vertical, SkipButtonMetric.verticalPadding)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -184,7 +157,7 @@ public struct DateTypeView: View {
 
     private var toastBottomInset: CGFloat {
         CTALayout.toastInset(
-            contentHeight: CTALayout.textButtonHeight + Self.ctaSpacing + CTALayout.xlButtonHeight
+            contentHeight: CTALayout.textButtonHeight + CTAMetric.spacing + CTALayout.xlButtonHeight
         )
     }
 
@@ -198,6 +171,41 @@ public struct DateTypeView: View {
             }
         )
     }
+}
+
+private enum HeaderMetric {
+    static let topPadding: CGFloat = 30
+    static let bottomSpacing: CGFloat = 41
+}
+
+private enum TitleRowMetric {
+    static let height: CGFloat = 66
+    static let width: CGFloat = 233
+    static let horizontalPadding: CGFloat = 20
+}
+
+private enum TipButtonMetric {
+    static let width: CGFloat = 40
+    static let height: CGFloat = 32
+    static let iconSize: CGFloat = 18
+
+    /// tip 버튼의 화면 기준 x. 제목 폭이 고정이라 화면 폭과 무관하다
+    static let leadingX: CGFloat = TitleRowMetric.horizontalPadding + TitleRowMetric.width
+    static let trailingX: CGFloat = leadingX + width
+    static let centerX: CGFloat = leadingX + width / 2
+}
+
+private enum AxisListMetric {
+    static let spacing: CGFloat = 32
+    static let horizontalPadding: CGFloat = 20
+}
+
+private enum CTAMetric {
+    static let spacing: CGFloat = 10
+}
+
+private enum SkipButtonMetric {
+    static let verticalPadding: CGFloat = 4
 }
 
 #if DEBUG

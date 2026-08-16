@@ -161,7 +161,7 @@ enum FeatureLog {
         switch mirror.displayStyle {
         case .enum:
             // Navigation/State enum 은 case 이름만 로그
-            // (예: main, loggedOut). 연관값 dump 금지.
+            // (예: mainTab, onboardingFlow). 연관값 dump 금지.
             return enumCaseName(from: value, mirror: mirror)
         case .collection, .set:
             return "\(mirror.children.count) items"
@@ -193,7 +193,7 @@ enum FeatureLog {
 
     /// enum case 라벨만 추출한다.
     /// - 연관값 없음: `home`
-    /// - 연관값 있음: `main` (중첩 State dump 금지)
+    /// - 연관값 있음: `mainTab` (중첩 State dump 금지)
     private static func enumCaseName(from value: Any, mirror: Mirror) -> String {
         if let label = mirror.children.first?.label, !label.isEmpty {
             return label

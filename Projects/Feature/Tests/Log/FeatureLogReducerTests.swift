@@ -101,7 +101,6 @@ final class FeatureLogReducerTests: XCTestCase {
     func test_무시필드판정_화면이동유형() {
         XCTAssertTrue(FeatureLogStateDiff.shouldIgnoreField("home"))
         XCTAssertTrue(FeatureLogStateDiff.shouldIgnoreField("explore"))
-        XCTAssertTrue(FeatureLogStateDiff.shouldIgnoreField("appCoordinator"))
         XCTAssertFalse(FeatureLogStateDiff.shouldIgnoreField("isLoading"))
         XCTAssertFalse(FeatureLogStateDiff.shouldIgnoreField("phase"))
 
@@ -298,7 +297,7 @@ final class FeatureLogReducerTests: XCTestCase {
 // MARK: - 래퍼 회귀용 더미 Reducer
 
 /// `.logged(as:)` 래퍼 전용 회귀 probe.
-/// Auth / AppCoordinator 가 못 덮는 조합(effect 반환 / `.none` / 상태 무변화)을 담는다.
+/// Auth / RootFlow 가 못 덮는 조합(effect 반환 / `.none` / 상태 무변화)을 담는다.
 private struct LogWrapperProbeFeature: Reducer {
     struct State: Equatable {
         var count = 0

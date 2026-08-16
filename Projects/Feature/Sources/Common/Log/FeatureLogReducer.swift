@@ -309,8 +309,7 @@ enum FeatureLogStateDiff {
 
     private static let ignoredParentFields: Set<String> = [
         "home", "explore", "map", "myPage",
-        "appIntro", "onboardingFlow", "auth", "mainTab", "overlay",
-        "appCoordinator"
+        "appIntro", "onboardingFlow", "auth", "mainTab", "overlay"
     ]
 
     private static let presentationFields: Set<String> = [
@@ -512,7 +511,7 @@ enum FeatureLogStateDiff {
             return summarized == "nil" ? "nil" : "presented"
         }
 
-        // Navigation enum 은 ".main" 형태로 찍히는 경우가 많아 짧은 토큰만 유지.
+        // Navigation enum 은 ".mainTab" 형태로 찍히는 경우가 많아 짧은 토큰만 유지.
         return FeatureLog.summarizeValue(value)
     }
 }

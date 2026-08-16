@@ -6,12 +6,6 @@ public struct NicknameView: View {
     // CTA 는 "다음" 하나뿐이다
     static let toastInset = CTALayout.toastInset(buttonHeights: [CTALayout.xlButtonHeight])
 
-    // 시안 여백. 키보드가 올라와 세로가 모자라면 이 값 아래로 줄어든다
-    private enum Layout {
-        static let topSpacing: CGFloat = 120
-        static let titleSpacing: CGFloat = 60
-    }
-
     @Bindable public var store: StoreOf<NicknameFeature>
 
     @State private var isNicknameFocused = false
@@ -52,19 +46,20 @@ public struct NicknameView: View {
 
     private var rootContent: some View {
         VStack(spacing: 0) {
+            // 시안 여백. 키보드가 올라와 세로가 모자라면 이 값 아래로 줄어든다
             Spacer(minLength: 0)
-                .frame(maxHeight: Layout.topSpacing)
+                .frame(maxHeight: TitleMetric.topSpacing)
 
             Text("둘픽에서 사용할 닉네임을 알려주세요")
                 .typography(.title1B)
                 .foregroundStyle(Color.gray900)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 240)
+                .frame(maxWidth: TitleMetric.maxWidth)
                 // 없으면 VStack 이 여백보다 제목 줄을 먼저 지운다
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
-                .frame(maxHeight: Layout.titleSpacing)
+                .frame(maxHeight: NicknameFieldMetric.topSpacing)
 
             AppTextField(
                 text: $store.nickname,
@@ -77,7 +72,7 @@ public struct NicknameView: View {
                 isFocused: $isNicknameFocused,
                 onSubmit: { isNicknameFocused = false }
             )
-            .padding(.horizontal, 20)
+            .padding(.horizontal, NicknameFieldMetric.horizontalPadding)
 
             Spacer(minLength: 0)
 
@@ -108,7 +103,7 @@ public struct NicknameView: View {
                 Image.arrowLeft
                     .renderingMode(.original)
                     .resizable()
-                    .frame(width: 24, height: 24)
+                    .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
             }
         }
     }
@@ -142,6 +137,20 @@ public struct NicknameView: View {
             set: { _ in }
         )
     }
+}
+
+private enum BackButtonMetric {
+    static let iconSize: CGFloat = 24
+}
+
+private enum TitleMetric {
+    static let topSpacing: CGFloat = 120
+    static let maxWidth: CGFloat = 240
+}
+
+private enum NicknameFieldMetric {
+    static let topSpacing: CGFloat = 60
+    static let horizontalPadding: CGFloat = 20
 }
 
 #if DEBUG

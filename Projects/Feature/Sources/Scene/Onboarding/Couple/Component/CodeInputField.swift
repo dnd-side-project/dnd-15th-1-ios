@@ -34,13 +34,13 @@ struct CodeInputField: View {
             sanitize: CoupleConnectFeature.normalizedCode,
             onSubmit: { isFocused = false }
         )
-        .frame(width: 1, height: 1)
+        .frame(width: HiddenFieldMetric.size, height: HiddenFieldMetric.size)
         .opacity(0.01)
         .accessibilityHidden(true)
     }
 
     private var boxes: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: BoxMetric.spacing) {
             ForEach(0..<length, id: \.self) { index in
                 box(character(at: index))
             }
@@ -53,9 +53,9 @@ struct CodeInputField: View {
             .foregroundStyle(Color.gray900)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
-            .frame(height: 72)
+            .frame(height: BoxMetric.height)
             .background(Color.gray50)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: BoxMetric.cornerRadius))
     }
 
     private func character(at index: Int) -> String {
@@ -63,6 +63,16 @@ struct CodeInputField: View {
         let target = code.index(code.startIndex, offsetBy: index)
         return String(code[target])
     }
+}
+
+private enum HiddenFieldMetric {
+    static let size: CGFloat = 1
+}
+
+private enum BoxMetric {
+    static let spacing: CGFloat = 4
+    static let height: CGFloat = 72
+    static let cornerRadius: CGFloat = 12
 }
 
 #if DEBUG

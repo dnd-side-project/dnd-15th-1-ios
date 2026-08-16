@@ -3,9 +3,6 @@ import SwiftUI
 import ThirdParty
 
 struct CoupleCodeInputView: View {
-    // CTA 는 "연결하기" 하나뿐이다
-    static let toastInset = CTALayout.toastInset(buttonHeights: [CTALayout.xlButtonHeight])
-
     let store: StoreOf<CoupleConnectFeature>
 
     @State private var isCodeFocused = false
@@ -13,7 +10,7 @@ struct CoupleCodeInputView: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-                .frame(height: 62.5)
+                .frame(height: TitleMetric.topSpacing)
 
             Text("코드를 입력해주세요")
                 .typography(.title1B)
@@ -21,7 +18,7 @@ struct CoupleCodeInputView: View {
                 .multilineTextAlignment(.center)
 
             Spacer()
-                .frame(height: 32)
+                .frame(height: CodeFieldMetric.topSpacing)
 
             CodeInputField(
                 code: codeBinding,
@@ -29,7 +26,7 @@ struct CoupleCodeInputView: View {
                 length: CoupleConnectFeature.codeLength
             )
             .disabled(store.isConnecting)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, CodeFieldMetric.horizontalPadding)
 
             Spacer(minLength: 0)
 
@@ -42,7 +39,7 @@ struct CoupleCodeInputView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.bgDefault)
-        .toast(item: toastBinding, bottomInset: Self.toastInset)
+        .toast(item: toastBinding, bottomInset: ToastMetric.bottomInset)
         .navigationTitle("커플 연결")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -67,7 +64,7 @@ struct CoupleCodeInputView: View {
                 Image.arrowLeft
                     .renderingMode(.original)
                     .resizable()
-                    .frame(width: 24, height: 24)
+                    .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
             }
         }
     }
@@ -89,6 +86,24 @@ struct CoupleCodeInputView: View {
             }
         )
     }
+}
+
+private enum BackButtonMetric {
+    static let iconSize: CGFloat = 24
+}
+
+private enum TitleMetric {
+    static let topSpacing: CGFloat = 62.5
+}
+
+private enum CodeFieldMetric {
+    static let topSpacing: CGFloat = 32
+    static let horizontalPadding: CGFloat = 20
+}
+
+private enum ToastMetric {
+    // CTA 는 "연결하기" 하나뿐이다
+    static let bottomInset: CGFloat = CTALayout.toastInset(buttonHeights: [CTALayout.xlButtonHeight])
 }
 
 #if DEBUG
