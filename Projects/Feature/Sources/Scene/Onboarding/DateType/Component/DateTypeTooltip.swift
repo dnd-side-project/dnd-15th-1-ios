@@ -41,11 +41,33 @@ struct DateTypeTooltip: View {
     }
 
     private struct ArrowShape: Shape {
+        /// 시안 SVG(17.86x16, 모서리 radius 2 라운드 삼각형) 좌표를 그대로 쓰고 rect 크기에 맞춰 스케일한다
         func path(in rect: CGRect) -> Path {
+            let scaleX = rect.width / ArrowMetric.width
+            let scaleY = rect.height / ArrowMetric.height
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: rect.minX + x * scaleX, y: rect.minY + y * scaleY)
+            }
+
             var path = Path()
-            path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.move(to: point(7.19914, 1))
+            path.addCurve(
+                to: point(10.6632, 1),
+                control1: point(7.96894, -0.333333),
+                control2: point(9.89344, -0.333333)
+            )
+            path.addLine(to: point(17.5914, 13))
+            path.addCurve(
+                to: point(15.8594, 16),
+                control1: point(18.3612, 14.3333),
+                control2: point(17.399, 16)
+            )
+            path.addLine(to: point(2.00298, 16))
+            path.addCurve(
+                to: point(0.270933, 13),
+                control1: point(0.463383, 16),
+                control2: point(-0.498867, 14.3333)
+            )
             path.closeSubpath()
             return path
         }
