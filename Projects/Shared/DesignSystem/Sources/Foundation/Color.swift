@@ -49,6 +49,8 @@ public extension ShapeStyle where Self == Color {
 
     // Brand
     static var brandPrimary: Color { Asset.brandPrimary.swiftUIColor }
+    // 선택된 행 배경, 경고 배지 배경 등 옅은 브랜드 배경
+    static var brandSurface: Color { Asset.brandSurface.swiftUIColor }
 
     // Text
     static var textPrimary: Color { Asset.textPrimary.swiftUIColor }

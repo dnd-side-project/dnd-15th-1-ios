@@ -1,7 +1,9 @@
 import CoreSocialAuth
+import Feature
 import Foundation
 import SharedLogger
 import ThirdParty
+import ThirdPartyUI
 
 enum AppBootstrap {
     @MainActor
@@ -9,6 +11,8 @@ enum AppBootstrap {
         let infra = InfraContainer.make()
 
         SocialAuthBootstrap.run(infra.socialAuthConfig)
+        ImageCacheBootstrap.run(namespace: infra.appConfig.bundleID)
+        SDKInitializer.InitSDK(appKey: infra.appConfig.kakaoNativeAppKey)
 
         prepareDependencies {
             Dependencies.register(&$0, infra: infra)

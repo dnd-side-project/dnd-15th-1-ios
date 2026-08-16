@@ -78,6 +78,7 @@ public struct MyPageFeature {
                 return .none
             }
         }
+        .logged(as: Self.self)
     }
 }
 

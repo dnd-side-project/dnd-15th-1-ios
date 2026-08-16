@@ -42,7 +42,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
         await store.send(.onAppear)
         await store.receive(\.sessionRestored.success)
         await store.receive(\.bootstrapRoute) {
-            $0.phase = .loggedOut(AuthFeature.State())
+            $0.phase = .onboarding(OnboardingFlowFeature.State())
         }
     }
 
@@ -82,7 +82,6 @@ final class AppCoordinatorFeatureTests: XCTestCase {
 
         await store.send(.onAppear)
         await store.receive(\.sessionRestored.success) {
-            $0.currentUserID = session.userID
             $0.phase = .main(
                 MainTabFeature.State(
                     selectedTab: .home,
@@ -91,6 +90,26 @@ final class AppCoordinatorFeatureTests: XCTestCase {
             )
         }
         await store.receive(\.flushPendingDeepLink)
+    }
+
+    func test_세션있음_온보딩미완료_온보딩단계() async {
+        let session = sampleSession
+        let store = TestStore(initialState: AppCoordinatorFeature.State()) {
+            AppCoordinatorFeature()
+        } withDependencies: {
+            $0.authClient.restoreSession = {
+                AuthBootstrap(session: session, isOnboardingCompleted: false)
+            }
+            $0.onboardingClient.hasSeenAppIntro = {
+                XCTFail("hasSeenAppIntro must not be called when session exists")
+                return false
+            }
+        }
+
+        await store.send(.onAppear)
+        await store.receive(\.sessionRestored.success) {
+            $0.phase = .onboarding(.resumingOnboarding)
+        }
     }
 
     func test_앱인트로완료_표시후_로그아웃() async {
@@ -108,7 +127,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
 
         await store.send(.appIntro(.delegate(.completed)))
         await store.receive(\.appIntroFinished) {
-            $0.phase = .loggedOut(AuthFeature.State())
+            $0.phase = .onboarding(OnboardingFlowFeature.State())
         }
     }
 
@@ -147,8 +166,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
                     MainTabFeature.State(
                         myPage: MyPageFeature.State(userID: session.userID)
                     )
-                ),
-                currentUserID: session.userID
+                )
             )
         ) {
             AppCoordinatorFeature()
@@ -160,8 +178,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
         }
 
         await store.send(.mainTab(.delegate(.logoutSucceeded))) {
-            $0.currentUserID = nil
-            $0.phase = .loggedOut(AuthFeature.State())
+            $0.phase = .onboarding(OnboardingFlowFeature.State())
         }
     }
 
@@ -169,7 +186,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
         let session = sampleSession
         let store = TestStore(
             initialState: AppCoordinatorFeature.State(
-                phase: .loggedOut(AuthFeature.State())
+                phase: .onboarding(OnboardingFlowFeature.State())
             )
         ) {
             AppCoordinatorFeature()
@@ -179,8 +196,16 @@ final class AppCoordinatorFeatureTests: XCTestCase {
         await store.send(.routeDeepLink(.map)) {
             $0.pendingDeepLink = .map
         }
-        await store.send(.auth(.delegate(.loginSucceeded(userID: session.userID)))) {
-            $0.currentUserID = session.userID
+        await store.send(
+            .onboardingFlow(
+                .auth(
+                    .delegate(
+                        .loginSucceeded(userID: session.userID, isOnboardingCompleted: true)
+                    )
+                )
+            )
+        )
+        await store.receive(\.onboardingFlow.delegate.authenticated) {
             $0.phase = .main(
                 MainTabFeature.State(
                     selectedTab: .home,
@@ -209,8 +234,7 @@ final class AppCoordinatorFeatureTests: XCTestCase {
                     MainTabFeature.State(
                         myPage: MyPageFeature.State(userID: session.userID)
                     )
-                ),
-                currentUserID: session.userID
+                )
             )
         ) {
             AppCoordinatorFeature()
@@ -222,8 +246,178 @@ final class AppCoordinatorFeatureTests: XCTestCase {
         }
 
         await store.send(.sessionExpired) {
-            $0.currentUserID = nil
-            $0.phase = .loggedOut(AuthFeature.State())
+            $0.phase = .onboarding(OnboardingFlowFeature.State())
         }
+    }
+}
+
+// 온보딩 단계 분기만 따로 본다
+@MainActor
+final class AppCoordinatorOnboardingTests: XCTestCase {
+    private let sampleSession = AuthSession(
+        accessToken: "access",
+        refreshToken: "refresh",
+        userID: "1"
+    )
+
+    func test_로그인성공_온보딩미완료_닉네임이_올라간다() async {
+        let session = sampleSession
+        let store = TestStore(
+            initialState: AppCoordinatorFeature.State(
+                phase: .onboarding(OnboardingFlowFeature.State())
+            )
+        ) {
+            AppCoordinatorFeature()
+        }
+
+        await store.send(
+            .onboardingFlow(
+                .auth(
+                    .delegate(
+                        .loginSucceeded(userID: session.userID, isOnboardingCompleted: false)
+                    )
+                )
+            )
+        ) {
+            $0.phase = .onboarding(OnboardingFlowFeature.State(path: [.nickname]))
+        }
+        await store.receive(\.onboardingFlow.delegate.authenticated)
+    }
+
+    func test_온보딩에서_로그아웃되면_로그인화면_그대로다() async {
+        let store = TestStore(
+            initialState: AppCoordinatorFeature.State(
+                phase: .onboarding(OnboardingFlowFeature.State())
+            )
+        ) {
+            AppCoordinatorFeature()
+        }
+
+        await store.send(.onboardingFlow(.delegate(.signedOut)))
+
+        XCTAssertEqual(store.state.phase, .onboarding(OnboardingFlowFeature.State()))
+    }
+
+    func test_온보딩완료_세션있음_메인이동() async {
+        let session = sampleSession
+        let store = TestStore(
+            initialState: AppCoordinatorFeature.State(
+                phase: .onboarding(.resumingOnboarding)
+            )
+        ) {
+            AppCoordinatorFeature()
+        } withDependencies: {
+            $0.authClient.currentSession = { session }
+        }
+
+        await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
+        await store.receive(\.onboardingSessionResolved) {
+            $0.phase = .main(
+                MainTabFeature.State(
+                    selectedTab: .home,
+                    myPage: MyPageFeature.State(userID: session.userID)
+                )
+            )
+        }
+        await store.receive(\.flushPendingDeepLink)
+    }
+
+    func test_온보딩완료_세션없음_로그인으로() async {
+        let store = TestStore(
+            initialState: AppCoordinatorFeature.State(
+                phase: .onboarding(.resumingOnboarding)
+            )
+        ) {
+            AppCoordinatorFeature()
+        } withDependencies: {
+            $0.authClient.currentSession = { nil }
+        }
+
+        await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
+        await store.receive(\.onboardingSessionResolved) {
+            $0.phase = .onboarding(OnboardingFlowFeature.State())
+        }
+    }
+
+    func test_온보딩완료_세션조회실패_로그인으로() async {
+        let store = TestStore(
+            initialState: AppCoordinatorFeature.State(
+                phase: .onboarding(.resumingOnboarding)
+            )
+        ) {
+            AppCoordinatorFeature()
+        } withDependencies: {
+            $0.authClient.currentSession = { throw AuthError.storage }
+        }
+
+        await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
+        await store.receive(\.onboardingSessionResolved) {
+            $0.phase = .onboarding(OnboardingFlowFeature.State())
+        }
+    }
+
+    func test_온보딩완료_메인이동_대기딥링크반영() async {
+        let session = sampleSession
+        let store = TestStore(
+            initialState: AppCoordinatorFeature.State(
+                phase: .onboarding(.resumingOnboarding),
+                pendingDeepLink: .map
+            )
+        ) {
+            AppCoordinatorFeature()
+        } withDependencies: {
+            $0.authClient.currentSession = { session }
+        }
+
+        await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
+        await store.receive(\.onboardingSessionResolved) {
+            $0.phase = .main(
+                MainTabFeature.State(
+                    selectedTab: .home,
+                    myPage: MyPageFeature.State(userID: session.userID)
+                )
+            )
+        }
+        await store.receive(\.flushPendingDeepLink) {
+            $0.pendingDeepLink = nil
+        }
+        await store.receive(\.routeDeepLink) {
+            $0.phase = .main(
+                MainTabFeature.State(
+                    selectedTab: .map,
+                    myPage: MyPageFeature.State(userID: session.userID)
+                )
+            )
+        }
+    }
+
+    func test_온보딩중_세션만료_로그아웃() async {
+        let store = TestStore(
+            initialState: AppCoordinatorFeature.State(
+                phase: .onboarding(.resumingOnboarding)
+            )
+        ) {
+            AppCoordinatorFeature()
+        }
+
+        await store.send(.onboardingFlow(.delegate(.sessionExpired)))
+        await store.receive(\.sessionExpired) {
+            $0.phase = .onboarding(OnboardingFlowFeature.State())
+        }
+    }
+
+    func test_온보딩중_홈딥링크_대기유지_로그인딥링크_무시() async {
+        let store = TestStore(
+            initialState: AppCoordinatorFeature.State(
+                phase: .onboarding(.resumingOnboarding)
+            )
+        ) {
+            AppCoordinatorFeature()
+        }
+
+        await store.send(.routeDeepLink(.home)) {
+            $0.pendingDeepLink = .home
+        }
+        await store.send(.routeDeepLink(.signIn))
     }
 }

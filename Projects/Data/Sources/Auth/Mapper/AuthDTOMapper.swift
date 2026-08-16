@@ -6,15 +6,18 @@ enum AuthDTOMapper {
         AuthSessionDTO(
             accessToken: response.token.accessToken,
             refreshToken: response.token.refreshToken,
-            userID: String(response.memberId)
+            userID: String(response.memberId),
+            isOnboardingCompleted: response.onboardingCompleted
         )
     }
 
-    static func toSessionDTO(token: AuthTokenDTO, userID: String) -> AuthSessionDTO {
+    /// 토큰 회전 경로. 기존 세션의 온보딩 플래그를 그대로 실어 보내야 다음 복원의 백업 값이 남는다.
+    static func toSessionDTO(token: AuthTokenDTO, rotating current: AuthSessionDTO) -> AuthSessionDTO {
         AuthSessionDTO(
             accessToken: token.accessToken,
             refreshToken: token.refreshToken,
-            userID: userID
+            userID: current.userID,
+            isOnboardingCompleted: current.isOnboardingCompleted
         )
     }
 

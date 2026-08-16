@@ -26,7 +26,6 @@ public struct AuthFeature {
     }
 
     public enum Action: Equatable {
-        case onAppear
         case loginButtonTapped(AuthProvider)
         case loginResponse(Result<AuthBootstrap, AuthError>)
         case termsLinkTapped(TermsType)
@@ -36,7 +35,7 @@ public struct AuthFeature {
 
         @CasePathable
         public enum Delegate: Equatable {
-            case loginSucceeded(userID: String)
+            case loginSucceeded(userID: String, isOnboardingCompleted: Bool)
         }
     }
 
@@ -47,8 +46,6 @@ public struct AuthFeature {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case .onAppear:
-                return .none
             case let .loginButtonTapped(provider):
                 return loginButtonTapped(provider, state: &state)
             case let .loginResponse(result):
@@ -65,6 +62,7 @@ public struct AuthFeature {
                 return .none
             }
         }
+        .logged(as: Self.self)
     }
 }
 
@@ -95,7 +93,14 @@ private extension AuthFeature {
         state.loadingProvider = nil
         switch result {
         case let .success(bootstrap):
-            return .send(.delegate(.loginSucceeded(userID: bootstrap.session.userID)))
+            return .send(
+                .delegate(
+                    .loginSucceeded(
+                        userID: bootstrap.session.userID,
+                        isOnboardingCompleted: bootstrap.isOnboardingCompleted
+                    )
+                )
+            )
         case let .failure(error):
             state.toast = toastState(for: error)
             return .none

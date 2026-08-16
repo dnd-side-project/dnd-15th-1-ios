@@ -153,6 +153,45 @@ Button("Login") {
 }
 ```
 
+
+### Feature Logging
+
+Feature 로그는 케이스별 수동 호출이 아니라 reducer 자동 로그를 쓴다.
+
+```swift
+public var body: some ReducerOf<Self> {
+    Reduce { state, action in
+        // ...
+    }
+    .logged(as: Self.self)
+}
+```
+
+규칙:
+
+1. owner reducer 에 1회만 부착
+2. RootFeature 는 제외
+3. 종류: 사용자 액션 / 상태 변경 / 화면 이동 / 오류
+4. category 는 `.feature`
+5. 토큰/Authorization/identityToken 금지, userID/provider/route 는 허용
+
+메시지 포맷:
+
+```text
+[Feature] [Auth] 사용자 액션: loginButtonTapped(provider=apple)
+[Feature] [Auth] 상태 변경: isLoading(false → true)
+[Feature] [AppCoordinator] 화면 이동: phase(bootstrapping → main)
+[Feature] [Auth] 오류: login(network, userVisible=true)
+```
+
+출력 규칙:
+
+1. 전역 직접 로그 (`Logger.shared`) 는 call site 접두를 남긴다  
+   예: `[App] [AppBootstrap.swift:17] run() - App bootstrap completed`
+2. 모듈 래퍼 로그 (`FeatureLog`, `NetworkLog`) 는 본문만 출력한다  
+   예: `[Feature] [MyPage] 상태 변경: userID(2 → nil)`  
+   예: `[Network] [Response] ← 200 /api/v1/auth/reissue (617ms, 367B)`
+
 ### 6. 폴더
 
 ```text

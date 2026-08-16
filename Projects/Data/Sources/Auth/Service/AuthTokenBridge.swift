@@ -24,7 +24,7 @@ final class AuthTokenBridge: TokenProviding, TokenRefreshing, @unchecked Sendabl
         }
 
         let refreshed = try await plainRemote.reissue(refreshToken: current.refreshToken)
-        let rotated = AuthDTOMapper.toSessionDTO(token: refreshed, userID: current.userID)
+        let rotated = AuthDTOMapper.toSessionDTO(token: refreshed, rotating: current)
         try await authLocal.saveSession(rotated)
     }
 }

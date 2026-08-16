@@ -7,26 +7,25 @@ public struct AppCoordinatorFeature {
     @ObservableState
     public struct State: Equatable {
         public var phase: Phase = .bootstrapping
-        public var currentUserID: String?
         public var pendingDeepLink: DeepLinkRoute?
         public var overlay = OverlayFeature.State()
 
         public init(
             phase: Phase = .bootstrapping,
-            currentUserID: String? = nil,
             pendingDeepLink: DeepLinkRoute? = nil,
             overlay: OverlayFeature.State = OverlayFeature.State()
         ) {
             self.phase = phase
-            self.currentUserID = currentUserID
             self.pendingDeepLink = pendingDeepLink
             self.overlay = overlay
         }
 
+        /// `onboarding` 은 로그인 root 위에 온보딩이 쌓이는 한 스택이다. 둘은 같은 phase 를 쓴다.
+        /// 이 phase 는 main 에 닿기 전 화면 구간(로그인 포함)을 가리키고, `isOnboardingCompleted` 는 닉네임 제출 여부를 알리는 서버 플래그다
         public enum Phase: Equatable {
             case bootstrapping
             case appIntro(AppIntroFeature.State)
-            case loggedOut(AuthFeature.State)
+            case onboarding(OnboardingFlowFeature.State)
             case main(MainTabFeature.State)
         }
 
@@ -42,14 +41,14 @@ public struct AppCoordinatorFeature {
             }
         }
 
-        public var loggedOutAuth: AuthFeature.State? {
+        public var onboardingFlow: OnboardingFlowFeature.State? {
             get {
-                guard case let .loggedOut(auth) = phase else { return nil }
-                return auth
+                guard case let .onboarding(state) = phase else { return nil }
+                return state
             }
             set {
                 if let newValue {
-                    phase = .loggedOut(newValue)
+                    phase = .onboarding(newValue)
                 }
             }
         }
@@ -75,15 +74,16 @@ public struct AppCoordinatorFeature {
         case deepLinkReceived(URL)
         case routeDeepLink(DeepLinkRoute)
         case flushPendingDeepLink
+        case onboardingSessionResolved(userID: String?)
         case appIntro(AppIntroFeature.Action)
-        case auth(AuthFeature.Action)
+        case onboardingFlow(OnboardingFlowFeature.Action)
         case mainTab(MainTabFeature.Action)
         case overlay(OverlayFeature.Action)
         case sessionExpired
 
         public enum BootstrapRoute: Equatable {
             case appIntro
-            case loggedOut
+            case signIn
         }
     }
 
@@ -100,12 +100,13 @@ public struct AppCoordinatorFeature {
             .ifLet(\.appIntro, action: \.appIntro) {
                 AppIntroFeature()
             }
-            .ifLet(\.loggedOutAuth, action: \.auth) {
-                AuthFeature()
+            .ifLet(\.onboardingFlow, action: \.onboardingFlow) {
+                OnboardingFlowFeature()
             }
             .ifLet(\.mainTab, action: \.mainTab) {
                 MainTabFeature()
             }
+            .logged(as: Self.self)
     }
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
@@ -117,7 +118,7 @@ public struct AppCoordinatorFeature {
         case let .bootstrapRoute(route):
             return applyBootstrapRoute(state: &state, route: route)
         case .appIntroFinished:
-            state.phase = .loggedOut(AuthFeature.State())
+            state.phase = .onboarding(OnboardingFlowFeature.State())
             return .none
         case let .deepLinkReceived(url):
             return receiveDeepLink(url)
@@ -125,15 +126,24 @@ public struct AppCoordinatorFeature {
             return routeDeepLink(state: &state, route: route)
         case .flushPendingDeepLink:
             return flushPendingDeepLink(state: &state)
+        case let .onboardingSessionResolved(userID):
+            return applyOnboardingSession(state: &state, userID: userID)
+        case .sessionExpired:
+            return moveToSignIn(state: &state)
+        case .appIntro, .onboardingFlow, .mainTab, .overlay:
+            return childDelegate(state: &state, action: action)
+        }
+    }
+
+    private func childDelegate(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case let .appIntro(.delegate(delegate)):
             return handleAppIntroDelegate(delegate: delegate)
-        case let .auth(.delegate(delegate)):
-            return handleAuthDelegate(state: &state, delegate: delegate)
+        case let .onboardingFlow(.delegate(delegate)):
+            return handleOnboardingFlowDelegate(state: &state, delegate: delegate)
         case let .mainTab(.delegate(delegate)):
             return handleMainTabDelegate(state: &state, delegate: delegate)
-        case .sessionExpired:
-            return moveToLoggedOut(state: &state)
-        case .appIntro, .auth, .mainTab, .overlay:
+        default:
             return .none
         }
     }
@@ -160,23 +170,23 @@ private extension AppCoordinatorFeature {
     ) -> Effect<Action> {
         switch result {
         case let .success(bootstrap):
-            state.currentUserID = bootstrap?.session.userID
             if let bootstrap {
-                // Temporary: ignore flag until onboarding phase Cycle.
-                state.phase = .main(makeMainState(userID: bootstrap.session.userID))
-                return .send(.flushPendingDeepLink)
+                return moveAfterAuthentication(
+                    state: &state,
+                    userID: bootstrap.session.userID,
+                    isOnboardingCompleted: bootstrap.isOnboardingCompleted
+                )
             }
-            return resolveLoggedOutBootstrapRoute()
+            return resolveSignedOutBootstrapRoute()
         case .failure:
-            state.currentUserID = nil
-            return resolveLoggedOutBootstrapRoute()
+            return resolveSignedOutBootstrapRoute()
         }
     }
 
-    func resolveLoggedOutBootstrapRoute() -> Effect<Action> {
+    func resolveSignedOutBootstrapRoute() -> Effect<Action> {
         .run { [onboardingClient] send in
             let seen = await onboardingClient.hasSeenAppIntro()
-            await send(.bootstrapRoute(seen ? .loggedOut : .appIntro))
+            await send(.bootstrapRoute(seen ? .signIn : .appIntro))
         }
     }
 
@@ -190,8 +200,8 @@ private extension AppCoordinatorFeature {
             return .run { [onboardingClient] _ in
                 await onboardingClient.markAppIntroSeen()
             }
-        case .loggedOut:
-            state.phase = .loggedOut(AuthFeature.State())
+        case .signIn:
+            state.phase = .onboarding(OnboardingFlowFeature.State())
             return .none
         }
     }
@@ -220,15 +230,7 @@ private extension AppCoordinatorFeature {
         case .bootstrapping:
             state.pendingDeepLink = route
             return .none
-        case .appIntro:
-            switch route {
-            case .signIn:
-                return .none
-            case .home, .explore, .map, .myPage:
-                state.pendingDeepLink = route
-                return .none
-            }
-        case .loggedOut:
+        case .appIntro, .onboarding:
             switch route {
             case .signIn:
                 return .none
@@ -249,16 +251,59 @@ private extension AppCoordinatorFeature {
         return .send(.routeDeepLink(route))
     }
 
-    func handleAuthDelegate(
+    func handleOnboardingFlowDelegate(
         state: inout State,
-        delegate: AuthFeature.Action.Delegate
+        delegate: OnboardingFlowFeature.Action.Delegate
     ) -> Effect<Action> {
         switch delegate {
-        case let .loginSucceeded(userID):
-            state.currentUserID = userID
-            state.phase = .main(makeMainState(userID: userID))
-            return .send(.flushPendingDeepLink)
+        case let .authenticated(userID, isOnboardingCompleted):
+            guard isOnboardingCompleted else {
+                // 스택은 이미 닉네임을 올렸다. 여기서는 phase 를 건드리지 않는다
+                return .none
+            }
+            return moveToMain(state: &state, userID: userID)
+        case .onboardingCompleted:
+            return resolveOnboardingSession()
+        case .signedOut:
+            // 스택은 이미 로그인 root 로 물러났다. 여기서 더 할 일이 없다
+            return .none
+        case .sessionExpired:
+            return .send(.sessionExpired)
         }
+    }
+
+    /// 온보딩 끝에서만 세션을 묻는다. 코디네이터는 userID 사본을 들고 있지 않다
+    func resolveOnboardingSession() -> Effect<Action> {
+        .run { [authClient] send in
+            let session = try? await authClient.currentSession()
+            await send(.onboardingSessionResolved(userID: session?.userID))
+        }
+    }
+
+    /// 온보딩은 인증 뒤에만 들어오므로, 세션이 비었다면 사라진 것이다
+    func applyOnboardingSession(state: inout State, userID: String?) -> Effect<Action> {
+        guard let userID else {
+            return moveToSignIn(state: &state)
+        }
+        return moveToMain(state: &state, userID: userID)
+    }
+
+    /// 세션 복구 결과로 phase 를 정한다. 온보딩 미완료면 닉네임이 올라간 스택으로 들어간다
+    func moveAfterAuthentication(
+        state: inout State,
+        userID: String,
+        isOnboardingCompleted: Bool
+    ) -> Effect<Action> {
+        guard isOnboardingCompleted else {
+            state.phase = .onboarding(.resumingOnboarding)
+            return .none
+        }
+        return moveToMain(state: &state, userID: userID)
+    }
+
+    func moveToMain(state: inout State, userID: String) -> Effect<Action> {
+        state.phase = .main(makeMainState(userID: userID))
+        return .send(.flushPendingDeepLink)
     }
 
     func handleMainTabDelegate(
@@ -267,15 +312,14 @@ private extension AppCoordinatorFeature {
     ) -> Effect<Action> {
         switch delegate {
         case .logoutSucceeded:
-            return moveToLoggedOut(state: &state)
+            return moveToSignIn(state: &state)
         case .sessionExpired:
             return .send(.sessionExpired)
         }
     }
 
-    func moveToLoggedOut(state: inout State) -> Effect<Action> {
-        state.currentUserID = nil
-        state.phase = .loggedOut(AuthFeature.State())
+    func moveToSignIn(state: inout State) -> Effect<Action> {
+        state.phase = .onboarding(OnboardingFlowFeature.State())
         return .none
     }
 

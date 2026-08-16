@@ -7,14 +7,22 @@ enum Dependencies {
         _ values: inout DependencyValues,
         infra: InfraContainer
     ) {
-        values.authClient = AuthClientFactory.make(
+        let authSession = AuthSessionAssembly.make(
             keychain: infra.keychain,
             networkConfig: infra.networkConfig,
             socialAuthClients: infra.socialAuthClients
         )
 
+        values.authClient = AuthClientFactory.make(session: authSession)
+        values.profileClient = ProfileClientFactory.make(session: authSession)
+        values.coupleClient = CoupleClientFactory.make(session: authSession)
+
         // API 연동 전 임시 mock, 나중에 ExploreClientFactory 로 교체
         values.exploreClient = .mock
+
+        // API 연동 전 임시 mock, 나중에 PlaceClientFactory / CourseClientFactory 로 교체
+        values.placeClient = .mock
+        values.courseClient = .mock
 
         values.recentSearchClient = RecentSearchClientFactory.make(
             userDefaults: infra.userDefaults
@@ -23,5 +31,9 @@ enum Dependencies {
         values.onboardingClient = OnboardingClientFactory.make(
             userDefaults: infra.userDefaults
         )
+
+        #if DEBUG
+        DebugLaunchOverride.apply(to: &values)
+        #endif
     }
 }

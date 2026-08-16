@@ -24,6 +24,10 @@ final class AuthFeatureTests: XCTestCase {
         await assertLoginSuccess(provider: .google)
     }
 
+    func test_온보딩_미완료_로그인_델리게이트_전달() async {
+        await assertLoginSuccess(provider: .kakao, isOnboardingCompleted: false)
+    }
+
     func test_loginFailed_토스트() async {
         await assertLoginFailure(
             error: .loginFailed,
@@ -108,7 +112,10 @@ final class AuthFeatureTests: XCTestCase {
         }
     }
 
-    private func assertLoginSuccess(provider: AuthProvider) async {
+    private func assertLoginSuccess(
+        provider: AuthProvider,
+        isOnboardingCompleted: Bool = true
+    ) async {
         let requested = LockIsolated<AuthProvider?>(nil)
         let session = self.session
         let store = TestStore(initialState: AuthFeature.State()) {
@@ -116,7 +123,10 @@ final class AuthFeatureTests: XCTestCase {
         } withDependencies: {
             $0.authClient.login = { value in
                 requested.setValue(value)
-                return AuthBootstrap(session: session, isOnboardingCompleted: true)
+                return AuthBootstrap(
+                    session: session,
+                    isOnboardingCompleted: isOnboardingCompleted
+                )
             }
         }
 
@@ -129,7 +139,14 @@ final class AuthFeatureTests: XCTestCase {
             $0.isLoading = false
             $0.loadingProvider = nil
         }
-        await store.receive(\.delegate.loginSucceeded)
+        await store.receive(
+            .delegate(
+                .loginSucceeded(
+                    userID: session.userID,
+                    isOnboardingCompleted: isOnboardingCompleted
+                )
+            )
+        )
         XCTAssertEqual(requested.value, provider)
     }
 

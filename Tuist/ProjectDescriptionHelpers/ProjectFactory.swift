@@ -162,9 +162,13 @@ public enum ProjectFactory {
     }
 
     /// App 타겟 생성.
+    ///
+    /// `packages` 는 dynamic 바이너리를 품은 SPM 패키지를 앱 번들에 embed 하기 위한 통로다.
+    /// 모듈 경계상 SDK 소유는 `ThirdParty*` 에 두고, App 은 embed 만 담당한다.
     public static func app(
         name: String = ProjectEnvironment.productName,
         dependencies: [TargetDependency],
+        packages: [Package] = [],
         infoPlist: InfoPlist = DefaultInfoPlist.app,
         sources: SourceFilesList = ["Sources/**"],
         resources: ResourceFileElements = ["Resources/**"]
@@ -186,13 +190,15 @@ public enum ProjectFactory {
         return Project(
             name: Module.app.targetName,
             organizationName: ProjectEnvironment.organizationName,
+            packages: packages,
             settings: ProjectSettings.project(),
             targets: [target],
             schemes: [
                 makeAppScheme(
                     name: "Dulpick-Debug",
                     targetName: name,
-                    configuration: ProjectEnvironment.debugConfigName
+                    configuration: ProjectEnvironment.debugConfigName,
+                    launchArguments: debugLaunchArguments
                 ),
                 makeAppScheme(
                     name: "Dulpick",
@@ -211,10 +217,18 @@ public enum ProjectFactory {
         )
     }
 
+    /// DEBUG 전용 강제 진입 스위치. 기본은 꺼진 상태로 Xcode 인자 목록에만 올려둔다.
+    /// 이름은 `App/Sources/DI/DebugLaunchOverride.swift` 와 맞춘다.
+    private static let debugLaunchArguments: [LaunchArgument] = [
+        .launchArgument(name: "-forceAppIntro", isEnabled: false),
+        .launchArgument(name: "-forceOnboarding", isEnabled: false),
+    ]
+
     private static func makeAppScheme(
         name: String,
         targetName: String,
-        configuration: ConfigurationName
+        configuration: ConfigurationName,
+        launchArguments: [LaunchArgument] = []
     ) -> Scheme {
         .scheme(
             name: name,
@@ -222,7 +236,10 @@ public enum ProjectFactory {
             buildAction: .buildAction(targets: [.target(targetName)]),
             runAction: .runAction(
                 configuration: configuration,
-                executable: .target(targetName)
+                executable: .target(targetName),
+                arguments: launchArguments.isEmpty
+                    ? nil
+                    : .arguments(launchArguments: launchArguments)
             ),
             archiveAction: .archiveAction(configuration: configuration),
             profileAction: .profileAction(

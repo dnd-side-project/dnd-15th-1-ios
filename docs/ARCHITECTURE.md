@@ -28,7 +28,7 @@ Projects/
 |---|---|
 | SharedUtils | `AppInfo` 등 순수 공통 코드 |
 | SharedDesignSystem | UI 토큰/컴포넌트 |
-| SharedLogger | 전 계층 공통 OSLog facade |
+| SharedLogger | 전 계층 공통 OSLog facade. Feature 는 `Reducer.logged(as:)` 로 Action/State/Navigation/Error 자동 로그 |
 | ThirdParty* | 외부 패키지 진입점. ThirdPartyCore = Alamofire + 소셜 SDK 입구 |
 | Domain | Entity, `*Client`, Error |
 | Core/* | Network/Storage |
