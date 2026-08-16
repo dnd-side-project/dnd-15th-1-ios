@@ -51,7 +51,6 @@ public struct AppCoordinatorView: View {
             ZStack {
                 Color.dimBackground
                     .ignoresSafeArea()
-                    .onTapGesture { placeImportStore.send(.closeTapped) }
 
                 PlaceImportView(store: placeImportStore)
                     .padding(.horizontal, 20)
