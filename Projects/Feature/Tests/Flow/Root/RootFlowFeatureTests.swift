@@ -42,7 +42,7 @@ final class RootFlowFeatureTests: XCTestCase {
         await store.send(.onAppear)
         await store.receive(\.sessionRestored.success)
         await store.receive(\.bootstrapRoute) {
-            $0.phase = .onboarding(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }
 
@@ -82,7 +82,7 @@ final class RootFlowFeatureTests: XCTestCase {
 
         await store.send(.onAppear)
         await store.receive(\.sessionRestored.success) {
-            $0.phase = .main(
+            $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
                     myPage: MyPageFeature.State(userID: session.userID)
@@ -108,7 +108,7 @@ final class RootFlowFeatureTests: XCTestCase {
 
         await store.send(.onAppear)
         await store.receive(\.sessionRestored.success) {
-            $0.phase = .onboarding(.resumingOnboarding)
+            $0.phase = .onboardingFlow(.resumingOnboarding)
         }
     }
 
@@ -127,7 +127,7 @@ final class RootFlowFeatureTests: XCTestCase {
 
         await store.send(.appIntro(.delegate(.completed)))
         await store.receive(\.appIntroFinished) {
-            $0.phase = .onboarding(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }
 
@@ -162,7 +162,7 @@ final class RootFlowFeatureTests: XCTestCase {
         let session = sampleSession
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .main(
+                phase: .mainTab(
                     MainTabFeature.State(
                         myPage: MyPageFeature.State(userID: session.userID)
                     )
@@ -178,7 +178,7 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.mainTab(.delegate(.logoutSucceeded))) {
-            $0.phase = .onboarding(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }
 
@@ -186,7 +186,7 @@ final class RootFlowFeatureTests: XCTestCase {
         let session = sampleSession
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(OnboardingFlowFeature.State())
+                phase: .onboardingFlow(OnboardingFlowFeature.State())
             )
         ) {
             RootFlowFeature()
@@ -206,7 +206,7 @@ final class RootFlowFeatureTests: XCTestCase {
             )
         )
         await store.receive(\.onboardingFlow.delegate.authenticated) {
-            $0.phase = .main(
+            $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
                     myPage: MyPageFeature.State(userID: session.userID)
@@ -217,7 +217,7 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.pendingDeepLink = nil
         }
         await store.receive(\.routeDeepLink) {
-            $0.phase = .main(
+            $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .map,
                     myPage: MyPageFeature.State(userID: session.userID)
@@ -230,7 +230,7 @@ final class RootFlowFeatureTests: XCTestCase {
         let session = sampleSession
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .main(
+                phase: .mainTab(
                     MainTabFeature.State(
                         myPage: MyPageFeature.State(userID: session.userID)
                     )
@@ -246,7 +246,7 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.sessionExpired) {
-            $0.phase = .onboarding(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }
 }
@@ -264,7 +264,7 @@ final class RootFlowOnboardingTests: XCTestCase {
         let session = sampleSession
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(OnboardingFlowFeature.State())
+                phase: .onboardingFlow(OnboardingFlowFeature.State())
             )
         ) {
             RootFlowFeature()
@@ -279,7 +279,7 @@ final class RootFlowOnboardingTests: XCTestCase {
                 )
             )
         ) {
-            $0.phase = .onboarding(OnboardingFlowFeature.State(path: [.nickname]))
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State(path: [.nickname]))
         }
         await store.receive(\.onboardingFlow.delegate.authenticated)
     }
@@ -287,7 +287,7 @@ final class RootFlowOnboardingTests: XCTestCase {
     func test_온보딩에서_로그아웃되면_로그인화면_그대로다() async {
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(OnboardingFlowFeature.State())
+                phase: .onboardingFlow(OnboardingFlowFeature.State())
             )
         ) {
             RootFlowFeature()
@@ -295,14 +295,14 @@ final class RootFlowOnboardingTests: XCTestCase {
 
         await store.send(.onboardingFlow(.delegate(.signedOut)))
 
-        XCTAssertEqual(store.state.phase, .onboarding(OnboardingFlowFeature.State()))
+        XCTAssertEqual(store.state.phase, .onboardingFlow(OnboardingFlowFeature.State()))
     }
 
     func test_온보딩완료_세션있음_메인이동() async {
         let session = sampleSession
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(.resumingOnboarding)
+                phase: .onboardingFlow(.resumingOnboarding)
             )
         ) {
             RootFlowFeature()
@@ -312,7 +312,7 @@ final class RootFlowOnboardingTests: XCTestCase {
 
         await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
         await store.receive(\.onboardingSessionResolved) {
-            $0.phase = .main(
+            $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
                     myPage: MyPageFeature.State(userID: session.userID)
@@ -325,7 +325,7 @@ final class RootFlowOnboardingTests: XCTestCase {
     func test_온보딩완료_세션없음_로그인으로() async {
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(.resumingOnboarding)
+                phase: .onboardingFlow(.resumingOnboarding)
             )
         ) {
             RootFlowFeature()
@@ -335,14 +335,14 @@ final class RootFlowOnboardingTests: XCTestCase {
 
         await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
         await store.receive(\.onboardingSessionResolved) {
-            $0.phase = .onboarding(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }
 
     func test_온보딩완료_세션조회실패_로그인으로() async {
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(.resumingOnboarding)
+                phase: .onboardingFlow(.resumingOnboarding)
             )
         ) {
             RootFlowFeature()
@@ -352,7 +352,7 @@ final class RootFlowOnboardingTests: XCTestCase {
 
         await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
         await store.receive(\.onboardingSessionResolved) {
-            $0.phase = .onboarding(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }
 
@@ -360,7 +360,7 @@ final class RootFlowOnboardingTests: XCTestCase {
         let session = sampleSession
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(.resumingOnboarding),
+                phase: .onboardingFlow(.resumingOnboarding),
                 pendingDeepLink: .map
             )
         ) {
@@ -371,7 +371,7 @@ final class RootFlowOnboardingTests: XCTestCase {
 
         await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
         await store.receive(\.onboardingSessionResolved) {
-            $0.phase = .main(
+            $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
                     myPage: MyPageFeature.State(userID: session.userID)
@@ -382,7 +382,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.pendingDeepLink = nil
         }
         await store.receive(\.routeDeepLink) {
-            $0.phase = .main(
+            $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .map,
                     myPage: MyPageFeature.State(userID: session.userID)
@@ -394,7 +394,7 @@ final class RootFlowOnboardingTests: XCTestCase {
     func test_온보딩중_세션만료_로그아웃() async {
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(.resumingOnboarding)
+                phase: .onboardingFlow(.resumingOnboarding)
             )
         ) {
             RootFlowFeature()
@@ -402,14 +402,14 @@ final class RootFlowOnboardingTests: XCTestCase {
 
         await store.send(.onboardingFlow(.delegate(.sessionExpired)))
         await store.receive(\.sessionExpired) {
-            $0.phase = .onboarding(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }
 
     func test_온보딩중_홈딥링크_대기유지_로그인딥링크_무시() async {
         let store = TestStore(
             initialState: RootFlowFeature.State(
-                phase: .onboarding(.resumingOnboarding)
+                phase: .onboardingFlow(.resumingOnboarding)
             )
         ) {
             RootFlowFeature()

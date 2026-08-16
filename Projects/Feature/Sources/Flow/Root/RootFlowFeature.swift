@@ -20,13 +20,13 @@ public struct RootFlowFeature {
             self.overlay = overlay
         }
 
-        /// `onboarding` 은 로그인 root 위에 온보딩이 쌓이는 한 스택이다. 둘은 같은 phase 를 쓴다.
-        /// 이 phase 는 main 에 닿기 전 화면 구간(로그인 포함)을 가리키고, `isOnboardingCompleted` 는 닉네임 제출 여부를 알리는 서버 플래그다
+        /// `onboardingFlow` 는 로그인 root 위에 온보딩이 쌓이는 한 스택이다. 둘은 같은 phase 를 쓴다.
+        /// 이 phase 는 mainTab 에 닿기 전 화면 구간(로그인 포함)을 가리키고, `isOnboardingCompleted` 는 닉네임 제출 여부를 알리는 서버 플래그다
         public enum Phase: Equatable {
             case bootstrapping
             case appIntro(AppIntroFeature.State)
-            case onboarding(OnboardingFlowFeature.State)
-            case main(MainTabFeature.State)
+            case onboardingFlow(OnboardingFlowFeature.State)
+            case mainTab(MainTabFeature.State)
         }
 
         public var appIntro: AppIntroFeature.State? {
@@ -43,24 +43,24 @@ public struct RootFlowFeature {
 
         public var onboardingFlow: OnboardingFlowFeature.State? {
             get {
-                guard case let .onboarding(state) = phase else { return nil }
+                guard case let .onboardingFlow(state) = phase else { return nil }
                 return state
             }
             set {
                 if let newValue {
-                    phase = .onboarding(newValue)
+                    phase = .onboardingFlow(newValue)
                 }
             }
         }
 
         public var mainTab: MainTabFeature.State? {
             get {
-                guard case let .main(tab) = phase else { return nil }
+                guard case let .mainTab(tab) = phase else { return nil }
                 return tab
             }
             set {
                 if let newValue {
-                    phase = .main(newValue)
+                    phase = .mainTab(newValue)
                 }
             }
         }
@@ -118,7 +118,7 @@ public struct RootFlowFeature {
         case let .bootstrapRoute(route):
             return applyBootstrapRoute(state: &state, route: route)
         case .appIntroFinished:
-            state.phase = .onboarding(OnboardingFlowFeature.State())
+            state.phase = .onboardingFlow(OnboardingFlowFeature.State())
             return .none
         case let .deepLinkReceived(url):
             return receiveDeepLink(url)
@@ -201,7 +201,7 @@ private extension RootFlowFeature {
                 await onboardingClient.markAppIntroSeen()
             }
         case .signIn:
-            state.phase = .onboarding(OnboardingFlowFeature.State())
+            state.phase = .onboardingFlow(OnboardingFlowFeature.State())
             return .none
         }
     }
@@ -230,7 +230,7 @@ private extension RootFlowFeature {
         case .bootstrapping:
             state.pendingDeepLink = route
             return .none
-        case .appIntro, .onboarding:
+        case .appIntro, .onboardingFlow:
             switch route {
             case .signIn:
                 return .none
@@ -238,7 +238,7 @@ private extension RootFlowFeature {
                 state.pendingDeepLink = route
                 return .none
             }
-        case .main:
+        case .mainTab:
             return routeInMain(state: &state, route: route)
         }
     }
@@ -295,14 +295,14 @@ private extension RootFlowFeature {
         isOnboardingCompleted: Bool
     ) -> Effect<Action> {
         guard isOnboardingCompleted else {
-            state.phase = .onboarding(.resumingOnboarding)
+            state.phase = .onboardingFlow(.resumingOnboarding)
             return .none
         }
         return moveToMain(state: &state, userID: userID)
     }
 
     func moveToMain(state: inout State, userID: String) -> Effect<Action> {
-        state.phase = .main(makeMainState(userID: userID))
+        state.phase = .mainTab(makeMainState(userID: userID))
         return .send(.flushPendingDeepLink)
     }
 
@@ -319,7 +319,7 @@ private extension RootFlowFeature {
     }
 
     func moveToSignIn(state: inout State) -> Effect<Action> {
-        state.phase = .onboarding(OnboardingFlowFeature.State())
+        state.phase = .onboardingFlow(OnboardingFlowFeature.State())
         return .none
     }
 
@@ -355,14 +355,14 @@ private extension RootFlowFeature {
             main.selectedTab = .myPage
         }
 
-        state.phase = .main(main)
+        state.phase = .mainTab(main)
         return .none
     }
 }
 
 private extension RootFlowFeature.State.Phase {
     var mainTabState: MainTabFeature.State? {
-        guard case let .main(state) = self else { return nil }
+        guard case let .mainTab(state) = self else { return nil }
         return state
     }
 }

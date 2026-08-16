@@ -12,7 +12,7 @@ import XCTest
 final class RootFlowViewLifecycleTests: XCTestCase {
     func test_데이트유형_건너뛰기_뒤에_커플화면이_액션을_보내지_않는다() async {
         let harness = Harness(
-            phase: .onboarding(
+            phase: .onboardingFlow(
                 OnboardingFlowFeature.State(
                     nickname: NicknameFeature.State(isTermsSheetPresented: false),
                     couple: connectedCoupleState,
@@ -32,7 +32,7 @@ final class RootFlowViewLifecycleTests: XCTestCase {
 
     func test_온보딩_완료로_phase가_바뀌어도_스택이_액션을_보내지_않는다() async {
         let harness = Harness(
-            phase: .onboarding(
+            phase: .onboardingFlow(
                 OnboardingFlowFeature.State(
                     nickname: NicknameFeature.State(isTermsSheetPresented: false),
                     couple: connectedCoupleState,

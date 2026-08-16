@@ -18,11 +18,11 @@ public struct RootFlowView: View {
                 if let introStore = store.scope(state: \.appIntro, action: \.appIntro) {
                     AppIntroView(store: introStore)
                 }
-            case .onboarding:
+            case .onboardingFlow:
                 if let onboardingStore = store.scope(state: \.onboardingFlow, action: \.onboardingFlow) {
                     OnboardingFlowView(store: onboardingStore)
                 }
-            case .main:
+            case .mainTab:
                 if let mainStore = store.scope(state: \.mainTab, action: \.mainTab) {
                     MainTabView(store: mainStore)
                 }
@@ -31,7 +31,7 @@ public struct RootFlowView: View {
         .overlay {
             OverlayView(store: store.scope(state: \.overlay, action: \.overlay))
         }
-        // 덮개는 phase 스위치 바깥에 둔다. 아래가 main 으로 바뀐 뒤 그 위에서 내려가야 한다
+        // 덮개는 phase 스위치 바깥에 둔다. 아래가 mainTab 으로 바뀐 뒤 그 위에서 내려가야 한다
         .fullScreenCover(isPresented: dateTypeBinding) {
             dateTypeCover
         }

@@ -28,8 +28,8 @@ final class FeatureLogTests: XCTestCase {
             "[Feature] [Auth] 상태 변경: isLoading(false → true)"
         )
         XCTAssertEqual(
-            FeatureLog.navigationMessage(scene: "RootFlow", field: "phase", from: "bootstrapping", to: "main"),
-            "[Feature] [RootFlow] 화면 이동: phase(bootstrapping → main)"
+            FeatureLog.navigationMessage(scene: "RootFlow", field: "phase", from: "bootstrapping", to: "mainTab"),
+            "[Feature] [RootFlow] 화면 이동: phase(bootstrapping → mainTab)"
         )
         XCTAssertEqual(
             FeatureLog.errorMessage(

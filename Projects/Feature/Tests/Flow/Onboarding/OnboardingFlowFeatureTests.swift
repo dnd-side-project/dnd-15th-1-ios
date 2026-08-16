@@ -79,7 +79,7 @@ final class OnboardingFlowFeatureTests: XCTestCase {
         await store.receive(\.dateType.delegate.saved)
         await store.receive(\.delegate.onboardingCompleted)
 
-        // 덮개는 RootFlow 가 main 으로 갈아탄 뒤 걷는다
+        // 덮개는 RootFlow 가 mainTab 으로 갈아탄 뒤 걷는다
         XCTAssertNotNil(store.state.dateType)
     }
 
