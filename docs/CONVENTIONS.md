@@ -201,7 +201,8 @@ Feature/Sources/
     MainTab/
     DeepLink/
     Overlay/
-  Common/
+  Extension/
+  Util/{Log,Image,Web,Terms,Map}
   Scene/{Auth,Home,Explore,Map,MyPage}
 Feature/Tests/
   AppCoordinator/
@@ -215,6 +216,17 @@ App/Sources/
   CompositionRoot.swift
   DI/
 ```
+
+공용 코드를 어디 둘지는 세 조건으로 판정한다. 셋 다 만족해야 DesignSystem 이다.
+
+| 조건 | 질문 |
+|---|---|
+| 형태 | 뷰·스타일·디자인 토큰인가 (모델·유틸·확장은 아니다) |
+| 의존 | Domain·TCA·ThirdParty SDK 를 모르는가 |
+| 결합 | 앱 고유 모델·문구·URL 을 모르는가 (호출자가 넘기는가) |
+
+하나라도 어기면 `Feature` 다. `Extension/` 은 타입 확장(`X+Y.swift`) 전용,
+나머지 공용 코드는 `Util/<주제>/` 에 둔다.
 
 규칙:
 

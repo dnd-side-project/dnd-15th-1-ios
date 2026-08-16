@@ -99,7 +99,8 @@ Feature/Sources/
     MainTab/
     DeepLink/
     Overlay/
-  Common/
+  Extension/
+  Util/{Log,Image,Web,Terms,Map}
   Scene/{Auth,Onboarding,Home,Explore,Map,MyPage}
 ```
 
@@ -110,6 +111,8 @@ Feature/Sources/
 3. 외부 요청은 `delegate` 로 AppCoordinator/MainTab 상승
 4. Feature 는 Domain `*Client` 만 사용
 5. 전역 전환/딥링크/overlay 는 AppCoordinator
+6. 공용 코드는 `Extension`(타입 확장) 과 `Util`(주제 폴더) 로 나눈다.
+   `Util/` 바로 아래에 파일을 두지 않는다 — 반드시 주제 폴더를 만든다
 
 네비게이션:
 
