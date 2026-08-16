@@ -90,27 +90,13 @@ appIntro complete
 
 단일 모듈. 기능은 폴더로 나눈다.
 
-```text
-Feature/Sources/
-  Root/
-  AppCoordinator/
-    MainTab/
-    DeepLink/
-    Overlay/
-  Extension/
-  Util/{Log,Image,Web,Terms,Map}
-  Scene/{Auth,Onboarding,Home,Explore,Map,MyPage}
-Feature/Tests/
-  AppCoordinator/, Auth/
-```
-
 규칙:
 
-1. Scene 안은 flat (`*Feature`, `*View`)
+1. 화면은 `Scene/<이름>/`, 그 안은 flat (`*Feature`, `*View`)
 2. Scene 간 직접 참조 금지
 3. 외부 요청은 `delegate` 로 AppCoordinator/MainTab 상승
 4. Feature 는 Domain `*Client` 만 사용
-5. 전역 전환/딥링크/overlay 는 AppCoordinator
+5. 전역 전환·딥링크·overlay 는 `AppCoordinator/` 아래 (`MainTab`, `DeepLink`, `Overlay`)
 6. 공용 코드는 `Extension`(타입 확장) 과 `Util`(주제 폴더) 로 나눈다.
    `Util/` 바로 아래에 파일을 두지 않는다 — 반드시 주제 폴더를 만든다
 
@@ -132,13 +118,7 @@ appIntro / loggedOut 은 home|explore|map|myPage 만 pending, signIn 은 무시
 
 ## 4. Domain / Data
 
-```text
-Domain/<Name>/{Model,Client,Error}
-Data/<Name>/{DTO,DataSource,Endpoint,Mapper,Repository,Service}
-  DTO/{Network,Storage}   # 선택
-  *Repository
-  *ClientFactory
-```
+새 기능을 만들 때 어떤 폴더를 두는지는 [CONVENTIONS.md](CONVENTIONS.md) §10 을 본다.
 
 규칙:
 
@@ -153,17 +133,6 @@ Data/<Name>/{DTO,DataSource,Endpoint,Mapper,Repository,Service}
 ---
 
 ## 5. App / Config
-
-```text
-App/Sources/
-  DulpickApp.swift
-  CompositionRoot.swift
-  DI/
-    AppBootstrap.swift
-    AppConfiguration.swift
-    InfraContainer.swift
-    Dependencies.swift
-```
 
 설정:
 

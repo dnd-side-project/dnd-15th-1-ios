@@ -151,7 +151,7 @@ public var body: some ReducerOf<Self> {
 
 ### 6. 폴더
 
-폴더 트리는 [ARCHITECTURE.md](ARCHITECTURE.md) §3~§5 를 본다.
+Feature 폴더 배치는 [ARCHITECTURE.md](ARCHITECTURE.md) §3 규칙을 본다.
 
 공용 코드를 어디 둘지는 세 조건으로 판정한다. 셋 다 만족해야 DesignSystem 이다.
 
@@ -237,25 +237,11 @@ public enum Action {
 Feature reducer 테스트
 Domain *Client override
 test_한글_한글
-force unwrap 금지
 ```
 
 ```text
 test_세션없음_로그아웃상태복구
 test_로그인성공_델리게이트_전달
-```
-
-```swift
-withDependencies {
-    $0.authClient.restoreSession = { nil }
-    $0.authClient.login = { _ in
-        AuthSession(
-            accessToken: "access",
-            refreshToken: "refresh",
-            userID: "demo"
-        )
-    }
-}
 ```
 
 규칙:
@@ -267,7 +253,7 @@ withDependencies {
 ### 10. 새 기능 체크
 
 1. Domain `{Model,Error,Client}`
-2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}`
+2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}` — `DTO/` 아래 `Network`·`Storage` 는 선택
 3. App `Dependencies.register`
 4. Feature `Scene/<Name>`
 5. 필요 시 AppCoordinator / MainTab / DeepLink
