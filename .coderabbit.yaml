@@ -33,16 +33,13 @@ reviews:
   path_instructions:
     - path: "Projects/**"
       instructions: |
-        Dulpick iOS: Tuist multi-project, Swift 6, SwiftUI, TCA.
-        세로 계층은 모듈, 가로 Feature는 폴더.
         Domain 포트는 *Client, Data 구현은 *Repository + *ClientFactory.
-        live 조립은 App only.
+        Domain *Client 의 live 등록은 App only. 외부 SDK 초기화는 SDK 를 소유한 모듈이 Bootstrap 타입으로 갖고, App 은 호출만 한다.
         DO NOT: force unwrap(!), IUO.
         상세: AGENTS.md, docs/ARCHITECTURE.md, docs/CONVENTIONS.md.
 
     - path: "Projects/Feature/**"
       instructions: |
-        Feature는 Domain, SharedUtils, SharedDesignSystem, ThirdParty, ThirdPartyUI 만 의존.
         Critical: Data / Core* / ThirdPartyCore import 금지.
         Critical: Scene 간 직접 참조/상태 수정 금지. 외부 요청은 delegate 로 상위 전달.
         Critical: phase / selectedTab / deep link 라우팅을 Scene 에서 직접 처리 금지.
@@ -59,7 +56,6 @@ reviews:
 
     - path: "Projects/Data/**"
       instructions: |
-        Data 는 DTO, DataSource, *Repository, *ClientFactory.
         Critical: Feature import 금지.
         Core/인프라 에러는 Domain 에러로 매핑.
         Repository 는 DataSource 를 기본으로 주입하고, SDK credential provider 등은 Service collaborator 로 허용.
@@ -67,14 +63,13 @@ reviews:
 
     - path: "Projects/App/**"
       instructions: |
-        App 은 bootstrap 과 live 조립만.
-        Critical: live 조립은 App DI only. Feature/Domain 에 live 생성 로직을 흩뿌리지 않는다.
+        Critical: Domain *Client 의 live 등록은 App DI only. Feature/Domain 에 live 생성 로직을 흩뿌리지 않는다.
         CompositionRoot 에서 Root store 1회 생성.
         View / WindowGroup 안에서 store 생성 금지.
 
     - path: "docs/**"
       instructions: |
-        아키텍처/컨벤션 문서. 링크와 현재 구조 정합만 확인.
+        링크와 현재 구조 정합만 확인.
         코드 스타일 nitpick 금지.
         source of truth: docs/ARCHITECTURE.md, docs/CONVENTIONS.md.
 

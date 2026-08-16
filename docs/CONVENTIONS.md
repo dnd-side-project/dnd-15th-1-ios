@@ -13,43 +13,12 @@
 
 ### 1. 코드 레이아웃
 
-- 들여쓰기: 4 spaces
-- 콜론(`:`)은 오른쪽만 공백
-- 연산자 좌우 공백 유지
-- 한 줄이 길면 파라미터/인자 기준 줄바꿈
-- 한 줄 최대: warning 120 / error 140 (`.swiftlint.yml`)
-- 빈 줄에 trailing whitespace 금지
-- 파일 끝 개행 유지
-- `// MARK: -` 위아래 빈 줄
+포맷과 안전성은 `.swiftlint.yml` 이 유일본이다. 문서에 다시 적지 않는다.
 
-```swift
-let number: Int = 42
-let dictionary: [String: Any] = [:]
+문서가 정하는 것은 린트가 못 잡는 둘뿐이다.
 
-function(
-    firstArgument: "Hello",
-    secondArgument: 100
-)
-
-guard
-    let user = user,
-    let name = user.name
-else {
-    return
-}
-```
-
-Import:
-
-- 알파벳 정렬
-- 시스템 프레임워크 먼저, 그다음 프로젝트/서드파티
-
-```swift
-import Foundation
-import SwiftUI
-
-import ThirdParty
-```
+- 한 줄이 길면 파라미터/인자 기준으로 줄바꿈한다
+- `// MARK: -` 위아래에 빈 줄을 둔다
 
 ### 2. 명명
 
@@ -72,14 +41,7 @@ func fetchUser() async throws -> User
 func getName(for user: User) -> String
 ```
 
-모듈:
-
-```text
-CoreNetwork, CoreStorage
-SharedUtils, SharedDesignSystem, SharedLogger
-ThirdParty, ThirdPartyUI, ThirdPartyCore
-Domain, Data, Feature, App
-```
+모듈 목록은 [ARCHITECTURE.md](ARCHITECTURE.md) §1 을 본다.
 
 계층 타입:
 
@@ -117,15 +79,10 @@ onAppear
 - 상속 없는 class 는 `final`
 - 접근 제어는 좁게 (`private` 우선)
 - 값 타입 우선
-- 컬렉션 단축 문법 (`[T]`, `[K: V]`)
-- force unwrap / IUO 금지
 - 파라미터/리턴 없는 클로저: `() -> Void`
-- trailing closure 사용
 - `async/await` 우선, GCD 남용 금지
 
 ```swift
-final class DefaultKeychainStorage { ... }
-var names: [String] = []
 let completion: () -> Void = { ... }
 ```
 
@@ -194,27 +151,18 @@ public var body: some ReducerOf<Self> {
 
 ### 6. 폴더
 
-```text
-Feature/Sources/
-  Root/
-  AppCoordinator/
-    MainTab/
-    DeepLink/
-    Overlay/
-  Common/
-  Scene/{Auth,Home,Explore,Map,MyPage}
-Feature/Tests/
-  AppCoordinator/
-  Auth/
+Feature 폴더 배치는 [ARCHITECTURE.md](ARCHITECTURE.md) §3 규칙을 본다.
 
-Domain/Sources/<Name>/{Model,Error,Client}
-Data/Sources/<Name>/{DTO,DataSource,Endpoint,Mapper,Repository,Service}
-  DTO/{Network,Storage}  # optional subfolders
-App/Sources/
-  DulpickApp.swift
-  CompositionRoot.swift
-  DI/
-```
+공용 코드를 어디 둘지는 세 조건으로 판정한다. 셋 다 만족해야 DesignSystem 이다.
+
+| 조건 | 질문 |
+|---|---|
+| 형태 | 뷰·스타일·디자인 토큰인가 (모델·유틸·확장은 아니다) |
+| 의존 | Domain·TCA·ThirdParty SDK 를 모르는가 |
+| 결합 | 앱 고유 모델·문구·URL 을 모르는가 (호출자가 넘기는가) |
+
+하나라도 어기면 `Feature` 다. `Extension/` 은 타입 확장(`X+Y.swift`) 전용,
+나머지 공용 코드는 `Util/<주제>/` 에 둔다.
 
 규칙:
 
@@ -226,28 +174,12 @@ App/Sources/
 
 ### 7. Import / DI
 
-허용:
-
-| 모듈 | 허용 |
-|---|---|
-| Feature | Domain, SharedUtils, SharedDesignSystem, SharedLogger, ThirdParty, ThirdPartyUI |
-| Domain | SharedUtils, ThirdParty |
-| Data | Domain, Core*, SharedLogger, SharedUtils, ThirdPartyCore |
-| Core | SharedUtils, SharedLogger, ThirdPartyCore |
-| App | 조립 only |
-
-금지:
-
-```text
-Feature → Data / Core* / ThirdPartyCore
-Domain  → Data / Core* / Feature
-Data    → Feature
-```
+모듈별 허용·금지 의존은 [ARCHITECTURE.md](ARCHITECTURE.md) §1 을 본다.
 
 DI:
 
-1. Feature 의존성은 Domain `*Client` 만
-2. live 조립은 App DI only
+1. Feature 의 데이터 접근은 Domain `*Client` 만
+2. Domain `*Client` 의 live 등록은 App DI only. 외부 SDK 초기화는 SDK 를 소유한 모듈이 Bootstrap 타입으로 갖고, App 은 호출만 한다
 3. bootstrap / Root store 는 `CompositionRoot` 1회
 4. View / `WindowGroup` 안에서 store 생성 금지
 5. Feature 코드에 `Repository` / `ClientFactory` 이름 쓰지 않음
@@ -305,25 +237,11 @@ public enum Action {
 Feature reducer 테스트
 Domain *Client override
 test_한글_한글
-force unwrap 금지
 ```
 
 ```text
 test_세션없음_로그아웃상태복구
 test_로그인성공_델리게이트_전달
-```
-
-```swift
-withDependencies {
-    $0.authClient.restoreSession = { nil }
-    $0.authClient.login = { _ in
-        AuthSession(
-            accessToken: "access",
-            refreshToken: "refresh",
-            userID: "demo"
-        )
-    }
-}
 ```
 
 규칙:
@@ -332,22 +250,10 @@ withDependencies {
 2. Domain/Data 단위 테스트는 기본 강제 없음
 3. 고위험 도메인만 보완 테스트 가능
 
-### 10. 환경
-
-| Scheme | Config | Bundle ID |
-|---|---|---|
-| `Dulpick-Debug` | Debug | `com.dulpick.debug` |
-| `Dulpick` | Release | `com.dulpick.app` |
-
-- storage namespace 는 Bundle ID 재사용
-- Tuist: bundle id / display name / flags
-- `Config/*.xcconfig`: API URL / secrets
-- `AppInfo` 가 Info.plist 값을 읽음
-
-### 11. 새 기능 체크
+### 10. 새 기능 체크
 
 1. Domain `{Model,Error,Client}`
-2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}`
+2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}` — `DTO/` 아래 `Network`·`Storage` 는 선택
 3. App `Dependencies.register`
 4. Feature `Scene/<Name>`
 5. 필요 시 AppCoordinator / MainTab / DeepLink
@@ -363,6 +269,7 @@ withDependencies {
 ```
 
 상세 구조는 [ARCHITECTURE.md](ARCHITECTURE.md).
+환경·scheme·Bundle ID 는 [ARCHITECTURE.md](ARCHITECTURE.md) §5 를 본다.
 
 ---
 
@@ -429,11 +336,13 @@ Type/Jira티켓
 feat/dnd-10
 fix/dnd-25
 refactor/dnd-42
+docs/agent-docs
 ```
 
 - Type 은 commit type 과 동일
 - jira key 는 소문자
-- 작은 설정/문서만 `chore/no-issue` 가능
+- Jira 키가 없으면 브랜치 이름에 `no-issue` 를 넣지 않는다. `docs/agent-docs` 처럼 내용을 쓴다.
+  `[NO-ISSUE]` 는 PR 제목에만 붙인다
 
 ### 2. 브랜치 구조
 
@@ -474,17 +383,8 @@ PR 제목:
 
 ---
 
-## d. 하지 말 것
-
-- Feature 모듈 쪼개기
-- AppShell / AppRuntime / AppEnvironment / AppConstants 재도입
-- Feature → Data/Core 직접 참조
-- Scene 간 직접 통신
-- storage typed key 과설계
-- 문서 주제별 과다 분리
-
-관련:
+## d. 관련
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
-- [../AGENTS.md](../AGENTS.md)
+- [../AGENTS.md](../AGENTS.md) — 하지 말 것은 `먼저 물을 것` 을 본다
 - [../.swiftlint.yml](../.swiftlint.yml)

@@ -6,7 +6,8 @@
 세로 계층 = 모듈
 가로 Feature = 폴더
 외부 의존성 = ThirdParty*
-live 조립 = App only
+Domain *Client live 등록 = App only
+외부 SDK 초기화 = 소유 모듈의 Bootstrap 타입, App 은 호출만
 ```
 
 ---
@@ -83,32 +84,21 @@ appIntro complete
   → loggedOut(Auth)
 ```
 
-현재 세션 복구는 로컬 조회 중심. refresh/401 interceptor 는 아직 없음.
-
 ---
 
 ## 3. Feature
 
 단일 모듈. 기능은 폴더로 나눈다.
 
-```text
-Feature/Sources/
-  Root/
-  AppCoordinator/
-    MainTab/
-    DeepLink/
-    Overlay/
-  Common/
-  Scene/{Auth,Onboarding,Home,Explore,Map,MyPage}
-```
-
 규칙:
 
-1. Scene 안은 flat (`*Feature`, `*View`)
+1. 화면은 `Scene/<이름>/`, 그 안은 flat (`*Feature`, `*View`)
 2. Scene 간 직접 참조 금지
 3. 외부 요청은 `delegate` 로 AppCoordinator/MainTab 상승
-4. Feature 는 Domain `*Client` 만 사용
-5. 전역 전환/딥링크/overlay 는 AppCoordinator
+4. 데이터·서비스 접근은 Domain `*Client` 만 사용 (모듈 의존은 §1)
+5. 전역 전환·딥링크·overlay 는 `AppCoordinator/` 아래 (`MainTab`, `DeepLink`, `Overlay`)
+6. 공용 코드는 `Extension`(타입 확장) 과 `Util`(주제 폴더) 로 나눈다.
+   `Util/` 바로 아래에 파일을 두지 않는다 — 반드시 주제 폴더를 만든다
 
 네비게이션:
 
@@ -124,22 +114,11 @@ bootstrapping / appIntro / loggedOut 이면 pending, 로그인 후 flush
 appIntro / loggedOut 은 home|explore|map|myPage 만 pending, signIn 은 무시
 ```
 
-현재:
-
-```text
-dulpick://home|explore|map|mypage|auth/sign-in
-```
-
 ---
 
 ## 4. Domain / Data
 
-```text
-Domain/<Name>/{Model,Client,Error}
-Data/<Name>/{DTO,DataSource,Endpoint,Mapper,Repository,Service}
-  *Repository
-  *ClientFactory
-```
+새 기능을 만들 때 어떤 폴더를 두는지는 [CONVENTIONS.md](CONVENTIONS.md) §10 을 본다.
 
 규칙:
 
@@ -154,17 +133,6 @@ Data/<Name>/{DTO,DataSource,Endpoint,Mapper,Repository,Service}
 ---
 
 ## 5. App / Config
-
-```text
-App/Sources/
-  DulpickApp.swift
-  CompositionRoot.swift
-  DI/
-    AppBootstrap.swift
-    AppConfiguration.swift
-    InfraContainer.swift
-    Dependencies.swift
-```
 
 설정:
 
@@ -183,71 +151,12 @@ storage namespace 는 Bundle ID 하나 재사용.
 
 ---
 
-## 6. 네이밍
-
-| 계층 | 패턴 | 예 |
-|---|---|---|
-| Domain client | `*Client` | `AuthClient` |
-| Data repository | `*Repository` | `AuthRepository` |
-| Core default impl | `Default*` | `DefaultKeychainStorage` |
-| Data factory | `*ClientFactory` | `AuthClientFactory` |
-| Feature | `*Feature` / `*View` | `HomeFeature` |
-
-모듈 prefix:
-
-```text
-CoreNetwork, SharedUtils, ThirdPartyUI ...
-```
-
----
-
-## 7. 새 기능
-
-1. Domain `{Model,Error,Client}`
-2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}`
-3. App `Dependencies.register`
-4. Feature `Scene/<Name>`
-5. 필요 시 AppCoordinator/MainTab/DeepLink
-6. Feature 테스트 (client override)
-
-질문:
-
-```text
-화면? Feature
-계약? Domain
-구현? Data
-인프라? Core
-외부 SDK? ThirdParty*
-조립? App
-```
-
----
-
-## 8. 테스트 / 분리
-
-테스트:
-
-- 기본: Feature reducer 테스트
-- mock: Domain `*Client` override
-- Domain/Data 테스트는 기본 강제 없음
-
-지금은 하지 않음:
-
-- Feature 모듈 쪼개기
-- Micro feature multi-project
-
-분리 검토 시점:
-
-- Feature 빌드 병목
-- 기능 단위 소유권 분리
-- Core 독립 교체 필요
-
----
-
-## 9. 관련
+## 6. 관련
 
 - [CONVENTIONS.md](CONVENTIONS.md)
 - [../AGENTS.md](../AGENTS.md)
 - [../CLAUDE.md](../CLAUDE.md) (`AGENTS.md` symlink)
+
+네이밍·새 기능 순서·테스트 규칙·DesignSystem 판정은 [CONVENTIONS.md](CONVENTIONS.md) 를 본다.
 
 구조는 이 파일, 코딩 규칙은 `CONVENTIONS.md` 가 source of truth 다.
