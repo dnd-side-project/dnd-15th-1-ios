@@ -52,7 +52,30 @@ struct DateTypeTooltip: View {
     }
 }
 
-enum BubbleMetric {
+extension DateTypeTooltip {
+    struct Placement {
+        let trailingOffset: CGFloat
+        let topOffset: CGFloat
+        let arrowTrailingInset: CGFloat
+    }
+
+    static func placement(
+        tipButtonTrailingX: CGFloat,
+        tipButtonCenterX: CGFloat,
+        tipButtonHeight: CGFloat
+    ) -> Placement {
+        Placement(
+            // 말풍선은 tip 버튼 오른쪽 끝에 트레일링 정렬된다. 시안 위치까지 그만큼 오른쪽으로 민다
+            trailingOffset: PlacementMetric.leadingInset + BubbleMetric.width - tipButtonTrailingX,
+            // overlay 의 y 원점은 tip 버튼 상단이고, 화살표 끝은 말풍선 상단보다 ArrowMetric.protrusion 만큼 위다
+            topOffset: tipButtonHeight + PlacementMetric.arrowGap + ArrowMetric.protrusion,
+            // 말풍선 왼쪽 끝이 42 로 고정이므로, 화살표가 tip 버튼 가운데를 가리키는 위치도 여기서 정해진다
+            arrowTrailingInset: PlacementMetric.leadingInset + BubbleMetric.width - tipButtonCenterX
+        )
+    }
+}
+
+private enum BubbleMetric {
     static let width: CGFloat = 262
     static let horizontalPadding: CGFloat = 20
     static let verticalPadding: CGFloat = 12
@@ -61,7 +84,7 @@ enum BubbleMetric {
     static let shadowYOffset: CGFloat = 2
 }
 
-enum ArrowMetric {
+private enum ArrowMetric {
     static let width: CGFloat = 17.86
     static let height: CGFloat = 16
     /// 밑변 6 은 말풍선 안에 묻는다. 이음새와 내부 그림자가 안 생긴다
@@ -70,11 +93,23 @@ enum ArrowMetric {
     static let protrusion: CGFloat = height - overlap
 }
 
+private enum PlacementMetric {
+    /// 시안: 말풍선 왼쪽 끝이 화면 왼쪽에서 42
+    static let leadingInset: CGFloat = 42
+    /// 시안: 화살표 뾰족한 끝이 tip 버튼 하단에서 4 아래
+    static let arrowGap: CGFloat = 4
+}
+
 #if DEBUG
 #Preview("툴팁") {
+    let placement = DateTypeTooltip.placement(
+        tipButtonTrailingX: 293,
+        tipButtonCenterX: 273,
+        tipButtonHeight: 32
+    )
     DateTypeTooltip(
         text: DateTypeView.tooltipText,
-        arrowTrailingInset: TooltipMetric.arrowTrailingInset
+        arrowTrailingInset: placement.arrowTrailingInset
     )
     .padding(40)
     .background(Color.primaryPink)

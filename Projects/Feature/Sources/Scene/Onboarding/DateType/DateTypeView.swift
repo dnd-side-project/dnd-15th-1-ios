@@ -87,11 +87,16 @@ public struct DateTypeView: View {
         .buttonStyle(.plain)
         .overlay(alignment: .topTrailing) {
             if store.isTooltipPresented {
+                let placement = DateTypeTooltip.placement(
+                    tipButtonTrailingX: TipButtonMetric.trailingX,
+                    tipButtonCenterX: TipButtonMetric.centerX,
+                    tipButtonHeight: TipButtonMetric.height
+                )
                 DateTypeTooltip(
                     text: Self.tooltipText,
-                    arrowTrailingInset: TooltipMetric.arrowTrailingInset
+                    arrowTrailingInset: placement.arrowTrailingInset
                 )
-                .offset(x: TooltipMetric.trailingOffset, y: TooltipMetric.topOffset)
+                .offset(x: placement.trailingOffset, y: placement.topOffset)
             }
         }
     }
@@ -188,23 +193,6 @@ private enum TipButtonMetric {
     static let leadingX: CGFloat = TitleRowMetric.horizontalPadding + TitleRowMetric.width
     static let trailingX: CGFloat = leadingX + width
     static let centerX: CGFloat = leadingX + width / 2
-}
-
-enum TooltipMetric {
-    /// 시안: 말풍선 왼쪽 끝이 화면 왼쪽에서 42
-    static let leadingInset: CGFloat = 42
-    /// 시안: 화살표 뾰족한 끝이 tip 버튼 하단에서 4 아래
-    static let arrowGap: CGFloat = 4
-
-    /// 말풍선은 tip 버튼 오른쪽 끝에 트레일링 정렬된다. 시안 위치까지 그만큼 오른쪽으로 민다
-    static let trailingOffset: CGFloat =
-        leadingInset + BubbleMetric.width - TipButtonMetric.trailingX
-    /// overlay 의 y 원점은 tip 버튼 상단이고, 화살표 끝은 말풍선 상단보다 ArrowMetric.protrusion 만큼 위다
-    static let topOffset: CGFloat =
-        TipButtonMetric.height + arrowGap + ArrowMetric.protrusion
-    /// 말풍선 왼쪽 끝이 42 로 고정이므로, 화살표가 tip 버튼 가운데를 가리키는 위치도 여기서 정해진다
-    static let arrowTrailingInset: CGFloat =
-        leadingInset + BubbleMetric.width - TipButtonMetric.centerX
 }
 
 private enum AxisListMetric {
