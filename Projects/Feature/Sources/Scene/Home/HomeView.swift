@@ -150,7 +150,7 @@ public struct HomeView: View {
             EmptyStateView(
                 image: .placeEmpty,
                 title: "최근 저장된 장소가 없어요!",
-                message: "다른 검색어를 입력해주세요"
+                message: "장소를 저장해주세요"
             )
             .padding(.top, 40)
         } else {
