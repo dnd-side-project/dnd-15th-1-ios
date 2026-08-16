@@ -10,16 +10,16 @@ struct TermsAgreementSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
+                .padding(.horizontal, HeaderMetric.horizontalPadding)
+                .padding(.top, HeaderMetric.topPadding)
 
             Spacer()
-                .frame(height: 24)
+                .frame(height: TermsRowMetric.topMargin)
 
             termsRows
 
             Spacer()
-                .frame(height: 24)
+                .frame(height: TermsRowMetric.bottomMargin)
 
             CTAContainer {
                 AppButton("모두 동의하기", style: .dark, size: .xl, fullWidth: true) {
@@ -30,7 +30,7 @@ struct TermsAgreementSheet: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: HeaderMetric.lineSpacing) {
             Text("잠깐만요!")
                 .typography(.title2B)
                 .foregroundStyle(Color.gray900)
@@ -67,17 +67,17 @@ struct TermsAgreementSheet: View {
                     Image.arrowRight
                         .renderingMode(.template)
                         .resizable()
-                        .frame(width: 20, height: 20)
+                        .frame(width: TermsRowMetric.arrowIconSize, height: TermsRowMetric.arrowIconSize)
                         .foregroundStyle(Color.textSecondary)
-                        .frame(width: 44, height: 44)
+                        .frame(width: TermsRowMetric.arrowHitArea, height: TermsRowMetric.arrowHitArea)
                 }
-                .frame(height: 44)
+                .frame(height: TermsRowMetric.height)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
-        .frame(height: 44)
-        .padding(.horizontal, 8)
+        .frame(height: TermsRowMetric.height)
+        .padding(.horizontal, TermsRowMetric.horizontalPadding)
     }
 
     // 필수 약관이라 동의는 "모두 동의하기" 하나로 끝난다. 아이콘은 항상 동의 상태를 보여준다
@@ -85,8 +85,8 @@ struct TermsAgreementSheet: View {
         Image.checkTrue
             .renderingMode(.original)
             .resizable()
-            .frame(width: 24, height: 24)
-            .frame(width: 44, height: 44)
+            .frame(width: CheckIconMetric.iconSize, height: CheckIconMetric.iconSize)
+            .frame(width: CheckIconMetric.slotSize, height: CheckIconMetric.slotSize)
     }
 }
 
@@ -98,6 +98,26 @@ private extension TermsType {
         case .privacy: "개인정보수집 및 이용(필수)"
         }
     }
+}
+
+private enum HeaderMetric {
+    static let horizontalPadding: CGFloat = 20
+    static let topPadding: CGFloat = 12
+    static let lineSpacing: CGFloat = 2
+}
+
+private enum TermsRowMetric {
+    static let topMargin: CGFloat = 24
+    static let bottomMargin: CGFloat = 24
+    static let height: CGFloat = 44
+    static let horizontalPadding: CGFloat = 8
+    static let arrowIconSize: CGFloat = 20
+    static let arrowHitArea: CGFloat = 44
+}
+
+private enum CheckIconMetric {
+    static let iconSize: CGFloat = 24
+    static let slotSize: CGFloat = 44
 }
 
 #if DEBUG

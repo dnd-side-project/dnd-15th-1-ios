@@ -8,15 +8,13 @@ struct SocialLoginButton: View {
     let isEnabled: Bool
     let action: () -> Void
 
-    private let iconSize: CGFloat = 20
-
     var body: some View {
         Button(action: action) {
             HStack(spacing: 0) {
                 icon
                     .resizable()
                     .renderingMode(.original)
-                    .frame(width: iconSize, height: iconSize)
+                    .frame(width: ButtonMetric.iconSize, height: ButtonMetric.iconSize)
 
                 Group {
                     if isLoading {
@@ -29,17 +27,17 @@ struct SocialLoginButton: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.trailing, iconSize)
+                .padding(.trailing, ButtonMetric.iconSize)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .padding(.horizontal, 24)
+            .frame(height: ButtonMetric.height)
+            .padding(.horizontal, ButtonMetric.horizontalPadding)
             .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: ButtonMetric.cornerRadius))
             .overlay {
                 if provider == .google {
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color.borderDefault, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: ButtonMetric.cornerRadius)
+                        .strokeBorder(Color.borderDefault, lineWidth: ButtonMetric.borderWidth)
                 }
             }
         }
@@ -77,6 +75,14 @@ struct SocialLoginButton: View {
         case .kakao, .google: .gray900
         }
     }
+}
+
+private enum ButtonMetric {
+    static let iconSize: CGFloat = 20
+    static let height: CGFloat = 56
+    static let horizontalPadding: CGFloat = 24
+    static let cornerRadius: CGFloat = 12
+    static let borderWidth: CGFloat = 1
 }
 
 #Preview("Default") {

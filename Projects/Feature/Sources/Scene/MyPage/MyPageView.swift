@@ -10,7 +10,7 @@ public struct MyPageView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: ContentMetric.spacing) {
             Spacer()
 
             if let userID = store.userID {
@@ -32,12 +32,21 @@ public struct MyPageView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(store.isLoading)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .padding(.horizontal, LogoutButtonMetric.horizontalPadding)
+            .padding(.bottom, LogoutButtonMetric.bottomPadding)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             store.send(.onAppear)
         }
     }
+}
+
+private enum ContentMetric {
+    static let spacing: CGFloat = 12
+}
+
+private enum LogoutButtonMetric {
+    static let horizontalPadding: CGFloat = 20
+    static let bottomPadding: CGFloat = 24
 }
