@@ -22,7 +22,7 @@ Dulpick 작업 시 에이전트 진입점.
 3. Feature 의 데이터 접근은 Domain `*Client` 만 쓴다
 4. Domain `*Client` live 등록은 App 만 한다. 외부 SDK 초기화는 SDK 를 소유한 모듈이 Bootstrap 타입으로 갖고, App 은 호출만 한다
 5. Core/인프라 에러는 Data 에서 Domain 에러로 매핑한다
-6. 전역 에러(`sessionExpired` 등)만 AppCoordinator 로 승격한다
+6. 전역 에러(`sessionExpired` 등)만 RootFlow 로 승격한다
 
 ---
 
