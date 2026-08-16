@@ -336,11 +336,13 @@ Type/Jira티켓
 feat/dnd-10
 fix/dnd-25
 refactor/dnd-42
+docs/agent-docs
 ```
 
 - Type 은 commit type 과 동일
 - jira key 는 소문자
-- 작은 설정/문서만 `chore/no-issue` 가능
+- Jira 키가 없으면 브랜치 이름에 `no-issue` 를 넣지 않는다. `docs/agent-docs` 처럼 내용을 쓴다.
+  `[NO-ISSUE]` 는 PR 제목에만 붙인다
 
 ### 2. 브랜치 구조
 
