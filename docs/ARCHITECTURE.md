@@ -6,7 +6,8 @@
 세로 계층 = 모듈
 가로 Feature = 폴더
 외부 의존성 = ThirdParty*
-live 조립 = App only
+Domain *Client live 등록 = App only
+외부 SDK 초기화 = 소유 모듈의 Bootstrap 타입, App 은 호출만
 ```
 
 ---

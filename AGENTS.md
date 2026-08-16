@@ -85,7 +85,7 @@ DulpickApp
 
 1. Feature 모듈을 기능별로 쪼개지 않는다. 폴더로 나눈다.
 2. Scene 간 직접 참조 금지. `delegate` 로 상위 전달.
-3. live 조립은 App 만.
+3. Domain `*Client` live 등록은 App 만 한다. 외부 SDK 초기화는 SDK 를 소유한 모듈이 Bootstrap 타입으로 갖고, App 은 호출만 한다.
 4. Feature 는 Domain `*Client` 만 사용.
 5. Core/인프라 에러는 Data 에서 Domain 에러로 매핑.
 6. 전역 에러(`sessionExpired` 등)만 AppCoordinator 로 승격.
