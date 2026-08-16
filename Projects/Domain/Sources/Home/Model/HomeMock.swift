@@ -9,16 +9,6 @@
 
 import Foundation
 
-public extension SavedPlace {
-    static let mocks: [SavedPlace] = [
-        SavedPlace(id: "1", name: "he november 라운지 강남역", category: .cafe),
-        SavedPlace(id: "2", name: "까치화방 카페 강남점", category: .cafe),
-        SavedPlace(id: "3", name: "만약 카페명이 너무 길다면 ...으로 처리하면...", category: .cafe),
-        SavedPlace(id: "4", name: "성수동 감성 카페", category: .cafe),
-        SavedPlace(id: "5", name: "을지로 노포 맛집", category: .food),
-    ]
-}
-
 public extension DateSchedule {
     static let mocks: [DateSchedule] = [
         DateSchedule(id: "1", title: "성수역 데이트", placeCount: 5, date: "26.08.06"),

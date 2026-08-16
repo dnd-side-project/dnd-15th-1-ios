@@ -14,11 +14,11 @@ struct SavedPlaceRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            place.category.icon
+            place.place.category.icon
                 .resizable()
                 .frame(width: 24, height: 24)
 
-            Text(place.name)
+            Text(place.place.name)
                 .typography(.body1M)
                 .foregroundStyle(Color.textPrimary)
                 .lineLimit(1)
