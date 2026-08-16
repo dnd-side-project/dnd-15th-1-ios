@@ -15,7 +15,7 @@ struct DateTypeAxisRow<Value: Equatable>: View {
     let onSelect: (Value) -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: RowMetric.spacing) {
             optionButton(leading)
             optionButton(trailing)
         }
@@ -32,7 +32,7 @@ struct DateTypeAxisRow<Value: Equatable>: View {
         return Button {
             onSelect(option.value)
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: OptionMetric.labelSpacing) {
                 option.icon
                     .renderingMode(.template)
                     .foregroundStyle(isSelected ? Color.commonWhite : Color.gray400)
@@ -53,12 +53,26 @@ struct DateTypeAxisRow<Value: Equatable>: View {
         Text("VS")
             .typography(.body2SB)
             .foregroundStyle(Color.commonWhite)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 2)
+            .padding(.horizontal, BadgeMetric.horizontalPadding)
+            .padding(.vertical, BadgeMetric.verticalPadding)
             .background(Color.textPrimary)
-            .clipShape(RoundedRectangle(cornerRadius: 29))
+            .clipShape(RoundedRectangle(cornerRadius: BadgeMetric.cornerRadius))
             .allowsHitTesting(false)
     }
+}
+
+private enum RowMetric {
+    static let spacing: CGFloat = 8
+}
+
+private enum OptionMetric {
+    static let labelSpacing: CGFloat = 4
+}
+
+private enum BadgeMetric {
+    static let horizontalPadding: CGFloat = 10
+    static let verticalPadding: CGFloat = 2
+    static let cornerRadius: CGFloat = 29
 }
 
 #if DEBUG
