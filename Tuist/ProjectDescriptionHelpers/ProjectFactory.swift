@@ -173,6 +173,8 @@ public enum ProjectFactory {
         sources: SourceFilesList = ["Sources/**"],
         resources: ResourceFileElements = ["Resources/**"]
     ) -> Project {
+        let shareExtension = shareExtensionTarget()
+
         let target = Target.target(
             name: name,
             destinations: ProjectEnvironment.destinations,
@@ -183,7 +185,7 @@ public enum ProjectFactory {
             sources: sources,
             resources: resources,
             entitlements: "Dulpick.entitlements",
-            dependencies: dependencies,
+            dependencies: dependencies + [.target(name: shareExtension.name)],
             settings: ProjectSettings.app()
         )
 
@@ -192,7 +194,7 @@ public enum ProjectFactory {
             organizationName: ProjectEnvironment.organizationName,
             packages: packages,
             settings: ProjectSettings.project(),
-            targets: [target],
+            targets: [target, shareExtension],
             schemes: [
                 makeAppScheme(
                     name: "Dulpick-Debug",
@@ -206,6 +208,35 @@ public enum ProjectFactory {
                     configuration: ProjectEnvironment.releaseConfigName
                 ),
             ]
+        )
+    }
+
+    /// 공유시트에 노출되는 Share Extension 타겟.
+    private static func shareExtensionTarget() -> Target {
+        let infoPlist: InfoPlist = .extendingDefault(with: [
+            "CFBundleDisplayName": .string(ProjectEnvironment.displayName),
+            "NSExtension": [
+                "NSExtensionPointIdentifier": "com.apple.share-services",
+                "NSExtensionPrincipalClass": "$(PRODUCT_MODULE_NAME).ShareViewController",
+                "NSExtensionAttributes": [
+                    "NSExtensionActivationRule": [
+                        "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+                        "NSExtensionActivationSupportsText": true,
+                    ],
+                ],
+            ],
+        ])
+
+        return Target.target(
+            name: "ShareExtension",
+            destinations: ProjectEnvironment.destinations,
+            product: .appExtension,
+            bundleId: ProjectEnvironment.AppBundle.release + ".ShareExtension",
+            deploymentTargets: .iOS(ProjectEnvironment.deploymentTarget),
+            infoPlist: infoPlist,
+            sources: ["ShareExtension/Sources/**"],
+            dependencies: [],
+            settings: ProjectSettings.shareExtension()
         )
     }
 
