@@ -13,6 +13,7 @@ import ThirdParty
 public struct PlaceImportView: View {
     @Bindable public var store: StoreOf<PlaceImportFeature>
     @State private var currentPage: Int?
+    @Environment(\.openURL) private var openURL
 
     public init(store: StoreOf<PlaceImportFeature>) {
         self.store = store
@@ -125,7 +126,11 @@ public struct PlaceImportView: View {
     }
 
     private var originButton: some View {
-        Button {} label: {
+        Button {
+            if let originURL {
+                openURL(originURL)
+            }
+        } label: {
             HStack(spacing: 4) {
                 Image.insta
                     .resizable()
@@ -182,6 +187,13 @@ public struct PlaceImportView: View {
             return placeImport.content.title ?? ""
         }
         return ""
+    }
+
+    private var originURL: URL? {
+        if case let .loaded(placeImport) = store.phase {
+            return URL(string: placeImport.canonicalUrl)
+        }
+        return nil
     }
 
     private var pages: [[ImportCandidate]] {
