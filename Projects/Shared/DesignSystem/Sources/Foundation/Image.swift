@@ -91,6 +91,16 @@ public extension Image {
     static var appIntroPlan: Image { Asset.appIntroPlan.swiftUIImage }
 }
 
+// MARK: - Home
+
+public extension Image {
+    static var logo: Image { Asset.logo.swiftUIImage }
+    static var bannerCoupleConnect: Image { Asset.bannerCoupleConnect.swiftUIImage }
+    static var bannerPeek: Image { Asset.bannerPeek.swiftUIImage }
+    static var bannerCalendar: Image { Asset.bannerCalendar.swiftUIImage }
+    static var placeEmpty: Image { Asset.placeEmpty.swiftUIImage }
+}
+
 // MARK: - Couple Connect
 
 public extension Image {
