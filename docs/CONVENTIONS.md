@@ -178,7 +178,7 @@ Feature 폴더 배치는 [ARCHITECTURE.md](ARCHITECTURE.md) §3 규칙을 본다
 
 DI:
 
-1. Feature 의존성은 Domain `*Client` 만
+1. Feature 의 데이터 접근은 Domain `*Client` 만
 2. Domain `*Client` 의 live 등록은 App DI only. 외부 SDK 초기화는 SDK 를 소유한 모듈이 Bootstrap 타입으로 갖고, App 은 호출만 한다
 3. bootstrap / Root store 는 `CompositionRoot` 1회
 4. View / `WindowGroup` 안에서 store 생성 금지

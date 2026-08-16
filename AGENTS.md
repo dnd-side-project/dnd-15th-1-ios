@@ -19,7 +19,7 @@ Dulpick 작업 시 에이전트 진입점.
 
 1. Feature 는 단일 모듈. 기능은 폴더로 나눈다
 2. Scene 간 직접 참조 금지. `delegate` 로 상위에 올린다
-3. Feature 는 Domain `*Client` 만 쓴다
+3. Feature 의 데이터 접근은 Domain `*Client` 만 쓴다
 4. Domain `*Client` live 등록은 App 만 한다. 외부 SDK 초기화는 SDK 를 소유한 모듈이 Bootstrap 타입으로 갖고, App 은 호출만 한다
 5. Core/인프라 에러는 Data 에서 Domain 에러로 매핑한다
 6. 전역 에러(`sessionExpired` 등)만 AppCoordinator 로 승격한다
