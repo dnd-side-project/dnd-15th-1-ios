@@ -8,6 +8,9 @@ public enum DeepLinkRouter {
             .map(String.init)
         let firstPath = pathParts.first?.lowercased()
 
+        if host == "import" || firstPath == "import" {
+            return parseImport(url)
+        }
         if host == "home" || firstPath == "home" { return .home }
         if host == "explore" || firstPath == "explore" { return .explore }
         if host == "map" || firstPath == "map" { return .map }
@@ -36,5 +39,19 @@ public enum DeepLinkRouter {
             return .signIn
         }
         return nil
+    }
+
+    // dulpick://import?url=<공유된 링크> 에서 링크를 뽑아냄
+    private static func parseImport(_ url: URL) -> DeepLinkRoute? {
+        guard
+            let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "url" })?
+                .value,
+            let importURL = URL(string: value)
+        else {
+            return nil
+        }
+        return .placeImport(url: importURL)
     }
 }

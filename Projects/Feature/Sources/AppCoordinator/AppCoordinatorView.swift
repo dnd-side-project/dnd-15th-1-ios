@@ -1,3 +1,4 @@
+import SharedDesignSystem
 import SwiftUI
 import ThirdParty
 
@@ -31,12 +32,30 @@ public struct AppCoordinatorView: View {
         .overlay {
             OverlayView(store: store.scope(state: \.overlay, action: \.overlay))
         }
+        // 모달은 시트가 아니라 화면 위에 즉시 얹는 오버레이
+        .overlay {
+            placeImportModal
+        }
         // 덮개는 phase 스위치 바깥에 둔다. 아래가 main 으로 바뀐 뒤 그 위에서 내려가야 한다
         .fullScreenCover(isPresented: dateTypeBinding) {
             dateTypeCover
         }
         .task {
             store.send(.onAppear)
+        }
+    }
+
+    @ViewBuilder
+    private var placeImportModal: some View {
+        if let placeImportStore = store.scope(state: \.placeImport, action: \.placeImport.presented) {
+            ZStack {
+                Color.dimBackground
+                    .ignoresSafeArea()
+                    .onTapGesture { placeImportStore.send(.closeTapped) }
+
+                PlaceImportView(store: placeImportStore)
+                    .padding(.horizontal, 20)
+            }
         }
     }
 

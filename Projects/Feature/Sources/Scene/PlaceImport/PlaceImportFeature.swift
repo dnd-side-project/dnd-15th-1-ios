@@ -13,6 +13,8 @@ import ThirdParty
 public struct PlaceImportFeature {
     @ObservableState
     public struct State: Equatable {
+        // 공유로 받은 인스타 링크. API 요청에 사용
+        public var link: URL
         public var phase: Phase
         public var selectedIDs: Set<Int>
 
@@ -33,7 +35,8 @@ public struct PlaceImportFeature {
             !candidates.isEmpty && selectedIDs.count == candidates.count
         }
 
-        public init(phase: Phase = .loading, selectedIDs: Set<Int> = []) {
+        public init(link: URL, phase: Phase = .loading, selectedIDs: Set<Int> = []) {
+            self.link = link
             self.phase = phase
             self.selectedIDs = selectedIDs
         }
@@ -44,13 +47,9 @@ public struct PlaceImportFeature {
         case candidateToggled(Int)
         case saveTapped
         case closeTapped
-        case delegate(Delegate)
-
-        @CasePathable
-        public enum Delegate: Equatable {
-            case closed
-        }
     }
+
+    @Dependency(\.dismiss) var dismiss
 
     public init() {}
 
@@ -72,10 +71,7 @@ public struct PlaceImportFeature {
                 return .none
 
             case .closeTapped:
-                return .send(.delegate(.closed))
-
-            case .delegate:
-                return .none
+                return .run { [dismiss] _ in await dismiss() }
             }
         }
     }

@@ -6,4 +6,5 @@ public enum DeepLinkRoute: Equatable, Sendable {
     case map
     case myPage
     case signIn
+    case placeImport(url: URL)
 }
