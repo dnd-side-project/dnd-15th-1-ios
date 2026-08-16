@@ -5,7 +5,7 @@ import XCTest
 final class FeatureLogTests: XCTestCase {
     func test_씬이름_Feature접미_제거() {
         XCTAssertEqual(FeatureLog.sceneName(from: "AuthFeature"), "Auth")
-        XCTAssertEqual(FeatureLog.sceneName(from: "AppCoordinatorFeature"), "AppCoordinator")
+        XCTAssertEqual(FeatureLog.sceneName(from: "RootFlowFeature"), "RootFlow")
         XCTAssertEqual(FeatureLog.sceneName(from: "MainTabFeature"), "MainTab")
         XCTAssertEqual(FeatureLog.sceneName(from: "SearchFeature"), "Search")
         XCTAssertEqual(FeatureLog.sceneName(from: "Root"), "Root")
@@ -28,8 +28,8 @@ final class FeatureLogTests: XCTestCase {
             "[Feature] [Auth] 상태 변경: isLoading(false → true)"
         )
         XCTAssertEqual(
-            FeatureLog.navigationMessage(scene: "AppCoordinator", field: "phase", from: "bootstrapping", to: "main"),
-            "[Feature] [AppCoordinator] 화면 이동: phase(bootstrapping → main)"
+            FeatureLog.navigationMessage(scene: "RootFlow", field: "phase", from: "bootstrapping", to: "main"),
+            "[Feature] [RootFlow] 화면 이동: phase(bootstrapping → main)"
         )
         XCTAssertEqual(
             FeatureLog.errorMessage(

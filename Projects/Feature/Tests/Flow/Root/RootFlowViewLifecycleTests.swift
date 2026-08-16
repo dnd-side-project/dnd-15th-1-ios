@@ -6,10 +6,10 @@ import UIKit
 import XCTest
 
 /// phase 가 바뀌면 온보딩 스택은 화면에 붙은 채로 걷힌다.
-/// 그때 사라지는 화면이 액션을 더 보내면 코디네이터는 이미 없는 상태로 그걸 받는다.
+/// 그때 사라지는 화면이 액션을 더 보내면 RootFlow 는 이미 없는 상태로 그걸 받는다.
 /// 창에 실제로 띄워야만 재현되므로 TestStore 대신 UIWindow 로 확인한다
 @MainActor
-final class AppCoordinatorViewLifecycleTests: XCTestCase {
+final class RootFlowViewLifecycleTests: XCTestCase {
     func test_데이트유형_건너뛰기_뒤에_커플화면이_액션을_보내지_않는다() async {
         let harness = Harness(
             phase: .onboarding(
@@ -60,32 +60,32 @@ final class AppCoordinatorViewLifecycleTests: XCTestCase {
 
 @MainActor
 private final class Harness {
-    let store: StoreOf<AppCoordinatorFeature>
+    let store: StoreOf<RootFlowFeature>
 
     private let recorded = LockIsolated<[String]>([])
     private let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
 
-    init(phase: AppCoordinatorFeature.State.Phase) {
+    init(phase: RootFlowFeature.State.Phase) {
         let recorded = self.recorded
         store = withDependencies {
             $0.authClient.currentSession = {
                 AuthSession(accessToken: "access", refreshToken: "refresh", userID: "1")
             }
         } operation: {
-            Store(initialState: AppCoordinatorFeature.State(phase: phase)) {
-                Reduce<AppCoordinatorFeature.State, AppCoordinatorFeature.Action> { _, action in
+            Store(initialState: RootFlowFeature.State(phase: phase)) {
+                Reduce<RootFlowFeature.State, RootFlowFeature.Action> { _, action in
                     let name = "\(action)"
                     recorded.withValue { $0.append(name) }
                     return .none
                 }
-                AppCoordinatorFeature()
+                RootFlowFeature()
             }
         }
     }
 
     func present() async {
         window.rootViewController = UIHostingController(
-            rootView: AppCoordinatorView(store: store)
+            rootView: RootFlowView(store: store)
         )
         window.makeKeyAndVisible()
         await settle(1)

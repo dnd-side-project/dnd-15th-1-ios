@@ -1,10 +1,10 @@
 import SwiftUI
 import ThirdParty
 
-public struct AppCoordinatorView: View {
-    @Bindable public var store: StoreOf<AppCoordinatorFeature>
+public struct RootFlowView: View {
+    @Bindable public var store: StoreOf<RootFlowFeature>
 
-    public init(store: StoreOf<AppCoordinatorFeature>) {
+    public init(store: StoreOf<RootFlowFeature>) {
         self.store = store
     }
 

@@ -4,15 +4,15 @@ import ThirdParty
 
 enum CompositionRoot {
     @MainActor
-    static func makeRootStore() -> StoreOf<RootFeature> {
+    static func makeRootStore() -> StoreOf<RootFlowFeature> {
         AppBootstrap.run()
-        return Store(initialState: RootFeature.State()) {
-            RootFeature()
+        return Store(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
         }
     }
 
     @MainActor
-    static func rootView(store: StoreOf<RootFeature>) -> some View {
-        RootView(store: store)
+    static func rootView(store: StoreOf<RootFlowFeature>) -> some View {
+        RootFlowView(store: store)
     }
 }

@@ -3,7 +3,7 @@ import Foundation
 import ThirdParty
 
 @Reducer
-public struct AppCoordinatorFeature {
+public struct RootFlowFeature {
     @ObservableState
     public struct State: Equatable {
         public var phase: Phase = .bootstrapping
@@ -149,7 +149,7 @@ public struct AppCoordinatorFeature {
     }
 }
 
-private extension AppCoordinatorFeature {
+private extension RootFlowFeature {
     func restoreSessionIfNeeded(state: inout State) -> Effect<Action> {
         guard case .bootstrapping = state.phase else {
             return .none
@@ -272,7 +272,7 @@ private extension AppCoordinatorFeature {
         }
     }
 
-    /// 온보딩 끝에서만 세션을 묻는다. 코디네이터는 userID 사본을 들고 있지 않다
+    /// 온보딩 끝에서만 세션을 묻는다. RootFlow 는 userID 사본을 들고 있지 않다
     func resolveOnboardingSession() -> Effect<Action> {
         .run { [authClient] send in
             let session = try? await authClient.currentSession()
@@ -360,7 +360,7 @@ private extension AppCoordinatorFeature {
     }
 }
 
-private extension AppCoordinatorFeature.State.Phase {
+private extension RootFlowFeature.State.Phase {
     var mainTabState: MainTabFeature.State? {
         guard case let .main(state) = self else { return nil }
         return state

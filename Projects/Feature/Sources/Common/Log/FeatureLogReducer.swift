@@ -309,8 +309,7 @@ enum FeatureLogStateDiff {
 
     private static let ignoredParentFields: Set<String> = [
         "home", "explore", "map", "myPage",
-        "appIntro", "onboardingFlow", "auth", "mainTab", "overlay",
-        "appCoordinator"
+        "appIntro", "onboardingFlow", "auth", "mainTab", "overlay"
     ]
 
     private static let presentationFields: Set<String> = [
