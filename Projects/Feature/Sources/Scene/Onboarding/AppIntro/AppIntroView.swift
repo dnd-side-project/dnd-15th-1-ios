@@ -120,10 +120,11 @@ public struct AppIntroView: View {
     }
 
     private var nextButton: some View {
-        AppButton("다음", style: .dark, size: .xl, fullWidth: true) {
-            store.send(.nextButtonTapped, animation: .easeInOut(duration: 0.25))
+        CTAContainer {
+            AppButton("다음", style: .dark, size: .xl, fullWidth: true) {
+                store.send(.nextButtonTapped, animation: .easeInOut(duration: 0.25))
+            }
         }
-        .padding(.horizontal, NextButtonMetric.horizontalPadding)
     }
 }
 
@@ -145,10 +146,6 @@ private enum IndicatorMetric {
     static let inactiveDotWidth: CGFloat = 8
     static let dotHeight: CGFloat = 8
     static let height: CGFloat = 32
-}
-
-private enum NextButtonMetric {
-    static let horizontalPadding: CGFloat = 20
 }
 
 #if DEBUG
