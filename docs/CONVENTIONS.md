@@ -56,8 +56,12 @@ func getName(for user: User) -> String
 | Core default impl | `Default*` | `DefaultKeychainStorage` |
 | Data factory | `*ClientFactory` | `AuthClientFactory` |
 | App infra | `InfraContainer` | `InfraContainer.make()` |
+| Feature 구간 컨테이너 | `*FlowFeature` | `RootFlowFeature`, `OnboardingFlowFeature` |
+| Feature 탭 허브 | `*TabFeature` | `MainTabFeature` |
 | Feature reducer | `*Feature` | `HomeFeature` |
 | Feature view | `*View` | `HomeView` |
+
+phase case 이름은 자식 타입에서 `Feature` 를 뗀 lowerCamel — `appIntro` / `onboardingFlow` / `mainTab`
 
 DataSource 프로퍼티:
 
@@ -127,17 +131,16 @@ public var body: some ReducerOf<Self> {
 규칙:
 
 1. owner reducer 에 1회만 부착
-2. RootFeature 는 제외
-3. 종류: 사용자 액션 / 상태 변경 / 화면 이동 / 오류
-4. category 는 `.feature`
-5. 토큰/Authorization/identityToken 금지, userID/provider/route 는 허용
+2. 종류: 사용자 액션 / 상태 변경 / 화면 이동 / 오류
+3. category 는 `.feature`
+4. 토큰/Authorization/identityToken 금지, userID/provider/route 는 허용
 
 메시지 포맷:
 
 ```text
 [Feature] [Auth] 사용자 액션: loginButtonTapped(provider=apple)
 [Feature] [Auth] 상태 변경: isLoading(false → true)
-[Feature] [AppCoordinator] 화면 이동: phase(bootstrapping → main)
+[Feature] [RootFlow] 화면 이동: phase(bootstrapping → mainTab)
 [Feature] [Auth] 오류: login(network, userVisible=true)
 ```
 
@@ -190,12 +193,12 @@ DI:
 ### 8. Scene 통신
 
 ```text
-Root
-└─ AppCoordinator
-   ├─ loggedOut(Auth)
-   ├─ main(MainTab: Home/Explore/Map/MyPage)
-   ├─ DeepLink
-   └─ Overlay
+RootFlow
+├─ appIntro(AppIntro)
+├─ onboardingFlow(OnboardingFlow: Auth/Nickname/Couple/DateType)
+├─ mainTab(MainTab: Home/Explore/Map/MyPage)
+├─ DeepLink
+└─ Overlay
 ```
 
 허용:
@@ -204,7 +207,7 @@ Root
 Scene → parent     : delegate bubble-up
 parent → Scene     : command
 Scene → Domain     : *Client
-URL → DeepLinkRouter → AppCoordinator
+URL → DeepLinkRouter → RootFlow
 ```
 
 금지:
@@ -229,7 +232,7 @@ public enum Action {
 ```
 
 로컬 에러는 Scene `errorMessage`.  
-전역 에러(`sessionExpired` 등)만 AppCoordinator 로 승격.
+전역 에러(`sessionExpired` 등)만 RootFlow 로 승격.
 
 ### 9. 테스트
 
@@ -256,7 +259,7 @@ test_로그인성공_델리게이트_전달
 2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}` — `DTO/` 아래 `Network`·`Storage` 는 선택
 3. App `Dependencies.register`
 4. Feature `Scene/<Name>`
-5. 필요 시 AppCoordinator / MainTab / DeepLink
+5. 필요 시 RootFlow / MainTab / DeepLink
 6. Feature 테스트
 
 ```text

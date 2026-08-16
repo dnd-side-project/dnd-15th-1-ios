@@ -3,7 +3,7 @@ import Foundation
 import SharedDesignSystem
 import ThirdParty
 
-/// main 에 닿기 전까지의 화면 스택. 로그인이 root 이고 온보딩 화면이 그 위로 쌓인다
+/// mainTab 에 닿기 전까지의 화면 스택. 로그인이 root 이고 온보딩 화면이 그 위로 쌓인다
 @Reducer
 public struct OnboardingFlowFeature {
     /// 로그인(root) 위로 쌓이는 화면. 커플 세 화면은 `CoupleConnectFeature.State` 하나를 공유한다
@@ -175,7 +175,7 @@ private extension OnboardingFlowFeature {
     ) -> Effect<Action> {
         switch delegate {
         case .saved, .skipped:
-            // 덮개는 여기서 비우지 않는다. main 으로 갈아탄 뒤 그 위에서 내려가야 커플 화면이 드러나지 않는다
+            // 덮개는 여기서 비우지 않는다. mainTab 으로 갈아탄 뒤 그 위에서 내려가야 커플 화면이 드러나지 않는다
             return .send(.delegate(.onboardingCompleted))
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))

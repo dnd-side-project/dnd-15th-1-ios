@@ -34,7 +34,7 @@ Projects/
 | Domain | Entity, `*Client`, Error |
 | Core/* | Network/Storage |
 | Data | DTO, DataSource, `*Repository`, `*ClientFactory` |
-| Feature | Root, AppCoordinator, MainTab, Scene |
+| Feature | Flow(Root/Onboarding/MainTab), Scene |
 | App | bootstrap, live 주입, root store |
 
 ### 의존
@@ -65,8 +65,8 @@ DulpickApp
       → AppBootstrap
           → InfraContainer.make()      # AppInfo/AppConfiguration
           → Dependencies.register      # Data.*ClientFactory
-      → Store(RootFeature)
-  → RootView → AppCoordinatorView
+      → Store(RootFlowFeature)
+  → RootFlowView
 ```
 
 앱 상태:
@@ -74,14 +74,14 @@ DulpickApp
 ```text
 bootstrapping
   → authClient.restoreSession()
-  → session 있음: main(...)
+  → session 있음: mainTab(...)
   → session 없음 + !hasSeenAppIntro: appIntro
-  → session 없음 + hasSeenAppIntro: loggedOut(Auth)
+  → session 없음 + hasSeenAppIntro: onboardingFlow(Auth root)
 
 appIntro enter
   → markAppIntroSeen()
 appIntro complete
-  → loggedOut(Auth)
+  → onboardingFlow(Auth root)
 ```
 
 ---
@@ -92,26 +92,26 @@ appIntro complete
 
 규칙:
 
-1. 화면은 `Scene/<이름>/`, 그 안은 flat (`*Feature`, `*View`)
+1. 화면은 `Scene/<이름>/`, 컨테이너는 `Flow/<이름>/`, 그 안은 flat (`*Feature`, `*View`)
 2. Scene 간 직접 참조 금지
-3. 외부 요청은 `delegate` 로 AppCoordinator/MainTab 상승
+3. 외부 요청은 `delegate` 로 RootFlow/MainTab 상승
 4. 데이터·서비스 접근은 Domain `*Client` 만 사용 (모듈 의존은 §1)
-5. 전역 전환·딥링크·overlay 는 `AppCoordinator/` 아래 (`MainTab`, `DeepLink`, `Overlay`)
+5. 전역 전환·딥링크·overlay 는 `Flow/` 아래 (`MainTab` 은 `Flow/` 바로 아래, `DeepLink`·`Overlay` 는 `Flow/Root/` 아래)
 6. 공용 코드는 `Extension`(타입 확장) 과 `Util`(주제 폴더) 로 나눈다.
    `Util/` 바로 아래에 파일을 두지 않는다 — 반드시 주제 폴더를 만든다
 
 네비게이션:
 
 ```text
-phase(AppCoordinator) → tab(MainTab) → scene local → overlay
+phase(RootFlow) → tab(MainTab) → scene local → overlay
 ```
 
 딥링크:
 
 ```text
-URL → DeepLinkRouter → DeepLinkRoute → AppCoordinator
-bootstrapping / appIntro / loggedOut 이면 pending, 로그인 후 flush
-appIntro / loggedOut 은 home|explore|map|myPage 만 pending, signIn 은 무시
+URL → DeepLinkRouter → DeepLinkRoute → RootFlow
+bootstrapping / appIntro / onboardingFlow 이면 pending, 로그인 후 flush
+appIntro / onboardingFlow 는 home|explore|map|myPage 만 pending, signIn 은 무시
 ```
 
 ---
@@ -128,7 +128,7 @@ appIntro / loggedOut 은 home|explore|map|myPage 만 pending, signIn 은 무시
 4. Repository 는 기본적으로 DataSource 만 주입. SDK credential provider 등은 `Service` collaborator 허용
 5. DataSource 프로퍼티는 `authLocal`, `authRemote`
 6. Core/인프라 에러는 Data 에서 Domain 에러로 매핑
-7. 여러 Client 조합은 Feature/AppCoordinator 에서 처리
+7. 여러 Client 조합은 Feature/RootFlow 에서 처리
 
 ---
 

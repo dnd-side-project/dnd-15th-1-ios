@@ -5,7 +5,7 @@ import ThirdParty
 
 @main
 struct DulpickApp: App {
-    private let store: StoreOf<RootFeature>
+    private let store: StoreOf<RootFlowFeature>
 
     init() {
         store = CompositionRoot.makeRootStore()
@@ -18,7 +18,7 @@ struct DulpickApp: App {
                     if SocialAuthRedirectHandler.handle(url: url) {
                         return
                     }
-                    store.send(.appCoordinator(.deepLinkReceived(url)))
+                    store.send(.deepLinkReceived(url))
                 }
         }
     }
