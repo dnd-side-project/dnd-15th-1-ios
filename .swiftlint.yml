@@ -1,9 +1,8 @@
 # Dulpick SwiftLint draft
 # 기준: StyleShare 계열 가이드 + 현재 레포(SwiftUI/TCA)
-# 상태: 초안. 세부 룰은 추후 조정 가능
 
 disabled_rules:
-  # 초안 단계 노이즈 완화
+  # 포맷터가 없어 노이즈만 커지는 룰
   - trailing_whitespace
   - todo
   - multiple_closures_with_trailing_closure

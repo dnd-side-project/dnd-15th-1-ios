@@ -84,8 +84,6 @@ appIntro complete
   → loggedOut(Auth)
 ```
 
-현재 세션 복구는 로컬 조회 중심. refresh/401 interceptor 는 아직 없음.
-
 ---
 
 ## 3. Feature
@@ -102,6 +100,8 @@ Feature/Sources/
   Extension/
   Util/{Log,Image,Web,Terms,Map}
   Scene/{Auth,Onboarding,Home,Explore,Map,MyPage}
+Feature/Tests/
+  AppCoordinator/, Auth/
 ```
 
 규칙:
@@ -128,12 +128,6 @@ bootstrapping / appIntro / loggedOut 이면 pending, 로그인 후 flush
 appIntro / loggedOut 은 home|explore|map|myPage 만 pending, signIn 은 무시
 ```
 
-현재:
-
-```text
-dulpick://home|explore|map|mypage|auth/sign-in
-```
-
 ---
 
 ## 4. Domain / Data
@@ -141,6 +135,7 @@ dulpick://home|explore|map|mypage|auth/sign-in
 ```text
 Domain/<Name>/{Model,Client,Error}
 Data/<Name>/{DTO,DataSource,Endpoint,Mapper,Repository,Service}
+  DTO/{Network,Storage}   # 선택
   *Repository
   *ClientFactory
 ```
@@ -187,71 +182,12 @@ storage namespace 는 Bundle ID 하나 재사용.
 
 ---
 
-## 6. 네이밍
-
-| 계층 | 패턴 | 예 |
-|---|---|---|
-| Domain client | `*Client` | `AuthClient` |
-| Data repository | `*Repository` | `AuthRepository` |
-| Core default impl | `Default*` | `DefaultKeychainStorage` |
-| Data factory | `*ClientFactory` | `AuthClientFactory` |
-| Feature | `*Feature` / `*View` | `HomeFeature` |
-
-모듈 prefix:
-
-```text
-CoreNetwork, SharedUtils, ThirdPartyUI ...
-```
-
----
-
-## 7. 새 기능
-
-1. Domain `{Model,Error,Client}`
-2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}`
-3. App `Dependencies.register`
-4. Feature `Scene/<Name>`
-5. 필요 시 AppCoordinator/MainTab/DeepLink
-6. Feature 테스트 (client override)
-
-질문:
-
-```text
-화면? Feature
-계약? Domain
-구현? Data
-인프라? Core
-외부 SDK? ThirdParty*
-조립? App
-```
-
----
-
-## 8. 테스트 / 분리
-
-테스트:
-
-- 기본: Feature reducer 테스트
-- mock: Domain `*Client` override
-- Domain/Data 테스트는 기본 강제 없음
-
-지금은 하지 않음:
-
-- Feature 모듈 쪼개기
-- Micro feature multi-project
-
-분리 검토 시점:
-
-- Feature 빌드 병목
-- 기능 단위 소유권 분리
-- Core 독립 교체 필요
-
----
-
-## 9. 관련
+## 6. 관련
 
 - [CONVENTIONS.md](CONVENTIONS.md)
 - [../AGENTS.md](../AGENTS.md)
 - [../CLAUDE.md](../CLAUDE.md) (`AGENTS.md` symlink)
+
+네이밍·새 기능 순서·테스트 규칙·DesignSystem 판정은 [CONVENTIONS.md](CONVENTIONS.md) 를 본다.
 
 구조는 이 파일, 코딩 규칙은 `CONVENTIONS.md` 가 source of truth 다.
