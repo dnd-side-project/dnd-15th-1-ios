@@ -70,8 +70,16 @@ public enum ProjectSettings {
         return .settings(
             base: base,
             configurations: [
-                .debug(name: ProjectEnvironment.debugConfigName, settings: debugSettings),
-                .release(name: ProjectEnvironment.releaseConfigName, settings: releaseSettings),
+                .debug(
+                    name: ProjectEnvironment.debugConfigName,
+                    settings: debugSettings,
+                    xcconfig: .relativeToRoot("Config/Debug.xcconfig")
+                ),
+                .release(
+                    name: ProjectEnvironment.releaseConfigName,
+                    settings: releaseSettings,
+                    xcconfig: .relativeToRoot("Config/Release.xcconfig")
+                ),
             ]
         )
     }
