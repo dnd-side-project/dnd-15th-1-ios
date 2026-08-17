@@ -5,6 +5,8 @@ public enum DefaultInfoPlist {
         "CFBundleDisplayName": "$(APP_DISPLAY_NAME)",
         "CFBundleShortVersionString": .string(ProjectEnvironment.appVersion),
         "CFBundleVersion": .string(ProjectEnvironment.appBuildNumber),
+        // 수출 규제 면제 대상. OS 가 주는 HTTPS 와 애플 프레임워크만 쓴다
+        "ITSAppUsesNonExemptEncryption": false,
 
         "API_BASE_URL": "$(API_BASE_URL)",
         "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
