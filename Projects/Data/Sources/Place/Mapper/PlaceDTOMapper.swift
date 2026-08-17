@@ -50,12 +50,13 @@ enum PlaceDTOMapper {
         }
     }
 
-    // "2026-08-17T01:27:55.129814" 처럼 타임존 없는 형식이라 초 단위까지만 파싱
-    private static func parseDate(_ raw: String) -> Date {
+    // "2026-08-17T01:27:55.129814" 처럼 타임존 없는 형식이라 초 단위까지만 파싱.
+    // 실패 시 현재 시각으로 위조하지 않고 nil 로 둔다
+    private static func parseDate(_ raw: String) -> Date? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        return formatter.date(from: String(raw.prefix(19))) ?? Date()
+        return formatter.date(from: String(raw.prefix(19)))
     }
 }
