@@ -17,8 +17,8 @@ public struct MainTabView: View {
             .tabItem { tabLabel("홈", icon: .home) }
             .tag(MainTabFeature.Tab.home)
 
-            NavigationStack {
-                ExploreView(store: store.scope(state: \.explore, action: \.explore))
+            NavigationStack(path: exploreSearchPath) {
+                ExploreView(store: exploreStore)
             }
             .tabItem { tabLabel("탐색", icon: .explore) }
             .tag(MainTabFeature.Tab.explore)
@@ -49,6 +49,18 @@ public struct MainTabView: View {
         return Binding(
             get: { homeStore.couplePath },
             set: { homeStore.send(.couplePathChanged($0)) }
+        )
+    }
+
+    private var exploreStore: StoreOf<ExploreFeature> {
+        store.scope(state: \.explore, action: \.explore)
+    }
+
+    private var exploreSearchPath: Binding<[ExploreFeature.Route]> {
+        let exploreStore = exploreStore
+        return Binding(
+            get: { exploreStore.path },
+            set: { exploreStore.send(.searchPathChanged($0)) }
         )
     }
 

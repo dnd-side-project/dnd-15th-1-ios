@@ -10,12 +10,17 @@ import ThirdParty
 
 @Reducer
 public struct ExploreFeature {
+    public enum Route: Hashable {
+        case search
+    }
+
     @ObservableState
     public struct State: Equatable {
         var posts: [Post] = []
         var filters: [String] = ["인기", "#성수", "#강남", "#을지로"]
         var selectedFilter: String = "인기"
-        @Presents var search: SearchFeature.State?
+        var search: SearchFeature.State?
+        var path: [Route] = []
 
         public init() {}
     }
@@ -24,8 +29,9 @@ public struct ExploreFeature {
         case onAppear
         case filterTapped(String)
         case searchButtonTapped
+        case searchPathChanged([Route])
         case popularPostsResponse([Post])
-        case search(PresentationAction<SearchFeature.Action>)
+        case search(SearchFeature.Action)
     }
 
     @Dependency(\.exploreClient) var exploreClient
@@ -47,6 +53,12 @@ public struct ExploreFeature {
 
             case .searchButtonTapped:
                 state.search = SearchFeature.State()
+                state.path = [.search]
+                return .none
+
+            case let .searchPathChanged(path):
+                state.path = path
+                if path.isEmpty { state.search = nil }
                 return .none
 
             case let .popularPostsResponse(posts):
@@ -57,7 +69,7 @@ public struct ExploreFeature {
                 return .none
             }
         }
-        .ifLet(\.$search, action: \.search) {
+        .ifLet(\.search, action: \.search) {
             SearchFeature()
         }
         .logged(as: Self.self)
