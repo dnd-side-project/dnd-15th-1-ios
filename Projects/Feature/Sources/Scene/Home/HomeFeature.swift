@@ -62,6 +62,7 @@ public struct HomeFeature {
     public enum Action: Equatable {
         case onAppear
         case coupleLoaded(CoupleStatus?)
+        case coupleLoadFailed(CoupleError)
         case savedPlacesLoaded([SavedPlace])
         case connectFlowRequested
         case couplePathChanged([CoupleRoute])
@@ -92,9 +93,19 @@ public struct HomeFeature {
             return .merge(loadCouple(), loadSavedPlaces())
 
         case let .coupleLoaded(status):
-            if let status {
-                state.nickname = status.me.nickname
-                state.partnerName = status.connected ? status.partner?.nickname : nil
+            guard let status else {
+                // 성공했지만 커플 없음(404) — 미연결로 확정해 이전 파트너를 지운다
+                state.partnerName = nil
+                return .none
+            }
+            state.nickname = status.me.nickname
+            state.partnerName = status.connected ? status.partner?.nickname : nil
+            return .none
+
+        case let .coupleLoadFailed(error):
+            // 인증 만료만 상위로 올려 로그인으로 보내고, 다른 실패는 기존 화면을 유지한다
+            if error == .unauthorized {
+                return .send(.delegate(.sessionExpired))
             }
             return .none
 
@@ -153,8 +164,14 @@ public struct HomeFeature {
 
     private func loadCouple() -> Effect<Action> {
         .run { [coupleClient] send in
-            let status = try? await coupleClient.current()
-            await send(.coupleLoaded(status))
+            do {
+                let status = try await coupleClient.current()
+                await send(.coupleLoaded(status))
+            } catch let error as CoupleError {
+                await send(.coupleLoadFailed(error))
+            } catch {
+                await send(.coupleLoadFailed(.unknown))
+            }
         }
     }
 
