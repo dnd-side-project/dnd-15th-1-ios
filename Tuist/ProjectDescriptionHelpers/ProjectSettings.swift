@@ -94,7 +94,10 @@ public enum ProjectSettings {
         ]) { _, new in new }
 
         return .settings(
-            base: base,
+            /// AccentColor colorset 을 지웠다. Tuist 기본값을 비우지 않으면 없는 색을 가리켜 경고가 난다
+            base: base.merging([
+                "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "",
+            ]) { _, new in new },
             configurations: [
                 .debug(
                     name: ProjectEnvironment.debugConfigName,
