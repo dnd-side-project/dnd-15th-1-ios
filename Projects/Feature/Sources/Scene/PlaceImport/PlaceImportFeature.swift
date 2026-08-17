@@ -54,9 +54,8 @@ public struct PlaceImportFeature {
         case closeTapped
     }
 
-    // 첫 조회 5초 대기 후 2초 간격 조회
-    private let initialDelay = 5
-    private let pollInterval = 2
+    // retryAfterSeconds 가 없을 때 쓰는 기본 폴링 간격
+    private let fallbackDelay = 5
     private let maxPollCount = 60
 
     @Dependency(\.placeImportClient) var placeImportClient
@@ -113,7 +112,9 @@ public struct PlaceImportFeature {
                 return .none
             }
             state.pollCount += 1
-            let delay = state.pollCount == 1 ? initialDelay : pollInterval
+            let delay = placeImport.retryAfterSeconds
+                .flatMap { $0 > 0 ? $0 : nil }
+                ?? fallbackDelay
             return poll(importId: placeImport.importId, after: delay)
 
         case .selectPlaces:
