@@ -15,7 +15,7 @@ public struct ProfileRemoteDataSource: Sendable {
     func initializeProfile(
         nickname: String,
         profileIcon: Int,
-        datePreferences: DatePreferencesRequestDTO
+        datePreferences: DatePreferencesRequestDTO?
     ) async throws -> InitializedMemberProfileResponseDTO {
         try await networkClient.request(
             ProfileEndpoint.initializeProfile(
