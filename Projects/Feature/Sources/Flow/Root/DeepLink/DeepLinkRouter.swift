@@ -48,10 +48,17 @@ public enum DeepLinkRouter {
                 .queryItems?
                 .first(where: { $0.name == "url" })?
                 .value,
-            let importURL = URL(string: value)
+            let importURL = URL(string: value),
+            isHTTPURL(importURL)
         else {
             return nil
         }
         return .placeImport(url: importURL)
+    }
+
+    // http/https scheme 과 host 를 가진 URL 만 허용
+    private static func isHTTPURL(_ url: URL) -> Bool {
+        let scheme = url.scheme?.lowercased()
+        return (scheme == "http" || scheme == "https") && url.host?.isEmpty == false
     }
 }

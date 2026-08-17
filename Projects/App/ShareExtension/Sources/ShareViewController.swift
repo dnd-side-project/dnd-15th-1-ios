@@ -42,17 +42,23 @@ final class ShareViewController: UIViewController {
 
     private nonisolated static func httpURL(from text: String?) -> URL? {
         guard let text else { return nil }
-        if let url = URL(string: text), url.scheme?.hasPrefix("http") == true {
+        if let url = URL(string: text), isHTTPURL(url) {
             return url
         }
         let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
         let range = NSRange(text.startIndex..., in: text)
         if let match = detector?.firstMatch(in: text, range: range),
            let url = match.url,
-           url.scheme?.hasPrefix("http") == true {
+           isHTTPURL(url) {
             return url
         }
         return nil
+    }
+
+    // http/https scheme 과 host 를 가진 URL 만 허용
+    private nonisolated static func isHTTPURL(_ url: URL) -> Bool {
+        let scheme = url.scheme?.lowercased()
+        return (scheme == "http" || scheme == "https") && url.host?.isEmpty == false
     }
 
     private func finish(with sharedURL: URL?) {
