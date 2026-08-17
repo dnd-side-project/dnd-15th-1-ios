@@ -12,14 +12,17 @@ public struct AuthView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            logoPlaceholder
-                .padding(.top, LogoMetric.topPadding)
-                .padding(.horizontal, LogoMetric.horizontalPadding)
-                .padding(.bottom, LogoMetric.bottomPadding)
+            VStack(spacing: LogoMetric.captionSpacing) {
+                logo
+                headline
+            }
+            .padding(.top, LogoMetric.topPadding)
+            .padding(.horizontal, LogoMetric.horizontalPadding)
+            .padding(.bottom, LogoMetric.bottomPadding)
 
             Spacer(minLength: 0)
 
-            illustrationPlaceholder
+            illustration
                 .layoutPriority(-1)
 
             Spacer(minLength: 0)
@@ -77,31 +80,44 @@ public struct AuthView: View {
         )
     }
 
-    private var logoPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 0)
-            .fill(Color(red: 50 / 255, green: 50 / 255, blue: 50 / 255))
-            .frame(width: LogoMetric.width, height: LogoMetric.height)
+    private var logo: some View {
+        Image.brandWordmark
+            .resizable()
+            .scaledToFit()
+            .frame(height: LogoMetric.height)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var illustrationPlaceholder: some View {
-        RoundedRectangle(cornerRadius: IllustrationMetric.cornerRadius)
-            .fill(Color.gray200)
-            .aspectRatio(340 / 300, contentMode: .fit)
+    private var headline: some View {
+        Text("우리 둘만의 데이트 장소 저장부터 코스짜기까지")
+            .typography(.body1SB)
+            .foregroundStyle(Color.textPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var illustration: some View {
+        Image.authIllustration
+            .resizable()
+            .aspectRatio(
+                IllustrationMetric.width / IllustrationMetric.height,
+                contentMode: .fit
+            )
+            .frame(maxWidth: IllustrationMetric.width)
             .padding(.horizontal, IllustrationMetric.horizontalPadding)
     }
 }
 
 private enum LogoMetric {
-    static let topPadding: CGFloat = 40
+    static let topPadding: CGFloat = 80
     static let horizontalPadding: CGFloat = 20
-    static let bottomPadding: CGFloat = 10
-    static let width: CGFloat = 165
-    static let height: CGFloat = 80
+    static let captionSpacing: CGFloat = 10
+    static let bottomPadding: CGFloat = 40
+    static let height: CGFloat = 73.36
 }
 
 private enum IllustrationMetric {
-    static let cornerRadius: CGFloat = 20
+    static let width: CGFloat = 340
+    static let height: CGFloat = 300
     static let horizontalPadding: CGFloat = 26.5
 }
 
@@ -111,7 +127,7 @@ private enum LoginButtonMetric {
 }
 
 private enum TermsMetric {
-    static let bottomPadding: CGFloat = 24
+    static let bottomPadding: CGFloat = 20
 }
 
 #Preview("Default") {

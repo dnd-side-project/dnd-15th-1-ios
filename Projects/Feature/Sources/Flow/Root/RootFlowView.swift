@@ -13,8 +13,7 @@ public struct RootFlowView: View {
         Group {
             switch store.phase {
             case .bootstrapping:
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                SplashView()
             case .appIntro:
                 if let introStore = store.scope(state: \.appIntro, action: \.appIntro) {
                     AppIntroView(store: introStore)
