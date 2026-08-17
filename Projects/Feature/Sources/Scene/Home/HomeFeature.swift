@@ -4,6 +4,13 @@ import ThirdParty
 
 @Reducer
 public struct HomeFeature {
+    /// 커플 연결 세 화면. 모두 `couple` 스토어 하나를 공유하고 Route 로 무엇을 그릴지만 가른다
+    public enum CoupleRoute: Hashable {
+        case connect
+        case codeInput
+        case complete
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var nickname: String
@@ -12,6 +19,8 @@ public struct HomeFeature {
         public var recommendations: [Post]
         public var pastSchedules: [DateSchedule]
         public var savedPlaces: [SavedPlace]
+        public var couple: CoupleConnectFeature.State?
+        public var couplePath: [CoupleRoute]
 
         public var isConnected: Bool {
             partnerName != nil
@@ -35,7 +44,9 @@ public struct HomeFeature {
             upcomingSchedule: UpcomingSchedule? = .mock,
             recommendations: [Post] = Post.mocks,
             pastSchedules: [DateSchedule] = DateSchedule.mocks,
-            savedPlaces: [SavedPlace] = []
+            savedPlaces: [SavedPlace] = [],
+            couple: CoupleConnectFeature.State? = nil,
+            couplePath: [CoupleRoute] = []
         ) {
             self.nickname = nickname
             self.partnerName = partnerName
@@ -43,6 +54,8 @@ public struct HomeFeature {
             self.recommendations = recommendations
             self.pastSchedules = pastSchedules
             self.savedPlaces = savedPlaces
+            self.couple = couple
+            self.couplePath = couplePath
         }
     }
 
@@ -50,6 +63,15 @@ public struct HomeFeature {
         case onAppear
         case coupleLoaded(CoupleStatus?)
         case savedPlacesLoaded([SavedPlace])
+        case connectFlowRequested
+        case couplePathChanged([CoupleRoute])
+        case couple(CoupleConnectFeature.Action)
+        case delegate(Delegate)
+
+        @CasePathable
+        public enum Delegate: Equatable {
+            case sessionExpired
+        }
     }
 
     @Dependency(\.placeClient) var placeClient
@@ -58,22 +80,74 @@ public struct HomeFeature {
     public init() {}
 
     public var body: some ReducerOf<Self> {
-        Reduce { state, action in
-            switch action {
-            case .onAppear:
-                return .merge(loadCouple(), loadSavedPlaces())
-
-            case let .coupleLoaded(status):
-                if let status {
-                    state.nickname = status.me.nickname
-                    state.partnerName = status.connected ? status.partner?.nickname : nil
-                }
-                return .none
-
-            case let .savedPlacesLoaded(places):
-                state.savedPlaces = places
-                return .none
+        Reduce(core)
+            .ifLet(\.couple, action: \.couple) {
+                CoupleConnectFeature()
             }
+    }
+
+    private func core(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .onAppear:
+            return .merge(loadCouple(), loadSavedPlaces())
+
+        case let .coupleLoaded(status):
+            if let status {
+                state.nickname = status.me.nickname
+                state.partnerName = status.connected ? status.partner?.nickname : nil
+            }
+            return .none
+
+        case let .savedPlacesLoaded(places):
+            state.savedPlaces = places
+            return .none
+
+        case .connectFlowRequested:
+            // 이미 연결된 경우 커플 연결로 보내지 않는다
+            guard !state.isConnected else { return .none }
+            state.couple = CoupleConnectFeature.State(myNickname: state.nickname, showsSkip: false)
+            state.couplePath = [.connect]
+            return .none
+
+        case let .couplePathChanged(path):
+            state.couplePath = path
+            // 스택이 비면 공유 스토어도 내려 다음 진입이 새 상태로 시작하게 한다
+            if path.isEmpty { state.couple = nil }
+            return .none
+
+        case let .couple(.delegate(delegate)):
+            return handleCoupleDelegate(state: &state, delegate: delegate)
+
+        case .couple, .delegate:
+            return .none
+        }
+    }
+
+    private func handleCoupleDelegate(
+        state: inout State,
+        delegate: CoupleConnectFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .showCodeInput:
+            state.couplePath.append(.codeInput)
+            return .none
+        case .showComplete:
+            state.couplePath.append(.complete)
+            return .none
+        case .back:
+            guard !state.couplePath.isEmpty else { return .none }
+            state.couplePath.removeLast()
+            if state.couplePath.isEmpty { state.couple = nil }
+            return .none
+        case .connected, .skipped:
+            // 홈 진입엔 skip 이 없지만 방어적으로 같이 닫고 배너·헤더를 새로 받는다
+            state.couple = nil
+            state.couplePath = []
+            return loadCouple()
+        case .sessionExpired:
+            state.couple = nil
+            state.couplePath = []
+            return .send(.delegate(.sessionExpired))
         }
     }
 
