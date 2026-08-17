@@ -158,8 +158,8 @@ public struct SearchView: View {
             switch store.selectedTab {
             case .post:
                 LazyVGrid(columns: columns, spacing: Spacing.s32) {
-                    ForEach(store.posts) { post in
-                        PostCard(post: post)
+                    ForEach(store.contents) { content in
+                        ContentCard(content: content)
                     }
                 }
             case .place:

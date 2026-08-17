@@ -1,0 +1,25 @@
+//
+//  ExploreClientFactory.swift
+//  Dulpick
+//
+//  Created by 이인호 on 8/17/26.
+//
+
+import Domain
+import Foundation
+
+public enum ExploreClientFactory {
+    public static func make(session: AuthSessionAssembly) -> ExploreClient {
+        let repository = ContentRepository(
+            remote: ContentRemoteDataSource(networkClient: session.authedClient)
+        )
+        // searchContents / searchPlaces 는 아직 서버 연동 전이라 mock 유지
+        return ExploreClient(
+            contents: { page, size in
+                try await repository.contents(page: page, size: size)
+            },
+            searchContents: ExploreClient.mock.searchContents,
+            searchPlaces: ExploreClient.mock.searchPlaces
+        )
+    }
+}

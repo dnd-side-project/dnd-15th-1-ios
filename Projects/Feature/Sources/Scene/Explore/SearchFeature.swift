@@ -28,14 +28,14 @@ public struct SearchFeature {
         var query: String = ""
         var recentSearches: [String] = []
         var selectedTab: Tab = .post
-        var posts: [Post] = []
+        var contents: [Content] = []
         var places: [Place] = []
         var isSearching = false
 
         // 선택된 탭 기준으로 결과 유무 판정
         var hasResult: Bool {
             switch selectedTab {
-            case .post: !posts.isEmpty
+            case .post: !contents.isEmpty
             case .place: !places.isEmpty
             }
         }
@@ -53,7 +53,8 @@ public struct SearchFeature {
         case recentSearchesUpdated([String])
         case tabSelected(Tab)
         case queryChangeDebounced
-        case searchResponse([Post], [Place])
+        case searchResponse([Content], [Place])
+        case searchFailed
     }
 
     @Dependency(\.exploreClient) var exploreClient
@@ -77,6 +78,29 @@ public struct SearchFeature {
         case .binding:
             return .none
 
+        case .queryChangeDebounced:
+            return search(state: &state)
+
+        case let .searchResponse(contents, places):
+            state.contents = contents
+            state.places = places
+            state.isSearching = false
+            return .none
+
+        case .searchFailed:
+            // 이전 결과는 두고 로딩만 해제
+            state.isSearching = false
+            return .none
+
+        case .onAppear, .searchSubmitted, .recentSearchTapped, .recentSearchDeleted,
+             .clearRecentTapped, .recentSearchesUpdated, .tabSelected:
+            return recentCore(state: &state, action: action)
+        }
+    }
+
+    // 최근 검색어·탭 전환 처리
+    private func recentCore(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .onAppear:
             return .run { [recentSearchClient] send in
                 await send(.recentSearchesUpdated(recentSearchClient.load()))
@@ -112,13 +136,7 @@ public struct SearchFeature {
             state.selectedTab = tab
             return .none
 
-        case .queryChangeDebounced:
-            return search(state: &state)
-
-        case let .searchResponse(posts, places):
-            state.posts = posts
-            state.places = places
-            state.isSearching = false
+        default:
             return .none
         }
     }
@@ -137,16 +155,20 @@ public struct SearchFeature {
     private func search(state: inout State) -> Effect<Action> {
         let query = state.query
         guard !query.isEmpty else {
-            state.posts = []
+            state.contents = []
             state.places = []
             state.isSearching = false
             return .none
         }
         state.isSearching = true
         return .run { [exploreClient] send in
-            async let posts = exploreClient.searchPosts(query)
+            async let contents = exploreClient.searchContents(query)
             async let places = exploreClient.searchPlaces(query)
-            await send(.searchResponse(try await posts, try await places))
+            await send(.searchResponse(try await contents, try await places))
+        } catch: { error, send in
+            // 취소는 실패로 보지 않는다
+            if error is CancellationError { return }
+            await send(.searchFailed)
         }
     }
 

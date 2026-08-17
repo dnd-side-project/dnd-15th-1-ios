@@ -1,5 +1,5 @@
 //
-//  PostCard.swift
+//  ContentCard.swift
 //  Dulpick
 //
 //  Created by 이인호 on 8/7/26.
@@ -9,15 +9,15 @@ import Domain
 import SharedDesignSystem
 import SwiftUI
 
-struct PostCard: View {
-    let post: Post
+struct ContentCard: View {
+    let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
             Color.clear
                 .aspectRatio(170.0 / 227.0, contentMode: .fit)
                 .overlay {
-                    RemoteImage(url: post.thumbnailURLs.first)
+                    RemoteImage(url: content.thumbnailURLs.first)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(alignment: .bottomLeading) {
@@ -25,7 +25,7 @@ struct PostCard: View {
                         .padding(Spacing.s8)
                 }
 
-            Text(post.title)
+            Text(content.title)
                 .typography(.body2M)
                 .foregroundStyle(Color.textPrimary)
                 .lineLimit(2)
@@ -38,8 +38,8 @@ struct PostCard: View {
                 .renderingMode(.template)
                 .resizable()
                 .frame(width: 16, height: 16)
-            
-            Text("\(post.placeCount)")
+
+            Text("\(content.placeCount)")
                 .typography(.body2SB)
         }
         .foregroundStyle(Color.commonWhite)
@@ -47,7 +47,7 @@ struct PostCard: View {
 }
 
 #Preview {
-    PostCard(post: Post.mocks[0])
+    ContentCard(content: Content.mocks[0])
         .frame(width: 180)
         .padding()
 }

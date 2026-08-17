@@ -13,6 +13,9 @@ import ThirdParty
 public struct ExploreView: View {
     @Bindable public var store: StoreOf<ExploreFeature>
 
+    // 화면당 하나. 카드가 보일 때 썸네일 미리 받아 스크롤 매끄럽게
+    @State private var prefetcher = RemoteImagePrefetcher()
+
     public init(store: StoreOf<ExploreFeature>) {
         self.store = store
     }
@@ -57,6 +60,13 @@ public struct ExploreView: View {
         .task { store.send(.onAppear) }
     }
 
+    // 끝에서 세 번째 카드가 보이면 미리 다음 페이지 로드해 스크롤 안 끊기게
+    private func prefetchIfNeeded(_ content: Content) {
+        if content.id == store.contents.suffix(3).first?.id {
+            store.send(.reachedEnd)
+        }
+    }
+
     @ViewBuilder
     private func searchDestination(_ route: ExploreFeature.Route) -> some View {
         if let searchStore = store.scope(state: \.search, action: \.search) {
@@ -89,9 +99,20 @@ public struct ExploreView: View {
                 .foregroundStyle(Color.textPrimary)
 
             LazyVGrid(columns: columns, spacing: Spacing.s32) {
-                ForEach(store.posts) { post in
-                    PostCard(post: post)
+                ForEach(store.contents) { content in
+                    ContentCard(content: content)
+                        .onAppear {
+                            prefetchIfNeeded(content)
+                            prefetcher.start(content.thumbnailURLs)
+                        }
+                        .onDisappear { prefetcher.stop(content.thumbnailURLs) }
                 }
+            }
+
+            if store.isLoadingContents {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
             }
         }
     }

@@ -112,8 +112,8 @@ public struct HomeView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 8) {
-                    ForEach(store.recommendations) { post in
-                        PostCard(post: post)
+                    ForEach(store.recommendations) { content in
+                        ContentCard(content: content)
                             .frame(width: 170)
                     }
                 }

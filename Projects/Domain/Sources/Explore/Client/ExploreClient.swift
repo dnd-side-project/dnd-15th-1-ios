@@ -10,8 +10,8 @@ import ThirdParty
 
 @DependencyClient
 public struct ExploreClient: Sendable {
-    public var popularPosts: @Sendable () async throws -> [Post]
-    public var searchPosts: @Sendable (_ query: String) async throws -> [Post]
+    public var contents: @Sendable (_ page: Int, _ size: Int) async throws -> ContentPage
+    public var searchContents: @Sendable (_ query: String) async throws -> [Content]
     public var searchPlaces: @Sendable (_ query: String) async throws -> [Place]
 }
 
