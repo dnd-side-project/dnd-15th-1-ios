@@ -9,15 +9,18 @@ public struct RootFlowFeature {
         public var phase: Phase = .bootstrapping
         public var pendingDeepLink: DeepLinkRoute?
         public var overlay = OverlayFeature.State()
+        @Presents public var placeImport: PlaceImportFeature.State?
 
         public init(
             phase: Phase = .bootstrapping,
             pendingDeepLink: DeepLinkRoute? = nil,
-            overlay: OverlayFeature.State = OverlayFeature.State()
+            overlay: OverlayFeature.State = OverlayFeature.State(),
+            placeImport: PlaceImportFeature.State? = nil
         ) {
             self.phase = phase
             self.pendingDeepLink = pendingDeepLink
             self.overlay = overlay
+            self.placeImport = placeImport
         }
 
         /// `onboardingFlow` 는 로그인 root 위에 온보딩이 쌓이는 한 스택이다. 둘은 같은 phase 를 쓴다.
@@ -79,6 +82,7 @@ public struct RootFlowFeature {
         case onboardingFlow(OnboardingFlowFeature.Action)
         case mainTab(MainTabFeature.Action)
         case overlay(OverlayFeature.Action)
+        case placeImport(PresentationAction<PlaceImportFeature.Action>)
         case sessionExpired
 
         public enum BootstrapRoute: Equatable {
@@ -106,6 +110,9 @@ public struct RootFlowFeature {
             .ifLet(\.mainTab, action: \.mainTab) {
                 MainTabFeature()
             }
+            .ifLet(\.$placeImport, action: \.placeImport) {
+                PlaceImportFeature()
+            }
             .logged(as: Self.self)
     }
 
@@ -130,6 +137,8 @@ public struct RootFlowFeature {
             return applyOnboardingSession(state: &state, userID: userID)
         case .sessionExpired:
             return moveToSignIn(state: &state)
+        case .placeImport:
+            return .none
         case .appIntro, .onboardingFlow, .mainTab, .overlay:
             return childDelegate(state: &state, action: action)
         }
@@ -234,7 +243,7 @@ private extension RootFlowFeature {
             switch route {
             case .signIn:
                 return .none
-            case .home, .explore, .map, .myPage:
+            case .home, .explore, .map, .myPage, .placeImport:
                 state.pendingDeepLink = route
                 return .none
             }
@@ -343,6 +352,9 @@ private extension RootFlowFeature {
         }
 
         switch route {
+        case let .placeImport(url):
+            state.placeImport = PlaceImportFeature.State(link: url)
+            return .none
         case .signIn:
             return .none
         case .home:

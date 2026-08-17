@@ -54,6 +54,28 @@ public enum ProjectSettings {
         ])
     }
 
+    public static func shareExtension() -> Settings {
+        let debugSettings = debug.merging([
+            "PRODUCT_BUNDLE_IDENTIFIER": .string(ProjectEnvironment.AppBundle.debug + ".ShareExtension"),
+            "GENERATE_INFOPLIST_FILE": "NO",
+            "TARGETED_DEVICE_FAMILY": "1",
+        ]) { _, new in new }
+
+        let releaseSettings = release.merging([
+            "PRODUCT_BUNDLE_IDENTIFIER": .string(ProjectEnvironment.AppBundle.release + ".ShareExtension"),
+            "GENERATE_INFOPLIST_FILE": "NO",
+            "TARGETED_DEVICE_FAMILY": "1",
+        ]) { _, new in new }
+
+        return .settings(
+            base: base,
+            configurations: [
+                .debug(name: ProjectEnvironment.debugConfigName, settings: debugSettings),
+                .release(name: ProjectEnvironment.releaseConfigName, settings: releaseSettings),
+            ]
+        )
+    }
+
     public static func app() -> Settings {
         let debugSettings = debug.merging([
             "PRODUCT_BUNDLE_IDENTIFIER": .string(ProjectEnvironment.AppBundle.debug),
