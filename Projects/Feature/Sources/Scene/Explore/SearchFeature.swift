@@ -58,6 +58,7 @@ public struct SearchFeature {
 
     @Dependency(\.exploreClient) var exploreClient
     @Dependency(\.recentSearchClient) var recentSearchClient
+    @Dependency(\.continuousClock) var clock
 
     private enum CancelID { case search }
 
@@ -150,7 +151,10 @@ public struct SearchFeature {
     }
 
     private func debounceSearch() -> Effect<Action> {
-        .send(.queryChangeDebounced)
-            .debounce(id: CancelID.search, for: .milliseconds(300), scheduler: DispatchQueue.main)
+        .run { [clock] send in
+            try await clock.sleep(for: .milliseconds(300))
+            await send(.queryChangeDebounced)
+        }
+        .cancellable(id: CancelID.search, cancelInFlight: true)
     }
 }
