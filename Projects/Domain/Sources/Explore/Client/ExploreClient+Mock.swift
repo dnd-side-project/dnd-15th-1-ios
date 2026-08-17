@@ -12,7 +12,7 @@ import ThirdParty
 
 public extension ExploreClient {
     static let mock = ExploreClient(
-        popularContents: { Content.mocks },
+        contents: { _, _ in ContentPage(items: Content.mocks, hasNext: false) },
         searchContents: { _ in Content.mocks },
         searchPlaces: { _ in Place.mocks }
     )
