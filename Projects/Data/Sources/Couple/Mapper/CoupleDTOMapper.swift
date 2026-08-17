@@ -28,4 +28,17 @@ enum CoupleDTOMapper {
             partnerIconID: partner.profileIcon
         )
     }
+
+    static func toStatus(_ dto: CoupleConnectionStatusResponseDTO) -> CoupleStatus {
+        CoupleStatus(
+            connected: dto.connected,
+            me: member(dto.me) ?? CoupleMember(nickname: "", iconID: 0),
+            partner: dto.connected ? member(dto.partner) : nil,
+            daysTogether: dto.daysTogether
+        )
+    }
+
+    private static func member(_ dto: CoupleMemberProfileResponseDTO?) -> CoupleMember? {
+        dto.map { CoupleMember(nickname: $0.nickname, iconID: $0.profileIcon) }
+    }
 }
