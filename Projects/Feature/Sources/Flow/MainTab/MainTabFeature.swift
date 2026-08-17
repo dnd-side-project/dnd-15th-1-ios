@@ -75,6 +75,11 @@ public struct MainTabFeature {
                 case .sessionExpired:
                     return .send(.delegate(.sessionExpired))
                 }
+            case let .home(.delegate(delegate)):
+                switch delegate {
+                case .sessionExpired:
+                    return .send(.delegate(.sessionExpired))
+                }
             case .home, .explore, .map, .myPage, .delegate:
                 return .none
             }

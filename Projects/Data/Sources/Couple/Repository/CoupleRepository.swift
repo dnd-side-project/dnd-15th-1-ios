@@ -35,11 +35,14 @@ public struct CoupleRepository: Sendable {
     // 다만 서버가 커플 없음을 404 로 답하는 경우도 있어 여기서만 nil 로 방어한다.
     // CoupleErrorMapper 는 404 를 invalidInviteCode 로 보므로 그 매핑을 타면
     // 커플이 없는 정상 상태가 에러가 된다. 방어는 current() 에만 둔다.
-    public func current() async throws -> Couple? {
+    public func current() async throws -> CoupleStatus? {
         do {
-            return CoupleDTOMapper.toDomain(try await coupleRemote.current())
+            return try CoupleDTOMapper.toStatus(try await coupleRemote.current())
         } catch NetworkError.notFound {
             return nil
+        } catch let error as CoupleError {
+            // 매퍼가 올린 불완전 응답 에러는 그대로 전달
+            throw error
         } catch {
             throw CoupleErrorMapper.map(error)
         }

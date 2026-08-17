@@ -11,8 +11,8 @@ public struct MainTabView: View {
 
     public var body: some View {
         TabView(selection: $store.selectedTab.sending(\.tabSelected)) {
-            NavigationStack {
-                HomeView(store: store.scope(state: \.home, action: \.home))
+            NavigationStack(path: homeCouplePath) {
+                HomeView(store: homeStore)
             }
             .tabItem { tabLabel("홈", icon: .home) }
             .tag(MainTabFeature.Tab.home)
@@ -37,6 +37,19 @@ public struct MainTabView: View {
             .tag(MainTabFeature.Tab.myPage)
         }
         .tint(Color.primaryPink)
+    }
+
+    // 커플 연결 스택은 홈 스토어가 소유하고, 홈 탭 NavigationStack 이 그 path 를 그대로 민다
+    private var homeStore: StoreOf<HomeFeature> {
+        store.scope(state: \.home, action: \.home)
+    }
+
+    private var homeCouplePath: Binding<[HomeFeature.CoupleRoute]> {
+        let homeStore = homeStore
+        return Binding(
+            get: { homeStore.couplePath },
+            set: { homeStore.send(.couplePathChanged($0)) }
+        )
     }
 
     private func tabLabel(_ title: String, icon: Image) -> some View {

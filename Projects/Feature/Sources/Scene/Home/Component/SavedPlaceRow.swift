@@ -25,8 +25,8 @@ struct SavedPlaceRow: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.bgSubtle)
         .clipShape(RoundedRectangle(cornerRadius: 12))

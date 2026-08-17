@@ -6,14 +6,14 @@ public struct SavedPlace: Equatable, Identifiable, Sendable {
     public let ownership: PlaceOwnership
     public let alias: String?
     public let memo: String?
-    public let savedAt: Date
+    public let savedAt: Date?
 
     public init(
         place: Place,
         ownership: PlaceOwnership,
         alias: String?,
         memo: String?,
-        savedAt: Date
+        savedAt: Date?
     ) {
         self.place = place
         self.ownership = ownership

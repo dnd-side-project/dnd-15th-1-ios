@@ -28,4 +28,25 @@ enum CoupleDTOMapper {
             partnerIconID: partner.profileIcon
         )
     }
+
+    // me 가 없거나 connected 인데 partner 가 없으면 불완전한 응답이라 sentinel 대신 에러로 올린다
+    static func toStatus(_ dto: CoupleConnectionStatusResponseDTO) throws -> CoupleStatus {
+        guard let me = member(dto.me) else {
+            throw CoupleError.unknown
+        }
+        let partner = member(dto.partner)
+        if dto.connected, partner == nil {
+            throw CoupleError.unknown
+        }
+        return CoupleStatus(
+            connected: dto.connected,
+            me: me,
+            partner: dto.connected ? partner : nil,
+            daysTogether: dto.daysTogether
+        )
+    }
+
+    private static func member(_ dto: CoupleMemberProfileResponseDTO?) -> CoupleMember? {
+        dto.map { CoupleMember(nickname: $0.nickname, iconID: $0.profileIcon) }
+    }
 }

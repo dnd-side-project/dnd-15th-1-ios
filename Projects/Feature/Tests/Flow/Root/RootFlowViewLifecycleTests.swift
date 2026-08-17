@@ -71,6 +71,9 @@ private final class Harness {
             $0.authClient.currentSession = {
                 AuthSession(accessToken: "access", refreshToken: "refresh", userID: "1")
             }
+            // mainTab 전환 시 홈 onAppear 가 호출하므로 네트워크 없이 응답만 준다
+            $0.coupleClient.current = { nil }
+            $0.placeClient.savedPlaces = { [] }
         } operation: {
             Store(initialState: RootFlowFeature.State(phase: phase)) {
                 Reduce<RootFlowFeature.State, RootFlowFeature.Action> { _, action in

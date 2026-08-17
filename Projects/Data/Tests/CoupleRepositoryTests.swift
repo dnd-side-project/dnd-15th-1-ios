@@ -130,12 +130,14 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let repository = makeRepository(network: network)
 
-        let couple = try await repository.current()
+        let status = try await repository.current()
 
-        XCTAssertNil(couple)
+        XCTAssertEqual(status?.connected, false)
+        XCTAssertNil(status?.partner)
+        XCTAssertEqual(status?.me.nickname, "나")
     }
 
-    func test_현재_상태가_연결이면_Couple을_준다() async throws {
+    func test_현재_상태가_연결이면_파트너를_준다() async throws {
         let network = StubNetworkClient()
         network.responses["GET \(currentPath)"] = CoupleConnectionStatusResponseDTO(
             connected: true,
@@ -147,10 +149,12 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let repository = makeRepository(network: network)
 
-        let couple = try await repository.current()
+        let status = try await repository.current()
 
-        XCTAssertEqual(couple?.partnerNickname, "상대방")
-        XCTAssertEqual(couple?.partnerIconID, 2)
+        XCTAssertEqual(status?.connected, true)
+        XCTAssertEqual(status?.partner?.nickname, "상대방")
+        XCTAssertEqual(status?.partner?.iconID, 2)
+        XCTAssertEqual(status?.daysTogether, 10)
     }
 
     func test_409는_alreadyConnected로_매핑된다() async throws {
@@ -173,9 +177,9 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let repository = makeRepository(network: network)
 
-        let couple = try await repository.current()
+        let status = try await repository.current()
 
-        XCTAssertNil(couple)
+        XCTAssertNil(status)
     }
 
     func test_연결에서_404는_여전히_invalidInviteCode를_던진다() async throws {

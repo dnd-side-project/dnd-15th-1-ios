@@ -11,6 +11,13 @@ public struct HomeView: View {
     }
 
     public var body: some View {
+        scrollContent
+            .navigationDestination(for: HomeFeature.CoupleRoute.self) { route in
+                coupleDestination(route)
+            }
+    }
+
+    private var scrollContent: some View {
         ScrollView {
             VStack(spacing: 0) {
                 topSection
@@ -28,18 +35,40 @@ public struct HomeView: View {
         .task { store.send(.onAppear) }
     }
 
+    // 세 화면 모두 같은 couple 스토어를 받고 Route 로 무엇을 그릴지만 가른다. push 동안 하단탭은 숨긴다
+    @ViewBuilder
+    private func coupleDestination(_ route: HomeFeature.CoupleRoute) -> some View {
+        if let coupleStore {
+            Group {
+                switch route {
+                case .connect:
+                    CoupleConnectView(store: coupleStore)
+                case .codeInput:
+                    CoupleCodeInputView(store: coupleStore)
+                case .complete:
+                    CoupleCompleteView(store: coupleStore)
+                }
+            }
+            .toolbar(.hidden, for: .tabBar)
+        }
+    }
+
+    private var coupleStore: StoreOf<CoupleConnectFeature>? {
+        store.scope(state: \.couple, action: \.couple)
+    }
+
     private var topSection: some View {
         VStack(spacing: 0) {
             HomeHeader(
                 nickname: store.nickname,
                 partnerName: store.partnerName,
-                calendarTapped: {}
+                calendarTapped: { store.send(.connectFlowRequested) }
             )
 
             HomeBanner(
                 isConnected: store.isConnected,
                 upcomingSchedule: store.upcomingSchedule,
-                connectTapped: {},
+                connectTapped: { store.send(.connectFlowRequested) },
                 bannerTapped: {}
             )
             .padding(.bottom, 20)
