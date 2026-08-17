@@ -13,9 +13,11 @@ final class RootFlowFeatureTests: XCTestCase {
 
     func test_세션없음_미완료_앱인트로() async {
         let markExp = expectation(description: "mark seen on intro entry")
+        let clock = TestClock()
         let store = TestStore(initialState: RootFlowFeature.State()) {
             RootFlowFeature()
         } withDependencies: {
+            $0.continuousClock = clock
             $0.authClient.restoreSession = { nil }
             $0.onboardingClient.hasSeenAppIntro = { false }
             $0.onboardingClient.markAppIntroSeen = {
@@ -24,6 +26,7 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.onAppear)
+        await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.success)
         await store.receive(\.bootstrapRoute) {
             $0.phase = .appIntro(AppIntroFeature.State())
@@ -32,14 +35,17 @@ final class RootFlowFeatureTests: XCTestCase {
     }
 
     func test_세션없음_완료_로그아웃() async {
+        let clock = TestClock()
         let store = TestStore(initialState: RootFlowFeature.State()) {
             RootFlowFeature()
         } withDependencies: {
+            $0.continuousClock = clock
             $0.authClient.restoreSession = { nil }
             $0.onboardingClient.hasSeenAppIntro = { true }
         }
 
         await store.send(.onAppear)
+        await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.success)
         await store.receive(\.bootstrapRoute) {
             $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
@@ -48,9 +54,11 @@ final class RootFlowFeatureTests: XCTestCase {
 
     func test_세션복구실패_미완료_앱인트로() async {
         let markExp = expectation(description: "mark seen on intro entry after restore failure")
+        let clock = TestClock()
         let store = TestStore(initialState: RootFlowFeature.State()) {
             RootFlowFeature()
         } withDependencies: {
+            $0.continuousClock = clock
             $0.authClient.restoreSession = { throw AuthError.storage }
             $0.onboardingClient.hasSeenAppIntro = { false }
             $0.onboardingClient.markAppIntroSeen = {
@@ -59,6 +67,7 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.onAppear)
+        await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.failure)
         await store.receive(\.bootstrapRoute) {
             $0.phase = .appIntro(AppIntroFeature.State())
@@ -68,9 +77,11 @@ final class RootFlowFeatureTests: XCTestCase {
 
     func test_세션있음_메인_인트로스킵() async {
         let session = sampleSession
+        let clock = TestClock()
         let store = TestStore(initialState: RootFlowFeature.State()) {
             RootFlowFeature()
         } withDependencies: {
+            $0.continuousClock = clock
             $0.authClient.restoreSession = {
                 AuthBootstrap(session: session, isOnboardingCompleted: true)
             }
@@ -81,6 +92,7 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.onAppear)
+        await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.success) {
             $0.phase = .mainTab(
                 MainTabFeature.State(
@@ -94,9 +106,11 @@ final class RootFlowFeatureTests: XCTestCase {
 
     func test_세션있음_온보딩미완료_온보딩단계() async {
         let session = sampleSession
+        let clock = TestClock()
         let store = TestStore(initialState: RootFlowFeature.State()) {
             RootFlowFeature()
         } withDependencies: {
+            $0.continuousClock = clock
             $0.authClient.restoreSession = {
                 AuthBootstrap(session: session, isOnboardingCompleted: false)
             }
@@ -107,6 +121,7 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.onAppear)
+        await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.success) {
             $0.phase = .onboardingFlow(.resumingOnboarding)
         }
@@ -246,6 +261,39 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.sessionExpired) {
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
+        }
+    }
+}
+
+// 스플래시 최소 노출만 따로 본다
+@MainActor
+final class RootFlowSplashTests: XCTestCase {
+    func test_스플래시는_최소_1초_머문다() async {
+        let clock = TestClock()
+        let store = TestStore(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.authClient.restoreSession = { nil }
+            $0.onboardingClient.hasSeenAppIntro = { true }
+        }
+
+        await store.send(.onAppear)
+        await clock.advance(by: .milliseconds(999))
+
+        // 아직 1초가 안 됐다. 세션 복원이 끝났어도 최소 노출은 잠들어 있어야 한다.
+        // checkSuspension 은 잠든 sleep 이 남아 있을 때 던진다
+        do {
+            try await clock.checkSuspension()
+            XCTFail("최소 노출을 기다리지 않아 스플래시가 한 프레임만 스치고 사라진다")
+        } catch {
+            // 최소 노출이 아직 남아 있다
+        }
+
+        await clock.advance(by: .milliseconds(1))
+        await store.receive(\.sessionRestored.success)
+        await store.receive(\.bootstrapRoute) {
             $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }

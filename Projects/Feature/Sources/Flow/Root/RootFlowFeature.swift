@@ -93,6 +93,7 @@ public struct RootFlowFeature {
 
     @Dependency(\.authClient) var authClient
     @Dependency(\.onboardingClient) var onboardingClient
+    @Dependency(\.continuousClock) var clock
 
     public init() {}
 
@@ -163,11 +164,15 @@ private extension RootFlowFeature {
         guard case .bootstrapping = state.phase else {
             return .none
         }
-        return .run { [authClient] send in
+        return .run { [authClient, clock] send in
+            // 스플래시가 한 프레임 스치고 사라지지 않게 최소 노출을 함께 기다린다
+            async let minimumDisplay: Void? = try? await clock.sleep(for: .seconds(1))
             do {
                 let bootstrap = try await authClient.restoreSession()
+                _ = await minimumDisplay
                 await send(.sessionRestored(.success(bootstrap)))
             } catch {
+                _ = await minimumDisplay
                 await send(.sessionRestored(.failure(mapAuthError(error))))
             }
         }
