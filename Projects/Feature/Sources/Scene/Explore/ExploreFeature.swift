@@ -16,7 +16,7 @@ public struct ExploreFeature {
 
     @ObservableState
     public struct State: Equatable {
-        var posts: [Post] = []
+        var contents: [Content] = []
         var filters: [String] = ["인기", "#성수", "#강남", "#을지로"]
         var selectedFilter: String = "인기"
         var search: SearchFeature.State?
@@ -30,7 +30,7 @@ public struct ExploreFeature {
         case filterTapped(String)
         case searchButtonTapped
         case searchPathChanged([Route])
-        case popularPostsResponse([Post])
+        case popularContentsResponse([Content])
         case search(SearchFeature.Action)
     }
 
@@ -43,8 +43,8 @@ public struct ExploreFeature {
             switch action {
             case .onAppear:
                 return .run { [exploreClient] send in
-                    let posts = try await exploreClient.popularPosts()
-                    await send(.popularPostsResponse(posts))
+                    let contents = try await exploreClient.popularContents()
+                    await send(.popularContentsResponse(contents))
                 }
 
             case let .filterTapped(filter):
@@ -61,8 +61,8 @@ public struct ExploreFeature {
                 if path.isEmpty { state.search = nil }
                 return .none
 
-            case let .popularPostsResponse(posts):
-                state.posts = posts
+            case let .popularContentsResponse(contents):
+                state.contents = contents
                 return .none
 
             case .search:

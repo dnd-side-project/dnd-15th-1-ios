@@ -16,7 +16,7 @@ public struct HomeFeature {
         public var nickname: String
         public var partnerName: String?
         public var upcomingSchedule: UpcomingSchedule?
-        public var recommendations: [Post]
+        public var recommendations: [Content]
         public var pastSchedules: [DateSchedule]
         public var savedPlaces: [SavedPlace]
         public var couple: CoupleConnectFeature.State?
@@ -42,7 +42,7 @@ public struct HomeFeature {
             nickname: String = "듀가나디햄햄",
             partnerName: String? = nil,
             upcomingSchedule: UpcomingSchedule? = .mock,
-            recommendations: [Post] = Post.mocks,
+            recommendations: [Content] = Content.mocks,
             pastSchedules: [DateSchedule] = DateSchedule.mocks,
             savedPlaces: [SavedPlace] = [],
             couple: CoupleConnectFeature.State? = nil,

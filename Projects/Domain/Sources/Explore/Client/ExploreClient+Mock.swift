@@ -12,33 +12,33 @@ import ThirdParty
 
 public extension ExploreClient {
     static let mock = ExploreClient(
-        popularPosts: { Post.mocks },
-        searchPosts: { _ in Post.mocks },
+        popularContents: { Content.mocks },
+        searchContents: { _ in Content.mocks },
         searchPlaces: { _ in Place.mocks }
     )
 }
 
-public extension Post {
-    static let mocks: [Post] = [
-        Post(
+public extension Content {
+    static let mocks: [Content] = [
+        Content(
             id: "1",
             title: "새벽까지 함께할 수 있는 데이트 성지 한강뷰 감성카페",
             thumbnailURLs: MockThumbnailURL.list(2, seed: 10),
             placeCount: 5
         ),
-        Post(
+        Content(
             id: "2",
             title: "한강뷰 데이트 장소",
             thumbnailURLs: MockThumbnailURL.list(2, seed: 20),
             placeCount: 5
         ),
-        Post(
+        Content(
             id: "3",
             title: "성수동 감성 카페 투어",
             thumbnailURLs: MockThumbnailURL.list(2, seed: 30),
             placeCount: 4
         ),
-        Post(
+        Content(
             id: "4",
             title: "을지로 노포 맛집 코스",
             thumbnailURLs: MockThumbnailURL.list(2, seed: 40),

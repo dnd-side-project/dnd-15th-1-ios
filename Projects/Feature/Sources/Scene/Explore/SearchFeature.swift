@@ -28,14 +28,14 @@ public struct SearchFeature {
         var query: String = ""
         var recentSearches: [String] = []
         var selectedTab: Tab = .post
-        var posts: [Post] = []
+        var contents: [Content] = []
         var places: [Place] = []
         var isSearching = false
 
         // 선택된 탭 기준으로 결과 유무 판정
         var hasResult: Bool {
             switch selectedTab {
-            case .post: !posts.isEmpty
+            case .post: !contents.isEmpty
             case .place: !places.isEmpty
             }
         }
@@ -53,7 +53,7 @@ public struct SearchFeature {
         case recentSearchesUpdated([String])
         case tabSelected(Tab)
         case queryChangeDebounced
-        case searchResponse([Post], [Place])
+        case searchResponse([Content], [Place])
     }
 
     @Dependency(\.exploreClient) var exploreClient
@@ -115,8 +115,8 @@ public struct SearchFeature {
         case .queryChangeDebounced:
             return search(state: &state)
 
-        case let .searchResponse(posts, places):
-            state.posts = posts
+        case let .searchResponse(contents, places):
+            state.contents = contents
             state.places = places
             state.isSearching = false
             return .none
@@ -137,16 +137,16 @@ public struct SearchFeature {
     private func search(state: inout State) -> Effect<Action> {
         let query = state.query
         guard !query.isEmpty else {
-            state.posts = []
+            state.contents = []
             state.places = []
             state.isSearching = false
             return .none
         }
         state.isSearching = true
         return .run { [exploreClient] send in
-            async let posts = exploreClient.searchPosts(query)
+            async let contents = exploreClient.searchContents(query)
             async let places = exploreClient.searchPlaces(query)
-            await send(.searchResponse(try await posts, try await places))
+            await send(.searchResponse(try await contents, try await places))
         }
     }
 

@@ -15,7 +15,7 @@ final class FeatureLogTests: XCTestCase {
         XCTAssertEqual(FeatureLog.operationName(fromActionName: "loginResponse"), "login")
         XCTAssertEqual(FeatureLog.operationName(fromActionName: "logoutResponse"), "logout")
         XCTAssertEqual(FeatureLog.operationName(fromActionName: "sessionRestored"), "restoreSession")
-        XCTAssertEqual(FeatureLog.operationName(fromActionName: "popularPostsResponse"), "popularPosts")
+        XCTAssertEqual(FeatureLog.operationName(fromActionName: "popularContentsResponse"), "popularContents")
     }
 
     func test_메시지형식_액션_상태_화면이동_오류() {
