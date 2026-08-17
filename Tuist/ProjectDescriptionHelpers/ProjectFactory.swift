@@ -215,6 +215,8 @@ public enum ProjectFactory {
     private static func shareExtensionTarget() -> Target {
         let infoPlist: InfoPlist = .extendingDefault(with: [
             "CFBundleDisplayName": .string(ProjectEnvironment.displayName),
+            "CFBundleShortVersionString": .string(ProjectEnvironment.appVersion),
+            "CFBundleVersion": .string(ProjectEnvironment.appBuildNumber),
             "NSExtension": [
                 "NSExtensionPointIdentifier": "com.apple.share-services",
                 "NSExtensionPrincipalClass": "$(PRODUCT_MODULE_NAME).ShareViewController",
