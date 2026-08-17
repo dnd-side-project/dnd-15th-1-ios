@@ -18,8 +18,7 @@ enum Dependencies {
         values.coupleClient = CoupleClientFactory.make(session: authSession)
         values.placeImportClient = PlaceImportClientFactory.make(session: authSession)
 
-        // API 연동 전 임시 mock, 나중에 ExploreClientFactory 로 교체
-        values.exploreClient = .mock
+        values.exploreClient = ExploreClientFactory.make(session: authSession)
 
         values.placeClient = PlaceClientFactory.make(session: authSession)
 
