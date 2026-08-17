@@ -31,7 +31,7 @@ public struct HomeFeature {
 
         public init(
             nickname: String = "듀가나디햄햄",
-            partnerName: String? = "만두",
+            partnerName: String? = nil,
             upcomingSchedule: UpcomingSchedule? = .mock,
             recommendations: [Post] = Post.mocks,
             pastSchedules: [DateSchedule] = DateSchedule.mocks,
@@ -48,10 +48,12 @@ public struct HomeFeature {
 
     public enum Action: Equatable {
         case onAppear
+        case coupleLoaded(CoupleStatus?)
         case savedPlacesLoaded([SavedPlace])
     }
 
     @Dependency(\.placeClient) var placeClient
+    @Dependency(\.coupleClient) var coupleClient
 
     public init() {}
 
@@ -59,15 +61,33 @@ public struct HomeFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                return .run { [placeClient] send in
-                    let places = (try? await placeClient.savedPlaces()) ?? []
-                    await send(.savedPlacesLoaded(places))
+                return .merge(loadCouple(), loadSavedPlaces())
+
+            case let .coupleLoaded(status):
+                if let status {
+                    state.nickname = status.me.nickname
+                    state.partnerName = status.connected ? status.partner?.nickname : nil
                 }
+                return .none
 
             case let .savedPlacesLoaded(places):
                 state.savedPlaces = places
                 return .none
             }
+        }
+    }
+
+    private func loadCouple() -> Effect<Action> {
+        .run { [coupleClient] send in
+            let status = try? await coupleClient.current()
+            await send(.coupleLoaded(status))
+        }
+    }
+
+    private func loadSavedPlaces() -> Effect<Action> {
+        .run { [placeClient] send in
+            let places = (try? await placeClient.savedPlaces()) ?? []
+            await send(.savedPlacesLoaded(places))
         }
     }
 }
