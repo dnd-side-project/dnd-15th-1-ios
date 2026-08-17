@@ -54,6 +54,7 @@ public struct SearchFeature {
         case tabSelected(Tab)
         case queryChangeDebounced
         case searchResponse([Content], [Place])
+        case searchFailed
     }
 
     @Dependency(\.exploreClient) var exploreClient
@@ -77,6 +78,29 @@ public struct SearchFeature {
         case .binding:
             return .none
 
+        case .queryChangeDebounced:
+            return search(state: &state)
+
+        case let .searchResponse(contents, places):
+            state.contents = contents
+            state.places = places
+            state.isSearching = false
+            return .none
+
+        case .searchFailed:
+            // 이전 결과는 두고 로딩만 해제
+            state.isSearching = false
+            return .none
+
+        case .onAppear, .searchSubmitted, .recentSearchTapped, .recentSearchDeleted,
+             .clearRecentTapped, .recentSearchesUpdated, .tabSelected:
+            return recentCore(state: &state, action: action)
+        }
+    }
+
+    // 최근 검색어·탭 전환 처리
+    private func recentCore(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .onAppear:
             return .run { [recentSearchClient] send in
                 await send(.recentSearchesUpdated(recentSearchClient.load()))
@@ -112,13 +136,7 @@ public struct SearchFeature {
             state.selectedTab = tab
             return .none
 
-        case .queryChangeDebounced:
-            return search(state: &state)
-
-        case let .searchResponse(contents, places):
-            state.contents = contents
-            state.places = places
-            state.isSearching = false
+        default:
             return .none
         }
     }
@@ -147,6 +165,10 @@ public struct SearchFeature {
             async let contents = exploreClient.searchContents(query)
             async let places = exploreClient.searchPlaces(query)
             await send(.searchResponse(try await contents, try await places))
+        } catch: { error, send in
+            // 취소는 실패로 보지 않는다
+            if error is CancellationError { return }
+            await send(.searchFailed)
         }
     }
 
