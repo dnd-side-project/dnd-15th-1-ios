@@ -37,9 +37,12 @@ public struct CoupleRepository: Sendable {
     // 커플이 없는 정상 상태가 에러가 된다. 방어는 current() 에만 둔다.
     public func current() async throws -> CoupleStatus? {
         do {
-            return CoupleDTOMapper.toStatus(try await coupleRemote.current())
+            return try CoupleDTOMapper.toStatus(try await coupleRemote.current())
         } catch NetworkError.notFound {
             return nil
+        } catch let error as CoupleError {
+            // 매퍼가 올린 불완전 응답 에러는 그대로 전달
+            throw error
         } catch {
             throw CoupleErrorMapper.map(error)
         }
