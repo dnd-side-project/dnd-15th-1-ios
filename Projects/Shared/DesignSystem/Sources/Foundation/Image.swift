@@ -91,10 +91,29 @@ public extension Image {
     static var appIntroPlan: Image { Asset.appIntroPlan.swiftUIImage }
 }
 
+// MARK: - Splash
+
+public extension Image {
+    static var splashBackground: Image { Asset.splashBackground.swiftUIImage }
+    static var splashBundle: Image { Asset.splashBundle.swiftUIImage }
+}
+
+// MARK: - Auth
+
+public extension Image {
+    static var authIllustration: Image { Asset.authIllustration.swiftUIImage }
+}
+
+// MARK: - Brand
+
+public extension Image {
+    static var brandMark: Image { Asset.brandMark.swiftUIImage }
+    static var brandWordmark: Image { Asset.brandWordmark.swiftUIImage }
+}
+
 // MARK: - Home
 
 public extension Image {
-    static var logo: Image { Asset.logo.swiftUIImage }
     static var bannerCoupleConnect: Image { Asset.bannerCoupleConnect.swiftUIImage }
     static var bannerPeek: Image { Asset.bannerPeek.swiftUIImage }
     static var bannerCalendar: Image { Asset.bannerCalendar.swiftUIImage }
