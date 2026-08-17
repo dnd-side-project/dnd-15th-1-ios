@@ -17,6 +17,8 @@ public struct CoupleConnectFeature {
     @ObservableState
     public struct State: Equatable {
         public var myNickname: String
+        // 온보딩은 skip 을 보여주고, 홈 진입은 숨긴다
+        public var showsSkip: Bool
         public var inviteCode: InviteCode?
         public var isLoadingInviteCode: Bool
         public var hasAttemptedInviteCode: Bool
@@ -29,6 +31,7 @@ public struct CoupleConnectFeature {
 
         public init(
             myNickname: String,
+            showsSkip: Bool = true,
             inviteCode: InviteCode? = nil,
             isLoadingInviteCode: Bool = false,
             hasAttemptedInviteCode: Bool = false,
@@ -40,6 +43,7 @@ public struct CoupleConnectFeature {
             toast: ToastState? = nil
         ) {
             self.myNickname = myNickname
+            self.showsSkip = showsSkip
             self.inviteCode = inviteCode
             self.isLoadingInviteCode = isLoadingInviteCode
             self.hasAttemptedInviteCode = hasAttemptedInviteCode

@@ -64,7 +64,9 @@ public struct CoupleConnectView: View {
             Spacer(minLength: 0)
 
             CTAContainer {
-                skipButton
+                if store.showsSkip {
+                    skipButton
+                }
                 shareButton
                 connectButton
             }
