@@ -35,7 +35,7 @@ public struct HomeFeature {
             upcomingSchedule: UpcomingSchedule? = .mock,
             recommendations: [Post] = Post.mocks,
             pastSchedules: [DateSchedule] = DateSchedule.mocks,
-            savedPlaces: [SavedPlace] = SavedPlace.mocks
+            savedPlaces: [SavedPlace] = []
         ) {
             self.nickname = nickname
             self.partnerName = partnerName
@@ -48,14 +48,24 @@ public struct HomeFeature {
 
     public enum Action: Equatable {
         case onAppear
+        case savedPlacesLoaded([SavedPlace])
     }
+
+    @Dependency(\.placeClient) var placeClient
 
     public init() {}
 
     public var body: some ReducerOf<Self> {
-        Reduce { _, action in
+        Reduce { state, action in
             switch action {
             case .onAppear:
+                return .run { [placeClient] send in
+                    let places = (try? await placeClient.savedPlaces()) ?? []
+                    await send(.savedPlacesLoaded(places))
+                }
+
+            case let .savedPlacesLoaded(places):
+                state.savedPlaces = places
                 return .none
             }
         }
