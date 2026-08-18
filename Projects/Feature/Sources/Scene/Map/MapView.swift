@@ -34,8 +34,9 @@ public struct MapView: View {
     /// 카테고리 드롭다운 메뉴의 화면 좌표. 한쪽이 닫혀도 다른 쪽 자리를 지우지 않으려고 따로 둔다
     @State private var categoryMenuFrame: CGRect?
 
-    /// 행 `⋮` 메뉴의 화면 좌표. 한 번에 하나만 열린다
-    @State private var rowMenuFrame: CGRect?
+    /// 행 `⋮` 메뉴의 화면 좌표와 그 주인 행. 한 번에 하나만 열린다.
+    /// 주인을 같이 드는 이유는, 다른 행을 열 때 옛 행의 사라짐이 새 좌표를 지우지 못하게 하려는 것이다
+    @State private var rowMenu: (id: String, frame: CGRect)?
 
     public init(store: StoreOf<MapFeature>) {
         self.store = store
@@ -209,7 +210,7 @@ private extension MapView {
             hideAboveAtTop: MapViewMetric.chipBarBottom + MapViewMetric.hideControlsGap,
             coverTopAtTop: MapViewMetric.searchBarBottom + MapViewMetric.coverGap,
             onTopCoveredChange: { isSearchBarCovered = $0 },
-            openMenuFrames: [ownershipMenuFrame, categoryMenuFrame, rowMenuFrame].compactMap { $0 }
+            openMenuFrames: [ownershipMenuFrame, categoryMenuFrame, rowMenu?.frame].compactMap { $0 }
         ) {
             floatingControls
         } header: {
@@ -362,11 +363,14 @@ private extension MapView {
                 .onGeometryChange(for: CGRect.self) { proxy in
                     proxy.frame(in: .global)
                 } action: { frame in
-                    rowMenuFrame = frame
+                    rowMenu = (id, frame)
                 }
                 .offset(y: MapViewMetric.rowMenuOffsetY)
                 .onDisappear {
-                    rowMenuFrame = nil
+                    // 다른 행을 여는 순간에는 새 행이 이미 주인이다. 그때는 지우지 않는다
+                    if rowMenu?.id == id {
+                        rowMenu = nil
+                    }
                 }
             }
         }
