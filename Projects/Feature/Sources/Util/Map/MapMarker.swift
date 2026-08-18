@@ -11,6 +11,8 @@ public struct MapMarker: Equatable, Identifiable, Sendable {
         /// 코스 번호 핀 ①②③
         case numbered(Int)
         case selected
+        /// 저장한 장소 핀. 카테고리마다 다른 에셋을 쓴다
+        case category(PlaceCategory)
     }
 
     public init(id: String, coordinate: Coordinate, kind: Kind) {

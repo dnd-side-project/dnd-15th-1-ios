@@ -495,7 +495,8 @@ private extension DulpickMapView {
 
 // MARK: - 기본 마커 심볼
 
-/// 0a 는 SDK 기본 마커 대신 여기서 그린 최소 심볼을 쓴다. 커스텀 에셋은 Cycle 1.
+/// `place` `numbered` `selected` 는 여기서 그린 최소 심볼을 쓴다.
+/// 저장한 장소 핀(`category`)만 시안 에셋을 그대로 얹는다.
 private enum MapMarkerSymbol {
     static let routeColor = UIColor(red: 0.98, green: 0.31, blue: 0.44, alpha: 1.0)
 
@@ -508,6 +509,7 @@ private enum MapMarkerSymbol {
         case .place: "dulpick.map.style.place"
         case .selected: "dulpick.map.style.selected"
         case let .numbered(number): "dulpick.map.style.numbered.\(number)"
+        case let .category(category): "dulpick.map.style.category.\(category.rawValue)"
         }
     }
 
@@ -519,6 +521,8 @@ private enum MapMarkerSymbol {
             circle(diameter: 30, fill: selectedColor, text: nil)
         case let .numbered(number):
             circle(diameter: 28, fill: selectedColor, text: "\(number)")
+        case let .category(category):
+            category.pin
         }
     }
 
