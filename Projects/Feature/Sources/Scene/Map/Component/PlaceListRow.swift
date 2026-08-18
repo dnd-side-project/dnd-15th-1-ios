@@ -8,6 +8,8 @@ private enum PlaceListRowMetric {
     static let thumbnailSize: CGFloat = 88
     static let thumbnailCornerRadius: CGFloat = 12
     static let dividerHeight: CGFloat = 1
+    /// 글자 묶음과 우측 슬롯 사이 최소 간격. 간격 토큰에 없는 값이다.
+    static let trailingGap: CGFloat = 2
     /// 썸네일 줄의 왼쪽이 아이콘이 아니라 장소명 글자에 맞는다. 그만큼 더 들어간다.
     static let textLeadingInset: CGFloat = Spacing.s20 + iconSize + Spacing.s12
 }
@@ -98,6 +100,9 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s12) {
             header
+                // 헤더가 드롭다운처럼 자기 밖 아래로 펼치는 걸 담을 수 있다.
+                // 올려두지 않으면 뒤에 그려지는 썸네일이 그 펼침을 덮는다
+                .zIndex(1)
 
             if !thumbnailURLs.isEmpty {
                 thumbnails
@@ -105,7 +110,9 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         }
         .padding(.vertical, Spacing.s16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .bottom) { divider }
+        // overlay 로 걸면 자식 위에 그려져 행 메뉴를 1pt 선이 가로지른다.
+        // 선 자리에는 여백뿐이라 background 로 내려도 보이는 모습은 같다
+        .background(alignment: .bottom) { divider }
     }
 
     private var header: some View {
@@ -126,8 +133,8 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
                     .lineLimit(1)
             }
 
-            // 우측 슬롯이 없는 행은 앞 여백도 두지 않는다. 빈 24 칸과 12 여백이 남으면 글자 폭만 줄어든다.
-            Spacer(minLength: hasTrailing ? Spacing.s12 : 0)
+            // 우측 슬롯이 없는 행은 앞 여백도 두지 않는다. 빈 24 칸과 그 앞 여백이 남으면 글자 폭만 줄어든다.
+            Spacer(minLength: hasTrailing ? PlaceListRowMetric.trailingGap : 0)
 
             if hasTrailing {
                 // 아이콘과 같은 높이를 확보해 장소명 줄에 맞춘다. 슬롯은 24 × 24 로 고정이다.

@@ -7,11 +7,6 @@ private enum CategoryChipMetric {
     static let height: CGFloat = 36
     static let iconSize: CGFloat = 20
     static let borderWidth: CGFloat = 1
-    static let shadowRadius: CGFloat = 4
-    static let shadowOffsetY: CGFloat = 2
-    static let shadowOpacity: Double = 0.12
-    /// 지도 위에 떠 있어 그림자가 `ScrollView` 에 잘린다. 위아래로 그만큼 자리를 준다.
-    static let shadowClearance = Spacing.s8
 }
 
 // MARK: - CategoryChipItem
@@ -63,7 +58,6 @@ struct CategoryChipBar<ID: Hashable>: View {
                 }
             }
             .padding(.horizontal, Spacing.s20)
-            .padding(.vertical, CategoryChipMetric.shadowClearance)
         }
     }
 }
@@ -102,11 +96,6 @@ private struct CategoryChip<ID: Hashable>: View {
     private var background: some View {
         Capsule()
             .fill(Color.bgDefault)
-            .shadow(
-                color: Color.commonBlack.opacity(CategoryChipMetric.shadowOpacity),
-                radius: CategoryChipMetric.shadowRadius,
-                y: CategoryChipMetric.shadowOffsetY
-            )
     }
 
     private var border: some View {

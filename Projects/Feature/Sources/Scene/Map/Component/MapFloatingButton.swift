@@ -5,13 +5,8 @@ import SwiftUI
 
 private enum MapFloatingMetric {
     static let height: CGFloat = 40
-    static let iconSize: CGFloat = 20
-    static let shadowRadius: CGFloat = 8
-    static let shadowOpacity: CGFloat = 0.10
-    static let shadowOffsetY: CGFloat = 2
-
-    /// 버튼 아래 끝과 시트 윗면 사이. a08 · b04 에서 잰 값이다.
-    static let gapAboveSheet = Spacing.s16
+    static let iconSize: CGFloat = 24
+    static let pillCornerRadius: CGFloat = 12
 }
 
 // MARK: - MapFloatingButton
@@ -23,7 +18,7 @@ private enum MapFloatingMetric {
 /// MapFloatingButton(title: "데이트 코스 짜러가기") { }    // 알약
 /// ```
 ///
-/// 위치는 잡지 않는다. 시트 위에 띄우려면 `MapFloatingControls` 에 담는다.
+/// 위치는 잡지 않는다. 시트 위에 띄우려면 `MapBottomSheet` 의 `above` 자리에 담는다.
 struct MapFloatingButton: View {
 
     private enum Shape {
@@ -69,25 +64,22 @@ private extension MapFloatingButton {
         }
     }
 
-    // 그림자는 원형에만 건다. 시안의 알약은 평평하다.
     func circleLabel(icon: Image) -> some View {
         self.icon(icon, tint: .textPrimary)
             .frame(width: MapFloatingMetric.height, height: MapFloatingMetric.height)
             .background(Color.commonWhite, in: Circle())
-            .shadow(
-                color: Color.commonBlack.opacity(MapFloatingMetric.shadowOpacity),
-                radius: MapFloatingMetric.shadowRadius,
-                y: MapFloatingMetric.shadowOffsetY
-            )
     }
 
     func pillLabel(title: String) -> some View {
         Text(title)
-            .typography(.body1SB)
+            .typography(.body1M)
             .foregroundStyle(Color.textInverse)
             .padding(.horizontal, Spacing.s20)
             .frame(height: MapFloatingMetric.height)
-            .background(Color.brandPrimary, in: Capsule())
+            .background(
+                Color.brandPrimary,
+                in: RoundedRectangle(cornerRadius: MapFloatingMetric.pillCornerRadius)
+            )
     }
 
     func icon(_ image: Image, tint: Color) -> some View {
@@ -99,124 +91,22 @@ private extension MapFloatingButton {
     }
 }
 
-// MARK: - MapFloatingControls
-
-/// 지도 위 버튼을 바텀시트 바로 위에 띄우는 층.
-///
-/// 시트 높이를 값으로 받아 그만큼 띄운다. `MapBottomSheet` 와 같은 `ZStack` 에 얹어
-/// `onHeightChange` 로 받은 높이를 그대로 넘기면 시트를 끌 때 버튼이 따라 움직인다.
-///
-/// ```swift
-/// ZStack(alignment: .bottom) {
-///     MapView()
-///     MapFloatingControls(sheetHeight: sheetHeight) {
-///         MapFloatingButton(title: "데이트 코스 짜러가기") { }
-///     } trailing: {
-///         MapFloatingButton(icon: .locate) { }
-///     }
-///     MapBottomSheet(
-///         detents: detents,
-///         selection: $detent,
-///         onHeightChange: { sheetHeight = $0 }
-///     ) {
-///         savedPlaceList
-///     }
-/// }
-/// ```
-struct MapFloatingControls<Leading: View, Trailing: View>: View {
-
-    // 버튼이 아니라 이 층이 좌표를 안다.
-    // 시안의 20 여백과 시트 위 16 간격이 호출부마다 흩어지지 않게 한다.
-    private let sheetHeight: CGFloat
-    private let leading: Leading
-    private let trailing: Trailing
-
-    init(
-        sheetHeight: CGFloat,
-        @ViewBuilder leading: () -> Leading,
-        @ViewBuilder trailing: () -> Trailing
-    ) {
-        self.sheetHeight = sheetHeight
-        self.leading = leading()
-        self.trailing = trailing()
-    }
-
-    var body: some View {
-        HStack(spacing: Spacing.s12) {
-            leading
-            Spacer(minLength: Spacing.s12)
-            trailing
-        }
-        .padding(.horizontal, Spacing.s20)
-        .padding(.bottom, sheetHeight + MapFloatingMetric.gapAboveSheet)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-    }
-}
-
-extension MapFloatingControls where Leading == EmptyView {
-
-    /// 오른쪽 버튼만 두는 경우 (b04 장소 고르기).
-    init(sheetHeight: CGFloat, @ViewBuilder trailing: () -> Trailing) {
-        self.init(sheetHeight: sheetHeight, leading: { EmptyView() }, trailing: trailing)
-    }
-}
-
 #if DEBUG
 
 // MARK: - Preview
 
-private struct MapFloatingButtonPreviewHost<Controls: View>: View {
-    let controls: (CGFloat) -> Controls
+// a08 — 좌하단 알약과 우하단 원형
+#Preview("지도 위 버튼") {
+    ZStack {
+        Color.gray200
+            .ignoresSafeArea()
 
-    @State private var selection: SheetDetent = .fraction(0.5)
-    @State private var sheetHeight: CGFloat = 0
-
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            // 지도 자리. SDK 를 붙이지 않는다
-            Color.gray200
-                .ignoresSafeArea()
-
-            controls(sheetHeight)
-
-            MapBottomSheet(
-                detents: [.fraction(0.5), .fraction(0.13)],
-                selection: $selection,
-                onHeightChange: { sheetHeight = $0 }
-            ) {
-                VStack(alignment: .leading, spacing: Spacing.s12) {
-                    Text("저장한 장소")
-                        .typography(.title3SB)
-                        .foregroundStyle(Color.textPrimary)
-
-                    Text("시트 높이 \(Int(sheetHeight))")
-                        .typography(.caption1M)
-                        .foregroundStyle(Color.textSecondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Spacing.s20)
-            }
-        }
-    }
-}
-
-// a08 — 시트를 끌면 두 버튼이 같이 오르내린다
-#Preview("지도 기본") {
-    MapFloatingButtonPreviewHost { sheetHeight in
-        MapFloatingControls(sheetHeight: sheetHeight) {
+        HStack(spacing: Spacing.s12) {
             MapFloatingButton(title: "데이트 코스 짜러가기") {}
-        } trailing: {
+            Spacer(minLength: Spacing.s12)
             MapFloatingButton(icon: .locate) {}
         }
-    }
-}
-
-// b04 — 장소 고르기에서는 현재위치 버튼만 뜬다
-#Preview("현재위치만") {
-    MapFloatingButtonPreviewHost { sheetHeight in
-        MapFloatingControls(sheetHeight: sheetHeight) {
-            MapFloatingButton(icon: .locate) {}
-        }
+        .padding(.horizontal, Spacing.s20)
     }
 }
 
