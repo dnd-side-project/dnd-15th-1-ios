@@ -12,17 +12,20 @@ public struct AppDropdown: View {
     @Binding private var selection: String?
     private let placeholder: String
     private let options: [String]
+    private let onMenuFrameChange: ((CGRect?) -> Void)?
     @State private var isExpanded = false
     @State private var pillHeight: CGFloat = 0
 
     public init(
         selection: Binding<String?>,
         placeholder: String,
-        options: [String]
+        options: [String],
+        onMenuFrameChange: ((CGRect?) -> Void)? = nil
     ) {
         self._selection = selection
         self.placeholder = placeholder
         self.options = options
+        self.onMenuFrameChange = onMenuFrameChange
     }
 
     private var isSelected: Bool {
@@ -44,7 +47,21 @@ public struct AppDropdown: View {
                         isExpanded = false
                     }
                     .fixedSize()
+                    // 아래 .offset 까지 반영된 자리가 나온다. 손으로 더하면 그만큼 아래로 밀린다
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .global)
+                    } action: { frame in
+                        onMenuFrameChange?(frame)
+                    }
                     .offset(y: pillHeight + 8)
+                    .onDisappear {
+                        onMenuFrameChange?(nil)
+                    }
+                }
+            }
+            .onChange(of: isExpanded) { _, expanded in
+                if !expanded {
+                    onMenuFrameChange?(nil)
                 }
             }
     }
@@ -62,11 +79,11 @@ public struct AppDropdown: View {
                     .renderingMode(.template)
                     .resizable()
                     .frame(width: 16, height: 16)
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(isSelected ? Color.textPrimary : Color.textTertiary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .background(Color.bgDefault)
+            .background(isSelected ? Color.bgSubtle : Color.bgDefault)
             .clipShape(Capsule())
             .overlay {
                 Capsule()
