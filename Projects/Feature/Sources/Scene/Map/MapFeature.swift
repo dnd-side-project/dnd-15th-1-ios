@@ -145,6 +145,8 @@ public struct MapFeature {
         case let .savedPlacesResponse(.failure(error)):
             // 인증 만료만 상위로 올려 로그인으로 보낸다. 다시 시도해도 안 풀리는 실패다
             if error == .unauthorized {
+                // 위에서 화면을 안 바꿔주면 시트가 로딩 뼈대에 갇힌다. 먼저 실패로 세운다
+                state.loadState = .failed
                 return .send(.delegate(.sessionExpired))
             }
             state.loadState = .failed
@@ -258,7 +260,8 @@ public struct MapFeature {
             } catch let error as PlaceError {
                 await send(.savedPlacesResponse(.failure(error)))
             } catch {
-                await send(.savedPlacesResponse(.failure(.network)))
+                // PlaceError 가 아닌 것을 network 로 부르면 원인을 잘못 이름 붙인다
+                await send(.savedPlacesResponse(.failure(.unknown)))
             }
         }
         // 탭을 오가며 여러 번 들어오면 늦게 온 옛 응답이 새 응답을 덮는다
