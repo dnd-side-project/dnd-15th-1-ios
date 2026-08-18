@@ -1,37 +1,503 @@
 import Domain
+import SharedDesignSystem
 import SwiftUI
 import ThirdParty
 
+// MARK: - RowMenuOption
+
+/// 장소 행의 `⋮` 메뉴 항목. 글자와 액션을 한자리에 묶어 `else` 로 삭제가 도는 걸 막는다.
+private enum RowMenuOption: String, CaseIterable {
+    case edit = "수정"
+    case delete = "삭제"
+}
+
+private enum CategoryDropdown {
+    static let allOption = "전체"
+}
+
+// MARK: - MapView
+
 public struct MapView: View {
     @Bindable public var store: StoreOf<MapFeature>
+
+    @State private var isSearchBarCovered = false
+
+    /// 기기 화면 높이. 시트 시작 높이의 기준이다
+    @State private var screenHeight: CGFloat = 0
+
+    /// 아래 안전영역(탭바 + 홈 인디케이터). 시트가 그 뒤로 이어지므로 목록 아래 여백에 더한다
+    @State private var bottomInset: CGFloat = 0
+
+    /// 저장자 드롭다운 메뉴의 화면 좌표. 시트 손짓이 이 안에서는 시작하지 않는다
+    @State private var ownershipMenuFrame: CGRect?
+
+    /// 카테고리 드롭다운 메뉴의 화면 좌표. 한쪽이 닫혀도 다른 쪽 자리를 지우지 않으려고 따로 둔다
+    @State private var categoryMenuFrame: CGRect?
+
+    /// 행 `⋮` 메뉴의 화면 좌표. 한 번에 하나만 열린다
+    @State private var rowMenuFrame: CGRect?
 
     public init(store: StoreOf<MapFeature>) {
         self.store = store
     }
 
     public var body: some View {
+        // 두 값은 조건이 달라 재는 층을 나눈다. 아래 안전영역은 안전영역을 무시하지 않는
+        // 자리에서만 실제 값이 나오므로, 그 층만 아래 뭉치 밖에 형제로 세운다
+        ZStack {
+            bottomInsetProbe
+            mapLayers
+        }
+    }
+}
+
+// MARK: - 층 나누기
+
+private extension MapView {
+    /// 지도 · 칩 · 시트 · 검색바 뭉치. 아래 안전영역을 무시하는 쪽이다
+    var mapLayers: some View {
+        // 세 층의 순서가 곧 시안이다. 칩 줄은 시트에 덮여야 하고(a10),
+        // 검색바는 시트를 끝까지 올려도 남아야 한다
+        ZStack(alignment: .bottom) {
+            map
+            categoryChipLayer
+            sheet
+            searchBarLayer
+        }
+        .background {
+            // 담는 층은 안전영역과 탭바만큼 짧다. 시작 높이는 기기 화면 기준이라 따로 잰다
+            GeometryReader { proxy in
+                Color.clear
+                    .onGeometryChange(for: CGFloat.self) { _ in proxy.size.height } action: {
+                        screenHeight = $0
+                    }
+            }
+            .ignoresSafeArea()
+        }
+        // 시트 흰 배경이 탭바 뒤로 이어지는 근거다. 빼면 시트 아래로 지도가 비친다
+        .ignoresSafeArea(edges: .bottom)
+        .toolbar(.hidden, for: .navigationBar)
+        .toast(item: toastBinding) { store.send(.retryTapped) }
+        .onAppear { store.send(.onAppear) }
+    }
+
+    /// 아래 안전영역(탭바 + 홈 인디케이터)을 재는 층.
+    /// `ignoresSafeArea` 안쪽에서 물으면 안전영역이 이미 먹혀 0 이 오므로, 아무 것도 걸지 않는다
+    var bottomInsetProbe: some View {
+        GeometryReader { proxy in
+            Color.clear
+                .onGeometryChange(for: CGFloat.self) { _ in proxy.safeAreaInsets.bottom } action: {
+                    bottomInset = $0
+                }
+        }
+        // Color.clear 도 탭을 받는다. 지도보다 아래층이지만 확실히 비켜둔다
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - 지도
+
+private extension MapView {
+    var map: some View {
         DulpickMapView(
             camera: Binding(
                 get: { store.camera },
                 set: { store.send(.cameraChanged($0)) }
             ),
             markers: store.markers,
-            onMarkerTap: { store.send(.markerTapped($0)) }
+            onMarkerTap: { store.send(.markerTapped($0)) },
+            onMapTap: { store.send(.rowMenuDismissed) }
         )
         .ignoresSafeArea()
-        .toolbar(.hidden, for: .navigationBar)
-        .onAppear { store.send(.onAppear) }
     }
 }
 
+// MARK: - 상단 검색바 · 카테고리 칩
+
+private extension MapView {
+    /// 시트 아래층. 시트가 올라오면 덮인다
+    var categoryChipLayer: some View {
+        CategoryChipBar(
+            items: chipItems,
+            selection: store.selectedCategory
+        ) { category in
+            store.send(.categoryTapped(category))
+        }
+        // 검색바와 따로 걸어도 결과가 같다. 묶음 그림자도 투명도를 따라 부품마다 그려진다
+        .shadow(
+            color: Color.commonBlack.opacity(MapViewMetric.topControlsShadowOpacity),
+            radius: MapViewMetric.topControlsShadowRadius,
+            y: MapViewMetric.topControlsShadowOffsetY
+        )
+        .padding(.top, MapViewMetric.searchBarBottom + Spacing.s8)
+        // 화면 높이를 채우기 전에 걸어야 그림자가 투명 영역까지 번지지 않는다
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    /// 시트 위층. 시트가 끝까지 올라와도 검색바가 남는다
+    var searchBarLayer: some View {
+        MapSearchBar(placeholder: "원하는 장소를 검색하세요") {
+            store.send(.searchBarTapped)
+        }
+        .padding(.horizontal, Spacing.s20)
+        .shadow(
+            color: Color.commonBlack.opacity(MapViewMetric.topControlsShadowOpacity),
+            radius: MapViewMetric.topControlsShadowRadius,
+            y: MapViewMetric.topControlsShadowOffsetY
+        )
+        // 시트가 검색바 뒤로 숨을 때 지도와 시트 머리가 틈으로 비치는 걸 막는다
+        .background(alignment: .top) { searchBarCover }
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    var searchBarCover: some View {
+        Color.bgDefault
+            .frame(height: MapViewMetric.searchBarBottom + MapViewMetric.coverGap)
+            .frame(maxWidth: .infinity)
+            // 위 안전영역은 따로 덮는다. ignoresSafeArea 를 판 자체에 걸면
+            // 판이 늘어나는 게 아니라 위로 옮겨져 검색바가 판 밖으로 나간다
+            .background(alignment: .top) {
+                Color.bgDefault.ignoresSafeArea(edges: .top)
+            }
+            // 판보다 먼저 걸어야 판과 같이 페이드한다. opacity 뒤에 걸면 판이 꺼져도 선이 지도 위에 남는다
+            .overlay(alignment: .bottom) {
+                Color.borderDefault
+                    .frame(height: MapViewMetric.coverBorderHeight)
+            }
+            .opacity(isSearchBarCovered ? 1 : 0)
+            .animation(.easeInOut(duration: MapViewMetric.fadeDuration), value: isSearchBarCovered)
+    }
+
+    var chipItems: [CategoryChipItem<PlaceCategory>] {
+        PlaceCategory.mapDisplayOrder.map { category in
+            CategoryChipItem(
+                id: category,
+                icon: category.icon,
+                title: category.displayName
+            )
+        }
+    }
+}
+
+// MARK: - 떠 있는 버튼
+
+private extension MapView {
+    var floatingControls: some View {
+        HStack(spacing: Spacing.s12) {
+            MapFloatingButton(title: "데이트 코스 짜러가기") {
+                store.send(.courseButtonTapped)
+            }
+
+            Spacer(minLength: Spacing.s12)
+
+            MapFloatingButton(icon: .locate) {
+                store.send(.currentLocationTapped)
+            }
+        }
+        .padding(.horizontal, Spacing.s20)
+    }
+}
+
+// MARK: - 시트
+
+private extension MapView {
+    var sheet: some View {
+        MapBottomSheet(
+            minVisibleHeight: MapViewMetric.sheetMinHeight,
+            initialVisibleHeight: screenHeight * MapViewMetric.sheetInitialRatio,
+            topLimit: MapViewMetric.searchBarBottom + MapViewMetric.coverGap,
+            hideAboveAtTop: MapViewMetric.chipBarBottom + MapViewMetric.hideControlsGap,
+            coverTopAtTop: MapViewMetric.searchBarBottom + MapViewMetric.coverGap,
+            onTopCoveredChange: { isSearchBarCovered = $0 },
+            openMenuFrames: [ownershipMenuFrame, categoryMenuFrame, rowMenuFrame].compactMap { $0 }
+        ) {
+            floatingControls
+        } header: {
+            sheetHeader
+        } content: {
+            sheetContent
+        }
+    }
+
+    var sheetHeader: some View {
+        VStack(alignment: .leading, spacing: Spacing.s8) {
+            Text("저장한 장소")
+                .typography(.title3SB)
+                .foregroundStyle(Color.textPrimary)
+
+            HStack(spacing: Spacing.s8) {
+                // 커플이 연동되어야 나온다. 미연동이면 카테고리 칩만 남는다
+                if store.isCoupleConnected {
+                    AppDropdown(
+                        selection: ownershipBinding,
+                        placeholder: PlaceOwnership.together.displayName,
+                        options: PlaceOwnership.mapDisplayOrder.map(\.displayName),
+                        onMenuFrameChange: { ownershipMenuFrame = $0 }
+                    )
+                }
+
+                AppDropdown(
+                    selection: categoryBinding,
+                    placeholder: CategoryDropdown.allOption,
+                    options: [CategoryDropdown.allOption] + PlaceCategory.mapDisplayOrder.map(\.displayName),
+                    onMenuFrameChange: { categoryMenuFrame = $0 }
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.s20)
+        .padding(.bottom, Spacing.s8)
+    }
+
+    @ViewBuilder
+    var sheetContent: some View {
+        switch store.loadState {
+        case .loading:
+            skeleton
+        case .failed:
+            failureState
+        case .loaded:
+            if store.isEmpty {
+                emptyState
+            } else {
+                placeList
+            }
+        }
+    }
+
+    /// 알림 띠는 3초 뒤 스스로 사라진다. 띠만 믿으면 재시도할 길이 없어져 본문에도 길을 둔다
+    var failureState: some View {
+        VStack(spacing: Spacing.s16) {
+            EmptyStateView(
+                image: .placeEmpty,
+                title: "장소를 불러오지 못했어요",
+                message: "잠시 뒤 다시 시도해주세요"
+            )
+
+            AppButton("다시 시도", style: .outlined, size: .md) {
+                store.send(.retryTapped)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, Spacing.s32)
+    }
+
+    var skeleton: some View {
+        VStack(spacing: Spacing.s16) {
+            ForEach(0 ..< MapViewMetric.skeletonRowCount, id: \.self) { _ in
+                ShimmerBlock(cornerRadius: MapViewMetric.cornerRadius)
+                    .frame(height: MapViewMetric.skeletonRowHeight)
+            }
+        }
+        .padding(.horizontal, Spacing.s20)
+        .padding(.top, Spacing.s8)
+    }
+
+    var emptyState: some View {
+        EmptyStateView(
+            image: .placeEmpty,
+            title: store.hasNoSavedPlace ? "저장한 장소가 없어요" : "조건에 맞는 장소가 없어요",
+            message: store.hasNoSavedPlace ? "마음에 드는 장소를 저장해보세요" : "필터를 바꿔보세요"
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, Spacing.s32)
+    }
+
+    var placeList: some View {
+        VStack(spacing: 0) {
+            ForEach(store.filteredPlaces) { saved in
+                row(saved)
+                    // 팝오버는 행 밖으로 나간다. 열린 행을 올려야 아래 행에 덮이지 않는다
+                    .zIndex(store.menuTargetPlaceID == saved.id ? 1 : 0)
+            }
+        }
+        .padding(.top, Spacing.s8)
+        // 마지막 행이 탭바에 가리지 않게 시트가 그만큼 더 올라간다
+        .padding(.bottom, Spacing.s20 + bottomInset)
+    }
+
+    func row(_ saved: SavedPlace) -> some View {
+        PlaceListRow(
+            icon: saved.place.category.icon,
+            name: saved.alias ?? saved.place.name,
+            address: saved.place.address,
+            thumbnailURLs: saved.place.thumbnailURLs
+        ) { url in
+            RemoteImage(url: url, cornerRadius: MapViewMetric.cornerRadius)
+        } trailing: {
+            menuButton(saved.id)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { store.send(.rowTapped(saved.id)) }
+    }
+
+    func menuButton(_ id: String) -> some View {
+        Button {
+            store.send(.rowMenuTapped(id))
+        } label: {
+            Image.menu
+                .renderingMode(.template)
+                .resizable()
+                .frame(
+                    width: MapViewMetric.menuIconSize,
+                    height: MapViewMetric.menuIconSize
+                )
+                .foregroundStyle(Color.textTertiary)
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) {
+            if store.menuTargetPlaceID == id {
+                DropdownMenu(options: RowMenuOption.allCases.map(\.rawValue), style: .menu) { option in
+                    switch RowMenuOption(rawValue: option) {
+                    case .edit:
+                        store.send(.editTapped(id))
+                    case .delete:
+                        store.send(.deleteTapped(id))
+                    case nil:
+                        break
+                    }
+                }
+                .fixedSize()
+                // 아래 .offset 까지 반영된 자리가 나온다. 손으로 더하면 그만큼 아래로 밀린다
+                .onGeometryChange(for: CGRect.self) { proxy in
+                    proxy.frame(in: .global)
+                } action: { frame in
+                    rowMenuFrame = frame
+                }
+                .offset(y: MapViewMetric.rowMenuOffsetY)
+                .onDisappear {
+                    rowMenuFrame = nil
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Binding
+
+private extension MapView {
+    /// `AppDropdown` 은 문자열만 오간다. 값으로 되돌려 액션에 싣는다
+    var ownershipBinding: Binding<String?> {
+        Binding(
+            get: { store.selectedOwnership == .together ? nil : store.selectedOwnership.displayName },
+            set: { newValue in
+                guard let newValue else {
+                    store.send(.ownershipSelected(.together))
+                    return
+                }
+                guard let filter = PlaceOwnership.fromDisplayName(newValue) else { return }
+                store.send(.ownershipSelected(filter))
+            }
+        )
+    }
+
+    var categoryBinding: Binding<String?> {
+        Binding(
+            get: { store.selectedCategory?.displayName },
+            set: { newValue in
+                guard let newValue, newValue != CategoryDropdown.allOption else {
+                    store.send(.categoryTapped(nil))
+                    return
+                }
+                guard let category = PlaceCategory.fromDisplayName(newValue) else { return }
+                // 리듀서가 같은 값 재탭을 해제로 읽는다. 드롭다운은 늘 그 값으로 놓아야 한다
+                if store.selectedCategory != category {
+                    store.send(.categoryTapped(category))
+                }
+            }
+        )
+    }
+
+    var toastBinding: Binding<ToastState?> {
+        Binding(
+            get: { store.toast },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.dismissToast)
+                }
+            }
+        )
+    }
+}
+
+// MARK: - MapViewMetric
+
+private enum MapViewMetric {
+    static let skeletonRowCount = 3
+    static let skeletonRowHeight: CGFloat = 64
+    static let cornerRadius: CGFloat = 12
+    static let menuIconSize: CGFloat = 24
+
+    /// `⋮` 버튼 아래에 팝오버가 붙는 거리. 버튼 높이만큼 내린다
+    static let rowMenuOffsetY: CGFloat = 32
+
+    static let topControlsShadowRadius: CGFloat = 4
+    static let topControlsShadowOpacity: Double = 0.10
+    static let topControlsShadowOffsetY: CGFloat = 2
+
+    /// 안전영역 상단에서 검색바 바닥까지
+    static let searchBarBottom: CGFloat = 48
+    /// 안전영역 상단에서 칩 줄 바닥까지 (검색바 48 + 간격 8 + 칩 36)
+    static let chipBarBottom: CGFloat = 92
+    /// 시트 윗면이 검색바 바닥에서 이만큼 아래로 오면 흰 판이 켜진다
+    static let coverGap: CGFloat = 8
+    /// 흰 판 아래 끝 경계선 두께. 판 높이 안쪽 맨 아래를 차지해 판을 늘리지 않는다
+    static let coverBorderHeight: CGFloat = 1
+    /// 시트 윗면이 칩 줄 바닥에서 이만큼 가까워지면 떠 있는 버튼이 사라진다
+    static let hideControlsGap: CGFloat = 100
+    /// 시트 바닥. 잡이 막대 33 + 제목 30 + 필터 줄 52 = 115 에 탭바 자리를 눈으로 더한 값이다.
+    /// 탭바 높이를 재서 더하면 재는 자리에 따라 0 이 섞여 들어오므로, 재지 않고 못 박는다
+    static let sheetMinHeight: CGFloat = 200
+    /// 시트 시작 높이. 화면 높이 대비
+    static let sheetInitialRatio: CGFloat = 0.4
+    static let fadeDuration: Double = 0.2
+}
+
 #if DEBUG
-#Preview {
+// a08 · a09 — 커플 연동, 저장한 장소가 있는 기본 상태
+#Preview("기본") {
     KakaoMapPreviewContainer {
         MapView(
             store: Store(initialState: MapFeature.State()) {
                 MapFeature()
             } withDependencies: {
                 $0.placeClient = .mock
+                $0.coupleClient.current = {
+                    CoupleStatus(
+                        connected: true,
+                        me: CoupleMember(nickname: "나", iconID: 1),
+                        partner: CoupleMember(nickname: "둘", iconID: 1),
+                        daysTogether: nil
+                    )
+                }
+            }
+        )
+    }
+}
+
+// 커플 미연동 — 저장자 칩이 사라진다
+#Preview("미연동") {
+    KakaoMapPreviewContainer {
+        MapView(
+            store: Store(initialState: MapFeature.State()) {
+                MapFeature()
+            } withDependencies: {
+                $0.placeClient = .mock
+                $0.coupleClient.current = { nil }
+            }
+        )
+    }
+}
+
+// 저장한 장소가 없는 빈 상태
+#Preview("빈 상태") {
+    KakaoMapPreviewContainer {
+        MapView(
+            store: Store(initialState: MapFeature.State()) {
+                MapFeature()
+            } withDependencies: {
+                $0.placeClient.savedPlaces = { [] }
+                $0.coupleClient.current = { nil }
             }
         )
     }
