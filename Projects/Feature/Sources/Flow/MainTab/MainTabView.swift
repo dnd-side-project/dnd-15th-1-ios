@@ -23,11 +23,9 @@ public struct MainTabView: View {
             .tabItem { tabLabel("탐색", icon: .explore) }
             .tag(MainTabFeature.Tab.explore)
 
-            NavigationStack {
-                MapView(store: store.scope(state: \.map, action: \.map))
-            }
-            .tabItem { tabLabel("지도", icon: .map) }
-            .tag(MainTabFeature.Tab.map)
+            MapFlowView(store: store.scope(state: \.map, action: \.map))
+                .tabItem { tabLabel("지도", icon: .map) }
+                .tag(MainTabFeature.Tab.map)
 
             NavigationStack {
                 MyPageView(store: store.scope(state: \.myPage, action: \.myPage))

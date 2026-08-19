@@ -4,17 +4,23 @@ import XCTest
 
 @MainActor
 final class MainTabMapDelegateTests: XCTestCase {
-    func test_받는_쪽이_없는_신호는_상위로_새어보내지_않는다() async {
+    func test_지도_화면_이동은_상위로_새어보내지_않는다() async {
         let store = TestStore(initialState: MainTabFeature.State()) {
             MainTabFeature()
         }
 
-        // 받는 쪽은 Cycle 2~4 다. 지금은 상태를 안 바꾸고 조용히 삼킨다
-        await store.send(.map(.delegate(.placeSelected("7"))))
-        await store.send(.map(.delegate(.searchRequested)))
-        await store.send(.map(.delegate(.courseRequested)))
-        await store.send(.map(.delegate(.editRequested("7"))))
-        await store.send(.map(.delegate(.deleteRequested("7"))))
+        // 화면 이동은 MapFlowFeature 가 자기 path 로 삼킨다. MainTab 은 탭만 지킨다
+        await store.send(.map(.map(.delegate(.placeSelected("7"))))) {
+            $0.map.path = [.placeDetail("7")]
+        }
+        await store.send(.map(.map(.delegate(.searchRequested)))) {
+            $0.map.path = [.placeDetail("7"), .search]
+        }
+        await store.send(.map(.map(.delegate(.courseRequested)))) {
+            $0.map.path = [.placeDetail("7"), .search, .course]
+        }
+        await store.send(.map(.map(.delegate(.editRequested("7")))))
+        await store.send(.map(.map(.delegate(.deleteRequested("7")))))
 
         XCTAssertEqual(store.state.selectedTab, .home)
     }
@@ -25,7 +31,8 @@ final class MainTabMapDelegateTests: XCTestCase {
         }
 
         // 전역 에러라 RootFlow 까지 올라가야 로그인으로 되돌아간다
-        await store.send(.map(.delegate(.sessionExpired)))
+        await store.send(.map(.map(.delegate(.sessionExpired))))
+        await store.receive(\.map.delegate.sessionExpired)
         await store.receive(\.delegate.sessionExpired)
     }
 }
