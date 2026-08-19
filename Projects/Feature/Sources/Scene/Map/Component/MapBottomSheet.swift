@@ -273,6 +273,8 @@ private extension MapBottomSheet {
     var scrollingContent: some View {
         ScrollView {
             content
+                // 안쪽 가로 스크롤이 스스로 잠그는 근거다. scrollDisabled 가 거기까지 안 닿는다
+                .environment(\.isSheetDragging, isDraggingSheet)
         }
         // 접힘에서 스크롤을 열어두면 목록을 쓸 때 시트가 안 펼쳐진다.
         // 시트가 손짓을 들고 있는 동안에도 잠근다. 안 잠그면 시트가 오르내릴 때 목록도 같이 스크롤된다

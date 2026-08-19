@@ -59,6 +59,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     private let trailing: Trailing
     /// 우측 슬롯을 둘지. `false` 면 24 칸도 그 앞 여백도 만들지 않아 장소명이 남는 폭을 다 쓴다.
     private let hasTrailing: Bool
+    @Environment(\.isSheetDragging) private var isSheetDragging
 
     init(
         icon: Image,
@@ -167,6 +168,8 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
             .padding(.leading, PlaceListRowMetric.textLeadingInset)
             .padding(.trailing, Spacing.s20)
         }
+        // 시트가 손짓을 들고 있는 동안에는 잠근다. 안 잠그면 시트를 올리는 중에 가로로 넘어간다
+        .scrollDisabled(isSheetDragging)
     }
 
     private var divider: some View {
