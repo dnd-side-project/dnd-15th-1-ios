@@ -7,22 +7,24 @@
 
 import SwiftUI
 
-// 사용법: AppDropdown(selection: $store.category, placeholder: "카테고리", options: [...])
+// 사용법: AppDropdown(selection: $store.category, isExpanded: $isOpen, placeholder: "카테고리", options: [...])
 public struct AppDropdown: View {
     @Binding private var selection: String?
+    @Binding private var isExpanded: Bool
     private let placeholder: String
     private let options: [String]
     private let onMenuFrameChange: ((CGRect?) -> Void)?
-    @State private var isExpanded = false
     @State private var pillHeight: CGFloat = 0
 
     public init(
         selection: Binding<String?>,
+        isExpanded: Binding<Bool>,
         placeholder: String,
         options: [String],
         onMenuFrameChange: ((CGRect?) -> Void)? = nil
     ) {
         self._selection = selection
+        self._isExpanded = isExpanded
         self.placeholder = placeholder
         self.options = options
         self.onMenuFrameChange = onMenuFrameChange
