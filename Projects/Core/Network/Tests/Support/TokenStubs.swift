@@ -55,3 +55,21 @@ actor StubTokenRefresher: TokenRefreshing {
         }
     }
 }
+
+/// `URLProtocolStub.requestHandler` 안에서 토큰을 바꿀 수 있게 동기 세터를 둔다.
+final class SyncTokenProvider: TokenProviding, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedToken: String?
+
+    init(token: String?) {
+        storedToken = token
+    }
+
+    func accessToken() async throws -> String? {
+        lock.withLock { storedToken }
+    }
+
+    func setToken(_ token: String?) {
+        lock.withLock { storedToken = token }
+    }
+}

@@ -180,4 +180,156 @@ final class AFNetworkClientAuthTests: XCTestCase {
             XCTFail("unexpected \(error)")
         }
     }
+
+    func test_토큰이_이미_갱신됐으면_재발급_없이_재시도한다() async throws {
+        let provider = SyncTokenProvider(token: "old-token")
+
+        URLProtocolStub.requestHandler = { request in
+            let authorization = request.value(forHTTPHeaderField: "Authorization")
+            if authorization == "Bearer old-token" {
+                // 다른 요청이 이미 재발급을 끝낸 상황을 만든다
+                provider.setToken("new-token")
+                return .init(statusCode: 401, headers: [:], data: Data())
+            }
+            XCTAssertEqual(authorization, "Bearer new-token")
+            return .init(statusCode: 200, headers: [:], data: Data(#"{"ok":true}"#.utf8))
+        }
+
+        struct Payload: Decodable, Equatable, Sendable { let ok: Bool }
+        let baseURL = try XCTUnwrap(URL(string: "https://api.example.invalid"))
+        let refresher = StubTokenRefresher(provider: nil, nextToken: nil)
+        let interceptor = AuthRequestInterceptor(
+            tokenProvider: provider,
+            tokenRefresher: refresher
+        )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
+        let client = AFNetworkClient(
+            session: TestSessionFactory.make(interceptor: interceptor),
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
+        )
+
+        let response: Payload = try await client.request(TestEndpoint())
+        XCTAssertEqual(response, Payload(ok: true))
+
+        let refreshCount = await refresher.refreshCount
+        XCTAssertEqual(refreshCount, 0)
+    }
+
+    func test_재발급_실패_직후_401은_재발급을_다시_부르지_않는다() async throws {
+        URLProtocolStub.requestHandler = { _ in
+            .init(statusCode: 401, headers: [:], data: Data())
+        }
+
+        struct Payload: Decodable, Sendable { let ok: Bool }
+        let baseURL = try XCTUnwrap(URL(string: "https://api.example.invalid"))
+        let provider = StubTokenProvider(token: "access-token")
+        let refresher = StubTokenRefresher(provider: provider, nextToken: nil)
+        await refresher.setError(NetworkError.unauthorized)
+        let interceptor = AuthRequestInterceptor(
+            tokenProvider: provider,
+            tokenRefresher: refresher
+        )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
+        let client = AFNetworkClient(
+            session: TestSessionFactory.make(interceptor: interceptor),
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
+        )
+
+        for _ in 0..<2 {
+            do {
+                let _: Payload = try await client.request(TestEndpoint())
+                XCTFail("expected unauthorized")
+            } catch let error as NetworkError {
+                XCTAssertEqual(error, .unauthorized)
+            } catch {
+                XCTFail("unexpected \(error)")
+            }
+        }
+
+        let refreshCount = await refresher.refreshCount
+        XCTAssertEqual(refreshCount, 1)
+    }
+}
+
+extension AFNetworkClientAuthTests {
+    func test_전송_실패는_기억하지_않아_다음_401에서_재발급을_다시_시도한다() async throws {
+        URLProtocolStub.requestHandler = { request in
+            if (request.value(forHTTPHeaderField: "Authorization") ?? "")
+                .contains("access-token-refreshed") == false {
+                return .init(statusCode: 401, headers: [:], data: Data())
+            }
+            return .init(statusCode: 200, headers: [:], data: Data(#"{"ok":true}"#.utf8))
+        }
+
+        struct Payload: Decodable, Equatable, Sendable { let ok: Bool }
+        let baseURL = try XCTUnwrap(URL(string: "https://api.example.invalid"))
+        let provider = StubTokenProvider(token: "access-token")
+        let refresher = StubTokenRefresher(provider: provider)
+        await refresher.setError(URLError(.timedOut))
+        let interceptor = AuthRequestInterceptor(
+            tokenProvider: provider,
+            tokenRefresher: refresher
+        )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
+        let client = AFNetworkClient(
+            session: TestSessionFactory.make(interceptor: interceptor),
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
+        )
+
+        // 1회차: 재발급이 전송 실패로 끝난다. 기억하면 안 된다.
+        do {
+            let _: Payload = try await client.request(TestEndpoint())
+            XCTFail("expected unauthorized")
+        } catch let error as NetworkError {
+            XCTAssertEqual(error, .unauthorized)
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+
+        await refresher.setError(nil)
+
+        // 2회차: 재발급을 다시 시도해 성공해야 한다.
+        let response: Payload = try await client.request(TestEndpoint())
+        XCTAssertEqual(response, Payload(ok: true))
+
+        let refreshCount = await refresher.refreshCount
+        XCTAssertEqual(refreshCount, 2)
+    }
+
+    func test_재발급이_실패해도_요청_하나가_부르는_재발급은_1회다() async throws {
+        URLProtocolStub.requestHandler = { _ in
+            .init(statusCode: 401, headers: [:], data: Data())
+        }
+
+        struct Payload: Decodable, Sendable { let ok: Bool }
+        let baseURL = try XCTUnwrap(URL(string: "https://api.example.invalid"))
+        let provider = StubTokenProvider(token: "access-token")
+        let refresher = StubTokenRefresher(provider: provider)
+        await refresher.setError(URLError(.timedOut))
+        let interceptor = AuthRequestInterceptor(
+            tokenProvider: provider,
+            tokenRefresher: refresher
+        )
+        let networkConfig = NetworkConfiguration(baseURL: baseURL)
+        let client = AFNetworkClient(
+            session: TestSessionFactory.make(interceptor: interceptor),
+            baseURL: networkConfig.baseURL,
+            jsonDecoder: networkConfig.jsonDecoder
+        )
+
+        do {
+            let _: Payload = try await client.request(TestEndpoint())
+            XCTFail("expected unauthorized")
+        } catch let error as NetworkError {
+            XCTAssertEqual(error, .unauthorized)
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+
+        let refreshCount = await refresher.refreshCount
+        XCTAssertEqual(refreshCount, 1)
+    }
 }
