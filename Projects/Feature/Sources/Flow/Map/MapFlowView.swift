@@ -26,7 +26,9 @@ public struct MapFlowView: View {
         case .postDetail:
             Text("게시글 상세 화면 준비 중 — Cycle 7")
         case .search:
-            Text("검색 화면 준비 중 — Cycle 3 (DND-50)")
+            if let searchStore = store.scope(state: \.placeSearch, action: \.placeSearch) {
+                PlaceSearchView(store: searchStore)
+            }
         case .course:
             Text("코스 화면 준비 중 — Cycle 4 (DND-51)")
         }

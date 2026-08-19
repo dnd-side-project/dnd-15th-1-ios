@@ -13,7 +13,17 @@ public struct MapFeature {
 
     @ObservableState
     public struct State: Equatable {
+        /// 지도가 무엇을 그리고 있는지. 검색 결과가 들어오면 저장 장소를 잠시 덮는다
+        public enum Mode: Equatable, Sendable {
+            case saved
+            case searchResult(query: String, places: [Place])
+        }
+
         public var camera: MapCamera = .ansan
+        public var mode: Mode = .saved
+
+        /// 저장 여부 표시. 서버 계약이 없어 화면 안에서만 산다
+        public var bookmarkedPlaceIDs: Set<String> = []
         public var places: [SavedPlace] = []
         public var loadState: LoadState = .loading
 
@@ -37,12 +47,23 @@ public struct MapFeature {
         }
 
         public var markers: [MapMarker] {
-            filteredPlaces.map { saved in
-                MapMarker(
-                    id: saved.id,
-                    coordinate: saved.place.coordinate,
-                    kind: .category(saved.place.category)
-                )
+            switch mode {
+            case .saved:
+                return filteredPlaces.map { saved in
+                    MapMarker(
+                        id: saved.id,
+                        coordinate: saved.place.coordinate,
+                        kind: .category(saved.place.category)
+                    )
+                }
+            case let .searchResult(_, places):
+                return places.map { place in
+                    MapMarker(
+                        id: place.id,
+                        coordinate: place.coordinate,
+                        kind: .category(place.category)
+                    )
+                }
             }
         }
 
@@ -77,6 +98,10 @@ public struct MapFeature {
         case currentLocationTapped
         case retryTapped
         case dismissToast
+        case searchResultsApplied(query: String, places: [Place])
+        case searchClearTapped
+        case searchBackTapped
+        case bookmarkTapped(String)
         case delegate(Delegate)
 
         @CasePathable
@@ -85,6 +110,7 @@ public struct MapFeature {
             case placeSelected(String)
             /// 검색바 탭. 받는 쪽은 Cycle 3 이다
             case searchRequested
+            case searchReopenRequested(query: String)
             /// `데이트 코스 짜러가기`. 받는 쪽은 Cycle 4 다
             case courseRequested
             case editRequested(String)
@@ -119,6 +145,8 @@ public struct MapFeature {
             return updateFilter(state: &state, action: action)
         case .editTapped, .deleteTapped, .markerTapped, .rowTapped, .searchBarTapped, .courseButtonTapped:
             return raise(state: &state, action: action)
+        case .searchResultsApplied, .searchClearTapped, .searchBackTapped, .bookmarkTapped:
+            return updateSearch(state: &state, action: action)
         case .delegate:
             return .none
         }
@@ -139,6 +167,7 @@ public struct MapFeature {
 
         case let .savedPlacesResponse(.success(places)):
             state.places = places
+            state.bookmarkedPlaceIDs = Set(places.map(\.id))
             state.loadState = .loaded
             return .none
 
@@ -275,5 +304,56 @@ public struct MapFeature {
             await send(.coupleResponse(status?.connected == true))
         }
         .cancellable(id: CancelID.couple, cancelInFlight: true)
+    }
+}
+
+private extension MapFeature {
+    func updateSearch(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .searchResultsApplied(query, places):
+            state.mode = .searchResult(query: query, places: places)
+            state.menuTargetPlaceID = nil
+            if let first = places.first {
+                state.camera.center = first.coordinate
+            }
+            return .none
+        case .searchClearTapped:
+            state.mode = .saved
+            return .none
+        case .searchBackTapped:
+            guard let query = state.searchQuery else { return .none }
+            return .send(.delegate(.searchReopenRequested(query: query)))
+        case let .bookmarkTapped(id):
+            if state.bookmarkedPlaceIDs.contains(id) {
+                state.bookmarkedPlaceIDs.remove(id)
+            } else {
+                state.bookmarkedPlaceIDs.insert(id)
+            }
+            return .none
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+}
+
+public extension MapFeature.State {
+    var isSearching: Bool {
+        if case .searchResult = mode { return true }
+        return false
+    }
+
+    var searchQuery: String? {
+        if case let .searchResult(query, _) = mode { return query }
+        return nil
+    }
+
+    var searchResults: [Place] {
+        if case let .searchResult(_, places) = mode { return places }
+        return []
+    }
+
+    func isBookmarked(_ placeID: String) -> Bool {
+        bookmarkedPlaceIDs.contains(placeID)
     }
 }

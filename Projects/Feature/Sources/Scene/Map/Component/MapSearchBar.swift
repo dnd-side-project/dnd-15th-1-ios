@@ -8,56 +8,128 @@ private enum MapSearchBarMetric {
     static let cornerRadius: CGFloat = 12
     static let borderWidth: CGFloat = 1
     static let buttonSize: CGFloat = 48
+    /// 검색 모드 뒤로가기. 오른쪽 돋보기 버튼(48)과 크기가 다르다
+    static let backButtonSize: CGFloat = 44
     static let buttonCornerRadius: CGFloat = 12
     static let iconSize: CGFloat = 24
 }
 
 // MARK: - MapSearchBar
 
-/// 지도 위 검색바. 글자를 받지 않고 탭만 올린다.
+/// 지도 위 검색바.
 ///
-/// 실제 검색 화면은 Cycle 3 이다. 여기서는 자리와 모양만 맞춘다.
+/// 저장 장소 모드에서는 글자를 안 받고 탭만 올린다.
+/// 검색 모드에서는 검색어를 보여주고 우측에 지우기를 준다.
 struct MapSearchBar: View {
     private let placeholder: String
-    private let action: () -> Void
+    private let text: String?
+    private let onTap: () -> Void
+    private let onClear: (() -> Void)?
+    private let onBack: (() -> Void)?
 
-    init(placeholder: String, action: @escaping () -> Void) {
+    init(
+        placeholder: String,
+        text: String? = nil,
+        onTap: @escaping () -> Void,
+        onClear: (() -> Void)? = nil,
+        onBack: (() -> Void)? = nil
+    ) {
         self.placeholder = placeholder
-        self.action = action
+        self.text = text
+        self.onTap = onTap
+        self.onClear = onClear
+        self.onBack = onBack
     }
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: Spacing.s4) {
-                Text(placeholder)
-                    .typography(.body1M)
-                    .foregroundStyle(Color.gray400)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Spacing.s20)
-                    .frame(height: MapSearchBarMetric.height)
-                    .background(Color.bgDefault)
-                    .clipShape(RoundedRectangle(cornerRadius: MapSearchBarMetric.cornerRadius))
-                    .overlay {
-                        // 선이 안쪽에 그려져야 높이가 48 로 유지된다
-                        RoundedRectangle(cornerRadius: MapSearchBarMetric.cornerRadius)
-                            .strokeBorder(Color.borderDefault, lineWidth: MapSearchBarMetric.borderWidth)
-                    }
-
-                Image.search
-                    .renderingMode(.template)
-                    .resizable()
-                    .frame(
-                        width: MapSearchBarMetric.iconSize,
-                        height: MapSearchBarMetric.iconSize
-                    )
-                    .foregroundStyle(Color.textInverseTertiary)
-                    .frame(
-                        width: MapSearchBarMetric.buttonSize,
-                        height: MapSearchBarMetric.buttonSize
-                    )
-                    .background(Color.brandPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: MapSearchBarMetric.buttonCornerRadius))
+        if onBack != nil {
+            HStack(spacing: Spacing.s12) {
+                backButton
+                field
             }
+        } else {
+            HStack(spacing: Spacing.s4) {
+                field
+                searchButton
+            }
+        }
+    }
+
+    private var backButton: some View {
+        Button {
+            onBack?()
+        } label: {
+            Image.arrowLeft
+                .renderingMode(.template)
+                .resizable()
+                .frame(
+                    width: MapSearchBarMetric.iconSize,
+                    height: MapSearchBarMetric.iconSize
+                )
+                .foregroundStyle(Color.textSecondary)
+                .frame(
+                    width: MapSearchBarMetric.backButtonSize,
+                    height: MapSearchBarMetric.backButtonSize
+                )
+        }
+        .buttonStyle(.plain)
+        .glassCircleBackground()
+    }
+
+    private var field: some View {
+        HStack(spacing: Spacing.s8) {
+            // 지우기 버튼과 손짓이 겹치지 않게 글자 칸만 탭을 받는다
+            Text(text ?? placeholder)
+                .typography(.body1M)
+                .foregroundStyle(text == nil ? Color.gray400 : Color.textPrimary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .padding(.leading, Spacing.s20)
+                .padding(.trailing, text != nil && onClear != nil ? 0 : Spacing.s20)
+                .contentShape(Rectangle())
+                .onTapGesture { onTap() }
+
+            if text != nil, let onClear {
+                Button(action: onClear) {
+                    Image.x
+                        .renderingMode(.template)
+                        .resizable()
+                        .frame(
+                            width: MapSearchBarMetric.iconSize,
+                            height: MapSearchBarMetric.iconSize
+                        )
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, Spacing.s20)
+            }
+        }
+        .frame(height: MapSearchBarMetric.height)
+        .background(Color.bgDefault)
+        .clipShape(RoundedRectangle(cornerRadius: MapSearchBarMetric.cornerRadius))
+        .overlay {
+            // 선이 안쪽에 그려져야 높이가 48 로 유지된다
+            RoundedRectangle(cornerRadius: MapSearchBarMetric.cornerRadius)
+                .strokeBorder(Color.borderDefault, lineWidth: MapSearchBarMetric.borderWidth)
+        }
+    }
+
+    private var searchButton: some View {
+        Button(action: onTap) {
+            Image.search
+                .renderingMode(.template)
+                .resizable()
+                .frame(
+                    width: MapSearchBarMetric.iconSize,
+                    height: MapSearchBarMetric.iconSize
+                )
+                .foregroundStyle(Color.textInverseTertiary)
+                .frame(
+                    width: MapSearchBarMetric.buttonSize,
+                    height: MapSearchBarMetric.buttonSize
+                )
+                .background(Color.brandPrimary)
+                .clipShape(RoundedRectangle(cornerRadius: MapSearchBarMetric.buttonCornerRadius))
         }
         .buttonStyle(.plain)
     }
@@ -65,11 +137,25 @@ struct MapSearchBar: View {
 
 #if DEBUG
 // a08 — 지도 위 검색바
-#Preview {
+#Preview("저장 장소") {
     ZStack(alignment: .top) {
         Color.gray300.ignoresSafeArea()
-        MapSearchBar(placeholder: "원하는 장소를 검색하세요") {}
+        MapSearchBar(placeholder: "원하는 장소를 검색하세요", onTap: {})
             .padding(.horizontal, Spacing.s20)
+    }
+}
+
+#Preview("검색") {
+    ZStack(alignment: .top) {
+        Color.gray300.ignoresSafeArea()
+        MapSearchBar(
+            placeholder: "원하는 장소를 검색하세요",
+            text: "음식점",
+            onTap: {},
+            onClear: {},
+            onBack: {}
+        )
+        .padding(.horizontal, Spacing.s20)
     }
 }
 #endif

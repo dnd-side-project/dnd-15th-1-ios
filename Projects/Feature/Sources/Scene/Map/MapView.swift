@@ -113,8 +113,15 @@ private extension MapView {
 // MARK: - 상단 검색바 · 카테고리 칩
 
 private extension MapView {
-    /// 시트 아래층. 시트가 올라오면 덮인다
+    @ViewBuilder
     var categoryChipLayer: some View {
+        if !store.isSearching {
+            savedChipLayer
+        }
+    }
+
+    /// 시트 아래층. 시트가 올라오면 덮인다
+    var savedChipLayer: some View {
         CategoryChipBar(
             items: chipItems,
             selection: store.selectedCategory
@@ -134,9 +141,13 @@ private extension MapView {
 
     /// 시트 아래층. 시트를 펼치면 덮인다
     var searchBarLayer: some View {
-        MapSearchBar(placeholder: "원하는 장소를 검색하세요") {
-            store.send(.searchBarTapped)
-        }
+        MapSearchBar(
+            placeholder: "원하는 장소를 검색하세요",
+            text: store.searchQuery,
+            onTap: { store.send(.searchBarTapped) },
+            onClear: { store.send(.searchClearTapped) },
+            onBack: store.isSearching ? { store.send(.searchBackTapped) } : nil
+        )
         .padding(.horizontal, Spacing.s20)
         .shadow(
             color: Color.commonBlack.opacity(MapViewMetric.topControlsShadowOpacity),
@@ -162,8 +173,10 @@ private extension MapView {
 private extension MapView {
     var floatingControls: some View {
         HStack(spacing: Spacing.s12) {
-            MapFloatingButton(title: "데이트 코스 짜러가기") {
-                store.send(.courseButtonTapped)
+            if !store.isSearching {
+                MapFloatingButton(title: "데이트 코스 짜러가기") {
+                    store.send(.courseButtonTapped)
+                }
             }
 
             Spacer(minLength: Spacing.s12)
@@ -182,7 +195,7 @@ private extension MapView {
     var sheet: some View {
         MapBottomSheet(
             selection: $sheetDetent,
-            expandLimit: .safeAreaTop,
+            expandLimit: store.isSearching ? .belowSearchBar : .safeAreaTop,
             openMenuFrames: [ownershipMenuFrame, categoryMenuFrame, rowMenu?.frame].compactMap { $0 },
             // 끌기 시작하면 열린 메뉴를 닫는다. 열어둔 채 끌면 메뉴가 시트를 따라다녀 어색하다
             onDragBegan: {
@@ -198,7 +211,16 @@ private extension MapView {
         }
     }
 
+    @ViewBuilder
     var sheetHeader: some View {
+        if store.isSearching {
+            EmptyView()
+        } else {
+            savedSheetHeader
+        }
+    }
+
+    var savedSheetHeader: some View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
             Text("저장한 장소")
                 .typography(.title3SB)
@@ -232,6 +254,15 @@ private extension MapView {
 
     @ViewBuilder
     var sheetContent: some View {
+        if store.isSearching {
+            searchResultList
+        } else {
+            savedSheetContent
+        }
+    }
+
+    @ViewBuilder
+    var savedSheetContent: some View {
         switch store.loadState {
         case .loading:
             skeleton
@@ -244,6 +275,40 @@ private extension MapView {
                 placeList
             }
         }
+    }
+
+    /// 검색 결과 행. 사진을 안 넘기고 우측에 북마크를 둔다
+    var searchResultList: some View {
+        VStack(spacing: 0) {
+            ForEach(store.searchResults) { place in
+                PlaceListRow(
+                    icon: place.category.icon,
+                    name: place.name,
+                    address: place.address,
+                    showsDivider: place.id != store.searchResults.last?.id
+                ) {
+                    bookmarkButton(place.id)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { store.send(.rowTapped(place.id)) }
+            }
+        }
+        .padding(.top, Spacing.s8)
+        .padding(.bottom, Spacing.s20 + bottomInset)
+    }
+
+    func bookmarkButton(_ id: String) -> some View {
+        Button {
+            store.send(.bookmarkTapped(id))
+        } label: {
+            (store.bookmarkedPlaceIDs.contains(id) ? Image.bookmarkFillColor : Image.bookmarkStroke)
+                .resizable()
+                .frame(
+                    width: MapViewMetric.menuIconSize,
+                    height: MapViewMetric.menuIconSize
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     /// 알림 띠는 3초 뒤 스스로 사라진다. 띠만 믿으면 재시도할 길이 없어져 본문에도 길을 둔다
@@ -287,7 +352,7 @@ private extension MapView {
     var placeList: some View {
         VStack(spacing: 0) {
             ForEach(store.filteredPlaces) { saved in
-                row(saved)
+                row(saved, showsDivider: saved.id != store.filteredPlaces.last?.id)
                     // 팝오버는 행 밖으로 나간다. 열린 행을 올려야 아래 행에 덮이지 않는다
                     .zIndex(store.menuTargetPlaceID == saved.id ? 1 : 0)
             }
@@ -297,11 +362,12 @@ private extension MapView {
         .padding(.bottom, Spacing.s20 + bottomInset)
     }
 
-    func row(_ saved: SavedPlace) -> some View {
+    func row(_ saved: SavedPlace, showsDivider: Bool) -> some View {
         PlaceListRow(
             icon: saved.place.category.icon,
             name: saved.alias ?? saved.place.name,
             address: saved.place.address,
+            showsDivider: showsDivider,
             thumbnailURLs: saved.place.thumbnailURLs
         ) { url in
             RemoteImage(url: url, cornerRadius: MapViewMetric.cornerRadius)
