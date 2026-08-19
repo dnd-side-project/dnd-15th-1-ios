@@ -54,6 +54,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     private let icon: Image
     private let name: String
     private let address: String
+    private let showsDivider: Bool
     private let thumbnailURLs: [URL]
     private let thumbnail: (URL) -> Thumbnail
     private let trailing: Trailing
@@ -65,6 +66,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         icon: Image,
         name: String,
         address: String,
+        showsDivider: Bool = true,
         thumbnailURLs: [URL] = [],
         @ViewBuilder thumbnail: @escaping (URL) -> Thumbnail,
         @ViewBuilder trailing: () -> Trailing
@@ -73,6 +75,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
             icon: icon,
             name: name,
             address: address,
+            showsDivider: showsDivider,
             thumbnailURLs: thumbnailURLs,
             thumbnail: thumbnail,
             trailing: trailing(),
@@ -84,6 +87,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         icon: Image,
         name: String,
         address: String,
+        showsDivider: Bool,
         thumbnailURLs: [URL],
         thumbnail: @escaping (URL) -> Thumbnail,
         trailing: Trailing,
@@ -92,6 +96,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         self.icon = icon
         self.name = name
         self.address = address
+        self.showsDivider = showsDivider
         self.thumbnailURLs = thumbnailURLs
         self.thumbnail = thumbnail
         self.trailing = trailing
@@ -113,7 +118,11 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         // overlay 로 걸면 자식 위에 그려져 행 메뉴를 1pt 선이 가로지른다.
         // 선 자리에는 여백뿐이라 background 로 내려도 보이는 모습은 같다
-        .background(alignment: .bottom) { divider }
+        .background(alignment: .bottom) {
+            if showsDivider {
+                divider
+            }
+        }
     }
 
     private var header: some View {
@@ -187,12 +196,14 @@ extension PlaceListRow where Thumbnail == EmptyView {
         icon: Image,
         name: String,
         address: String,
+        showsDivider: Bool = true,
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.init(
             icon: icon,
             name: name,
             address: address,
+            showsDivider: showsDivider,
             thumbnailURLs: [],
             thumbnail: { _ in EmptyView() },
             trailing: trailing
@@ -208,6 +219,7 @@ extension PlaceListRow where Trailing == EmptyView {
         icon: Image,
         name: String,
         address: String,
+        showsDivider: Bool = true,
         thumbnailURLs: [URL] = [],
         @ViewBuilder thumbnail: @escaping (URL) -> Thumbnail
     ) {
@@ -215,6 +227,7 @@ extension PlaceListRow where Trailing == EmptyView {
             icon: icon,
             name: name,
             address: address,
+            showsDivider: showsDivider,
             thumbnailURLs: thumbnailURLs,
             thumbnail: thumbnail,
             trailing: EmptyView(),
@@ -227,11 +240,12 @@ extension PlaceListRow where Trailing == EmptyView {
 
 extension PlaceListRow where Thumbnail == EmptyView, Trailing == EmptyView {
     /// 아이콘 · 장소명 · 주소만 있는 가장 짧은 행.
-    init(icon: Image, name: String, address: String) {
+    init(icon: Image, name: String, address: String, showsDivider: Bool = true) {
         self.init(
             icon: icon,
             name: name,
             address: address,
+            showsDivider: showsDivider,
             thumbnailURLs: [],
             thumbnail: { _ in EmptyView() },
             trailing: EmptyView(),
@@ -427,6 +441,22 @@ private struct PlaceListRowPreviewMark: View {
         ) { url in
             RemoteImage(url: url)
         }
+    }
+}
+
+#Preview("마지막 행 구분선 없음") {
+    VStack(spacing: 0) {
+        PlaceListRow(
+            icon: .categoryFood,
+            name: PlaceListRowPreview.name,
+            address: PlaceListRowPreview.address
+        )
+        PlaceListRow(
+            icon: .categoryCafe,
+            name: PlaceListRowPreview.name,
+            address: PlaceListRowPreview.address,
+            showsDivider: false
+        )
     }
 }
 
