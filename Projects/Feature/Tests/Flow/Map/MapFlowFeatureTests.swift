@@ -33,6 +33,7 @@ final class MapFlowFeatureTests: XCTestCase {
 
         await store.send(.map(.searchBarTapped))
         await store.receive(\.map.delegate.searchRequested) {
+            $0.placeSearch = PlaceSearchFeature.State()
             $0.path = [.search]
         }
 

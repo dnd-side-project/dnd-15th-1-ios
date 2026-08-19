@@ -42,6 +42,7 @@ final class MapFeatureTests: XCTestCase {
         // `markers` 는 계산 프로퍼티라 TestStore 상태 비교에 안 걸린다. 따로 단언한다
         await store.send(.savedPlacesResponse(.success(places))) {
             $0.places = places
+            $0.bookmarkedPlaceIDs = ["1", "2"]
             $0.loadState = .loaded
         }
 
@@ -326,33 +327,5 @@ final class MapFeatureDelegateTests: XCTestCase {
 
         await store.send(.courseButtonTapped)
         await store.receive(\.delegate.courseRequested)
-    }
-}
-
-private extension SavedPlace {
-    static func fixture(
-        id: String,
-        latitude: Double,
-        longitude: Double,
-        category: PlaceCategory = .cafe,
-        ownership: PlaceOwnership = .mine
-    ) -> SavedPlace {
-        SavedPlace(
-            place: Place(
-                id: id,
-                kakaoPlaceID: "kakao-\(id)",
-                name: "장소 \(id)",
-                category: category,
-                address: "경기도 안산시 상록구 건건동 \(id)",
-                roadAddress: "경기도 안산시 상록구 건건로 \(id)",
-                coordinate: Coordinate(latitude: latitude, longitude: longitude),
-                bookmarkCount: 0,
-                thumbnailURLs: []
-            ),
-            ownership: ownership,
-            alias: nil,
-            memo: nil,
-            savedAt: Date(timeIntervalSince1970: 1_786_000_000)
-        )
     }
 }
