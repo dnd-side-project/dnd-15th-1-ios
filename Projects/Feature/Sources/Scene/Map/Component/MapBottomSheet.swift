@@ -215,7 +215,7 @@ private extension MapBottomSheet {
                 .zIndex(1)
             scrollingContent
         }
-        .frame(height: shownHeight(layout: layout), alignment: .top)
+        .frame(height: layout.expandedHeight, alignment: .top)
         .frame(maxWidth: .infinity)
         .background(Color.bgDefault)
         .clipShape(
@@ -233,6 +233,10 @@ private extension MapBottomSheet {
         // above 는 시트에 얹어야 시트 윗면을 따라 움직인다.
         // 아래 .frame 은 담는 층 전체라, 그 뒤에 얹으면 화면 맨 위에 박힌다
         .overlay(alignment: .top) { aboveSlot }
+        // 카드 바닥은 아래 .frame 이 담는 층 바닥에 맞춘다.
+        // 안 보여야 할 높이만큼 아래로 밀면 카드 윗면이 shownHeight 자리에 온다.
+        // above 를 얹은 뒤에 밀어야 above 도 같이 따라온다
+        .offset(y: layout.expandedHeight - shownHeight(layout: layout))
         // 두 높이를 재기 전에는 단계 높이를 못 정해 시트가 엉뚱한 높이로 한 프레임 그려진다
         .opacity(didPlaceSheet ? 1 : 0)
         // 담는 층 바닥에 붙인다. 담는 층이 아래 안전영역까지 뻗어 흰 배경이 탭바 뒤로 이어진다
