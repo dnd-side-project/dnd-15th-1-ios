@@ -10,6 +10,8 @@ final class StubNetworkClient: NetworkClient, @unchecked Sendable {
     let name: String
     var responses: [String: Any] = [:]
     var errors: [String: Error] = [:]
+    /// 요청이 응답을 돌려주기 직전에 끼어드는 훅. 재발급이 끼어드는 상황을 만든다.
+    var onRequest: (@Sendable () async -> Void)?
     private(set) var requestedPaths: [String] = []
     private(set) var requestedKeys: [String] = []
     private(set) var requestedBodies: [String: Data?] = [:]
@@ -20,6 +22,7 @@ final class StubNetworkClient: NetworkClient, @unchecked Sendable {
 
     func request<T: Decodable & Sendable>(_ endpoint: some APIEndpoint) async throws -> T {
         record(endpoint)
+        await onRequest?()
         if let error = error(for: endpoint) {
             throw error
         }
@@ -31,6 +34,7 @@ final class StubNetworkClient: NetworkClient, @unchecked Sendable {
 
     func request(_ endpoint: some APIEndpoint) async throws {
         record(endpoint)
+        await onRequest?()
         if let error = error(for: endpoint) {
             throw error
         }
@@ -87,6 +91,15 @@ final class StubKeychainStorage: KeychainStorage, @unchecked Sendable {
     func get<T: Codable & Sendable>(forKey key: String) async throws -> T? {
         guard let data = storage[key] else { return nil }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    func update<T: Codable & Sendable>(
+        forKey key: String,
+        _ transform: @Sendable (T) -> T
+    ) async throws {
+        guard let data = storage[key] else { return }
+        let current = try JSONDecoder().decode(T.self, from: data)
+        storage[key] = try JSONEncoder().encode(transform(current))
     }
 
     func delete(forKey key: String) async throws {

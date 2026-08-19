@@ -203,6 +203,44 @@ final class AuthRepositoryTests: XCTestCase {
         XCTAssertEqual(restored?.isOnboardingCompleted, true)
     }
 
+    func test_온보딩_플래그_저장이_재발급된_토큰을_덮지_않는다() async throws {
+        let network = StubNetworkClient()
+        network.responses[AuthStubFixture.memberKey] = AuthStubFixture.member(
+            onboardingCompleted: true
+        )
+
+        let local = AuthLocalDataSource(storage: StubKeychainStorage())
+        try await local.saveStubSession(
+            accessToken: "old-access",
+            refreshToken: "old-refresh",
+            userID: "7",
+            isOnboardingCompleted: nil
+        )
+
+        // members/me 응답 직전에 인터셉터가 토큰을 회전시킨 상황을 만든다
+        network.onRequest = {
+            try? await local.saveSession(
+                AuthSessionDTO(
+                    accessToken: "new-access",
+                    refreshToken: "new-refresh",
+                    userID: "7",
+                    isOnboardingCompleted: nil
+                )
+            )
+        }
+
+        let repository = AuthRepository.stub(plainClient: network, authLocal: local)
+
+        let bootstrap = try await repository.restoreSession()
+
+        XCTAssertEqual(bootstrap?.isOnboardingCompleted, true)
+
+        let stored = try await local.loadSession()
+        XCTAssertEqual(stored?.accessToken, "new-access")
+        XCTAssertEqual(stored?.refreshToken, "new-refresh")
+        XCTAssertEqual(stored?.isOnboardingCompleted, true)
+    }
+
     func test_logout_요청은_authed_클라이언트_경로를_사용한다() async throws {
         let plainClient = StubNetworkClient(name: "plain")
         let authedClient = StubNetworkClient(name: "authed")
