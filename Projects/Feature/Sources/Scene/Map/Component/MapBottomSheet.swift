@@ -64,6 +64,9 @@ struct MapBottomSheet<Above: View, Header: View, Content: View>: View {
     /// 열린 메뉴의 화면 좌표. 시작점이 이 안이면 시트 손짓을 시작하지 않는다
     private let openMenuFrames: [CGRect]
 
+    /// 손짓 주인이 시트로 정해지는 순간 한 번 불린다. 열린 메뉴를 닫는 데 쓴다
+    private let onDragBegan: (() -> Void)?
+
     private let above: Above
     private let header: Header
     private let content: Content
@@ -116,6 +119,7 @@ extension MapBottomSheet {
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
+        onDragBegan: (() -> Void)? = nil,
         @ViewBuilder above: () -> Above,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
@@ -123,6 +127,7 @@ extension MapBottomSheet {
         self._selection = selection
         self.expandLimit = expandLimit
         self.openMenuFrames = openMenuFrames
+        self.onDragBegan = onDragBegan
         self.above = above()
         self.header = header()
         self.content = content()
@@ -135,6 +140,7 @@ extension MapBottomSheet where Above == EmptyView {
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
+        onDragBegan: (() -> Void)? = nil,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
     ) {
@@ -142,6 +148,7 @@ extension MapBottomSheet where Above == EmptyView {
             selection: selection,
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
+            onDragBegan: onDragBegan,
             above: { EmptyView() },
             header: header,
             content: content
@@ -155,12 +162,14 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
+        onDragBegan: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.init(
             selection: selection,
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
+            onDragBegan: onDragBegan,
             above: { EmptyView() },
             header: { EmptyView() },
             content: content
@@ -174,6 +183,7 @@ extension MapBottomSheet where Header == EmptyView {
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
+        onDragBegan: (() -> Void)? = nil,
         @ViewBuilder above: () -> Above,
         @ViewBuilder content: () -> Content
     ) {
@@ -181,6 +191,7 @@ extension MapBottomSheet where Header == EmptyView {
             selection: selection,
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
+            onDragBegan: onDragBegan,
             above: above,
             header: { EmptyView() },
             content: content
@@ -388,6 +399,9 @@ private extension MapBottomSheet {
                     dragOwner = owner
                     // 정해진 시점의 누적 이동량을 기준으로 잡는다. 이후 이동은 전부 이 값과의 차다
                     dragBaseline = value.translation.height
+                    if owner == .sheet {
+                        onDragBegan?()
+                    }
                 }
 
                 guard dragOwner == .sheet else { return }

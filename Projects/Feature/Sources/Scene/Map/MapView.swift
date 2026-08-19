@@ -15,6 +15,12 @@ private enum CategoryDropdown {
     static let allOption = "전체"
 }
 
+/// 시트 헤더의 필터 메뉴. 한 번에 하나만 열린다
+private enum FilterMenu {
+    case ownership
+    case category
+}
+
 // MARK: - MapView
 
 public struct MapView: View {
@@ -26,6 +32,8 @@ public struct MapView: View {
     /// 아래 안전영역(탭바 + 홈 인디케이터). 시트가 그 뒤로 이어지므로 목록 아래 여백에 더한다
     @State private var bottomInset: CGFloat = 0
 
+    /// 지금 열린 필터 메뉴. 하나만 열린다
+    @State private var openFilterMenu: FilterMenu?
 
     /// 저장자 드롭다운 메뉴의 화면 좌표. 시트 손짓이 이 안에서는 시작하지 않는다
     @State private var ownershipMenuFrame: CGRect?
@@ -175,7 +183,12 @@ private extension MapView {
         MapBottomSheet(
             selection: $sheetDetent,
             expandLimit: .safeAreaTop,
-            openMenuFrames: [ownershipMenuFrame, categoryMenuFrame, rowMenu?.frame].compactMap { $0 }
+            openMenuFrames: [ownershipMenuFrame, categoryMenuFrame, rowMenu?.frame].compactMap { $0 },
+            // 끌기 시작하면 열린 메뉴를 닫는다. 열어둔 채 끌면 메뉴가 시트를 따라다녀 어색하다
+            onDragBegan: {
+                openFilterMenu = nil
+                store.send(.rowMenuDismissed)
+            }
         ) {
             floatingControls
         } header: {
@@ -196,6 +209,7 @@ private extension MapView {
                 if store.isCoupleConnected {
                     AppDropdown(
                         selection: ownershipBinding,
+                        isExpanded: filterMenuBinding(.ownership),
                         placeholder: PlaceOwnership.together.displayName,
                         options: PlaceOwnership.mapDisplayOrder.map(\.displayName),
                         onMenuFrameChange: { ownershipMenuFrame = $0 }
@@ -204,6 +218,7 @@ private extension MapView {
 
                 AppDropdown(
                     selection: categoryBinding,
+                    isExpanded: filterMenuBinding(.category),
                     placeholder: CategoryDropdown.allOption,
                     options: [CategoryDropdown.allOption] + PlaceCategory.mapDisplayOrder.map(\.displayName),
                     onMenuFrameChange: { categoryMenuFrame = $0 }
@@ -345,6 +360,13 @@ private extension MapView {
 // MARK: - Binding
 
 private extension MapView {
+    /// 메뉴 하나의 열림 바인딩. 하나를 열면 다른 하나가 저절로 닫힌다
+    func filterMenuBinding(_ menu: FilterMenu) -> Binding<Bool> {
+        Binding(
+            get: { openFilterMenu == menu },
+            set: { isOpen in openFilterMenu = isOpen ? menu : nil }
+        )
+    }
 
     /// `AppDropdown` 은 문자열만 오간다. 값으로 되돌려 액션에 싣는다
     var ownershipBinding: Binding<String?> {
