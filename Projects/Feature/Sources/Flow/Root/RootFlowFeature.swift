@@ -342,7 +342,7 @@ private extension RootFlowFeature {
             selectedTab: .home,
             home: HomeFeature.State(),
             explore: ExploreFeature.State(),
-            map: MapFeature.State(),
+            map: MapFlowFeature.State(map: MapFeature.State()),
             myPage: MyPageFeature.State(userID: userID)
         )
     }
