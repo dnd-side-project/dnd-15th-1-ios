@@ -27,6 +27,7 @@ public struct AppTextField: View {
     }
 
     @Binding private var text: String
+    @FocusState private var fieldFocus: Bool
     private let placeholder: String
     private let size: Size
     private let style: Style
@@ -41,7 +42,7 @@ public struct AppTextField: View {
     ///   - sanitize: 주면 입력이 들어오기 전에 이 규칙으로 걸러 UIKit 입력칸으로 그린다.
     ///     한글 조합 중에는 SwiftUI 바인딩으로 되돌린 값이 입력칸에 닿지 않아 글자수 제한이 새기 때문이다.
     ///     이 경우 리턴 키는 완료 고정이고 `submitLabel` 은 쓰이지 않는다
-    ///   - isFocused: `sanitize` 를 준 경우의 포커스 통로. UIKit 입력칸은 `.focused` 로 잡히지 않는다
+    ///   - isFocused: 바깥에서 포커스를 켜고 끌 통로. 안 주면 사용자가 탭한 대로만 움직인다
     public init(
         text: Binding<String>,
         placeholder: String,
@@ -67,14 +68,14 @@ public struct AppTextField: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s8) {
             field
 
             if let errorMessage {
                 Text(errorMessage)
                     .typography(.caption1M)
                     .foregroundStyle(Color.statusError)
-                    .padding(.leading, 8)
+                    .padding(.leading, Spacing.s8)
             }
         }
     }
@@ -85,7 +86,7 @@ public struct AppTextField: View {
 
             accessoryView
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, Spacing.s20)
         .padding(.vertical, size.verticalPadding)
         .frame(height: size.height)
         .background(style == .filled ? Color.gray50 : Color.bgDefault)
@@ -111,11 +112,28 @@ public struct AppTextField: View {
                 onSubmit: onSubmit
             )
         } else {
-            TextField(placeholder, text: $text)
-                .typography(.body1M)
-                .foregroundStyle(Color.gray900)
-                .submitLabel(submitLabel)
-                .onSubmit { onSubmit?() }
+            TextField(
+                "",
+                text: $text,
+                prompt: Text(placeholder)
+                    .font(Typography.body1M.font)
+                    .foregroundStyle(Color.gray400)
+            )
+            .typography(.body1M)
+            .foregroundStyle(Color.gray900)
+            .submitLabel(submitLabel)
+            .onSubmit { onSubmit?() }
+            .focused($fieldFocus)
+            .onChange(of: fieldFocus) { _, isOn in
+                if isFocused?.wrappedValue != isOn {
+                    isFocused?.wrappedValue = isOn
+                }
+            }
+            .onChange(of: isFocused?.wrappedValue) { _, wanted in
+                if let wanted, wanted != fieldFocus {
+                    fieldFocus = wanted
+                }
+            }
         }
     }
 
