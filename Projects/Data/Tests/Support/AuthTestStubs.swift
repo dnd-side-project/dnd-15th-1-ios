@@ -93,6 +93,15 @@ final class StubKeychainStorage: KeychainStorage, @unchecked Sendable {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
+    func update<T: Codable & Sendable>(
+        forKey key: String,
+        _ transform: @Sendable (T) -> T
+    ) async throws {
+        guard let data = storage[key] else { return }
+        let current = try JSONDecoder().decode(T.self, from: data)
+        storage[key] = try JSONEncoder().encode(transform(current))
+    }
+
     func delete(forKey key: String) async throws {
         storage.removeValue(forKey: key)
     }
