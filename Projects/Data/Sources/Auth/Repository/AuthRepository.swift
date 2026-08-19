@@ -48,7 +48,8 @@ public struct AuthRepository: Sendable {
             return session.isOnboardingCompleted ?? false
         }
 
-        try await authLocal.saveSession(session.with(isOnboardingCompleted: completed))
+        // 세션 전체를 다시 쓰면 그 사이 재발급된 토큰을 덮는다. 플래그만 갱신한다.
+        try await authLocal.updateOnboardingCompleted(completed)
         return completed
     }
 
