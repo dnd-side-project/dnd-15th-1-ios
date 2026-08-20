@@ -496,8 +496,9 @@ private extension DulpickMapView {
 
 // MARK: - 기본 마커 심볼
 
-/// `place` `numbered` `selected` 는 여기서 그린 최소 심볼을 쓴다.
-/// 저장한 장소 핀(`category`)은 시안 에셋을, 코스 후보(`candidate`)는 `MapPlacePin` 을 얹는다.
+/// `place` `numbered` 는 여기서 그린 최소 심볼을 쓴다.
+/// 고른 장소(`selected`)와 코스 후보(`candidate`)는 `MapPlacePin` 을 얹는다.
+/// 저장한 장소 핀(`category`)은 시안 에셋을 20 으로 줄여 쓴다.
 @MainActor
 private enum MapMarkerSymbol {
     static let routeColor = UIColor(red: 0.98, green: 0.31, blue: 0.44, alpha: 1.0)
@@ -527,13 +528,24 @@ private enum MapMarkerSymbol {
         case .place:
             circle(diameter: 22, fill: placeColor, text: nil)
         case .selected:
-            circle(diameter: 30, fill: selectedColor, text: nil)
+            rendered(MapPlacePin(content: .selected))
         case let .numbered(number):
             circle(diameter: 28, fill: selectedColor, text: "\(number)")
         case let .category(category):
-            category.pin
+            resized(category.pin, to: categoryPinSide)
         case .candidate:
             rendered(MapPlacePin(content: .candidate))
+        }
+    }
+
+    /// 저장한 장소 핀. 에셋은 24 로 그려져 있고 시안 대조에서 20 으로 정했다.
+    /// 에셋을 고치면 일곱 카테고리와 다른 화면까지 같이 바뀌어 여기서 줄인다
+    private static let categoryPinSide: CGFloat = 20
+
+    private static func resized(_ image: UIImage, to side: CGFloat) -> UIImage {
+        let size = CGSize(width: side, height: side)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
         }
     }
 
@@ -552,11 +564,11 @@ private enum MapMarkerSymbol {
     /// 원형 마커는 중심이 좌표다. 물방울은 뾰족한 아래 끝이 좌표다.
     static func anchorPoint(for kind: MapMarker.Kind) -> CGPoint {
         switch kind {
-        case .candidate:
+        case .selected, .candidate:
             // 그림자 여백만큼 이미지가 커졌다. 1.0 을 주면 끝이 좌표보다 그만큼 위에 앉는다
             CGPoint(x: 0.5, y: (pinShadowInset + pinHeight) / (pinShadowInset * 2 + pinHeight))
         // default 를 쓰지 않는다. 물방울 심볼이 늘면 여기서 컴파일이 막혀야 한다
-        case .place, .numbered, .selected, .category:
+        case .place, .numbered, .category:
             CGPoint(x: 0.5, y: 0.5)
         }
     }
