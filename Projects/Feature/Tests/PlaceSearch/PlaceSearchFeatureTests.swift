@@ -208,4 +208,51 @@ final class PlaceSearchFeatureTests: XCTestCase {
             $0.loadState = .loaded
         }
     }
+
+    func test_새_검색어를_치면_이전_요청이_끊긴다() async {
+        let clock = TestClock()
+        let firstPlaces = [Place.fixture(id: "1", name: "음식점A")]
+        let secondPlaces = [Place.fixture(id: "2", name: "카페B")]
+        let firstSearchStarted = LockIsolated(false)
+
+        let store = TestStore(initialState: PlaceSearchFeature.State()) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.placeClient.searchPlaces = { query in
+                if query == "음식점" {
+                    firstSearchStarted.setValue(true)
+                    try await clock.sleep(for: .milliseconds(100))
+                    return firstPlaces
+                }
+                return secondPlaces
+            }
+            $0.mapRecentSearchClient.load = { [] }
+        }
+
+        await store.send(.binding(.set(\.query, "음식점"))) {
+            $0.query = "음식점"
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.queryChangeDebounced) {
+            $0.loadState = .loading
+        }
+
+        var attempts = 0
+        while !firstSearchStarted.value && attempts < 100 {
+            attempts += 1
+            await Task.yield()
+        }
+        XCTAssertTrue(firstSearchStarted.value, "첫 요청이 시작되어야 한다")
+
+        await store.send(.binding(.set(\.query, "카페"))) {
+            $0.query = "카페"
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.queryChangeDebounced)
+        await store.receive(\.searchResponse.success) {
+            $0.results = secondPlaces
+            $0.loadState = .loaded
+        }
+    }
 }

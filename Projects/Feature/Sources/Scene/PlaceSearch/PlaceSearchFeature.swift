@@ -194,11 +194,15 @@ public struct PlaceSearchFeature {
                 .cancel(id: CancelID.request)
             )
         }
-        return .run { [clock] send in
-            try await clock.sleep(for: .milliseconds(300))
-            await send(.queryChangeDebounced)
-        }
-        .cancellable(id: CancelID.debounce, cancelInFlight: true)
+        // 새 검색어를 치면 돌던 요청도 끊는다. 안 끊으면 옛 응답이 새 검색어 화면에 얹힌다
+        return .merge(
+            .cancel(id: CancelID.request),
+            .run { [clock] send in
+                try await clock.sleep(for: .milliseconds(300))
+                await send(.queryChangeDebounced)
+            }
+            .cancellable(id: CancelID.debounce, cancelInFlight: true)
+        )
     }
 
     private func search(state: inout State) -> Effect<Action> {
