@@ -114,19 +114,29 @@ public struct SearchView: View {
 
     private var resultContent: some View {
         VStack(alignment: .leading, spacing: Spacing.s24) {
-            segmentTabs
-
-            if store.hasResult {
-                resultList
-            } else if !store.isSearching {
-                EmptyStateView(
-                    image: .placeEmpty,
-                    title: "검색 결과가 없어요",
-                    message: "다른 검색어를 입력해주세요"
-                )
-            } else {
-                Spacer()
+            if store.hasSearchResult {
+                segmentTabs
+                    .transition(.opacity)
             }
+            resultBody
+        }
+    }
+
+    @ViewBuilder
+    private var resultBody: some View {
+        if store.hasSearchResult, store.hasResult {
+            resultList
+                .transition(.opacity)
+        } else if store.isSearching, store.isFirstSearch {
+            // 첫 검색만 로딩(빈 화면). 이후 재검색은 직전 화면 유지 → 빈 상태 안 깜빡임
+            Spacer()
+        } else {
+            EmptyStateView(
+                image: .placeEmpty,
+                title: "검색 결과가 없어요",
+                message: "다른 검색어를 입력해주세요"
+            )
+            .transition(.opacity)
         }
     }
 
@@ -189,9 +199,14 @@ public struct SearchView: View {
 
     private func recentChip(_ term: String) -> some View {
         HStack(spacing: Spacing.s4) {
-            Text(term)
-                .typography(.body1M)
-                .foregroundStyle(Color.textTertiary)
+            Button {
+                store.send(.recentSearchTapped(term))
+            } label: {
+                Text(term)
+                    .typography(.body1M)
+                    .foregroundStyle(Color.textTertiary)
+            }
+            .buttonStyle(.plain)
 
             Button {
                 store.send(.recentSearchDeleted(term))

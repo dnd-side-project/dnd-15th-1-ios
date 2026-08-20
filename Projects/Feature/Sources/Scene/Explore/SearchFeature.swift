@@ -37,6 +37,8 @@ public struct SearchFeature {
         var contentsHasNext: Bool = true
         var isSearching = false
         var isLoadingMore = false
+        // 로딩 표시는 첫 검색에만. 재검색 때는 직전 화면을 유지해 빈 상태가 깜빡이지 않게 한다
+        var isFirstSearch = true
 
         // 선택된 탭 기준으로 결과 유무 판정
         var hasResult: Bool {
@@ -44,6 +46,11 @@ public struct SearchFeature {
             case .post: !contents.isEmpty
             case .place: !places.isEmpty
             }
+        }
+
+        // 게시글/장소 탭은 실제 검색 결과가 있을 때만 노출. 장소는 아직 목업이라 게시글(실데이터) 기준
+        var hasSearchResult: Bool {
+            !contents.isEmpty
         }
 
         public init() {}
@@ -95,6 +102,7 @@ public struct SearchFeature {
             state.contentsPage = 1
             state.places = places
             state.isSearching = false
+            state.isFirstSearch = false
             return .none
 
         case .reachedEnd:
@@ -111,6 +119,7 @@ public struct SearchFeature {
             // 이전 결과는 두고 로딩만 해제
             state.isSearching = false
             state.isLoadingMore = false
+            state.isFirstSearch = false
             return .none
 
         case .onAppear, .searchSubmitted, .recentSearchTapped, .recentSearchDeleted,
@@ -181,6 +190,8 @@ public struct SearchFeature {
             state.contentsPage = 0
             state.contentsHasNext = true
             state.isSearching = false
+            // 검색어를 비우면 새 세션이라 다음 첫 검색에 다시 로딩을 보여준다
+            state.isFirstSearch = true
             return .none
         }
         state.isSearching = true
@@ -189,11 +200,15 @@ public struct SearchFeature {
         return .run { [exploreClient] send in
             async let contents = exploreClient.searchContents(query, .popular, 0, Self.pageSize)
             async let places = exploreClient.searchPlaces(query)
-            await send(.searchResponse(try await contents, try await places))
+            // 로딩 → 결과/빈상태 전환을 페이드로 부드럽게 한다
+            await send(
+                .searchResponse(try await contents, try await places),
+                animation: .easeInOut(duration: 0.2)
+            )
         } catch: { error, send in
             // 취소는 실패로 보지 않는다
             if error is CancellationError { return }
-            await send(.searchFailed)
+            await send(.searchFailed, animation: .easeInOut(duration: 0.2))
         }
     }
 
