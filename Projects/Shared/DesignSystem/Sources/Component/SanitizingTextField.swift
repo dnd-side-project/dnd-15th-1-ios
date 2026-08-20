@@ -146,7 +146,7 @@ public struct SanitizingTextField: UIViewRepresentable {
             string: placeholder,
             attributes: [
                 .font: typography.uiFont,
-                .foregroundColor: UIColor.placeholderText,
+                .foregroundColor: UIColor(Color.gray400),
             ]
         )
     }

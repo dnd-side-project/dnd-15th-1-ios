@@ -22,19 +22,23 @@ public struct MapFlowFeature {
     public struct State: Equatable {
         public var map: MapFeature.State
         public var path: [Route]
+        public var placeSearch: PlaceSearchFeature.State?
 
         public init(
             map: MapFeature.State = MapFeature.State(),
-            path: [Route] = []
+            path: [Route] = [],
+            placeSearch: PlaceSearchFeature.State? = nil
         ) {
             self.map = map
             self.path = path
+            self.placeSearch = placeSearch
         }
     }
 
     public enum Action: Equatable {
         case pathChanged([Route])
         case map(MapFeature.Action)
+        case placeSearch(PlaceSearchFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
@@ -51,6 +55,9 @@ public struct MapFlowFeature {
             MapFeature()
         }
         Reduce(core)
+            .ifLet(\.placeSearch, action: \.placeSearch) {
+                PlaceSearchFeature()
+            }
             .logged(as: Self.self)
     }
 
@@ -58,9 +65,16 @@ public struct MapFlowFeature {
         switch action {
         case let .pathChanged(path):
             state.path = path
+            if !path.contains(.search) {
+                state.placeSearch = nil
+            }
             return .none
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
+        case let .placeSearch(.delegate(delegate)):
+            return handle(searchDelegate: delegate, state: &state)
+        case .placeSearch:
+            return .none
         case .map, .delegate:
             return .none
         }
@@ -78,7 +92,14 @@ private extension MapFlowFeature {
             state.path.append(.placeDetail(id))
             return .none
         case .searchRequested:
+            state.placeSearch = PlaceSearchFeature.State()
             state.path.append(.search)
+            return .none
+        case let .searchReopenRequested(query):
+            state.placeSearch = PlaceSearchFeature.State(query: query)
+            if !state.path.contains(.search) {
+                state.path.append(.search)
+            }
             return .none
         case .courseRequested:
             state.path.append(.course)
@@ -86,6 +107,30 @@ private extension MapFlowFeature {
         case .editRequested, .deleteRequested:
             // PlaceClient 에 수정·삭제 계약이 없다. 계약이 생겨도 데이터 갱신이라 path 를 안 쓴다
             return .none
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        }
+    }
+
+    func handle(
+        searchDelegate: PlaceSearchFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch searchDelegate {
+        case .dismissed:
+            // 검색바 X 와 같이 저장 장소 모드로 돌아가 뒤로가기 루프를 끊는다
+            return .merge(
+                .send(.pathChanged([])),
+                .send(.map(.searchClearTapped))
+            )
+        case let .searchConfirmed(query, places):
+            return .merge(
+                .send(.pathChanged([])),
+                .send(.map(.searchResultsApplied(query: query, places: places)))
+            )
+        case let .placeSelected(id):
+            // 장소 상세는 Cycle 2 (DND-49). pathChanged 를 거쳐야 검색 자식과 그 효과가 정리된다
+            return .send(.pathChanged([.placeDetail(id)]))
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         }

@@ -29,6 +29,11 @@ enum Dependencies {
             userDefaults: infra.userDefaults
         )
 
+        values.mapRecentSearchClient = RecentSearchClientFactory.make(
+            userDefaults: infra.userDefaults,
+            key: "map-recent-searches"
+        )
+
         values.onboardingClient = OnboardingClientFactory.make(
             userDefaults: infra.userDefaults
         )
