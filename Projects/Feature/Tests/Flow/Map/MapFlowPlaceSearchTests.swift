@@ -136,4 +136,21 @@ final class MapFlowPlaceSearchTests: XCTestCase {
             $0.map.mode = .saved
         }
     }
+
+    func test_검색결과_행을_누르면_상세로_가고_검색이_정리된다() async {
+        var state = MapFlowFeature.State()
+        state.placeSearch = PlaceSearchFeature.State()
+        state.path = [.search]
+
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.placeSearch(.delegate(.placeSelected("p1"))))
+        await store.receive(\.pathChanged) {
+            $0.path = [.placeDetail("p1")]
+            $0.placeSearch = nil
+        }
+    }
 }

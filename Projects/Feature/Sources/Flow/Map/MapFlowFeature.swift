@@ -129,9 +129,8 @@ private extension MapFlowFeature {
                 .send(.map(.searchResultsApplied(query: query, places: places)))
             )
         case let .placeSelected(id):
-            // 장소 상세는 Cycle 2 (DND-49). 경로만 밀어 둔다
-            state.path = [.placeDetail(id)]
-            return .none
+            // 장소 상세는 Cycle 2 (DND-49). pathChanged 를 거쳐야 검색 자식과 그 효과가 정리된다
+            return .send(.pathChanged([.placeDetail(id)]))
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         }
