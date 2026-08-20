@@ -20,7 +20,6 @@ private enum CourseDateViewMetric {
 /// 날짜는 필수, 시간은 선택이다. `다음` 은 늘 눌리고 누를 때 날짜만 검증한다.
 public struct CourseDateView: View {
     @Bindable private var store: StoreOf<CourseFeature>
-    @Environment(\.dismiss) private var dismiss
 
     public init(store: StoreOf<CourseFeature>) {
         self.store = store
@@ -116,7 +115,7 @@ private extension CourseDateView {
 
     var backButton: some View {
         Button {
-            dismiss()
+            store.send(.backTapped)
         } label: {
             Image.arrowLeft
                 .renderingMode(.template)

@@ -134,6 +134,13 @@ private extension MapFlowFeature {
         case .placePickRequested:
             state.path.append(.coursePlacePick)
             return .none
+        case .dismissed:
+            var next = state.path
+            // 코스 화면이 스스로 닫는 신호라, 맨 위가 코스 경로일 때만 뺀다
+            if let last = next.last, last == .course || last == .coursePlacePick {
+                next.removeLast()
+            }
+            return .send(.pathChanged(next))
         case .buildRequested:
             // Cycle 5 (DND-52) 가 코스 결과 화면을 붙일 때까지 삼킨다
             return .none

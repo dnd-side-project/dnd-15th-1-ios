@@ -23,7 +23,6 @@ private enum CoursePlacePickMetric {
 /// 고른 순서가 곧 번호다.
 public struct CoursePlacePickView: View {
     @Bindable private var store: StoreOf<CourseFeature>
-    @Environment(\.dismiss) private var dismiss
 
     /// 시트 단계. 시트가 접혀 있는지 펼쳐져 있는지다
     @State private var sheetDetent: SheetDetent = .collapsed
@@ -244,7 +243,7 @@ private extension CoursePlacePickView {
 
     var backButton: some View {
         Button {
-            dismiss()
+            store.send(.backTapped)
         } label: {
             Image.arrowLeft
                 .renderingMode(.template)

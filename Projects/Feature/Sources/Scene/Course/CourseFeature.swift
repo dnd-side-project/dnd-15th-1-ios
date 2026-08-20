@@ -75,6 +75,7 @@ public struct CourseFeature {
         case cameraChanged(MapCamera)
         case buildTapped
         case retryTapped
+        case backTapped
 
         case delegate(Delegate)
 
@@ -84,6 +85,7 @@ public struct CourseFeature {
             /// 서버 명세가 없어 `Date` 로 만드는 자리를 Cycle 5 로 미룬다
             case buildRequested(date: DateComponents, time: DateComponents?, placeIDs: [String])
             case placePickRequested
+            case dismissed
             case sessionExpired
         }
     }
@@ -111,7 +113,7 @@ public struct CourseFeature {
             return updateDate(state: &state, action: action)
         case .ownershipSelected, .categoryTapped, .rowTapped, .markerTapped, .cameraChanged:
             return updatePlace(state: &state, action: action)
-        case .buildTapped:
+        case .backTapped, .buildTapped:
             return raise(state: &state, action: action)
         case .delegate:
             return .none
@@ -222,6 +224,9 @@ private extension CourseFeature {
 
     func raise(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case .backTapped:
+            return .send(.delegate(.dismissed))
+
         case .buildTapped:
             guard let date = state.date, !state.selectedPlaceIDs.isEmpty else { return .none }
             return .send(
