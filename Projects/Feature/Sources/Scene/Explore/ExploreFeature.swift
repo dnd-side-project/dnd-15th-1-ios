@@ -47,6 +47,8 @@ public struct ExploreFeature {
 
     @Dependency(\.exploreClient) var exploreClient
 
+    private enum CancelID { case load }
+
     public init() {}
 
     public var body: some ReducerOf<Self> {
@@ -81,8 +83,14 @@ public struct ExploreFeature {
             return .none
 
         case let .filterTapped(filter):
+            // 인기=POPULAR, 그 외 태그=검색. 칩을 바꾸면 그리드를 리셋하고 첫 페이지부터 다시 받는다
+            guard filter != state.selectedFilter else { return .none }
             state.selectedFilter = filter
-            return .none
+            state.contents = []
+            state.page = 0
+            state.hasNext = true
+            state.isLoadingContents = false
+            return loadNext(state: &state)
 
         case .searchButtonTapped:
             state.search = SearchFeature.State()
@@ -105,18 +113,33 @@ public struct ExploreFeature {
         state.filters = [Self.popularFilter] + page.popularTags.map { "#\($0)" }
     }
 
-    // 로딩 중이거나 마지막 페이지면 무시
+    // 로딩 중이거나 마지막 페이지면 무시. 선택 칩이 인기면 목록, 태그면 검색을 받는다
     private func loadNext(state: inout State) -> Effect<Action> {
         guard !state.isLoadingContents, state.hasNext else { return .none }
         state.isLoadingContents = true
         let page = state.page
+        let selected = state.selectedFilter
         return .run { [exploreClient] send in
             do {
-                let result = try await exploreClient.contents(.popular, page, Self.pageSize)
+                let result: ContentPage
+                if selected == Self.popularFilter {
+                    result = try await exploreClient.contents(.popular, page, Self.pageSize)
+                } else {
+                    result = try await exploreClient.searchContents(
+                        Self.tagQuery(selected), .popular, page, Self.pageSize
+                    )
+                }
                 await send(.contentsResponse(result))
             } catch {
                 await send(.contentsLoadFailed)
             }
         }
+        // 칩을 바꾸면 진행 중이던 이전 로드를 취소해 결과가 섞이지 않게 한다
+        .cancellable(id: CancelID.load, cancelInFlight: true)
+    }
+
+    // "#성수" → "성수". 검색어에는 해시 기호를 빼고 넘긴다
+    private static func tagQuery(_ filter: String) -> String {
+        filter.hasPrefix("#") ? String(filter.dropFirst()) : filter
     }
 }
