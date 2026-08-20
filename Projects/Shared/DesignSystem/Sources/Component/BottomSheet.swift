@@ -65,9 +65,11 @@ private struct BottomSheetContainer<Content: View>: View {
     }
 
     private var handle: some View {
+        // 시안 대조에서 정한 잡이 자리. 위 14 · 막대 6 · 아래 13 = 33
         Capsule()
             .fill(Color.gray100)
             .frame(width: 50, height: 6)
-            .frame(height: 34)
+            .padding(.top, 14)
+            .padding(.bottom, 13)
     }
 }
