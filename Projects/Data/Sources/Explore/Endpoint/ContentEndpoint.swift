@@ -6,10 +6,11 @@
 //
 
 import CoreNetwork
+import Domain
 import Foundation
 
 enum ContentEndpoint: APIEndpoint {
-    case contents(page: Int, size: Int)
+    case contents(sort: ContentSort, page: Int, size: Int)
 
     var path: String {
         switch self {
@@ -25,11 +26,11 @@ enum ContentEndpoint: APIEndpoint {
         }
     }
 
-    // sort 는 서버 기본 정렬(최신순)에 맡기고 page/size 만 넘김
     var queryItems: [URLQueryItem] {
         switch self {
-        case let .contents(page, size):
+        case let .contents(sort, page, size):
             return [
+                URLQueryItem(name: "sort", value: sort.rawValue),
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "size", value: String(size)),
             ]

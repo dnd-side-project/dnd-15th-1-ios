@@ -3,6 +3,7 @@ import ThirdParty
 
 @DependencyClient
 public struct ProfileClient: Sendable {
+    public var member: @Sendable () async throws -> UserProfile
     public var updateNickname: @Sendable (_ nickname: String, _ iconID: Int) async throws -> UserProfile
     public var updateDatePreference: @Sendable (_ preference: DatePreference) async throws -> UserProfile
 }

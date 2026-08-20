@@ -15,9 +15,9 @@ public struct ContentRepository: Sendable {
         self.remote = remote
     }
 
-    public func contents(page: Int, size: Int) async throws -> ContentPage {
+    public func contents(sort: ContentSort, page: Int, size: Int) async throws -> ContentPage {
         do {
-            return ContentDTOMapper.toDomain(try await remote.contents(page: page, size: size))
+            return ContentDTOMapper.toDomain(try await remote.contents(sort: sort, page: page, size: size))
         } catch {
             throw ExploreErrorMapper.map(error)
         }

@@ -15,8 +15,8 @@ public enum ExploreClientFactory {
         )
         // searchContents / searchPlaces 는 아직 서버 연동 전이라 mock 유지
         return ExploreClient(
-            contents: { page, size in
-                try await repository.contents(page: page, size: size)
+            contents: { sort, page, size in
+                try await repository.contents(sort: sort, page: page, size: size)
             },
             searchContents: ExploreClient.mock.searchContents,
             searchPlaces: ExploreClient.mock.searchPlaces

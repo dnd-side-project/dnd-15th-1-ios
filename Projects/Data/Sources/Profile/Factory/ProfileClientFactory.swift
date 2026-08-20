@@ -8,6 +8,9 @@ public enum ProfileClientFactory {
 
     private static func makeClient(repository: ProfileRepository) -> ProfileClient {
         ProfileClient(
+            member: {
+                try await repository.member()
+            },
             updateNickname: { nickname, iconID in
                 try await repository.updateNickname(nickname: nickname, iconID: iconID)
             },

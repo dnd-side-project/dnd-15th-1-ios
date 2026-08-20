@@ -6,6 +6,7 @@
 //
 
 import CoreNetwork
+import Domain
 import Foundation
 
 public struct ContentRemoteDataSource: Sendable {
@@ -15,7 +16,7 @@ public struct ContentRemoteDataSource: Sendable {
         self.networkClient = networkClient
     }
 
-    func contents(page: Int, size: Int) async throws -> ContentPageResponseDTO {
-        try await networkClient.request(ContentEndpoint.contents(page: page, size: size))
+    func contents(sort: ContentSort, page: Int, size: Int) async throws -> ContentPageResponseDTO {
+        try await networkClient.request(ContentEndpoint.contents(sort: sort, page: page, size: size))
     }
 }
