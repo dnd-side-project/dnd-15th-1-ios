@@ -163,6 +163,7 @@ public struct AppTextField: View {
                         .resizable()
                         .frame(width: 24, height: 24)
                         .foregroundStyle(Color.gray300)
+                        .accessibilityLabel("입력 지우기")
                 }
             }
         }
