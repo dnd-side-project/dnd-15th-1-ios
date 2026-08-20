@@ -9,14 +9,17 @@ public struct RemoteImage: View {
 
     private let url: URL?
     private let cornerRadius: CGFloat
+    private let placeholderImage: Image?
 
     /// 원격 이미지를 표시한다.
     /// - Parameters:
     ///   - url: 받아올 이미지 주소. `nil` 이면 실패와 같은 placeholder 가 보인다
     ///   - cornerRadius: 이미지와 placeholder 에 함께 적용할 모서리 반경. 기본값 `0`
-    public init(url: URL?, cornerRadius: CGFloat = 0) {
+    ///   - placeholderImage: 실패·URL 없음일 때 gray500 배경 중앙에 놓을 이미지. 지정하지 않으면 기본 placeholder
+    public init(url: URL?, cornerRadius: CGFloat = 0, placeholderImage: Image? = nil) {
         self.url = url
         self.cornerRadius = cornerRadius
+        self.placeholderImage = placeholderImage
     }
 
     public var body: some View {
@@ -49,15 +52,35 @@ public struct RemoteImage: View {
     }
 
     // 실패와 URL 없음은 사용자가 할 수 있는 행동이 같아 화면에서 나누지 않는다
+    @ViewBuilder
     private var placeholder: some View {
-        Color.gray300.overlay {
-            // 에셋에 색이 박혀 있어 foregroundStyle 로 물들이지 않는다
-            Image.error
-                .resizable()
-                .frame(
-                    width: Self.placeholderIconSize,
-                    height: Self.placeholderIconSize
-                )
+        if let placeholderImage {
+            // 배경 gray500 에만 선형 그라디언트(위 투명 → 아래 검정 50%)를 얹고,
+            // placeholder 이미지는 그 위 중앙에 둬 그라디언트 영향을 받지 않게 한다
+            Color.gray500
+                .overlay {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.5)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                .overlay {
+                    placeholderImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 140)
+                }
+        } else {
+            Color.gray300.overlay {
+                // 에셋에 색이 박혀 있어 foregroundStyle 로 물들이지 않는다
+                Image.error
+                    .resizable()
+                    .frame(
+                        width: Self.placeholderIconSize,
+                        height: Self.placeholderIconSize
+                    )
+            }
         }
     }
 }

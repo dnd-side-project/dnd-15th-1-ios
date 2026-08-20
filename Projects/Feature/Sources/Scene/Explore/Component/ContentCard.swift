@@ -17,12 +17,13 @@ struct ContentCard: View {
             Color.clear
                 .aspectRatio(170.0 / 227.0, contentMode: .fit)
                 .overlay {
-                    RemoteImage(url: content.thumbnailURLs.first)
+                    RemoteImage(url: content.thumbnailURLs.first, placeholderImage: .placeEmpty)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(alignment: .bottomLeading) {
                     placeCountBadge
-                        .padding(Spacing.s8)
+                        .padding(.leading, 14)
+                        .padding(.bottom, 14)
                 }
 
             Text(content.title)
