@@ -40,10 +40,16 @@ struct CoupleCodeInputView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.bgDefault)
         .toast(item: toastBinding, bottomInset: ToastMetric.bottomInset)
-        .navigationTitle("커플 연결")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        .toolbar { backToolbar }
+        .toolbar {
+            backToolbar
+            ToolbarItem(placement: .principal) {
+                Text("커플 연결")
+                    .typography(.body1SB)
+                    .foregroundStyle(Color.gray900)
+            }
+        }
         // push 애니메이션 중에 준 포커스는 버려진다. 전환이 끝난 뒤에 준다
         .task {
             try? await Task.sleep(for: .milliseconds(400))

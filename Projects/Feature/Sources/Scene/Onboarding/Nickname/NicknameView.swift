@@ -16,10 +16,16 @@ public struct NicknameView: View {
 
     public var body: some View {
         rootContent
-            .navigationTitle("닉네임 설정")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
-            .toolbar { backToolbar }
+            .toolbar {
+                backToolbar
+                ToolbarItem(placement: .principal) {
+                    Text("닉네임 설정")
+                        .typography(.body1SB)
+                        .foregroundStyle(Color.gray900)
+                }
+            }
             // 약관을 다 읽고 나면 바로 닉네임을 치게 한다. 시트가 뜰 때는 건드리지 않는다
             .onChange(of: store.isTermsSheetPresented) { _, isPresented in
                 if !isPresented {
