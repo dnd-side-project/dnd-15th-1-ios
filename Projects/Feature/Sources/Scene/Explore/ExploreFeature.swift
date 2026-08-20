@@ -31,6 +31,11 @@ public struct ExploreFeature {
         var search: SearchFeature.State?
         var path: [Route] = []
 
+        // 인기면 기본 제목, 태그를 고르면 그 태그를 제목으로
+        var sectionTitle: String {
+            selectedFilter == ExploreFeature.popularFilter ? "지금 인기있는 장소" : selectedFilter
+        }
+
         public init() {}
     }
 
