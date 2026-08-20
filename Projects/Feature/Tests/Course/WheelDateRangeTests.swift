@@ -55,4 +55,10 @@ final class WheelDateRangeTests: XCTestCase {
         XCTAssertEqual(resolved.month, 2)
         XCTAssertEqual(resolved.day, 28)
     }
+
+    func test_윤년_2월은_일이_29일까지_나온다() {
+        let range = WheelDateRange(yearRange: yearRange, minimum: nil)
+
+        XCTAssertEqual(range.days(year: 2028, month: 2), Array(1 ... 29))
+    }
 }

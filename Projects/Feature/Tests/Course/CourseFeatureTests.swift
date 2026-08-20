@@ -115,6 +115,9 @@ final class CoursePlacePickTests: XCTestCase {
     func test_핀탭_행탭과같다() async {
         let store = loadedStore()
 
+        await store.send(.markerTapped("a")) { $0.selectedPlaceIDs = ["a"] }
+        await store.send(.rowTapped("a")) { $0.selectedPlaceIDs = [] }
+
         await store.send(.rowTapped("a")) { $0.selectedPlaceIDs = ["a"] }
         await store.send(.markerTapped("a")) { $0.selectedPlaceIDs = [] }
     }
