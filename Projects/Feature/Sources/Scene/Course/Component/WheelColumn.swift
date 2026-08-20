@@ -82,7 +82,12 @@ struct WheelColumn<Item: Hashable>: View {
         .scrollTargetBehavior(.viewAligned)
         .contentMargins(.vertical, WheelMetrics.columnContentInset, for: .scrollContent)
         .scrollIndicators(.hidden)
-        .onAppear { position = selection }
+        // 시트가 올라오는 애니메이션에 첫 스크롤이 실리면 버벅인다
+        .onAppear {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { position = selection }
+        }
         .onChange(of: position) { _, newValue in
             guard let newValue, newValue != selection else { return }
             selection = newValue
