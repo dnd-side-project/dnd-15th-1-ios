@@ -81,6 +81,12 @@ public struct Typography: Sendable {
         max(0, size * (lineHeightMultiple - Self.fontLineHeightRatio))
     }
 
+    /// 시안이 잡는 글자 한 줄 상자 높이 (`size * lineHeightMultiple`).
+    /// `lineSpacing` 은 줄 사이에 더하는 값이고, 이건 한 줄이 차지하는 상자 자체다.
+    public var lineHeight: CGFloat {
+        size * lineHeightMultiple
+    }
+
     /// UIKit 으로 그리는 입력칸이 SwiftUI 쪽과 같은 글꼴을 쓰게 하는 통로.
     /// 등록이 실패해도 화면이 비지 않도록 시스템 폰트로 떨어진다
     public var uiFont: UIFont {
