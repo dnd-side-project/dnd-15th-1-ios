@@ -16,12 +16,6 @@ private enum CoursePlacePickMetric {
     static let listGapAboveCTA: CGFloat = 20
 }
 
-/// 시트 헤더의 필터 메뉴. 한 번에 하나만 열린다
-private enum FilterMenu {
-    case ownership
-    case category
-}
-
 // MARK: - CoursePlacePickView
 
 /// 코스에 담을 장소를 고르는 화면. 시안 b04 · b05 · b06 · b07.
