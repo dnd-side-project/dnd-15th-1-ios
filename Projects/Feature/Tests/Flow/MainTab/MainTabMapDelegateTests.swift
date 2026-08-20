@@ -18,6 +18,7 @@ final class MainTabMapDelegateTests: XCTestCase {
             $0.map.placeSearch = PlaceSearchFeature.State()
         }
         await store.send(.map(.map(.delegate(.courseRequested)))) {
+            $0.map.course = CourseFeature.State()
             $0.map.path = [.placeDetail("7"), .search, .course]
         }
         await store.send(.map(.map(.delegate(.editRequested("7")))))

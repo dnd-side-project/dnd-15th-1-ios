@@ -40,6 +40,7 @@ final class MapFlowFeatureTests: XCTestCase {
         await store.send(.map(.courseButtonTapped))
         await store.receive(\.map.delegate.courseRequested) {
             $0.path = [.search, .course]
+            $0.course = CourseFeature.State()
         }
     }
 
