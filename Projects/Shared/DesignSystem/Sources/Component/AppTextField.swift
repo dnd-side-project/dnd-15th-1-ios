@@ -73,7 +73,7 @@ public struct AppTextField: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .typography(.caption1M)
+                    .typography(.body2M)
                     .foregroundStyle(Color.statusError)
                     .padding(.leading, Spacing.s8)
             }
