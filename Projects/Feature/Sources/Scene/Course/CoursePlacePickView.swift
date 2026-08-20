@@ -9,7 +9,7 @@ private enum CoursePlacePickMetric {
     static let cornerRadius: CGFloat = 12
     static let skeletonRowCount = 3
     static let skeletonRowHeight: CGFloat = 64
-    static let backButtonSide: CGFloat = 40
+    static let backButtonSize: CGFloat = 44
     static let backButtonIconSide: CGFloat = 24
     static let ctaButtonHeight: CGFloat = 56
     /// 목록 마지막 행과 CTA 버튼 윗면 사이
@@ -255,8 +255,8 @@ private extension CoursePlacePickView {
                 )
                 .foregroundStyle(Color.textSecondary)
                 .frame(
-                    width: CoursePlacePickMetric.backButtonSide,
-                    height: CoursePlacePickMetric.backButtonSide
+                    width: CoursePlacePickMetric.backButtonSize,
+                    height: CoursePlacePickMetric.backButtonSize
                 )
                 .glassCircleBackground()
         }

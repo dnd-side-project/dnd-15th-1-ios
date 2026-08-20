@@ -9,7 +9,7 @@ private enum CourseDateViewMetric {
     static let titleTopPadding: CGFloat = 28
     static let subtitleTopPadding: CGFloat = Spacing.s8
     static let fieldsTopPadding: CGFloat = Spacing.s32
-    static let backButtonSide: CGFloat = 24
+    static let backButtonSize: CGFloat = 24
     static let sheetAnimationDuration: Duration = .seconds(Motion.sheetDuration)
 }
 
@@ -122,8 +122,8 @@ private extension CourseDateView {
                 .renderingMode(.template)
                 .resizable()
                 .frame(
-                    width: CourseDateViewMetric.backButtonSide,
-                    height: CourseDateViewMetric.backButtonSide
+                    width: CourseDateViewMetric.backButtonSize,
+                    height: CourseDateViewMetric.backButtonSize
                 )
                 .foregroundStyle(Color.textSecondary)
         }
