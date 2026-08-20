@@ -1,3 +1,4 @@
+import Domain
 import Foundation
 import ThirdParty
 
@@ -8,8 +9,6 @@ import ThirdParty
 public struct MapFlowFeature {
     /// 지도(root) 위로 쌓이는 화면. 각 case 의 화면은 담당 Cycle 이 자기 PR 에서 채운다
     public enum Route: Hashable {
-        /// Cycle 2 (DND-49)
-        case placeDetail(String)
         /// Cycle 7 (미배정)
         case postDetail(String)
         /// Cycle 3 (DND-50)
@@ -27,16 +26,26 @@ public struct MapFlowFeature {
         public var path: [Route]
         public var placeSearch: PlaceSearchFeature.State?
 
+        /// 핀·행·검색에서 뜬 장소 상세. 시트 표시는 `MapFlowView` 가 한다
+        @Presents public var detail: PlaceDetailFeature.State?
+
+        /// 행 메뉴 `수정` 으로 뜬 별칭 지정 시트
+        @Presents public var alias: PlaceAliasFeature.State?
+
         public init(
             map: MapFeature.State = MapFeature.State(),
             course: CourseFeature.State? = nil,
             path: [Route] = [],
-            placeSearch: PlaceSearchFeature.State? = nil
+            placeSearch: PlaceSearchFeature.State? = nil,
+            detail: PlaceDetailFeature.State? = nil,
+            alias: PlaceAliasFeature.State? = nil
         ) {
             self.map = map
             self.course = course
             self.path = path
             self.placeSearch = placeSearch
+            self.detail = detail
+            self.alias = alias
         }
     }
 
@@ -45,6 +54,8 @@ public struct MapFlowFeature {
         case map(MapFeature.Action)
         case course(CourseFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
+        case detail(PresentationAction<PlaceDetailFeature.Action>)
+        case alias(PresentationAction<PlaceAliasFeature.Action>)
         case delegate(Delegate)
 
         @CasePathable
@@ -63,6 +74,12 @@ public struct MapFlowFeature {
         Reduce(core)
             .ifLet(\.course, action: \.course) {
                 CourseFeature()
+            }
+            .ifLet(\.$detail, action: \.detail) {
+                PlaceDetailFeature()
+            }
+            .ifLet(\.$alias, action: \.alias) {
+                PlaceAliasFeature()
             }
             .ifLet(\.placeSearch, action: \.placeSearch) {
                 PlaceSearchFeature()
@@ -87,6 +104,8 @@ public struct MapFlowFeature {
             return handle(courseDelegate: delegate, state: &state)
         case let .placeSearch(.delegate(delegate)):
             return handle(searchDelegate: delegate, state: &state)
+        case .detail, .alias:
+            return handleChild(state: &state, action: action)
         case .map, .course, .placeSearch, .delegate:
             return .none
         }
@@ -94,14 +113,14 @@ public struct MapFlowFeature {
 }
 
 private extension MapFlowFeature {
-    /// 지도가 올린 신호를 경로로 옮긴다. 화면 이동이 아닌 것은 여기서 삼킨다
+    /// 지도가 올린 신호로 시트나 경로를 연다. 화면 이동이 아닌 것은 여기서 삼킨다
     func handle(
         mapDelegate: MapFeature.Action.Delegate,
         state: inout State
     ) -> Effect<Action> {
         switch mapDelegate {
-        case let .placeSelected(id):
-            state.path.append(.placeDetail(id))
+        case let .placeDetailRequested(id):
+            presentDetail(state: &state, id: id)
             return .none
         case .searchRequested:
             state.placeSearch = PlaceSearchFeature.State()
@@ -118,8 +137,13 @@ private extension MapFlowFeature {
             state.course = CourseFeature.State()
             state.path.append(.course)
             return .none
-        case .editRequested, .deleteRequested:
-            // PlaceClient 에 수정·삭제 계약이 없다. 계약이 생겨도 데이터 갱신이라 path 를 안 쓴다
+        case let .aliasRequested(id):
+            if let saved = state.map.places.first(where: { $0.id == id }) {
+                state.alias = PlaceAliasFeature.State(savedPlace: saved)
+            }
+            return .none
+        case .deleteRequested:
+            // PlaceClient 에 삭제 계약이 없다. 계약이 생겨도 데이터 갱신이라 path 를 안 쓴다
             return .none
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
@@ -165,11 +189,76 @@ private extension MapFlowFeature {
                 .send(.pathChanged([])),
                 .send(.map(.searchResultsApplied(query: query, places: places)))
             )
-        case let .placeSelected(id):
-            // 장소 상세는 Cycle 2 (DND-49). pathChanged 를 거쳐야 검색 자식과 그 효과가 정리된다
-            return .send(.pathChanged([.placeDetail(id)]))
+        case let .placeSelected(place):
+            // 고른 장소 하나를 지도에 올리고 시트만 상세로 바꾼다. 상세는 밀린 화면이 아니다
+            presentDetail(state: &state, place: place)
+            return .concatenate(
+                .send(.pathChanged([])),
+                .send(.map(.searchResultsApplied(query: place.name, places: [place])))
+            )
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         }
+    }
+
+    func handleChild(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .alias(.presented(.delegate(.saved(id, alias)))):
+            state.alias = nil
+            return .send(.map(.aliasSaved(id: id, alias: alias)))
+
+        case .alias(.presented(.delegate(.cancelled))), .alias(.dismiss):
+            state.alias = nil
+            return .none
+
+        case .detail(.presented(.delegate(.closed))), .detail(.dismiss):
+            dismissDetail(state: &state)
+            return .none
+
+        case .detail, .alias:
+            // 북마크·지도·게시물은 받는 쪽이 아직 없다. 삼킨다
+            return .none
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    /// 저장 모드면 저장 목록, 검색 모드면 검색 결과에서 찾는다. 없으면 시트를 안 연다
+    func presentDetail(state: inout State, id: String) {
+        switch state.map.mode {
+        case .saved:
+            if let saved = state.map.places.first(where: { $0.id == id }) {
+                presentDetail(state: &state, savedPlace: saved)
+            }
+        case .searchResult:
+            if let place = state.map.searchResults.first(where: { $0.id == id }) {
+                presentDetail(state: &state, place: place)
+            }
+        }
+    }
+
+    func presentDetail(state: inout State, savedPlace: SavedPlace) {
+        state.detail = PlaceDetailFeature.State(savedPlace: savedPlace)
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: savedPlace.id,
+            coordinate: savedPlace.place.coordinate
+        )
+    }
+
+    func presentDetail(state: inout State, place: Place) {
+        var detail = PlaceDetailFeature.State(place: place)
+        detail.isBookmarked = state.map.bookmarkedPlaceIDs.contains(place.id)
+        state.detail = detail
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: place.id,
+            coordinate: place.coordinate
+        )
+    }
+
+    func dismissDetail(state: inout State) {
+        state.detail = nil
+        state.map.selectedPlace = nil
     }
 }

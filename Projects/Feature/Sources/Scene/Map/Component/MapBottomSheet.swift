@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - MapBottomSheetMetric
 
-private enum MapBottomSheetMetric {
+enum MapBottomSheetMetric {
     static let cornerRadius: CGFloat = 32
     static let grabberWidth: CGFloat = 50
     static let grabberHeight: CGFloat = 6
