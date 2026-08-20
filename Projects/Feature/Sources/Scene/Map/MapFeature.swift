@@ -15,7 +15,7 @@ public struct MapFeature {
     public struct State: Equatable {
         /// 지도가 무엇을 그리고 있는지. 검색 결과가 들어오면 저장 장소를 잠시 덮는다
         public enum Mode: Equatable, Sendable {
-            case saved40
+            case saved
             case searchResult(query: String, places: [Place])
         }
 
