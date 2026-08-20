@@ -137,7 +137,8 @@ final class MapFlowPlaceSearchTests: XCTestCase {
         }
     }
 
-    func test_검색결과_행을_누르면_상세로_가고_검색이_정리된다() async {
+    func test_검색결과_행을_누르면_지도에_올리고_상세를_연다() async {
+        let place = Place.fixture(id: "p1", name: "고른 장소")
         var state = MapFlowFeature.State()
         state.placeSearch = PlaceSearchFeature.State()
         state.path = [.search]
@@ -147,10 +148,20 @@ final class MapFlowPlaceSearchTests: XCTestCase {
         }
         store.exhaustivity = .off
 
-        await store.send(.placeSearch(.delegate(.placeSelected("p1"))))
+        await store.send(.placeSearch(.delegate(.placeSelected(place)))) {
+            $0.detail = PlaceDetailFeature.State(place: place)
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: place.id,
+                coordinate: place.coordinate
+            )
+        }
         await store.receive(\.pathChanged) {
-            $0.path = [.placeDetail("p1")]
+            $0.path = []
             $0.placeSearch = nil
+        }
+        await store.receive(\.map.searchResultsApplied) {
+            $0.map.mode = .searchResult(query: "고른 장소", places: [place])
+            $0.map.camera.center = place.coordinate
         }
     }
 }

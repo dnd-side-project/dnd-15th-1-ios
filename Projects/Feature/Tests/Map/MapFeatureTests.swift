@@ -272,7 +272,7 @@ final class MapFeatureDelegateTests: XCTestCase {
         await store.send(.markerTapped("7")) {
             $0.menuTargetPlaceID = nil
         }
-        await store.receive(\.delegate.placeSelected)
+        await store.receive(\.delegate.placeDetailRequested)
     }
 
     func test_행을_누르면_팝오버가_닫히고_상위로_올린다() async {
@@ -283,7 +283,7 @@ final class MapFeatureDelegateTests: XCTestCase {
         await store.send(.rowTapped("7")) {
             $0.menuTargetPlaceID = nil
         }
-        await store.receive(\.delegate.placeSelected)
+        await store.receive(\.delegate.placeDetailRequested)
     }
 
     func test_수정을_고르면_팝오버가_닫히고_상위로_올린다() async {
@@ -294,7 +294,7 @@ final class MapFeatureDelegateTests: XCTestCase {
         await store.send(.editTapped("7")) {
             $0.menuTargetPlaceID = nil
         }
-        await store.receive(\.delegate.editRequested)
+        await store.receive(\.delegate.aliasRequested)
     }
 
     func test_삭제를_고르면_팝오버가_닫히고_상위로_올린다() async {
@@ -327,5 +327,158 @@ final class MapFeatureDelegateTests: XCTestCase {
 
         await store.send(.courseButtonTapped)
         await store.receive(\.delegate.courseRequested)
+    }
+}
+
+@MainActor
+final class MapFeatureChildTests: XCTestCase {
+    private var savedPlaces: [SavedPlace] {
+        [
+            .fixture(id: "7", latitude: 37.3, longitude: 126.9),
+            .fixture(id: "8", latitude: 37.4, longitude: 126.8),
+        ]
+    }
+
+    func test_행을_누르면_상세_요청을_올린다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.rowTapped("7"))
+        XCTAssertNil(store.state.selectedPlace)
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_핀을_누르면_상세_요청을_올린다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.markerTapped("7"))
+        XCTAssertNil(store.state.selectedPlace)
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_목록에_없는_id_여도_상세_요청을_올린다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.rowTapped("없는id"))
+        XCTAssertNil(store.state.selectedPlace)
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_검색_결과에서_행을_누르면_상세_요청을_올린다() async {
+        let place = Place.fixture(id: "s1", name: "검색 장소")
+        var state = MapFeature.State()
+        state.mode = .searchResult(query: "카페", places: [place])
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.rowTapped("s1"))
+        XCTAssertNil(store.state.selectedPlace)
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_수정을_누르면_별칭_요청을_올리고_팝오버가_닫힌다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        state.menuTargetPlaceID = "7"
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.editTapped("7")) {
+            $0.menuTargetPlaceID = nil
+        }
+        await store.receive(\.delegate.aliasRequested)
+    }
+
+    func test_별칭을_저장하면_목록이_바뀌고_토스트가_뜬다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        await store.send(.aliasSaved(id: "7", alias: "우리 첫 카페")) {
+            let old = $0.places[0]
+            $0.places[0] = SavedPlace(
+                place: old.place,
+                ownership: old.ownership,
+                alias: "우리 첫 카페",
+                memo: old.memo,
+                savedAt: old.savedAt
+            )
+            $0.toast = ToastState(message: "별칭을 저장했어요")
+        }
+    }
+
+    func test_선택_핀을_누르면_요청을_안_올린다() async {
+        let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
+
+        await store.send(.markerTapped(MapFeature.State.selectedMarkerID))
+    }
+}
+
+@MainActor
+final class MapFeatureSelectedPinTests: XCTestCase {
+    private let savedPlaces: [SavedPlace] = [
+        .fixture(id: "1", latitude: 37.3128, longitude: 126.9040),
+        .fixture(id: "2", latitude: 37.3141, longitude: 126.9068),
+    ]
+
+    private func loadedState(selected: MapFeature.State.SelectedPlace? = nil) -> MapFeature.State {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        state.loadState = .loaded
+        state.selectedPlace = selected
+        return state
+    }
+
+    func test_상세가_없으면_마커개수가_기존과_같다() async {
+        let store = TestStore(initialState: loadedState()) { MapFeature() }
+        XCTAssertEqual(store.state.markers.count, store.state.filteredPlaces.count)
+        XCTAssertEqual(store.state.markers.map(\.kind), [.category(.cafe), .category(.cafe)])
+    }
+
+    func test_선택된_장소가_있으면_선택핀이_맨뒤에_붙는다() async {
+        let selected = MapFeature.State.SelectedPlace(
+            id: savedPlaces[0].id,
+            coordinate: savedPlaces[0].place.coordinate
+        )
+        let store = TestStore(initialState: loadedState(selected: selected)) { MapFeature() }
+
+        XCTAssertEqual(store.state.markers.count, 3)
+        XCTAssertEqual(store.state.markers.last?.kind, .selected)
+        XCTAssertEqual(
+            store.state.markers.last?.coordinate,
+            savedPlaces[0].place.coordinate
+        )
+    }
+
+    func test_선택된_장소가_있어도_기존_카테고리핀은_그대로다() async {
+        let before = TestStore(initialState: loadedState()) { MapFeature() }.state.markers
+        let selected = MapFeature.State.SelectedPlace(
+            id: savedPlaces[0].id,
+            coordinate: savedPlaces[0].place.coordinate
+        )
+        let store = TestStore(initialState: loadedState(selected: selected)) { MapFeature() }
+
+        XCTAssertEqual(Array(store.state.markers.dropLast()), before)
+    }
+
+    func test_선택된_장소를_지우면_선택핀이_빠진다() async {
+        let selected = MapFeature.State.SelectedPlace(
+            id: savedPlaces[0].id,
+            coordinate: savedPlaces[0].place.coordinate
+        )
+        let open = TestStore(initialState: loadedState(selected: selected)) { MapFeature() }
+        XCTAssertEqual(open.state.markers.count, 3)
+
+        let closed = TestStore(initialState: loadedState()) { MapFeature() }
+        XCTAssertEqual(closed.state.markers.count, 2)
+        XCTAssertFalse(closed.state.markers.contains { $0.kind == .selected })
     }
 }

@@ -256,3 +256,42 @@ final class PlaceSearchFeatureTests: XCTestCase {
         }
     }
 }
+
+@MainActor
+final class PlaceSearchSelectionTests: XCTestCase {
+    func test_행을_누르면_그_장소를_올린다() async {
+        let place = Place.fixture(id: "1", name: "장소명")
+        var state = PlaceSearchFeature.State()
+        state.query = "음식점"
+        state.results = [place]
+        state.loadState = .loaded
+
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.mapRecentSearchClient.add = { term in [term] }
+        }
+
+        await store.send(.rowTapped("1"))
+        await store.receive(\.recentSearchesUpdated) {
+            $0.recentSearches = ["음식점"]
+        }
+        await store.receive(\.delegate.placeSelected)
+    }
+
+    func test_목록에_없는_행은_안_올린다() async {
+        var state = PlaceSearchFeature.State()
+        state.results = [Place.fixture(id: "1", name: "장소명")]
+
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.mapRecentSearchClient.add = { _ in
+                XCTFail("없는 행을 최근 검색어에 넣으면 안 된다")
+                return []
+            }
+        }
+
+        await store.send(.rowTapped("없는id"))
+    }
+}
