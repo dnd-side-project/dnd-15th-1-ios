@@ -307,7 +307,9 @@ extension Bundle {
            let identifier = KakaoMapPreviewBundleShim.overrideBundleIdentifier {
             return identifier
         }
-        return dulpickPreviewShimBundleIdentifier
+        // getter 자기 참조는 컴파일러가 재귀로 막는다. 같은 셀렉터를 메시지로 보낸다.
+        return perform(#selector(getter: Bundle.dulpickPreviewShimBundleIdentifier))?
+            .takeUnretainedValue() as? String
     }
 }
 #endif
