@@ -26,25 +26,28 @@ extension Place {
 extension SavedPlace {
     static func fixture(
         id: String,
-        latitude: Double,
-        longitude: Double,
+        latitude: Double = 37.3,
+        longitude: Double = 126.9,
         category: PlaceCategory = .cafe,
-        ownership: PlaceOwnership = .mine
+        ownership: PlaceOwnership = .mine,
+        alias: String? = nil,
+        name: String? = nil,
+        bookmarkCount: Int = 0
     ) -> SavedPlace {
         SavedPlace(
             place: Place(
                 id: id,
                 kakaoPlaceID: "kakao-\(id)",
-                name: "장소 \(id)",
+                name: name ?? "장소 \(id)",
                 category: category,
                 address: "경기도 안산시 상록구 건건동 \(id)",
                 roadAddress: "경기도 안산시 상록구 건건로 \(id)",
                 coordinate: Coordinate(latitude: latitude, longitude: longitude),
-                bookmarkCount: 0,
+                bookmarkCount: bookmarkCount,
                 thumbnailURLs: []
             ),
             ownership: ownership,
-            alias: nil,
+            alias: alias,
             memo: nil,
             savedAt: Date(timeIntervalSince1970: 1_786_000_000)
         )

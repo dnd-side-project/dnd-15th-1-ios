@@ -19,6 +19,17 @@ public struct MapFeature {
             case searchResult(query: String, places: [Place])
         }
 
+        /// 지금 열린 상세의 장소. 흐름이 채우고, 지도는 선택 핀만 이걸로 그린다
+        public struct SelectedPlace: Equatable, Sendable {
+            public let id: String
+            public let coordinate: Coordinate
+
+            public init(id: String, coordinate: Coordinate) {
+                self.id = id
+                self.coordinate = coordinate
+            }
+        }
+
         public var camera: MapCamera = .ansan
         public var mode: Mode = .saved
 
@@ -39,32 +50,14 @@ public struct MapFeature {
 
         public var toast: ToastState?
 
+        /// 지금 열린 상세. `nil` 이면 선택 핀을 안 그린다
+        public var selectedPlace: SelectedPlace?
+
         /// 지도 핀과 시트 목록이 함께 보는 하나의 배열이다. 둘이 어긋날 수 없다
         public var filteredPlaces: [SavedPlace] {
             places
                 .filter { selectedOwnership.matches($0.ownership) }
                 .filter { selectedCategory == nil || $0.place.category == selectedCategory }
-        }
-
-        public var markers: [MapMarker] {
-            switch mode {
-            case .saved:
-                return filteredPlaces.map { saved in
-                    MapMarker(
-                        id: saved.id,
-                        coordinate: saved.place.coordinate,
-                        kind: .category(saved.place.category)
-                    )
-                }
-            case let .searchResult(_, places):
-                return places.map { place in
-                    MapMarker(
-                        id: place.id,
-                        coordinate: place.coordinate,
-                        kind: .category(place.category)
-                    )
-                }
-            }
         }
 
         /// 다 불러온 뒤 보일 게 없는 상태
@@ -102,18 +95,21 @@ public struct MapFeature {
         case searchClearTapped
         case searchBackTapped
         case bookmarkTapped(String)
+        /// 별칭 시트가 저장한 뒤 목록을 갈아 끼운다
+        case aliasSaved(id: String, alias: String)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
-            /// 핀·행 탭. 받는 쪽은 Cycle 2 다
-            case placeSelected(String)
+            /// 핀·행 탭. 흐름이 상세 시트를 연다
+            case placeDetailRequested(String)
             /// 검색바 탭. 받는 쪽은 Cycle 3 이다
             case searchRequested
             case searchReopenRequested(query: String)
             /// `데이트 코스 짜러가기`. 받는 쪽은 Cycle 4 다
             case courseRequested
-            case editRequested(String)
+            /// 행 메뉴 수정. 흐름이 별칭 시트를 연다
+            case aliasRequested(String)
             case deleteRequested(String)
             /// 세션 만료. RootFlow 까지 올라가 로그인으로 되돌린다
             case sessionExpired
@@ -147,6 +143,8 @@ public struct MapFeature {
             return raise(state: &state, action: action)
         case .searchResultsApplied, .searchClearTapped, .searchBackTapped, .bookmarkTapped:
             return updateSearch(state: &state, action: action)
+        case .aliasSaved:
+            return applyAlias(state: &state, action: action)
         case .delegate:
             return .none
         }
@@ -252,21 +250,29 @@ public struct MapFeature {
         }
     }
 
-    /// 받는 쪽이 이 Scene 밖이라 상태만 정리하고 `delegate` 로 올린다
+    /// 이 Scene 밖이 받는 신호는 `delegate` 로 올린다
     private func raise(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case let .editTapped(id):
             state.menuTargetPlaceID = nil
-            return .send(.delegate(.editRequested(id)))
+            return .send(.delegate(.aliasRequested(id)))
 
         case let .deleteTapped(id):
             state.menuTargetPlaceID = nil
             return .send(.delegate(.deleteRequested(id)))
 
-        case let .markerTapped(id), let .rowTapped(id):
+        case let .markerTapped(id):
             // 상세로 넘어가는 길이다. 열린 팝오버를 두면 상세 시트 뒤에 남는다
             state.menuTargetPlaceID = nil
-            return .send(.delegate(.placeSelected(id)))
+            // 선택 핀 id 는 목록에 없다. 다시 찾으면 상세가 닫히거나 엉뚱한 장소가 열린다
+            guard id != State.selectedMarkerID else {
+                return .none
+            }
+            return .send(.delegate(.placeDetailRequested(id)))
+
+        case let .rowTapped(id):
+            state.menuTargetPlaceID = nil
+            return .send(.delegate(.placeDetailRequested(id)))
 
         case .searchBarTapped:
             return .send(.delegate(.searchRequested))
@@ -335,9 +341,63 @@ private extension MapFeature {
             return .none
         }
     }
+
+    func applyAlias(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .aliasSaved(id, alias):
+            // 서버에 별칭 수정 계약이 없다. 목록을 화면 안에서 갈아 끼운다
+            if let index = state.places.firstIndex(where: { $0.id == id }) {
+                let old = state.places[index]
+                state.places[index] = SavedPlace(
+                    place: old.place,
+                    ownership: old.ownership,
+                    alias: alias,
+                    memo: old.memo,
+                    savedAt: old.savedAt
+                )
+            }
+            state.toast = ToastState(message: "별칭을 저장했어요")
+            return .none
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
 }
 
 public extension MapFeature.State {
+    /// 선택 핀 전용 id. 장소 목록에 없는 값이라 탭해도 상세를 다시 찾지 않는다
+    static let selectedMarkerID = "map.selected"
+
+    var markers: [MapMarker] {
+        var markers: [MapMarker]
+        switch mode {
+        case .saved:
+            markers = filteredPlaces.map { categoryMarker($0.place) }
+        case let .searchResult(_, places):
+            markers = places.map(categoryMarker)
+        }
+        // 고른 장소의 기존 핀은 지우지 않는다. 시안처럼 그 위에 선택 핀을 얹는다
+        if let selectedPlace {
+            markers.append(
+                MapMarker(
+                    id: Self.selectedMarkerID,
+                    coordinate: selectedPlace.coordinate,
+                    kind: .selected
+                )
+            )
+        }
+        return markers
+    }
+
+    private func categoryMarker(_ place: Place) -> MapMarker {
+        MapMarker(
+            id: place.id,
+            coordinate: place.coordinate,
+            kind: .category(place.category)
+        )
+    }
+
     var isSearching: Bool {
         if case .searchResult = mode { return true }
         return false
