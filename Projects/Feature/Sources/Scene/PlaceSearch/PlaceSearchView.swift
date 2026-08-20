@@ -17,8 +17,6 @@ private enum PlaceSearchMetric {
     static let cornerRadius: CGFloat = 12
     static let skeletonRowHeight: CGFloat = 64
     static let skeletonRowCount = 3
-    /// 안전영역 상단에서 상단 줄 위까지
-    static let topBarTopInset: CGFloat = 10
     /// 상단줄 아래 여백
     static let topBarBottomInset: CGFloat = 10
     /// 최근 검색어 제목 줄 위아래 여백
@@ -63,7 +61,8 @@ public struct PlaceSearchView: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: Spacing.s12) {
+        // 기본 네비바 뒤로가기와 같은 높이에 서게 입력칸 가운데가 아니라 위에 붙인다
+        HStack(alignment: .top, spacing: Spacing.s12) {
             backButton
 
             AppTextField(
@@ -78,7 +77,6 @@ public struct PlaceSearchView: View {
             )
         }
         .padding(.horizontal, Spacing.s20)
-        .padding(.top, PlaceSearchMetric.topBarTopInset)
         .padding(.bottom, PlaceSearchMetric.topBarBottomInset)
     }
 

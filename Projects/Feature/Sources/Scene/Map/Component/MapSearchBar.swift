@@ -43,7 +43,8 @@ struct MapSearchBar: View {
 
     var body: some View {
         if onBack != nil {
-            HStack(spacing: Spacing.s12) {
+            // 기본 네비바 뒤로가기와 같은 높이에 서게 입력칸 가운데가 아니라 위에 붙인다
+            HStack(alignment: .top, spacing: Spacing.s12) {
                 backButton
                 field
             }

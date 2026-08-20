@@ -23,24 +23,28 @@ private enum DateWheelPickerMetric {
 /// `selection` 에는 `year` · `month` · `day` 만 쓴다. 나머지 필드는 받은 그대로 둔다.
 struct DateWheelPicker: View {
 
-    private static let calendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone.autoupdatingCurrent
-        return calendar
-    }()
-
     @Binding private var selection: DateComponents
-    private let yearRange: ClosedRange<Int>
+    private let range: WheelDateRange
 
-    init(selection: Binding<DateComponents>, yearRange: ClosedRange<Int>) {
+    init(
+        selection: Binding<DateComponents>,
+        yearRange: ClosedRange<Int>,
+        minimum: DateComponents? = nil
+    ) {
         self._selection = selection
-        self.yearRange = yearRange
+        self.range = WheelDateRange(yearRange: yearRange, minimum: minimum)
     }
 
     var body: some View {
+        let resolved = range.resolved(selection)
+        let year = resolved.year ?? range.yearRange.lowerBound
+        let month = resolved.month ?? 1
+        // 일 열 행마다 달력을 돌지 않게, 이번 평가에서 한 번만 센다.
+        let days = range.days(year: year, month: month)
+
         ZStack {
             WheelSelectionBar()
-            columns
+            columns(year: year, days: days)
             unitOverlay
         }
         .frame(maxWidth: .infinity)
@@ -52,11 +56,15 @@ struct DateWheelPicker: View {
 
     // MARK: - Layer
 
-    private var columns: some View {
+    private func columns(year: Int, days: [Int]) -> some View {
         HStack(spacing: WheelMetrics.columnSpacing) {
-            WheelColumn(items: Array(yearRange), selection: yearBinding) { String($0) }
-            WheelColumn(items: Array(1...12), selection: monthBinding, title: WheelFormat.twoDigits)
-            WheelColumn(items: Array(1...dayCount), selection: dayBinding, title: WheelFormat.twoDigits)
+            WheelColumn(items: range.years, selection: yearBinding) { String($0) }
+            WheelColumn(
+                items: range.months(year: year),
+                selection: monthBinding,
+                title: WheelFormat.twoDigits
+            )
+            WheelColumn(items: days, selection: dayBinding, title: WheelFormat.twoDigits)
         }
         .padding(.trailing, DateWheelPickerMetric.trailingInset)
     }
@@ -90,92 +98,56 @@ struct DateWheelPicker: View {
 
     private var yearBinding: Binding<Int?> {
         Binding(
-            get: { resolvedYear },
+            get: { range.resolved(selection).year },
             set: { newValue in
                 guard let newValue else { return }
-                update(year: newValue, month: resolvedMonth, day: resolvedDay)
+                var next = selection
+                next.year = newValue
+                selection = range.resolved(next)
             }
         )
     }
 
     private var monthBinding: Binding<Int?> {
         Binding(
-            get: { resolvedMonth },
+            get: { range.resolved(selection).month },
             set: { newValue in
                 guard let newValue else { return }
-                update(year: resolvedYear, month: newValue, day: resolvedDay)
+                var next = selection
+                next.month = newValue
+                selection = range.resolved(next)
             }
         )
     }
 
     private var dayBinding: Binding<Int?> {
         Binding(
-            get: { resolvedDay },
+            get: { range.resolved(selection).day },
             set: { newValue in
                 guard let newValue else { return }
-                update(year: resolvedYear, month: resolvedMonth, day: newValue)
+                var next = selection
+                next.day = newValue
+                selection = range.resolved(next)
             }
         )
     }
 
     // MARK: - Value
 
-    private var resolvedYear: Int {
-        min(max(selection.year ?? yearRange.lowerBound, yearRange.lowerBound), yearRange.upperBound)
-    }
-
-    private var resolvedMonth: Int {
-        min(max(selection.month ?? 1, 1), 12)
-    }
-
-    /// 30일까지인 달에서 31일을 들고 있으면 그 달의 마지막 날로 내린다.
-    private var resolvedDay: Int {
-        let day = max(selection.day ?? 1, 1)
-        return min(day, dayCount)
-    }
-
-    private var dayCount: Int {
-        dayCount(year: resolvedYear, month: resolvedMonth)
-    }
-
     /// 빈 필드나 그 달에 없는 날짜를 들고 들어온 경우 밖의 값도 휠이 보여주는 값으로 맞춰준다.
     ///
     /// 이미 맞으면 아무것도 쓰지 않아 `onChange` 가 스스로를 다시 불러 되먹임하는 일이 없다.
     private func normalizeSelection() {
-        let year = resolvedYear
-        let month = resolvedMonth
-        let day = resolvedDay
-
-        guard selection.year != year || selection.month != month || selection.day != day else {
+        let resolved = range.resolved(selection)
+        guard
+            selection.year != resolved.year
+                || selection.month != resolved.month
+                || selection.day != resolved.day
+        else {
             return
         }
 
-        update(year: year, month: month, day: day)
-    }
-
-    private func update(year: Int, month: Int, day: Int) {
-        var components = selection
-        components.year = year
-        components.month = month
-        components.day = min(day, dayCount(year: year, month: month))
-        selection = components
-    }
-
-    /// 그레고리력 기준 그 달의 일수. 윤년 2월은 29를 돌려준다.
-    private func dayCount(year: Int, month: Int) -> Int {
-        var components = DateComponents()
-        components.year = year
-        components.month = month
-        components.day = 1
-
-        guard
-            let date = Self.calendar.date(from: components),
-            let dayRange = Self.calendar.range(of: .day, in: .month, for: date)
-        else {
-            return 31
-        }
-
-        return dayRange.count
+        selection = resolved
     }
 }
 

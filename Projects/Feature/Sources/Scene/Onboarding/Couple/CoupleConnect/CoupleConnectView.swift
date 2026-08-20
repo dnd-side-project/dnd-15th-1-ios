@@ -14,10 +14,16 @@ public struct CoupleConnectView: View {
 
     public var body: some View {
         rootContent
-            .navigationTitle("커플 연결")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
-            .toolbar { backToolbar }
+            .toolbar {
+                backToolbar
+                ToolbarItem(placement: .principal) {
+                    Text("커플 연결")
+                        .typography(.body1SB)
+                        .foregroundStyle(Color.gray900)
+                }
+            }
             .onAppear {
                 store.send(.onAppear)
             }

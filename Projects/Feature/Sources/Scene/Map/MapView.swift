@@ -11,16 +11,6 @@ private enum RowMenuOption: String, CaseIterable {
     case delete = "삭제"
 }
 
-private enum CategoryDropdown {
-    static let allOption = "전체"
-}
-
-/// 시트 헤더의 필터 메뉴. 한 번에 하나만 열린다
-private enum FilterMenu {
-    case ownership
-    case category
-}
-
 // MARK: - MapView
 
 public struct MapView: View {
@@ -241,8 +231,8 @@ private extension MapView {
                 AppDropdown(
                     selection: categoryBinding,
                     isExpanded: filterMenuBinding(.category),
-                    placeholder: CategoryDropdown.allOption,
-                    options: [CategoryDropdown.allOption] + PlaceCategory.mapDisplayOrder.map(\.displayName),
+                    placeholder: PlaceCategory.unfilteredName,
+                    options: [PlaceCategory.unfilteredName] + PlaceCategory.mapDisplayOrder.map(\.displayName),
                     onMenuFrameChange: { categoryMenuFrame = $0 }
                 )
             }
@@ -453,7 +443,7 @@ private extension MapView {
         Binding(
             get: { store.selectedCategory?.displayName },
             set: { newValue in
-                guard let newValue, newValue != CategoryDropdown.allOption else {
+                guard let newValue, newValue != PlaceCategory.unfilteredName else {
                     store.send(.categoryTapped(nil))
                     return
                 }
