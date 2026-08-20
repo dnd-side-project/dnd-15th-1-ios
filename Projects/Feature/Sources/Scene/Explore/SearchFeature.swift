@@ -11,6 +11,9 @@ import ThirdParty
 
 @Reducer
 public struct SearchFeature {
+    /// 게시글 검색 한 페이지 크기. 탐색 무한스크롤과 동일하게 맞춘다
+    static let pageSize = 10
+
     public enum Tab: String, Equatable, Sendable, CaseIterable {
         case post
         case place
@@ -30,7 +33,10 @@ public struct SearchFeature {
         var selectedTab: Tab = .post
         var contents: [Content] = []
         var places: [Place] = []
+        var contentsPage: Int = 0
+        var contentsHasNext: Bool = true
         var isSearching = false
+        var isLoadingMore = false
 
         // 선택된 탭 기준으로 결과 유무 판정
         var hasResult: Bool {
@@ -53,7 +59,9 @@ public struct SearchFeature {
         case recentSearchesUpdated([String])
         case tabSelected(Tab)
         case queryChangeDebounced
-        case searchResponse([Content], [Place])
+        case searchResponse(ContentPage, [Place])
+        case reachedEnd
+        case moreContentsLoaded(ContentPage)
         case searchFailed
     }
 
@@ -61,7 +69,7 @@ public struct SearchFeature {
     @Dependency(\.recentSearchClient) var recentSearchClient
     @Dependency(\.continuousClock) var clock
 
-    private enum CancelID { case search }
+    private enum CancelID { case search, loadMore }
 
     public init() {}
 
@@ -81,15 +89,28 @@ public struct SearchFeature {
         case .queryChangeDebounced:
             return search(state: &state)
 
-        case let .searchResponse(contents, places):
-            state.contents = contents
+        case let .searchResponse(page, places):
+            state.contents = page.items
+            state.contentsHasNext = page.hasNext
+            state.contentsPage = 1
             state.places = places
             state.isSearching = false
+            return .none
+
+        case .reachedEnd:
+            return loadMoreContents(state: &state)
+
+        case let .moreContentsLoaded(page):
+            state.contents += page.items
+            state.contentsHasNext = page.hasNext
+            state.contentsPage += 1
+            state.isLoadingMore = false
             return .none
 
         case .searchFailed:
             // 이전 결과는 두고 로딩만 해제
             state.isSearching = false
+            state.isLoadingMore = false
             return .none
 
         case .onAppear, .searchSubmitted, .recentSearchTapped, .recentSearchDeleted,
@@ -157,12 +178,16 @@ public struct SearchFeature {
         guard !query.isEmpty else {
             state.contents = []
             state.places = []
+            state.contentsPage = 0
+            state.contentsHasNext = true
             state.isSearching = false
             return .none
         }
         state.isSearching = true
+        state.contentsPage = 0
+        state.contentsHasNext = true
         return .run { [exploreClient] send in
-            async let contents = exploreClient.searchContents(query)
+            async let contents = exploreClient.searchContents(query, .popular, 0, Self.pageSize)
             async let places = exploreClient.searchPlaces(query)
             await send(.searchResponse(try await contents, try await places))
         } catch: { error, send in
@@ -170,6 +195,27 @@ public struct SearchFeature {
             if error is CancellationError { return }
             await send(.searchFailed)
         }
+    }
+
+    // 게시글 탭 스크롤 끝에서 다음 페이지를 append. 로딩 중·마지막·빈 검색어면 무시
+    private func loadMoreContents(state: inout State) -> Effect<Action> {
+        let query = state.query
+        guard state.selectedTab == .post, !query.isEmpty,
+              state.contentsHasNext, !state.isLoadingMore, !state.isSearching else {
+            return .none
+        }
+        state.isLoadingMore = true
+        let page = state.contentsPage
+        return .run { [exploreClient] send in
+            do {
+                let result = try await exploreClient.searchContents(query, .popular, page, Self.pageSize)
+                await send(.moreContentsLoaded(result))
+            } catch {
+                if error is CancellationError { return }
+                await send(.searchFailed)
+            }
+        }
+        .cancellable(id: CancelID.loadMore, cancelInFlight: true)
     }
 
     private func debounceSearch() -> Effect<Action> {

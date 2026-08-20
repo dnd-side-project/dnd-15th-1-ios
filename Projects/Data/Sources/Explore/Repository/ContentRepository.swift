@@ -22,4 +22,19 @@ public struct ContentRepository: Sendable {
             throw ExploreErrorMapper.map(error)
         }
     }
+
+    public func searchContents(
+        query: String,
+        sort: ContentSort,
+        page: Int,
+        size: Int
+    ) async throws -> ContentPage {
+        do {
+            return ContentDTOMapper.toDomain(
+                try await remote.searchContents(query: query, sort: sort, page: page, size: size)
+            )
+        } catch {
+            throw ExploreErrorMapper.map(error)
+        }
+    }
 }

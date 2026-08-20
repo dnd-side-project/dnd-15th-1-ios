@@ -5,6 +5,7 @@
 //  Created by 이인호 on 8/7/26.
 //
 
+import Domain
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -152,6 +153,13 @@ public struct SearchView: View {
         }
     }
 
+    // 끝에서 세 번째 카드가 보이면 다음 페이지를 미리 받아 스크롤이 끊기지 않게 한다
+    private func prefetchIfNeeded(_ content: Content) {
+        if content.id == store.contents.suffix(3).first?.id {
+            store.send(.reachedEnd)
+        }
+    }
+
     @ViewBuilder
     private var resultList: some View {
         ScrollView {
@@ -160,7 +168,14 @@ public struct SearchView: View {
                 LazyVGrid(columns: columns, spacing: Spacing.s32) {
                     ForEach(store.contents) { content in
                         ContentCard(content: content)
+                            .onAppear { prefetchIfNeeded(content) }
                     }
+                }
+
+                if store.isLoadingMore {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
                 }
             case .place:
                 LazyVStack(spacing: Spacing.s8) {
