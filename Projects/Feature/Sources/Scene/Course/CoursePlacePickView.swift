@@ -182,27 +182,27 @@ private extension CoursePlacePickView {
     var placeList: some View {
         VStack(spacing: 0) {
             ForEach(store.filteredPlaces) { saved in
-                row(saved, hasDivider: saved.id != store.filteredPlaces.last?.id)
+                row(saved, showsDivider: saved.id != store.filteredPlaces.last?.id)
             }
         }
         .padding(.top, Spacing.s8)
         .padding(.bottom, ctaCoverPadding)
     }
 
-    func row(_ saved: SavedPlace, hasDivider: Bool) -> some View {
+    func row(_ saved: SavedPlace, showsDivider: Bool) -> some View {
         let badge = store.state.badgeState(for: saved.id)
 
         return PlaceListRow(
             icon: saved.place.category.icon,
             name: saved.alias ?? saved.place.name,
             address: saved.place.address,
+            showsDivider: showsDivider,
             thumbnailURLs: saved.place.thumbnailURLs
         ) { url in
             RemoteImage(url: url, cornerRadius: CoursePlacePickMetric.cornerRadius)
         } trailing: {
             PlaceNumberBadge(state: badge)
         }
-        .hasDivider(hasDivider)
         // 배경은 행이 안 칠한다. 고른 행만 여기서 연분홍을 얹는다 (b06)
         .background(badge == .unselected ? Color.clear : Color.brandSurface)
         .contentShape(Rectangle())
