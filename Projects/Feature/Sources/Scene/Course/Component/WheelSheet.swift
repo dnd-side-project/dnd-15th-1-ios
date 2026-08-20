@@ -4,9 +4,8 @@ import SwiftUI
 // MARK: - WheelSheet Metric
 
 private enum WheelSheetMetric {
-    static let wheelVerticalPadding: CGFloat = Spacing.s24
     static let buttonHorizontalPadding: CGFloat = Spacing.s20
-    static let buttonBottomPadding: CGFloat = Spacing.s16
+    static let buttonBottomPadding: CGFloat = Spacing.s20
 }
 
 // MARK: - WheelSheet
@@ -32,7 +31,6 @@ struct WheelSheet<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             content
-                .padding(.vertical, WheelSheetMetric.wheelVerticalPadding)
 
             AppButton("확인", style: .dark, size: .xl, fullWidth: true) {
                 onConfirm()
