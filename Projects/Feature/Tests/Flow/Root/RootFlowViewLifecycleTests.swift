@@ -74,6 +74,10 @@ private final class Harness {
             // mainTab 전환 시 홈 onAppear 가 호출하므로 네트워크 없이 응답만 준다
             $0.coupleClient.current = { nil }
             $0.placeClient.savedPlaces = { [] }
+            $0.profileClient.member = { UserProfile(nickname: "둘픽", iconID: 0, datePreference: nil) }
+            $0.exploreClient.contents = { _, _, _ in
+                ContentPage(items: [], hasNext: false, popularTags: [])
+            }
         } operation: {
             Store(initialState: RootFlowFeature.State(phase: phase)) {
                 Reduce<RootFlowFeature.State, RootFlowFeature.Action> { _, action in

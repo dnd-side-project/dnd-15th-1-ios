@@ -4,6 +4,9 @@ import ThirdParty
 
 @Reducer
 public struct HomeFeature {
+    /// 추천 섹션에 보여줄 게시물 수
+    static let recommendationCount = 10
+
     /// 커플 연결 세 화면. 모두 `couple` 스토어 하나를 공유하고 Route 로 무엇을 그릴지만 가른다
     public enum CoupleRoute: Hashable {
         case connect
@@ -42,7 +45,7 @@ public struct HomeFeature {
             nickname: String = "듀가나디햄햄",
             partnerName: String? = nil,
             upcomingSchedule: UpcomingSchedule? = .mock,
-            recommendations: [Content] = Content.mocks,
+            recommendations: [Content] = [],
             pastSchedules: [DateSchedule] = DateSchedule.mocks,
             savedPlaces: [SavedPlace] = [],
             couple: CoupleConnectFeature.State? = nil,
@@ -64,6 +67,7 @@ public struct HomeFeature {
         case coupleLoaded(CoupleStatus?)
         case coupleLoadFailed(CoupleError)
         case savedPlacesLoaded([SavedPlace])
+        case recommendationsLoaded([Content])
         case connectFlowRequested
         case couplePathChanged([CoupleRoute])
         case couple(CoupleConnectFeature.Action)
@@ -77,6 +81,8 @@ public struct HomeFeature {
 
     @Dependency(\.placeClient) var placeClient
     @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.exploreClient) var exploreClient
+    @Dependency(\.profileClient) var profileClient
 
     public init() {}
 
@@ -90,7 +96,7 @@ public struct HomeFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
-            return .merge(loadCouple(), loadSavedPlaces())
+            return .merge(loadCouple(), loadSavedPlaces(), loadRecommendations())
 
         case let .coupleLoaded(status):
             guard let status else {
@@ -113,6 +119,17 @@ public struct HomeFeature {
             state.savedPlaces = places
             return .none
 
+        case let .recommendationsLoaded(contents):
+            state.recommendations = contents
+            return .none
+
+        case .connectFlowRequested, .couplePathChanged, .couple, .delegate:
+            return coupleNavCore(state: &state, action: action)
+        }
+    }
+
+    private func coupleNavCore(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .connectFlowRequested:
             // 이미 연결된 경우 커플 연결로 보내지 않는다
             guard !state.isConnected else { return .none }
@@ -129,7 +146,7 @@ public struct HomeFeature {
         case let .couple(.delegate(delegate)):
             return handleCoupleDelegate(state: &state, delegate: delegate)
 
-        case .couple, .delegate:
+        default:
             return .none
         }
     }
@@ -179,6 +196,16 @@ public struct HomeFeature {
         .run { [placeClient] send in
             let places = (try? await placeClient.savedPlaces()) ?? []
             await send(.savedPlacesLoaded(places))
+        }
+    }
+
+    private func loadRecommendations() -> Effect<Action> {
+        .run { [profileClient, exploreClient] send in
+            // datePreference 를 등록한 사용자만 취향(PREFERENCE) 정렬을 쓰고, 아니면 POPULAR
+            let hasPreference = (try? await profileClient.member())?.datePreference != nil
+            let sort: ContentSort = hasPreference ? .preference : .popular
+            let page = try? await exploreClient.contents(sort, 0, Self.recommendationCount)
+            await send(.recommendationsLoaded(page?.items ?? []))
         }
     }
 }
