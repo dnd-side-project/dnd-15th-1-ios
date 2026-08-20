@@ -10,8 +10,7 @@ private enum CourseDateViewMetric {
     static let subtitleTopPadding: CGFloat = Spacing.s8
     static let fieldsTopPadding: CGFloat = Spacing.s32
     static let backButtonSide: CGFloat = 24
-    /// `BottomSheet` 의 `.animation(.easeOut(duration: 0.22), value:)` 과 같다
-    static let sheetAnimationDuration: Duration = .milliseconds(220)
+    static let sheetAnimationDuration: Duration = .seconds(Motion.sheetDuration)
 }
 
 // MARK: - CourseDateView

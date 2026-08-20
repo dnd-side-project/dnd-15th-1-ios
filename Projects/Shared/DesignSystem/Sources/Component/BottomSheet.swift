@@ -34,7 +34,7 @@ public extension View {
             .accessibilityAddTraits(isPresented.wrappedValue ? .isModal : [])
         }
         // 바깥에 둬야 같은 값에 묶인 화면 쪽 변화도 시트와 같은 곡선으로 따라온다
-        .animation(.easeOut(duration: 0.22), value: isPresented.wrappedValue)
+        .animation(.easeOut(duration: Motion.sheetDuration), value: isPresented.wrappedValue)
     }
 }
 
