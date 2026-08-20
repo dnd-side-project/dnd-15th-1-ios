@@ -83,4 +83,7 @@ public extension PlaceCategory {
     static func fromDisplayName(_ name: String) -> PlaceCategory? {
         mapDisplayOrder.first { $0.displayName == name }
     }
+
+    /// 카테고리 드롭다운에서 특정 카테고리가 아니라 전부를 뜻하는 문구.
+    static let unfilteredName = "전체"
 }
