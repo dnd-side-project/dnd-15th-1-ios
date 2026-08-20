@@ -219,6 +219,7 @@ extension DulpickMapView {
 
                 let options = PoiOptions(styleID: styleID, poiID: marker.id)
                 options.clickable = true
+                options.rank = MapMarkerSymbol.rank(for: marker.kind)
                 layer.addPoi(option: options, at: marker.coordinate.mapPoint)?.show()
             }
 
@@ -276,7 +277,7 @@ extension DulpickMapView {
                         PerLevelPoiStyle(
                             iconStyle: PoiIconStyle(
                                 symbol: MapMarkerSymbol.image(for: kind),
-                                anchorPoint: CGPoint(x: 0.5, y: 0.5)
+                                anchorPoint: MapMarkerSymbol.anchorPoint(for: kind)
                             ),
                             level: 0
                         ),
@@ -496,7 +497,8 @@ private extension DulpickMapView {
 // MARK: - 기본 마커 심볼
 
 /// `place` `numbered` `selected` 는 여기서 그린 최소 심볼을 쓴다.
-/// 저장한 장소 핀(`category`)만 시안 에셋을 그대로 얹는다.
+/// 저장한 장소 핀(`category`)은 시안 에셋을, 코스 후보(`candidate`)는 `MapPlacePin` 을 얹는다.
+@MainActor
 private enum MapMarkerSymbol {
     static let routeColor = UIColor(red: 0.98, green: 0.31, blue: 0.44, alpha: 1.0)
 
@@ -504,12 +506,19 @@ private enum MapMarkerSymbol {
     private static let selectedColor = UIColor(red: 0.14, green: 0.14, blue: 0.16, alpha: 1.0)
     private static let userLocationColor = UIColor(red: 0.16, green: 0.47, blue: 0.96, alpha: 1.0)
 
+    /// 그림자 radius 2 + offsetY 1 을 담는 여백
+    private static let pinShadowInset: CGFloat = 4
+
+    /// 물방울 높이. `MapPlacePin` 의 피그마 Vector 28 × 31.86 에서 온 값이다
+    private static let pinHeight: CGFloat = 31.86
+
     static func styleID(for kind: MapMarker.Kind) -> String {
         switch kind {
         case .place: "dulpick.map.style.place"
         case .selected: "dulpick.map.style.selected"
         case let .numbered(number): "dulpick.map.style.numbered.\(number)"
         case let .category(category): "dulpick.map.style.category.\(category.rawValue)"
+        case .candidate: "dulpick.map.style.candidate"
         }
     }
 
@@ -523,7 +532,43 @@ private enum MapMarkerSymbol {
             circle(diameter: 28, fill: selectedColor, text: "\(number)")
         case let .category(category):
             category.pin
+        case .candidate:
+            rendered(MapPlacePin(content: .candidate))
         }
+    }
+
+    /// 같은 자리의 카테고리·장소 배지 위에 고른 핀이 앉는다. rank 가 큰 쪽이 위다.
+    static func rank(for kind: MapMarker.Kind) -> Int {
+        switch kind {
+        case .place, .category:
+            0
+        case .numbered, .selected, .candidate:
+            1
+        }
+    }
+
+    /// 마커 이미지의 어느 점이 좌표에 놓이는지.
+    ///
+    /// 원형 마커는 중심이 좌표다. 물방울은 뾰족한 아래 끝이 좌표다.
+    static func anchorPoint(for kind: MapMarker.Kind) -> CGPoint {
+        switch kind {
+        case .candidate:
+            // 그림자 여백만큼 이미지가 커졌다. 1.0 을 주면 끝이 좌표보다 그만큼 위에 앉는다
+            CGPoint(x: 0.5, y: (pinShadowInset + pinHeight) / (pinShadowInset * 2 + pinHeight))
+        // default 를 쓰지 않는다. 물방울 심볼이 늘면 여기서 컴파일이 막혀야 한다
+        case .place, .numbered, .selected, .category:
+            CGPoint(x: 0.5, y: 0.5)
+        }
+    }
+
+    /// SwiftUI 부품을 지도가 받는 `UIImage` 로 굽는다.
+    ///
+    /// `MapPlacePin` 은 그림자를 달고 있어 프레임 밖으로 잉크가 번진다.
+    /// `ImageRenderer` 는 프레임까지만 그리므로 여백을 둘러 잘리지 않게 한다.
+    private static func rendered(_ view: some View) -> UIImage {
+        let renderer = ImageRenderer(content: view.padding(pinShadowInset))
+        renderer.scale = UIScreen.main.scale
+        return renderer.uiImage ?? UIImage()
     }
 
     static func userLocationImage() -> UIImage {
