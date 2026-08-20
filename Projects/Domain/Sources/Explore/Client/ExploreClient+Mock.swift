@@ -18,7 +18,7 @@ public extension ExploreClient {
         searchContents: { _, _, _, _ in
             ContentPage(items: Content.mocks, hasNext: false, popularTags: [])
         },
-        searchPlaces: { _ in Place.mocks }
+        searchPlaces: { _, _, _ in PlacePage(items: Place.mocks, hasNext: false) }
     )
 }
 

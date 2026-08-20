@@ -170,6 +170,12 @@ public struct SearchView: View {
         }
     }
 
+    private func prefetchIfNeeded(_ place: Place) {
+        if place.id == store.places.suffix(3).first?.id {
+            store.send(.reachedEnd)
+        }
+    }
+
     @ViewBuilder
     private var resultList: some View {
         ScrollView {
@@ -191,7 +197,14 @@ public struct SearchView: View {
                 LazyVStack(spacing: Spacing.s8) {
                     ForEach(store.places) { place in
                         PlaceRow(place: place)
+                            .onAppear { prefetchIfNeeded(place) }
                     }
+                }
+
+                if store.isLoadingMore {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
                 }
             }
         }

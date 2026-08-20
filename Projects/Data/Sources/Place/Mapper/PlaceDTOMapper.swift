@@ -19,6 +19,28 @@ enum PlaceDTOMapper {
         )
     }
 
+    static func toSearchPage(_ dto: PlaceSearchResponseDTO) -> PlacePage {
+        PlacePage(
+            items: dto.places.map(toPlace),
+            hasNext: dto.hasNext
+        )
+    }
+
+    // placeId 는 미저장 장소라 null → kakaoPlaceId 를 식별자로 쓴다
+    private static func toPlace(_ dto: PlaceSearchItemDTO) -> Place {
+        Place(
+            id: dto.placeId.map(String.init) ?? dto.kakaoPlaceId ?? UUID().uuidString,
+            kakaoPlaceID: dto.kakaoPlaceId,
+            name: dto.name,
+            category: category(dto.categoryName),
+            address: dto.address,
+            roadAddress: dto.roadAddress,
+            coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
+            bookmarkCount: 0,
+            thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
+        )
+    }
+
     private static func toPlace(_ dto: SavedPlaceResponseDTO) -> Place {
         Place(
             id: String(dto.placeId),

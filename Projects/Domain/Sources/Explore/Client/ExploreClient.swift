@@ -14,7 +14,9 @@ public struct ExploreClient: Sendable {
     public var searchContents: @Sendable (
         _ query: String, _ sort: ContentSort, _ page: Int, _ size: Int
     ) async throws -> ContentPage
-    public var searchPlaces: @Sendable (_ query: String) async throws -> [Place]
+    public var searchPlaces: @Sendable (
+        _ query: String, _ page: Int, _ size: Int
+    ) async throws -> PlacePage
 }
 
 extension ExploreClient: TestDependencyKey {
