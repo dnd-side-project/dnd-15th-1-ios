@@ -319,9 +319,9 @@ private extension MapBottomSheet {
     /// 기기 화면 전체 높이를 재는 층.
     /// 담는 층은 안전영역과 탭바만큼 짧아 `GeometryReader` 로는 화면 높이가 안 나온다
     var screenHeightProbe: some View {
-        GeometryReader { proxy in
+        GeometryReader { _ in
             Color.clear
-                .onGeometryChange(for: CGFloat.self) { _ in proxy.size.height } action: { height in
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                     if screenHeight != height {
                         screenHeight = height
                     }
