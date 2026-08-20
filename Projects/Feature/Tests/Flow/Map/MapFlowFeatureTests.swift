@@ -10,6 +10,8 @@ final class MapFlowFeatureTests: XCTestCase {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var map = MapFeature.State()
         map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
         }
@@ -29,6 +31,8 @@ final class MapFlowFeatureTests: XCTestCase {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var map = MapFeature.State()
         map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
         }
@@ -48,6 +52,8 @@ final class MapFlowFeatureTests: XCTestCase {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var map = MapFeature.State()
         map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
         }
@@ -115,6 +121,8 @@ final class MapFlowFeatureTests: XCTestCase {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var map = MapFeature.State()
         map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
         }

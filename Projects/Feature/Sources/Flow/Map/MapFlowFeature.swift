@@ -240,7 +240,10 @@ private extension MapFlowFeature {
     }
 
     func presentDetail(state: inout State, savedPlace: SavedPlace) {
-        state.detail = PlaceDetailFeature.State(savedPlace: savedPlace)
+        var detail = PlaceDetailFeature.State(savedPlace: savedPlace)
+        // 검색 모드에서 끈 북마크가 저장 목록에서 다시 켜져 보이면 안 된다. 두 길이 같은 집합을 본다
+        detail.isBookmarked = state.map.bookmarkedPlaceIDs.contains(savedPlace.id)
+        state.detail = detail
         state.map.selectedPlace = MapFeature.State.SelectedPlace(
             id: savedPlace.id,
             coordinate: savedPlace.place.coordinate
