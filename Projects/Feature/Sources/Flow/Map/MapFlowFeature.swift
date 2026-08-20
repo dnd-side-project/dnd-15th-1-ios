@@ -16,20 +16,25 @@ public struct MapFlowFeature {
         case search
         /// Cycle 4 (DND-51)
         case course
+        /// Cycle 4 (DND-51)
+        case coursePlacePick
     }
 
     @ObservableState
     public struct State: Equatable {
         public var map: MapFeature.State
+        public var course: CourseFeature.State?
         public var path: [Route]
         public var placeSearch: PlaceSearchFeature.State?
 
         public init(
             map: MapFeature.State = MapFeature.State(),
+            course: CourseFeature.State? = nil,
             path: [Route] = [],
             placeSearch: PlaceSearchFeature.State? = nil
         ) {
             self.map = map
+            self.course = course
             self.path = path
             self.placeSearch = placeSearch
         }
@@ -38,6 +43,7 @@ public struct MapFlowFeature {
     public enum Action: Equatable {
         case pathChanged([Route])
         case map(MapFeature.Action)
+        case course(CourseFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
         case delegate(Delegate)
 
@@ -55,6 +61,9 @@ public struct MapFlowFeature {
             MapFeature()
         }
         Reduce(core)
+            .ifLet(\.course, action: \.course) {
+                CourseFeature()
+            }
             .ifLet(\.placeSearch, action: \.placeSearch) {
                 PlaceSearchFeature()
             }
@@ -68,14 +77,17 @@ public struct MapFlowFeature {
             if !path.contains(.search) {
                 state.placeSearch = nil
             }
+            if !path.contains(.course), !path.contains(.coursePlacePick) {
+                state.course = nil
+            }
             return .none
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
+        case let .course(.delegate(delegate)):
+            return handle(courseDelegate: delegate, state: &state)
         case let .placeSearch(.delegate(delegate)):
             return handle(searchDelegate: delegate, state: &state)
-        case .placeSearch:
-            return .none
-        case .map, .delegate:
+        case .map, .course, .placeSearch, .delegate:
             return .none
         }
     }
@@ -102,10 +114,28 @@ private extension MapFlowFeature {
             }
             return .none
         case .courseRequested:
+            // 지난 진입의 날짜·장소를 물려받으면 안 된다
+            state.course = CourseFeature.State()
             state.path.append(.course)
             return .none
         case .editRequested, .deleteRequested:
             // PlaceClient 에 수정·삭제 계약이 없다. 계약이 생겨도 데이터 갱신이라 path 를 안 쓴다
+            return .none
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        }
+    }
+
+    func handle(
+        courseDelegate: CourseFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch courseDelegate {
+        case .placePickRequested:
+            state.path.append(.coursePlacePick)
+            return .none
+        case .buildRequested:
+            // Cycle 5 (DND-52) 가 코스 결과 화면을 붙일 때까지 삼킨다
             return .none
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))

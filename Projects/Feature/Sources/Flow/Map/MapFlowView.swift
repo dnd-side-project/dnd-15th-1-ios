@@ -30,12 +30,18 @@ public struct MapFlowView: View {
                 PlaceSearchView(store: searchStore)
             }
         case .course:
-            Text("코스 화면 준비 중 — Cycle 4 (DND-51)")
+            if let courseStore { CourseDateView(store: courseStore) }
+        case .coursePlacePick:
+            if let courseStore { CoursePlacePickView(store: courseStore) }
         }
     }
 
     private var mapStore: StoreOf<MapFeature> {
         store.scope(state: \.map, action: \.map)
+    }
+
+    private var courseStore: StoreOf<CourseFeature>? {
+        store.scope(state: \.course, action: \.course)
     }
 
     // 지도 목적지 스택은 MapFlowFeature 가 소유하고, NavigationStack 이 그 path 를 그대로 민다
