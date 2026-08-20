@@ -29,8 +29,10 @@ public struct CourseFeature {
         public var time: DateComponents?
         public var showsDateError = false
         public var activeWheel: WheelTarget?
+        /// 자정을 넘겨도 하한과 초기값이 다른 날을 가리키지 않게, 한 번 센 오늘을 같이 쓴다
+        public var today: DateComponents
         /// 시트 안에서 굴리는 임시값. `확인` 을 눌러야 date/time 으로 넘어간다
-        public var draftDate: DateComponents = Self.defaultDate
+        public var draftDate: DateComponents
         public var draftTime: DateComponents = Self.defaultTime
 
         // 장소 화면
@@ -43,7 +45,11 @@ public struct CourseFeature {
         public var selectedPlaceIDs: [String] = []
         public var camera: MapCamera = .ansan
 
-        public init() {}
+        public init() {
+            let today = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+            self.today = today
+            self.draftDate = today
+        }
     }
 
     // MARK: Action
@@ -381,11 +387,6 @@ public extension CourseFeature.State {
 // MARK: - Default
 
 private extension CourseFeature.State {
-
-    /// 휠을 처음 열었을 때 놓이는 자리. 시안에 근거가 없어 오늘로 둔다
-    static var defaultDate: DateComponents {
-        Calendar.current.dateComponents([.year, .month, .day], from: Date())
-    }
 
     /// 시안 b03·c10 이 `오후 1:00` 을 보인다
     static var defaultTime: DateComponents {
