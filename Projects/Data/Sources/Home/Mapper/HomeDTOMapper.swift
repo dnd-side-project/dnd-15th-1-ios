@@ -24,7 +24,8 @@ enum HomeDTOMapper {
     }
 
     private static func toUpcoming(_ dto: DateCourseResponseDTO) -> UpcomingSchedule {
-        UpcomingSchedule(date: dto.date, placeCount: dto.totalPlaceCount)
+        // 배너는 코스 제목을 보여준다
+        UpcomingSchedule(title: dto.title, placeCount: dto.totalPlaceCount)
     }
 
     private static func toDateSchedule(_ dto: DateCourseResponseDTO) -> DateSchedule {
@@ -32,7 +33,15 @@ enum HomeDTOMapper {
             id: String(dto.dateCourseId),
             title: dto.title,
             placeCount: dto.totalPlaceCount,
-            date: dto.date
+            // 지난 데이트는 yy.MM.dd
+            date: shortDate(dto.date)
         )
+    }
+
+    // "2026-08-16" → "26.08.16"
+    private static func shortDate(_ raw: String) -> String {
+        let parts = raw.split(separator: "-")
+        guard parts.count == 3 else { return raw }
+        return "\(parts[0].suffix(2)).\(parts[1]).\(parts[2])"
     }
 }

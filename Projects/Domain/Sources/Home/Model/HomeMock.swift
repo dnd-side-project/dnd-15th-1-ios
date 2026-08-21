@@ -18,5 +18,5 @@ public extension DateSchedule {
 }
 
 public extension UpcomingSchedule {
-    static let mock = UpcomingSchedule(date: "08.05", placeCount: 5)
+    static let mock = UpcomingSchedule(title: "성수동 데이트", placeCount: 5)
 }

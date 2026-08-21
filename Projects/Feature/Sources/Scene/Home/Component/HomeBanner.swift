@@ -114,7 +114,7 @@ struct HomeBanner: View {
         Button(action: bannerTapped) {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("\(schedule.date) 데이트 일정")
+                    Text(schedule.title)
                         .typography(.title3SB)
                         .foregroundStyle(Color.commonWhite)
 
