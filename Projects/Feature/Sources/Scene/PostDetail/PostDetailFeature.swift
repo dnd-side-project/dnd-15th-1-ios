@@ -1,8 +1,3 @@
-//
-//  PostDetailFeature.swift
-//  Dulpick
-//
-
 import Domain
 import Foundation
 import ThirdParty
@@ -66,7 +61,7 @@ public struct PostDetailFeature {
         case load
     }
 
-    @Dependency(\.postDetailContentSource) var postDetailContentSource
+    @Dependency(\.postDetailContentClient) var postDetailContentClient
 
     public init() {}
 
@@ -134,9 +129,9 @@ public struct PostDetailFeature {
     }
 
     private func load(id: String) -> Effect<Action> {
-        .run { [postDetailContentSource] send in
+        .run { [postDetailContentClient] send in
             do {
-                await send(.detailResponse(try await postDetailContentSource.load(id)))
+                await send(.detailResponse(try await postDetailContentClient.contentDetail(id)))
             } catch let error as ExploreError {
                 await send(.detailFailed(error))
             } catch {

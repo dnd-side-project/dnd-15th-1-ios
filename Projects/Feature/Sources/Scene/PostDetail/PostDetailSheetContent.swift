@@ -1,8 +1,4 @@
-//
-//  PostDetailSheetContent.swift
-//  Dulpick
-//
-
+import Domain
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
