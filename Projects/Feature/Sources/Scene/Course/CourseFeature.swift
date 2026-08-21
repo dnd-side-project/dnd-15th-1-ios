@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Domain
 import Foundation
+import SharedDesignSystem
 
 // MARK: - CourseFeature
 
@@ -34,9 +35,15 @@ public struct CourseFeature {
         /// 시트 안에서 굴리는 임시값. `확인` 을 눌러야 date/time 으로 넘어간다
         public var draftDate: DateComponents
         public var draftTime: DateComponents = Self.defaultTime
+        /// POST /api/v1/date-courses 응답. 다음 화면이 들고 간다
+        public var dateCourseID: String?
+        /// 낙관적 락 번호. 서버 응답 값을 그대로 들고 다닌다
+        public var version: Int?
+        public var isCreatingCourse = false
+        public var toast: ToastState?
 
         // 장소 화면
-        public var places: [SavedPlace] = []
+        public var places: [CoursePlaceCandidate] = []
         public var loadState: LoadState = .loading
         public var isCoupleConnected = false
         public var selectedOwnership: PlaceOwnership = .together
@@ -56,8 +63,10 @@ public struct CourseFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case savedPlacesResponse(Result<[SavedPlace], PlaceError>)
+        case coursePlacesResponse(Result<[CoursePlaceCandidate], CourseError>)
         case coupleResponse(CoupleStatus?)
+        case courseCreated(Result<DateCourse, CourseError>)
+        case toastDismissed
 
         // 날짜 화면
         case dateFieldTapped
@@ -83,8 +92,14 @@ public struct CourseFeature {
         public enum Delegate: Equatable {
             /// 날짜와 시간을 합치지 않고 그대로 올린다.
             /// 서버 명세가 없어 `Date` 로 만드는 자리를 Cycle 5 로 미룬다
-            case buildRequested(date: DateComponents, time: DateComponents?, placeIDs: [String])
-            case placePickRequested
+            case buildRequested(
+                dateCourseID: String,
+                version: Int,
+                date: DateComponents,
+                time: DateComponents?,
+                placeIDs: [String]
+            )
+            case placePickRequested(dateCourseID: String)
             case dismissed
             case sessionExpired
         }
@@ -93,9 +108,10 @@ public struct CourseFeature {
     private enum CancelID {
         case load
         case couple
+        case createCourse
     }
 
-    @Dependency(\.placeClient) var placeClient
+    @Dependency(\.courseClient) var courseClient
     @Dependency(\.coupleClient) var coupleClient
 
     public init() {}
@@ -107,9 +123,10 @@ public struct CourseFeature {
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
-        case .onAppear, .retryTapped, .savedPlacesResponse, .coupleResponse:
+        case .onAppear, .retryTapped, .coursePlacesResponse, .coupleResponse:
             return load(state: &state, action: action)
-        case .dateFieldTapped, .timeFieldTapped, .wheelDraftChanged, .wheelConfirmed, .wheelDismissed, .nextTapped:
+        case .dateFieldTapped, .timeFieldTapped, .wheelDraftChanged, .wheelConfirmed, .wheelDismissed,
+             .nextTapped, .courseCreated, .toastDismissed:
             return updateDate(state: &state, action: action)
         case .ownershipSelected, .categoryTapped, .rowTapped, .markerTapped, .cameraChanged:
             return updatePlace(state: &state, action: action)
@@ -135,12 +152,12 @@ private extension CourseFeature {
             state.loadState = .loading
             return loadPlaces()
 
-        case let .savedPlacesResponse(.success(places)):
+        case let .coursePlacesResponse(.success(places)):
             state.places = places
             state.loadState = .loaded
             return .none
 
-        case let .savedPlacesResponse(.failure(error)):
+        case let .coursePlacesResponse(.failure(error)):
             state.loadState = .failed
             return error == .unauthorized ? .send(.delegate(.sessionExpired)) : .none
 
@@ -184,17 +201,54 @@ private extension CourseFeature {
             return .none
 
         case .nextTapped:
-            guard state.date != nil else {
-                state.showsDateError = true
-                return .none
+            return startCreateCourse(state: &state)
+
+        case let .courseCreated(.success(course)):
+            state.isCreatingCourse = false
+            state.dateCourseID = course.id
+            state.version = course.version
+            return .send(.delegate(.placePickRequested(dateCourseID: course.id)))
+
+        case let .courseCreated(.failure(error)):
+            state.isCreatingCourse = false
+            guard error != .unauthorized else {
+                return .send(.delegate(.sessionExpired))
             }
-            state.showsDateError = false
-            return .send(.delegate(.placePickRequested))
+            state.toast = ToastState(message: "잠시 뒤 다시 시도해주세요")
+            return .none
+
+        case .toastDismissed:
+            state.toast = nil
+            return .none
 
         default:
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
+    }
+
+    func startCreateCourse(state: inout State) -> Effect<Action> {
+        guard let date = state.date else {
+            state.showsDateError = true
+            return .none
+        }
+        state.showsDateError = false
+        state.isCreatingCourse = true
+
+        let time = state.time ?? State.defaultTime
+        let title = DateCourseTitle.make(date: date)
+
+        return .run { [courseClient] send in
+            do {
+                let course = try await courseClient.createCourse(title, date, time)
+                await send(.courseCreated(.success(course)))
+            } catch let error as CourseError {
+                await send(.courseCreated(.failure(error)))
+            } catch {
+                await send(.courseCreated(.failure(.unknown)))
+            }
+        }
+        .cancellable(id: CancelID.createCourse, cancelInFlight: true)
     }
 
     func updatePlace(state: inout State, action: Action) -> Effect<Action> {
@@ -228,10 +282,17 @@ private extension CourseFeature {
             return .send(.delegate(.dismissed))
 
         case .buildTapped:
-            guard let date = state.date, !state.selectedPlaceIDs.isEmpty else { return .none }
+            guard let dateCourseID = state.dateCourseID,
+                  let version = state.version,
+                  let date = state.date,
+                  !state.selectedPlaceIDs.isEmpty else {
+                return .none
+            }
             return .send(
                 .delegate(
                     .buildRequested(
+                        dateCourseID: dateCourseID,
+                        version: version,
                         date: date,
                         time: state.time,
                         placeIDs: state.selectedPlaceIDs
@@ -246,14 +307,14 @@ private extension CourseFeature {
     }
 
     func loadPlaces() -> Effect<Action> {
-        .run { [placeClient] send in
+        .run { [courseClient] send in
             do {
-                let places = try await placeClient.savedPlaces()
-                await send(.savedPlacesResponse(.success(places)))
-            } catch let error as PlaceError {
-                await send(.savedPlacesResponse(.failure(error)))
+                let places = try await courseClient.coursePlaces()
+                await send(.coursePlacesResponse(.success(places)))
+            } catch let error as CourseError {
+                await send(.coursePlacesResponse(.failure(error)))
             } catch {
-                await send(.savedPlacesResponse(.failure(.unknown)))
+                await send(.coursePlacesResponse(.failure(.unknown)))
             }
         }
         // 두 화면이 각각 onAppear 를 보내면 늦게 온 옛 응답이 새 응답을 덮는다
@@ -320,30 +381,30 @@ private enum CourseMarkerID {
 
 public extension CourseFeature.State {
 
-    var filteredPlaces: [SavedPlace] {
+    var filteredPlaces: [CoursePlaceCandidate] {
         places
             .filter { selectedOwnership.matches($0.ownership) }
-            .filter { selectedCategory == nil || $0.place.category == selectedCategory }
+            .filter { selectedCategory == nil || $0.category == selectedCategory }
     }
 
     /// 카테고리 핀을 먼저 두고 고른 물방울을 뒤에 둔다. 지도가 배열 순서로 그려 물방울이 위에 온다
     var markers: [MapMarker] {
         let selected = Set(selectedPlaceIDs)
         let categoryPins = filteredPlaces
-            .map { saved in
+            .map { candidate in
                 MapMarker(
-                    id: saved.id,
-                    coordinate: saved.place.coordinate,
-                    kind: .category(saved.place.category)
+                    id: candidate.id,
+                    coordinate: candidate.coordinate,
+                    kind: .category(candidate.category)
                 )
             }
         // 고른 물방울은 필터를 타지 않는다. 목록에서 사라져도 핀으로 해제할 수 있어야 한다
         let candidatePins = places
             .filter { selected.contains($0.id) }
-            .map { saved in
+            .map { candidate in
                 MapMarker(
-                    id: CourseMarkerID.candidate(saved.id),
-                    coordinate: saved.place.coordinate,
+                    id: CourseMarkerID.candidate(candidate.id),
+                    coordinate: candidate.coordinate,
                     kind: .candidate
                 )
             }

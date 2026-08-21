@@ -21,9 +21,7 @@ enum Dependencies {
         values.exploreClient = ExploreClientFactory.make(session: authSession)
 
         values.placeClient = PlaceClientFactory.make(session: authSession)
-
-        // API 연동 전 임시 mock, 나중에 CourseClientFactory 로 교체
-        values.courseClient = .mock
+        values.courseClient = CourseClientFactory.make(session: authSession)
 
         values.recentSearchClient = RecentSearchClientFactory.make(
             userDefaults: infra.userDefaults

@@ -174,23 +174,23 @@ private extension CoursePlacePickView {
 
     var placeList: some View {
         VStack(spacing: 0) {
-            ForEach(store.filteredPlaces) { saved in
-                row(saved, showsDivider: saved.id != store.filteredPlaces.last?.id)
+            ForEach(store.filteredPlaces) { candidate in
+                row(candidate, showsDivider: candidate.id != store.filteredPlaces.last?.id)
             }
         }
         .padding(.top, Spacing.s8)
         .padding(.bottom, ctaCoverPadding)
     }
 
-    func row(_ saved: SavedPlace, showsDivider: Bool) -> some View {
-        let badge = store.state.badgeState(for: saved.id)
+    func row(_ candidate: CoursePlaceCandidate, showsDivider: Bool) -> some View {
+        let badge = store.state.badgeState(for: candidate.id)
 
         return PlaceListRow(
-            icon: saved.place.category.icon,
-            name: saved.alias ?? saved.place.name,
-            address: saved.place.address,
+            icon: candidate.category.icon,
+            name: candidate.alias ?? candidate.name,
+            address: candidate.address,
             showsDivider: showsDivider,
-            thumbnailURLs: saved.place.thumbnailURLs
+            thumbnailURLs: candidate.thumbnailURLs
         ) { url in
             RemoteImage(url: url, cornerRadius: CoursePlacePickMetric.cornerRadius)
         } trailing: {
@@ -199,7 +199,7 @@ private extension CoursePlacePickView {
         // 배경은 행이 안 칠한다. 고른 행만 여기서 연분홍을 얹는다 (b06)
         .background(badge == .unselected ? Color.clear : Color.brandSurface)
         .contentShape(Rectangle())
-        .onTapGesture { store.send(.rowTapped(saved.id)) }
+        .onTapGesture { store.send(.rowTapped(candidate.id)) }
     }
 
     var skeleton: some View {
