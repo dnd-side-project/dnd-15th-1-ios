@@ -55,6 +55,22 @@ enum SheetDragOwner: Hashable, Sendable {
     case content
 }
 
+// MARK: - SheetGestureKind
+
+/// 시트가 손짓을 받는 방식. 시트마다 하나를 고른다.
+///
+/// 분해 문서 `2026-08-13-map-course-ui-split.md:194-200` 의 표가 SSOT 다.
+enum SheetGestureKind: Hashable, Sendable {
+
+    /// 접힘에서 목록을 쓸면 시트가 먼저 오른다. 저장한 장소 · 장소 상세 · 게시글 상세 · 검색 결과가 쓴다
+    case a // swiftlint:disable:this identifier_name
+
+    /// 접힘에서는 목록만 스크롤되고 시트는 손잡이로만 움직인다.
+    /// 펼침에서는 목록 맨 위를 아래로 끌면 시트가 내려간다. 목록이 더 갈 곳이 없어서다.
+    /// 코스 화면 둘이 쓴다
+    case b // swiftlint:disable:this identifier_name
+}
+
 // MARK: - SheetLayout
 
 /// 시트가 설 자리를 내는 계산.
@@ -64,8 +80,9 @@ enum SheetDragOwner: Hashable, Sendable {
 /// 접힘은 화면 전체 기준이고 펼침은 담는 층 기준이라 둘을 다 받는다.
 struct SheetLayout: Equatable {
 
-    /// 접힘에서 보이는 높이. 기기 화면 전체 높이 대비 비율이다
-    static let collapsedScreenRatio: CGFloat = 0.5
+    /// 접힘에서 보이는 높이. 기기 화면 전체 높이 대비 비율이다.
+    /// 40~45% 안에서 실기기로 맞춘다 (2026-08-21 결정)
+    static let collapsedScreenRatio: CGFloat = 0.45
 
     /// 안전영역 위 끝에서 화면 바닥까지
     let containerHeight: CGFloat
@@ -99,6 +116,15 @@ struct SheetLayout: Equatable {
         }
     }
 
+    /// 그 단계에서 화면 밖으로 내려가 있는 카드 높이.
+    ///
+    /// 카드는 늘 펼침 높이로 서고 `.offset` 으로 내려간다. 접힘에서는 이만큼이
+    /// 담는 층 바닥 아래에 있어 본문 스크롤의 바닥도 거기 있다.
+    /// 이 값을 본문 아래 여백으로 주지 않으면 목록 끝이 화면 밖에 갇힌다
+    func hiddenHeight(for detent: SheetDetent) -> CGFloat {
+        max(expandedHeight - height(for: detent), 0)
+    }
+
     /// 시트 윗면의 담는 층 위 끝 기준 y
     func top(forVisible visibleHeight: CGFloat) -> CGFloat {
         containerHeight - visibleHeight
@@ -125,18 +151,44 @@ struct SheetLayout: Equatable {
 
     /// 세로 손짓을 시트가 받을지 본문 스크롤에 넘길지 정한다.
     ///
-    /// 접힘에서는 본문이 안 스크롤되므로 시트가 늘 받는다.
+    /// 종류 A 는 접힘에서 본문이 안 스크롤되므로 시트가 늘 받는다.
     /// 펼침에서는 본문이 맨 위이고 아래로 끄는 손짓만 시트가 받는다.
-    /// 이 갈림이 없으면 목록을 쓸 때 시트가 딸려 온다.
+    /// 종류 B 는 접힘에서 손잡이 밖 손짓을 안 받는다. 펼침에서는 종류 A 와 같다.
+    /// 손잡이 판정은 `dragOwner` 가 먼저 한다.
     ///
     /// - Parameter translationY: 아래로 끌면 양수다
     static func sheetTakesDrag(
+        kind: SheetGestureKind,
         detent: SheetDetent,
         isContentAtTop: Bool,
         translationY: CGFloat
     ) -> Bool {
-        guard detent == .expanded else { return true }
-        return isContentAtTop && translationY > 0
+        switch kind {
+        case .a:
+            guard detent == .expanded else { return true }
+            return isContentAtTop && translationY > 0
+        case .b:
+            guard detent == .expanded else { return false }
+            return isContentAtTop && translationY > 0
+        }
+    }
+
+    /// 본문 스크롤을 열어둘지. 종류 B 는 접힘에서도 연다.
+    ///
+    /// 시트가 손짓을 들고 있는 동안에는 종류와 무관하게 잠근다.
+    /// 안 잠그면 시트가 오르내릴 때 목록도 같이 스크롤된다
+    static func contentScrolls(
+        kind: SheetGestureKind,
+        detent: SheetDetent,
+        isDraggingSheet: Bool
+    ) -> Bool {
+        guard !isDraggingSheet else { return false }
+        switch kind {
+        case .a:
+            return detent == .expanded
+        case .b:
+            return true
+        }
     }
 
     /// 시트 손짓으로 인정하는 세로 우세 비율. 가로 스크롤을 쓸다 시트가 딸려오는 걸 막는다
@@ -150,15 +202,23 @@ struct SheetLayout: Equatable {
     /// - Parameters:
     ///   - translation: 손짓의 누적 이동량. 아래로 끌면 `height` 가 양수다
     ///   - startedInOpenMenu: 손짓 시작점이 열린 드롭다운 안이었는지
-    static func dragOwner(
+    ///   - startedInGrabber: 손짓 시작점이 손잡이 안이었는지. 종류 B 가 시트를 움직이는 유일한 길이다
+    static func dragOwner( // swiftlint:disable:this function_parameter_count
+        kind: SheetGestureKind,
         detent: SheetDetent,
         isContentAtTop: Bool,
         translation: CGSize,
-        startedInOpenMenu: Bool
+        startedInOpenMenu: Bool,
+        startedInGrabber: Bool
     ) -> SheetDragOwner? {
-        // 드롭다운이 열려 있으면 그 안만 스크롤한다
+        // 드롭다운이 열려 있으면 그 안만 스크롤한다. 손잡이보다 이쪽이 먼저다
         if startedInOpenMenu {
             return .content
+        }
+
+        // 손잡이는 스크롤할 내용이 없다. 종류와 무관하게 시트가 가져간다
+        if startedInGrabber {
+            return .sheet
         }
 
         let vertical = abs(translation.height)
@@ -173,6 +233,7 @@ struct SheetLayout: Equatable {
         }
 
         return sheetTakesDrag(
+            kind: kind,
             detent: detent,
             isContentAtTop: isContentAtTop,
             translationY: translation.height

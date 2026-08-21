@@ -22,6 +22,9 @@ public struct MapView: View {
     /// 아래 안전영역(탭바 + 홈 인디케이터). 시트가 그 뒤로 이어지므로 목록 아래 여백에 더한다
     @State private var bottomInset: CGFloat = 0
 
+    /// 접힘 시트 윗면의 화면 좌표 y. 지도가 초점 자리를 잡는 근거다
+    @State private var collapsedSheetTop: CGFloat = 0
+
     /// 지금 열린 필터 메뉴. 하나만 열린다
     @State private var openFilterMenu: FilterMenu?
 
@@ -113,7 +116,8 @@ private extension MapView {
             ),
             markers: store.markers,
             onMarkerTap: { store.send(.markerTapped($0)) },
-            onMapTap: { store.send(.rowMenuDismissed) }
+            onMapTap: { store.send(.rowMenuDismissed) },
+            collapsedSheetTop: collapsedSheetTop
         )
         .ignoresSafeArea()
     }
@@ -210,7 +214,9 @@ private extension MapView {
             onDragBegan: {
                 openFilterMenu = nil
                 store.send(.rowMenuDismissed)
-            }
+            },
+            gestureKind: .a,
+            onCollapsedTopChange: { collapsedSheetTop = $0 },
         ) {
             floatingControls
         } header: {

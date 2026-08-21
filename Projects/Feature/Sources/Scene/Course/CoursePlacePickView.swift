@@ -27,7 +27,7 @@ public struct CoursePlacePickView: View {
     /// 시트 단계. 시트가 접혀 있는지 펼쳐져 있는지다
     @State private var sheetDetent: SheetDetent = .collapsed
 
-    @State private var bottomInset: CGFloat = 0
+    @State private var collapsedSheetTop: CGFloat = 0
 
     /// 지금 열린 필터 메뉴. 하나만 열린다
     @State private var openFilterMenu: FilterMenu?
@@ -39,14 +39,11 @@ public struct CoursePlacePickView: View {
     }
 
     public var body: some View {
-        ZStack {
-            bottomInsetProbe
-            ZStack(alignment: .bottom) {
-                map
-                backButtonLayer
-                sheet
-                cta
-            }
+        ZStack(alignment: .bottom) {
+            map
+            backButtonLayer
+            sheet
+            cta
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .tabBar)
@@ -60,23 +57,15 @@ public struct CoursePlacePickView: View {
 
 private extension CoursePlacePickView {
 
-    var bottomInsetProbe: some View {
-        GeometryReader { _ in
-            Color.clear
-                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: {
-                    bottomInset = $0
-                }
-        }
-        .allowsHitTesting(false)
-    }
-
     /// 마지막 행이 CTA 버튼 윗면에서 20 위에 서게 시트가 그만큼 더 올라간다.
     /// 그라데이션은 안 피한다. 그 아래로 목록이 비쳐 보이는 것이 그 층의 뜻이다
+    ///
+    /// 아래 안전영역은 안 더한다. 이 화면의 시트와 CTA 가 둘 다 안전영역 바닥에 붙어
+    /// 이미 그만큼 올라와 있다. `MapView` 는 시트가 안전영역 아래까지 뻗어 더해야 한다
     var ctaCoverPadding: CGFloat {
         Spacing.s20                                 // CTAContainer 의 버튼 아래 패딩
             + CoursePlacePickMetric.ctaButtonHeight
             + CoursePlacePickMetric.listGapAboveCTA
-            + bottomInset
     }
 
     var map: some View {
@@ -86,7 +75,8 @@ private extension CoursePlacePickView {
                 set: { store.send(.cameraChanged($0)) }
             ),
             markers: store.markers,
-            onMarkerTap: { store.send(.markerTapped($0)) }
+            onMarkerTap: { store.send(.markerTapped($0)) },
+            collapsedSheetTop: collapsedSheetTop
         )
         .ignoresSafeArea()
     }
@@ -105,7 +95,10 @@ private extension CoursePlacePickView {
             expandLimit: .belowSearchBar,
             openMenuFrames: [ownershipMenuFrame, categoryMenuFrame].compactMap { $0 },
             // 끌기 시작하면 열린 메뉴를 닫는다. 열어둔 채 끌면 메뉴가 시트를 따라다녀 어색하다
-            onDragBegan: { openFilterMenu = nil }
+            onDragBegan: { openFilterMenu = nil },
+            // 손잡이로만 오르내린다. 접힘에서도 목록이 스크롤된다 (분해 문서 `:194-200`)
+            gestureKind: .b,
+            onCollapsedTopChange: { collapsedSheetTop = $0 },
         ) {
             EmptyView()
         } header: {
