@@ -367,6 +367,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             )
         }
         await store.receive(\.flushPendingDeepLink)
+        await store.finish()
         XCTAssertEqual(authorizationCount.value, 1)
     }
 
