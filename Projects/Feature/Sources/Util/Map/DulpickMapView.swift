@@ -90,6 +90,8 @@ extension DulpickMapView {
             self.container = container
             let controller = KMController(viewContainer: container)
             controller.delegate = self
+            // 120Hz 기기에서 지도가 60Hz 로 묶이는 것을 푼다. SDK 기본값이 false 다
+            controller.proMotionSupport = true
             self.controller = controller
             controller.prepareEngine()
             controller.activateEngine()
