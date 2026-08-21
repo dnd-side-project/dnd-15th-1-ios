@@ -1,3 +1,4 @@
+import CoreNotification
 import CoreSocialAuth
 import Feature
 import Foundation
@@ -7,10 +8,9 @@ import ThirdPartyUI
 
 enum AppBootstrap {
     @MainActor
-    static func run() {
-        let infra = InfraContainer.make()
-
+    static func run(_ infra: InfraContainer) {
         SocialAuthBootstrap.run(infra.socialAuthConfig)
+        NotificationBootstrap.run(infra.notificationConfig, client: infra.remoteNotificationClient)
         ImageCacheBootstrap.run(namespace: infra.appConfig.bundleID)
         SDKInitializer.InitSDK(appKey: infra.appConfig.kakaoNativeAppKey)
 

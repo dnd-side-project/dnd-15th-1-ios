@@ -1,4 +1,5 @@
 import CoreNetwork
+import CoreNotification
 import CoreSocialAuth
 import CoreStorage
 import Foundation
@@ -10,6 +11,9 @@ struct InfraContainer: Sendable {
 
     let socialAuthConfig: SocialAuthConfiguration
     let socialAuthClients: SocialAuthClients
+
+    let notificationConfig: NotificationConfiguration
+    let remoteNotificationClient: RemoteNotificationClient
 
     let userDefaults: any UserDefaultsStorage
     let keychain: any KeychainStorage
@@ -28,6 +32,11 @@ extension InfraContainer {
         )
         let socialAuthClients = SocialAuthClientFactory().make()
 
+        let notificationConfig = NotificationConfiguration(
+            firebaseOptionsResourceName: appConfig.firebaseOptionsResourceName
+        )
+        let remoteNotificationClient = RemoteNotificationClientFactory().make()
+
         let bundleID = appConfig.bundleID
         let userDefaults = DefaultUserDefaultsStorage()
         let keychain = DefaultKeychainStorage(service: bundleID)
@@ -37,6 +46,8 @@ extension InfraContainer {
             networkConfig: networkConfig,
             socialAuthConfig: socialAuthConfig,
             socialAuthClients: socialAuthClients,
+            notificationConfig: notificationConfig,
+            remoteNotificationClient: remoteNotificationClient,
             userDefaults: userDefaults,
             keychain: keychain
         )

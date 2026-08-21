@@ -39,6 +39,9 @@ enum Dependencies {
             userDefaults: infra.userDefaults
         )
 
+        values.notificationClient = NotificationClientFactory.make(
+            client: infra.remoteNotificationClient
+        )
         #if DEBUG
         DebugLaunchOverride.apply(to: &values)
         #endif

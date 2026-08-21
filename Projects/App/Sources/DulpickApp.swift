@@ -7,8 +7,12 @@ import ThirdParty
 struct DulpickApp: App {
     private let store: StoreOf<RootFlowFeature>
 
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     init() {
-        store = CompositionRoot.makeRootStore()
+        let infra = InfraContainer.make()
+        store = CompositionRoot.makeRootStore(infra: infra)
+        appDelegate.remoteNotificationClient = infra.remoteNotificationClient
     }
 
     var body: some Scene {
