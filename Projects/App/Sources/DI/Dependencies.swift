@@ -42,6 +42,9 @@ enum Dependencies {
         values.notificationClient = NotificationClientFactory.make(
             client: infra.remoteNotificationClient
         )
+
+        values.locationClient = LocationClientFactory.make()
+
         #if DEBUG
         DebugLaunchOverride.apply(to: &values)
         #endif
