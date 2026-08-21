@@ -20,6 +20,7 @@ public enum DefaultInfoPlist {
             "UIInterfaceOrientationPortrait",
         ],
         "UIUserInterfaceStyle": "Light",
+        "NSLocationWhenInUseUsageDescription": .string("현재 위치로 지도를 옮기기 위해 위치를 사용해요"),
         "UIApplicationSceneManifest": [
             "UIApplicationSupportsMultipleScenes": false,
             "UISceneConfigurations": [:],
