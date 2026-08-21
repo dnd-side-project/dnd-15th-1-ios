@@ -64,6 +64,12 @@ struct MapBottomSheet<Above: View, Header: View, Content: View>: View {
     /// 열린 메뉴의 화면 좌표. 시작점이 이 안이면 시트 손짓을 시작하지 않는다
     private let openMenuFrames: [CGRect]
 
+    /// 이 시트가 손짓을 받는 방식. 분해 문서 `:194-200` 표를 따른다
+    private let gestureKind: SheetGestureKind
+
+    /// 접힘 시트 윗면의 화면 전체(global) 좌표 y. 지도 카메라가 초점 자리를 잡는 근거다
+    private let onCollapsedTopChange: ((CGFloat) -> Void)?
+
     /// 손짓 주인이 시트로 정해지는 순간 한 번 불린다. 열린 메뉴를 닫는 데 쓴다
     private let onDragBegan: (() -> Void)?
 
@@ -100,9 +106,21 @@ struct MapBottomSheet<Above: View, Header: View, Content: View>: View {
     /// 제스처는 손을 댄 지점부터 누적되므로, 이 값을 빼야 시트가 한 프레임에 튀지 않는다.
     @State private var dragBaseline: CGFloat = 0
 
+    /// 손잡이의 화면 전체 좌표. 시작점이 이 안이면 시트가 손짓을 가져간다
+    @State private var grabberFrame: CGRect = .zero
+
     var body: some View {
         GeometryReader { proxy in
-            sheet(layout: layout(in: proxy.size.height))
+            let resolved = layout(in: proxy.size.height)
+            sheet(layout: resolved)
+                .onChange(of: resolved, initial: true) { _, newLayout in
+                    guard newLayout.isResolved else { return }
+                    // 담는 층 기준 y 에 담는 층의 화면 좌표를 더해 화면 전체 기준으로 바꾼다
+                    onCollapsedTopChange?(
+                        proxy.frame(in: .global).minY
+                            + newLayout.top(forVisible: newLayout.collapsedHeight)
+                    )
+                }
         }
         .background { screenHeightProbe }
     }
@@ -120,6 +138,8 @@ extension MapBottomSheet {
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
+        gestureKind: SheetGestureKind = .followsContent,
+        onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
         @ViewBuilder above: () -> Above,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
@@ -128,6 +148,8 @@ extension MapBottomSheet {
         self.expandLimit = expandLimit
         self.openMenuFrames = openMenuFrames
         self.onDragBegan = onDragBegan
+        self.gestureKind = gestureKind
+        self.onCollapsedTopChange = onCollapsedTopChange
         self.above = above()
         self.header = header()
         self.content = content()
@@ -141,6 +163,8 @@ extension MapBottomSheet where Above == EmptyView {
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
+        gestureKind: SheetGestureKind = .followsContent,
+        onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
     ) {
@@ -149,6 +173,8 @@ extension MapBottomSheet where Above == EmptyView {
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
             onDragBegan: onDragBegan,
+            gestureKind: gestureKind,
+            onCollapsedTopChange: onCollapsedTopChange,
             above: { EmptyView() },
             header: header,
             content: content
@@ -163,6 +189,8 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
+        gestureKind: SheetGestureKind = .followsContent,
+        onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.init(
@@ -170,6 +198,8 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
             onDragBegan: onDragBegan,
+            gestureKind: gestureKind,
+            onCollapsedTopChange: onCollapsedTopChange,
             above: { EmptyView() },
             header: { EmptyView() },
             content: content
@@ -184,6 +214,8 @@ extension MapBottomSheet where Header == EmptyView {
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
+        gestureKind: SheetGestureKind = .followsContent,
+        onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
         @ViewBuilder above: () -> Above,
         @ViewBuilder content: () -> Content
     ) {
@@ -192,6 +224,8 @@ extension MapBottomSheet where Header == EmptyView {
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
             onDragBegan: onDragBegan,
+            gestureKind: gestureKind,
+            onCollapsedTopChange: onCollapsedTopChange,
             above: above,
             header: { EmptyView() },
             content: content
@@ -224,7 +258,7 @@ private extension MapBottomSheet {
             // 올려두지 않으면 뒤에 그려지는 본문이 그 펼침을 덮는다
             fixedTop
                 .zIndex(1)
-            scrollingContent
+            scrollingContent(layout: layout)
         }
         .frame(height: layout.expandedHeight, alignment: .top)
         .frame(maxWidth: .infinity)
@@ -277,23 +311,29 @@ private extension MapBottomSheet {
                 .frame(maxWidth: .infinity)
                 .padding(.top, MapBottomSheetMetric.grabberTopInset)
                 .padding(.bottom, MapBottomSheetMetric.grabberBottomInset)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { grabberFrame = $0 }
             header
         }
     }
 
-    /// 펼침에서만 스크롤되는 본문.
+    /// 손짓 종류에 따라 스크롤이 열리는 본문.
     ///
-    /// 접힘에서 스크롤을 열어두면 목록을 쓸 때 시트가 안 펼쳐진다.
+    /// `followsContent` 는 접힘에서 스크롤을 열어두면 목록을 쓸 때 시트가 안 펼쳐진다.
     /// 맨 위인지는 손짓을 시트와 스크롤 중 어디로 보낼지 가르는 근거라 매번 받아둔다
-    var scrollingContent: some View {
+    func scrollingContent(layout: SheetLayout) -> some View {
         ScrollView {
             content
                 // 안쪽 가로 스크롤이 스스로 잠그는 근거다. scrollDisabled 가 거기까지 안 닿는다
                 .environment(\.isSheetDragging, isDraggingSheet)
         }
-        // 접힘에서 스크롤을 열어두면 목록을 쓸 때 시트가 안 펼쳐진다.
-        // 시트가 손짓을 들고 있는 동안에도 잠근다. 안 잠그면 시트가 오르내릴 때 목록도 같이 스크롤된다
-        .scrollDisabled(selection != .expanded || isDraggingSheet)
+        .scrollDisabled(
+            !SheetLayout.contentScrolls(
+                kind: gestureKind,
+                detent: selection,
+                isDraggingSheet: isDraggingSheet
+            )
+        )
+        .contentMargins(.bottom, layout.hiddenHeight(for: selection), for: .scrollContent)
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, offset in
@@ -433,10 +473,12 @@ private extension MapBottomSheet {
     /// 이번 손짓의 주인을 정한다. 판정은 `SheetLayout` 이 하고 여기는 뷰 상태만 모은다
     func decideDragOwner(_ value: DragGesture.Value) -> SheetDragOwner? {
         SheetLayout.dragOwner(
+            kind: gestureKind,
             detent: selection,
             isContentAtTop: isContentAtTop,
             translation: value.translation,
-            startedInOpenMenu: openMenuFrames.contains { $0.contains(value.startLocation) }
+            startedInOpenMenu: openMenuFrames.contains { $0.contains(value.startLocation) },
+            startedInGrabber: grabberFrame.contains(value.startLocation)
         )
     }
 }

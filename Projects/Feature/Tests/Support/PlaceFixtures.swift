@@ -53,3 +53,38 @@ extension SavedPlace {
         )
     }
 }
+
+extension CoursePlaceCandidate {
+    static func fixture(
+        id: String,
+        latitude: Double = 37.31,
+        longitude: Double = 126.90,
+        category: PlaceCategory = .food,
+        ownership: PlaceOwnership = .together
+    ) -> CoursePlaceCandidate {
+        CoursePlaceCandidate(
+            id: id,
+            name: "장소명",
+            address: "경기도 안산시 모모로 145길",
+            category: category,
+            coordinate: Coordinate(latitude: latitude, longitude: longitude),
+            ownership: ownership,
+            alias: nil,
+            thumbnailURLs: []
+        )
+    }
+}
+
+enum PlaceFixtures {
+    static let savedPlaces: [SavedPlace] = [
+        .fixture(id: "1", latitude: 37.3128, longitude: 126.9040, category: .cafe),
+        .fixture(id: "2", latitude: 37.3141, longitude: 126.9068, category: .food),
+        .fixture(id: "3", latitude: 37.3200, longitude: 126.9100, category: .tourism),
+    ]
+
+    static let coursePlaceCandidates: [CoursePlaceCandidate] = [
+        .fixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food),
+        .fixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe),
+        .fixture(id: "c", latitude: 37.33, longitude: 126.92, category: .tourism),
+    ]
+}

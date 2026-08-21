@@ -15,6 +15,10 @@ struct DulpickMapView: UIViewRepresentable {
     var userLocation: Coordinate?
     var onMarkerTap: (String) -> Void = { _ in }
     var onMapTap: () -> Void = {}
+    /// 접힘 시트 윗면의 화면 전체(global) 좌표 y.
+    /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 `focusRatio` 지점에 놓는다.
+    /// `0` 이면 화면 한가운데에 그대로 둔다
+    var collapsedSheetTop: CGFloat = 0
 
     func makeCoordinator() -> Coordinator {
         Coordinator(camera: camera)
@@ -37,7 +41,8 @@ struct DulpickMapView: UIViewRepresentable {
             camera: camera,
             markers: markers,
             routes: routes,
-            userLocation: userLocation
+            userLocation: userLocation,
+            collapsedSheetTop: collapsedSheetTop
         )
     }
 
@@ -68,11 +73,13 @@ extension DulpickMapView {
         private var desiredMarkers: [MapMarker] = []
         private var desiredRoutes: [MapRoute] = []
         private var desiredUserLocation: Coordinate?
+        private var desiredCollapsedSheetTop: CGFloat = 0
 
         private var appliedCamera: MapCamera?
         private var appliedMarkers: [MapMarker]?
         private var appliedRoutes: [MapRoute]?
         private var appliedUserLocation: Coordinate?
+        private var appliedCollapsedSheetTop: CGFloat = 0
 
         private var registeredPoiStyleIDs: Set<String> = []
 
@@ -90,6 +97,8 @@ extension DulpickMapView {
             self.container = container
             let controller = KMController(viewContainer: container)
             controller.delegate = self
+            // 120Hz 기기에서 지도가 60Hz 로 묶이는 것을 푼다. SDK 기본값이 false 다
+            controller.proMotionSupport = true
             self.controller = controller
             controller.prepareEngine()
             controller.activateEngine()
@@ -116,12 +125,14 @@ extension DulpickMapView {
             camera: MapCamera,
             markers: [MapMarker],
             routes: [MapRoute],
-            userLocation: Coordinate?
+            userLocation: Coordinate?,
+            collapsedSheetTop: CGFloat
         ) {
             desiredCamera = camera
             desiredMarkers = markers
             desiredRoutes = routes
             desiredUserLocation = userLocation
+            desiredCollapsedSheetTop = collapsedSheetTop
             render()
         }
 
@@ -132,9 +143,10 @@ extension DulpickMapView {
         private func render() {
             guard isMapReady, let map = mapView else { return }
 
-            if desiredCamera != appliedCamera {
+            if desiredCamera != appliedCamera || desiredCollapsedSheetTop != appliedCollapsedSheetTop {
                 moveCamera(map, to: desiredCamera)
                 appliedCamera = desiredCamera
+                appliedCollapsedSheetTop = desiredCollapsedSheetTop
             }
 
             if desiredMarkers != appliedMarkers {
@@ -160,6 +172,7 @@ extension DulpickMapView {
             appliedMarkers = nil
             appliedRoutes = nil
             appliedUserLocation = nil
+            appliedCollapsedSheetTop = 0
         }
 
         // MARK: - 레이어 그리기
@@ -398,25 +411,68 @@ private extension DulpickMapView.Coordinator {
 private extension DulpickMapView.Coordinator {
     func moveCamera(_ map: KakaoMap, to camera: MapCamera) {
         let update = CameraUpdate.make(
-            target: camera.center.mapPoint,
+            target: focusedCenter(map, to: camera),
             zoomLevel: camera.zoomLevel,
             mapView: map
         )
         map.animateCamera(
             cameraUpdate: update,
             options: CameraAnimationOptions(
-                autoElevation: false,
+                // 멀리 옮길 때 카메라를 들어 올렸다 내린다. 화면이 당겨진 채 미끄러지면 어지럽다
+                autoElevation: true,
                 consecutive: false,
-                durationInMillis: 250
+                durationInMillis: 150
             )
         )
     }
 
+    /// 접힘 시트 윗면 대비 초점 지점의 자리.
+    ///
+    /// 절반이 아니다. 검색바와 카테고리 칩이 지도 위쪽을 덮어, 온전히 보이는 띠의
+    /// 한가운데가 그보다 아래다. 아이폰 14 기준 칩 바닥 139pt ~ 시트 윗면 464pt 의
+    /// 한가운데가 302pt 이고 그것이 시트 윗면의 0.65 다 (2026-08-21 실측)
+    private static let focusRatio: CGFloat = 0.65
+
+    /// 초점 지점의 y. 시트 윗면이 안 왔거나 뷰 밖이면 화면 한가운데다
+    private func focusY(in rect: CGRect) -> CGFloat {
+        guard desiredCollapsedSheetTop > 0, desiredCollapsedSheetTop <= rect.height else {
+            return rect.midY
+        }
+        return desiredCollapsedSheetTop * Self.focusRatio
+    }
+
+    /// 목표 좌표가 시트 위 영역의 한가운데에 보이도록 카메라 중심을 남쪽으로 민다.
+    ///
+    /// 지도를 먼저 옮겨 재면 화면이 한 번 튄다. 그래서 **지금 자리에서** 픽셀당 위도를 재고,
+    /// 줌이 다르면 한 단계에 두 배인 성질로 환산한다.
+    private func focusedCenter(_ map: KakaoMap, to camera: MapCamera) -> MapPoint {
+        let target = camera.center
+        let rect = map.viewRect
+        let focusY = focusY(in: rect)
+        // 초점이 화면 한가운데면 오프셋이 0 이므로 목표 좌표를 그대로 돌려준다
+        guard focusY != rect.midY else {
+            return target.mapPoint
+        }
+
+        let centerLatitude = map.getPosition(CGPoint(x: rect.midX, y: rect.midY)).wgsCoord.latitude
+        let focusLatitude = map.getPosition(CGPoint(x: rect.midX, y: focusY)).wgsCoord.latitude
+
+        // 줌이 한 단계 오르면 같은 픽셀이 덮는 위도 폭이 절반이 된다
+        let scale = pow(2.0, Double(map.zoomLevel - camera.zoomLevel))
+        let offset = (centerLatitude - focusLatitude) * scale
+
+        return Coordinate(
+            latitude: target.latitude + offset,
+            longitude: target.longitude
+        ).mapPoint
+    }
+
     func reportCamera(of map: KakaoMap) {
         let rect = map.viewRect
-        let center = map.getPosition(CGPoint(x: rect.midX, y: rect.midY)).wgsCoord
+        let focusY = focusY(in: rect)
+        let focus = map.getPosition(CGPoint(x: rect.midX, y: focusY)).wgsCoord
         let updated = MapCamera(
-            center: Coordinate(latitude: center.latitude, longitude: center.longitude),
+            center: Coordinate(latitude: focus.latitude, longitude: focus.longitude),
             zoomLevel: map.zoomLevel
         )
 
@@ -630,7 +686,7 @@ private extension Coordinate {
 #if DEBUG
 /// `MapView` 프리뷰가 안 쓰는 표면(번호 핀·선택 핀·경로선·현재위치)까지 한 번에 보여준다.
 #Preview("코스 마커 + 경로") {
-    @Previewable @State var camera: MapCamera = .ansan
+    @Previewable @State var camera: MapCamera = .seoulCityHall
 
     let places = SavedPlace.mocks.prefix(4)
 
@@ -647,7 +703,7 @@ private extension Coordinate {
             routes: [
                 MapRoute(id: "preview.course", coordinates: places.map(\.place.coordinate)),
             ],
-            userLocation: MapCamera.ansan.center
+            userLocation: MapCamera.seoulCityHall.center
         )
         .ignoresSafeArea()
     }

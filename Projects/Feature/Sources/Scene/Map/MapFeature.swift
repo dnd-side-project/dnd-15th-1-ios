@@ -30,7 +30,7 @@ public struct MapFeature {
             }
         }
 
-        public var camera: MapCamera = .ansan
+        public var camera: MapCamera = .seoulCityHall
         public var mode: Mode = .saved
 
         /// 저장 여부 표시. 서버 계약이 없어 화면 안에서만 산다
@@ -167,6 +167,7 @@ public struct MapFeature {
             state.places = places
             state.bookmarkedPlaceIDs = Set(places.map(\.id))
             state.loadState = .loaded
+            state.camera = Self.overview(of: state)
             return .none
 
         case let .savedPlacesResponse(.failure(error)):
@@ -207,8 +208,8 @@ public struct MapFeature {
             return .none
 
         case .currentLocationTapped:
-            // 현재위치 권한과 추적은 이 사이클 밖이다. 카메라를 기본 자리로 되돌린다
-            state.camera = .ansan
+            // 현재위치 권한과 GPS 는 Cycle 13(DND-70) 이다. 지금은 기본 자리로 되돌린다
+            state.camera = .seoulCityHall
             return .none
 
         default:
@@ -224,10 +225,14 @@ public struct MapFeature {
         case let .categoryTapped(category):
             // 같은 칩을 다시 누르면 선택이 풀려 전체로 돌아간다
             state.selectedCategory = (state.selectedCategory == category) ? nil : category
+            // 남은 목록의 첫 행으로 옮긴다. 실기기에서 어색하면 이 줄만 지운다 (2026-08-21 결정)
+            state.camera = Self.overview(of: state)
             return .none
 
         case let .ownershipSelected(filter):
             state.selectedOwnership = filter
+            // 카테고리 필터와 같은 규칙이다. 안 옮기면 화면 한가운데 장소가 목록에서 사라진다
+            state.camera = Self.overview(of: state)
             return .none
 
         case let .rowMenuTapped(id):
@@ -268,10 +273,17 @@ public struct MapFeature {
             guard id != State.selectedMarkerID else {
                 return .none
             }
+            if let coordinate = Self.coordinate(of: id, in: state) {
+                state.camera = .focusing(coordinate, zoomLevel: state.camera.zoomLevel)
+            }
             return .send(.delegate(.placeDetailRequested(id)))
 
         case let .rowTapped(id):
             state.menuTargetPlaceID = nil
+            if let coordinate = Self.coordinate(of: id, in: state) {
+                // 상세로 들어가는 길이다. 확대하면 보던 지도가 달라져 방향을 잃는다 (2026-08-21 결정)
+                state.camera = .focusing(coordinate, zoomLevel: state.camera.zoomLevel)
+            }
             return .send(.delegate(.placeDetailRequested(id)))
 
         case .searchBarTapped:
@@ -320,7 +332,7 @@ private extension MapFeature {
             state.mode = .searchResult(query: query, places: places)
             state.menuTargetPlaceID = nil
             if let first = places.first {
-                state.camera.center = first.coordinate
+                state.camera = .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
             }
             return .none
         case .searchClearTapped:
@@ -415,5 +427,22 @@ public extension MapFeature.State {
 
     func isBookmarked(_ placeID: String) -> Bool {
         bookmarkedPlaceIDs.contains(placeID)
+    }
+}
+
+private extension MapFeature {
+
+    /// 여러 장소를 보는 자리. 첫 행이 없으면 서울 시청이다
+    static func overview(of state: State) -> MapCamera {
+        guard let first = state.filteredPlaces.first else { return .seoulCityHall }
+        return .focusing(first.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+    }
+
+    /// 검색 결과와 저장 목록 어느 쪽에서든 그 id 의 좌표를 찾는다
+    static func coordinate(of id: String, in state: State) -> Coordinate? {
+        if let place = state.searchResults.first(where: { $0.id == id }) {
+            return place.coordinate
+        }
+        return state.places.first { $0.id == id }?.place.coordinate
     }
 }

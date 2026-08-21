@@ -101,6 +101,7 @@ final class MapSearchModeTests: XCTestCase {
             $0.places = saved
             $0.loadState = .loaded
             $0.bookmarkedPlaceIDs = ["1"]
+            $0.camera = .focusing(saved[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
     }
 }
