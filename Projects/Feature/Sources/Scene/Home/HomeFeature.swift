@@ -7,6 +7,9 @@ public struct HomeFeature {
     /// 추천 섹션에 보여줄 게시물 수
     static let recommendationCount = 10
 
+    /// 최근 저장 장소 미리보기 수
+    static let recentSavedPlaceCount = 5
+
     /// 커플 연결 세 화면. 모두 `couple` 스토어 하나를 공유하고 Route 로 무엇을 그릴지만 가른다
     public enum CoupleRoute: Hashable {
         case connect
@@ -79,7 +82,6 @@ public struct HomeFeature {
         }
     }
 
-    @Dependency(\.placeClient) var placeClient
     @Dependency(\.homeClient) var homeClient
     @Dependency(\.exploreClient) var exploreClient
     @Dependency(\.profileClient) var profileClient
@@ -188,8 +190,8 @@ public struct HomeFeature {
     }
 
     private func loadSavedPlaces() -> Effect<Action> {
-        .run { [placeClient] send in
-            let places = (try? await placeClient.savedPlaces()) ?? []
+        .run { [homeClient] send in
+            let places = (try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount)) ?? []
             await send(.savedPlacesLoaded(places))
         }
     }

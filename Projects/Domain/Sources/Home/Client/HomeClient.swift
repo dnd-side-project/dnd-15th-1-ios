@@ -11,6 +11,7 @@ import ThirdParty
 @DependencyClient
 public struct HomeClient: Sendable {
     public var home: @Sendable () async throws -> HomeSummary
+    public var recentSavedPlaces: @Sendable (_ size: Int) async throws -> [SavedPlace]
 }
 
 extension HomeClient: TestDependencyKey {

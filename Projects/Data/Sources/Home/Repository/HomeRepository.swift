@@ -22,4 +22,12 @@ public struct HomeRepository: Sendable {
             throw HomeErrorMapper.map(error)
         }
     }
+
+    public func recentSavedPlaces(size: Int) async throws -> [SavedPlace] {
+        do {
+            return try await remote.recentSavedPlaces(size: size).map(PlaceDTOMapper.toDomain)
+        } catch {
+            throw HomeErrorMapper.map(error)
+        }
+    }
 }

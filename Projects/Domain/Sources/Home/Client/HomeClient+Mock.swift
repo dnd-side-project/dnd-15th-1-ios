@@ -11,6 +11,7 @@ import Foundation
 
 public extension HomeClient {
     static let mock = HomeClient(
-        home: { HomeSummary(connected: true, myNickname: "둘픽이", partnerNickname: "오몽이") }
+        home: { HomeSummary(connected: true, myNickname: "둘픽이", partnerNickname: "오몽이") },
+        recentSavedPlaces: { _ in [] }
     )
 }

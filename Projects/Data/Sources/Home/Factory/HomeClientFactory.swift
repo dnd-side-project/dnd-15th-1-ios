@@ -14,7 +14,8 @@ public enum HomeClientFactory {
             remote: HomeRemoteDataSource(networkClient: session.authedClient)
         )
         return HomeClient(
-            home: { try await repository.home() }
+            home: { try await repository.home() },
+            recentSavedPlaces: { size in try await repository.recentSavedPlaces(size: size) }
         )
     }
 }
