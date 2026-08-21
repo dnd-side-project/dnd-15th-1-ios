@@ -7,9 +7,17 @@
 
 import Foundation
 
-// 쓰는 필드만 선언한다. currentDateCourse 등 나머지 키는 디코딩에서 무시됨
 struct HomeSummaryResponseDTO: Decodable, Sendable {
     let connected: Bool
     let myNickname: String?
     let partnerNickname: String?
+    let currentDateCourse: DateCourseResponseDTO?
+}
+
+// 현재 데이트 코스·지난 데이트가 같은 형태로 온다. 쓰는 필드만 선언
+struct DateCourseResponseDTO: Decodable, Sendable {
+    let dateCourseId: Int
+    let title: String
+    let date: String
+    let totalPlaceCount: Int
 }

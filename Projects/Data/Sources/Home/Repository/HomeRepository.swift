@@ -30,4 +30,12 @@ public struct HomeRepository: Sendable {
             throw HomeErrorMapper.map(error)
         }
     }
+
+    public func pastDates(size: Int) async throws -> [DateSchedule] {
+        do {
+            return HomeDTOMapper.toPastDates(try await remote.pastDates(size: size))
+        } catch {
+            throw HomeErrorMapper.map(error)
+        }
+    }
 }

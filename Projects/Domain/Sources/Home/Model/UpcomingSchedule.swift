@@ -7,7 +7,7 @@
 
 import Foundation
 
-// 다가오는 데이트 일정, 상단 배너에 표시. 코스짜기 연동 전까지 mock 고정
+// 다가오는 데이트 일정, 상단 배너에 표시
 public struct UpcomingSchedule: Equatable, Sendable {
     public let date: String
     public let placeCount: Int

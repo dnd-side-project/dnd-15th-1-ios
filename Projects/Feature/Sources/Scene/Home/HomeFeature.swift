@@ -10,6 +10,9 @@ public struct HomeFeature {
     /// 최근 저장 장소 미리보기 수
     static let recentSavedPlaceCount = 5
 
+    /// 지난 데이트 미리보기 수
+    static let pastDateCount = 3
+
     /// 커플 연결 세 화면. 모두 `couple` 스토어 하나를 공유하고 Route 로 무엇을 그릴지만 가른다
     public enum CoupleRoute: Hashable {
         case connect
@@ -47,9 +50,9 @@ public struct HomeFeature {
         public init(
             nickname: String = "듀가나디햄햄",
             partnerName: String? = nil,
-            upcomingSchedule: UpcomingSchedule? = .mock,
+            upcomingSchedule: UpcomingSchedule? = nil,
             recommendations: [Content] = [],
-            pastSchedules: [DateSchedule] = DateSchedule.mocks,
+            pastSchedules: [DateSchedule] = [],
             savedPlaces: [SavedPlace] = [],
             couple: CoupleConnectFeature.State? = nil,
             couplePath: [CoupleRoute] = []
@@ -71,6 +74,7 @@ public struct HomeFeature {
         case homeLoadFailed(HomeError)
         case savedPlacesLoaded([SavedPlace])
         case recommendationsLoaded([Content])
+        case pastDatesLoaded([DateSchedule])
         case savedPlacesSeeAllTapped
         case connectFlowRequested
         case couplePathChanged([CoupleRoute])
@@ -105,7 +109,9 @@ public struct HomeFeature {
         case let .homeLoaded(summary):
             state.nickname = summary.myNickname
             state.partnerName = summary.connected ? summary.partnerNickname : nil
-            return .none
+            state.upcomingSchedule = summary.currentDateCourse
+            // 지난 데이트는 연결됐을 때만 있다
+            return summary.connected ? loadPastDates() : .none
 
         case let .homeLoadFailed(error):
             // 인증 만료만 상위로 올려 로그인으로 보내고, 다른 실패는 기존 화면을 유지한다
@@ -120,6 +126,10 @@ public struct HomeFeature {
 
         case let .recommendationsLoaded(contents):
             state.recommendations = contents
+            return .none
+
+        case let .pastDatesLoaded(schedules):
+            state.pastSchedules = schedules
             return .none
 
         case .savedPlacesSeeAllTapped:
@@ -199,6 +209,13 @@ public struct HomeFeature {
         .run { [homeClient] send in
             let places = (try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount)) ?? []
             await send(.savedPlacesLoaded(places))
+        }
+    }
+
+    private func loadPastDates() -> Effect<Action> {
+        .run { [homeClient] send in
+            let dates = (try? await homeClient.pastDates(Self.pastDateCount)) ?? []
+            await send(.pastDatesLoaded(dates))
         }
     }
 

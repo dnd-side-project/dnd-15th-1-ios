@@ -11,6 +11,7 @@ import Foundation
 enum HomeEndpoint: APIEndpoint {
     case home
     case recentSavedPlaces(size: Int)
+    case pastDates(size: Int)
 
     var path: String {
         switch self {
@@ -18,12 +19,14 @@ enum HomeEndpoint: APIEndpoint {
             return "/api/v1/home"
         case .recentSavedPlaces:
             return "/api/v1/home/recent-saved-places"
+        case .pastDates:
+            return "/api/v1/home/past-dates"
         }
     }
 
     var method: HTTPMethod {
         switch self {
-        case .home, .recentSavedPlaces:
+        case .home, .recentSavedPlaces, .pastDates:
             return .get
         }
     }
@@ -32,7 +35,7 @@ enum HomeEndpoint: APIEndpoint {
         switch self {
         case .home:
             return []
-        case let .recentSavedPlaces(size):
+        case let .recentSavedPlaces(size), let .pastDates(size):
             return [URLQueryItem(name: "size", value: String(size))]
         }
     }
