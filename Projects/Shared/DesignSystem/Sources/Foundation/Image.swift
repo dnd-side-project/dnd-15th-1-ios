@@ -117,7 +117,9 @@ public extension Image {
     static var bannerCoupleConnect: Image { Asset.bannerCoupleConnect.swiftUIImage }
     static var bannerPeek: Image { Asset.bannerPeek.swiftUIImage }
     static var bannerCalendar: Image { Asset.bannerCalendar.swiftUIImage }
+    static var bannerTogether: Image { Asset.bannerTogether.swiftUIImage }
     static var placeEmpty: Image { Asset.placeEmpty.swiftUIImage }
+    static var dateScheduleEmpty: Image { Asset.dateScheduleEmpty.swiftUIImage }
 }
 
 // MARK: - Couple Connect
