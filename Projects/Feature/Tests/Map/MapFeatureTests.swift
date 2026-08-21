@@ -105,6 +105,7 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.ownershipSelected(.mine)) {
             $0.selectedOwnership = .mine
+            $0.camera = .focusing(self.mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         // 둘 다 저장한 장소도 내가 저장한 것이다
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["1", "3"])
@@ -115,8 +116,32 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.ownershipSelected(.partner)) {
             $0.selectedOwnership = .partner
+            $0.camera = .focusing(self.mixed[1].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["2", "3"])
+    }
+
+    func test_저장자를_고르면_남은_목록의_첫_행으로_간다() async {
+        let store = loadedStore(mixed)
+        await store.send(.ownershipSelected(.partner)) {
+            $0.selectedOwnership = .partner
+            $0.camera = .focusing(self.mixed[1].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+        XCTAssertEqual(store.state.filteredPlaces.first?.id, "2")
+    }
+
+    func test_저장자를_골라_목록이_비면_서울_시청으로_간다() async {
+        var state = MapFeature.State()
+        state.places = [mixed[0]]
+        state.loadState = .loaded
+        state.camera = .focusing(mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        await store.send(.ownershipSelected(.partner)) {
+            $0.selectedOwnership = .partner
+            $0.camera = .seoulCityHall
+        }
+        XCTAssertTrue(store.state.filteredPlaces.isEmpty)
     }
 
     func test_카테고리를_고르면_핀과_목록이_같이_줄어든다() async {
@@ -145,6 +170,7 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.ownershipSelected(.partner)) {
             $0.selectedOwnership = .partner
+            $0.camera = .focusing(self.mixed[1].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = .cafe
