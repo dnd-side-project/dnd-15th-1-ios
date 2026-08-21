@@ -71,6 +71,7 @@ public struct HomeFeature {
         case homeLoadFailed(HomeError)
         case savedPlacesLoaded([SavedPlace])
         case recommendationsLoaded([Content])
+        case savedPlacesSeeAllTapped
         case connectFlowRequested
         case couplePathChanged([CoupleRoute])
         case couple(CoupleConnectFeature.Action)
@@ -79,6 +80,7 @@ public struct HomeFeature {
         @CasePathable
         public enum Delegate: Equatable {
             case sessionExpired
+            case showAllSavedPlaces
         }
     }
 
@@ -119,6 +121,10 @@ public struct HomeFeature {
         case let .recommendationsLoaded(contents):
             state.recommendations = contents
             return .none
+
+        case .savedPlacesSeeAllTapped:
+            // 전체보기는 지도 탭으로 이동. 실제 탭 전환은 상위(MainTab)가 처리
+            return .send(.delegate(.showAllSavedPlaces))
 
         case .connectFlowRequested, .couplePathChanged, .couple, .delegate:
             return coupleNavCore(state: &state, action: action)

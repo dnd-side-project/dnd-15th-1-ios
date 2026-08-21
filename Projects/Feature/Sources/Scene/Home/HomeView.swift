@@ -158,7 +158,9 @@ public struct HomeView: View {
             Spacer()
 
             if !store.visibleSavedPlaces.isEmpty {
-                Button {} label: {
+                Button {
+                    store.send(.savedPlacesSeeAllTapped)
+                } label: {
                     HStack(spacing: 2) {
                         Text("전체보기")
                             .typography(.body1M)
