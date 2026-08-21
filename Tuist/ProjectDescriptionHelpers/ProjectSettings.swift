@@ -91,6 +91,8 @@ public enum ProjectSettings {
             "PRODUCT_NAME": .string(ProjectEnvironment.productName),
             "GENERATE_INFOPLIST_FILE": "NO",
             "TARGETED_DEVICE_FAMILY": "1",
+            "CODE_SIGN_ENTITLEMENTS": "Dulpick-Debug.entitlements",
+            "FIREBASE_OPTIONS_RESOURCE": "GoogleService-Info-Debug",
         ]) { _, new in new }
 
         let releaseSettings = release.merging([
@@ -99,6 +101,8 @@ public enum ProjectSettings {
             "PRODUCT_NAME": .string(ProjectEnvironment.productName),
             "GENERATE_INFOPLIST_FILE": "NO",
             "TARGETED_DEVICE_FAMILY": "1",
+            "CODE_SIGN_ENTITLEMENTS": "Dulpick-Release.entitlements",
+            "FIREBASE_OPTIONS_RESOURCE": "GoogleService-Info-Release",
         ]) { _, new in new }
 
         return .settings(
