@@ -93,6 +93,7 @@ public struct RootFlowFeature {
 
     @Dependency(\.authClient) var authClient
     @Dependency(\.onboardingClient) var onboardingClient
+    @Dependency(\.notificationClient) var notificationClient
     @Dependency(\.continuousClock) var clock
 
     public init() {}
@@ -271,11 +272,17 @@ private extension RootFlowFeature {
     ) -> Effect<Action> {
         switch delegate {
         case let .authenticated(userID, isOnboardingCompleted):
+            let requestNotificationAuthorization = Effect<Action>.run { [notificationClient] _ in
+                _ = await notificationClient.requestAuthorization()
+            }
             guard isOnboardingCompleted else {
                 // 스택은 이미 닉네임을 올렸다. 여기서는 phase 를 건드리지 않는다
-                return .none
+                return requestNotificationAuthorization
             }
-            return moveToMain(state: &state, userID: userID)
+            return .merge(
+                requestNotificationAuthorization,
+                moveToMain(state: &state, userID: userID)
+            )
         case .onboardingCompleted:
             return resolveOnboardingSession()
         case .signedOut:

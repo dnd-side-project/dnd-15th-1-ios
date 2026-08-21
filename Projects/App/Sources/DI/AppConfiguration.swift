@@ -6,13 +6,15 @@ struct AppConfiguration: Sendable {
     let bundleID: String
     let kakaoNativeAppKey: String
     let googleClientID: String
+    let firebaseOptionsResourceName: String
 
     static func make() -> AppConfiguration {
         AppConfiguration(
             baseURL: AppInfo.apiBaseURL,
             bundleID: AppInfo.bundleID,
             kakaoNativeAppKey: AppInfo.kakaoNativeAppKey,
-            googleClientID: AppInfo.googleClientID
+            googleClientID: AppInfo.googleClientID,
+            firebaseOptionsResourceName: AppInfo.firebaseOptionsResourceName
         )
     }
 }
