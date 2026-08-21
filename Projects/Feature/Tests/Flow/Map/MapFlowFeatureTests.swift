@@ -231,7 +231,7 @@ final class MapFlowPostDetailTests: XCTestCase {
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         } withDependencies: {
-            $0.postDetailContentSource.load = { _ in loaded }
+            $0.postDetailContentClient.contentDetail = { _ in loaded }
         }
 
         await store.send(.detail(.presented(.delegate(.contentSelected("1"))))) {
@@ -308,7 +308,7 @@ final class MapFlowPostDetailTests: XCTestCase {
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         } withDependencies: {
-            $0.postDetailContentSource.load = { _ in loaded }
+            $0.postDetailContentClient.contentDetail = { _ in loaded }
         }
 
         await store.send(.postDetail(.presented(.onAppear))) {

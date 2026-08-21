@@ -27,7 +27,7 @@ final class PostDetailFeatureTests: XCTestCase {
         return TestStore(initialState: state) {
             PostDetailFeature()
         } withDependencies: {
-            $0.postDetailContentSource.load = { id in
+            $0.postDetailContentClient.contentDetail = { id in
                 if let load { return try await load(id) }
                 if let failure { throw failure }
                 guard let loaded else { throw ExploreError.unknown }
