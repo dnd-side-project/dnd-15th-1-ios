@@ -8,6 +8,9 @@ public struct MapFlowView: View {
     /// 아래 안전영역(탭바 + 홈 인디케이터). 상세 시트 목록 아래 여백에 더한다
     @State private var bottomInset: CGFloat = 0
 
+    /// 상세 시트 층의 높이. 게시글이 뜰 때 장소 상세를 이만큼 아래로 치운다
+    @State private var layerHeight: CGFloat = 0
+
     public init(store: StoreOf<MapFlowFeature>) {
         self.store = store
     }
@@ -63,6 +66,7 @@ private extension MapFlowView {
             ZStack(alignment: .bottom) {
                 MapView(store: mapStore)
                 detailLayer
+                postDetailLayer
             }
         }
         // 별칭 시트는 TabView 안이라 딤이 탭바를 못 덮는다. 시험 삼아 시트 동안 탭바를 숨긴다. 별로면 이 줄을 지운다
@@ -85,13 +89,40 @@ private extension MapFlowView {
                 // 장소가 바뀌어도 if let 은 참이라 시트가 남는다. id 로 뷰를 갈아야 detent·스크롤이 초기화된다
                 PlaceDetailView(store: detailStore, bottomInset: bottomInset)
                     .id(detailStore.id)
-                    .transition(.move(edge: .bottom))
+                    .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
+                    .ignoresSafeArea(edges: .bottom)
+                    // 게시글이 떠도 장소 상세를 트리에서 빼지 않는다. 빼면 시트 단계와 스크롤이 날아간다.
+                    // 대신 화면 아래로 치워둔다. 게시글을 닫으면 보던 자리 그대로 다시 올라온다
+                    .offset(y: store.postDetail == nil ? 0 : layerHeight)
+                    // 치울 때는 즉시, 올릴 때만 스프링. 사라지는 시트는 안 움직인다는 규칙에 맞춘다
+                    .animation(
+                        store.postDetail == nil ? MapBottomSheetMetric.settle : nil,
+                        value: store.postDetail == nil
+                    )
+                    .allowsHitTesting(store.postDetail == nil)
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { layerHeight = $0 }
+        .animation(
+            MapBottomSheetMetric.settle,
+            value: store.detail == nil
+        )
+    }
+
+    /// 게시글 상세 시트. 장소 상세 위에 얹힌다.
+    /// 아래 안전영역만 무시한다. 지도 전체를 감싸면 목록 시트가 재는 아래 여백이 0 이 된다
+    @ViewBuilder
+    var postDetailLayer: some View {
+        ZStack(alignment: .bottom) {
+            if let postDetailStore = store.scope(state: \.postDetail, action: \.postDetail.presented) {
+                PostDetailView(store: postDetailStore, bottomInset: bottomInset)
+                    .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
                     .ignoresSafeArea(edges: .bottom)
             }
         }
         .animation(
             MapBottomSheetMetric.settle,
-            value: store.detail == nil
+            value: store.postDetail == nil
         )
     }
 

@@ -32,13 +32,17 @@ public struct MapFlowFeature {
         /// 행 메뉴 `수정` 으로 뜬 별칭 지정 시트
         @Presents public var alias: PlaceAliasFeature.State?
 
+        /// 장소 상세에서 뜬 게시글 상세. 시트 표시는 `MapFlowView` 가 한다
+        @Presents public var postDetail: PostDetailFeature.State?
+
         public init(
             map: MapFeature.State = MapFeature.State(),
             course: CourseFeature.State? = nil,
             path: [Route] = [],
             placeSearch: PlaceSearchFeature.State? = nil,
             detail: PlaceDetailFeature.State? = nil,
-            alias: PlaceAliasFeature.State? = nil
+            alias: PlaceAliasFeature.State? = nil,
+            postDetail: PostDetailFeature.State? = nil
         ) {
             self.map = map
             self.course = course
@@ -46,6 +50,7 @@ public struct MapFlowFeature {
             self.placeSearch = placeSearch
             self.detail = detail
             self.alias = alias
+            self.postDetail = postDetail
         }
     }
 
@@ -56,6 +61,7 @@ public struct MapFlowFeature {
         case placeSearch(PlaceSearchFeature.Action)
         case detail(PresentationAction<PlaceDetailFeature.Action>)
         case alias(PresentationAction<PlaceAliasFeature.Action>)
+        case postDetail(PresentationAction<PostDetailFeature.Action>)
         case delegate(Delegate)
 
         @CasePathable
@@ -81,6 +87,9 @@ public struct MapFlowFeature {
             .ifLet(\.$alias, action: \.alias) {
                 PlaceAliasFeature()
             }
+            .ifLet(\.$postDetail, action: \.postDetail) {
+                PostDetailFeature()
+            }
             .ifLet(\.placeSearch, action: \.placeSearch) {
                 PlaceSearchFeature()
             }
@@ -104,7 +113,7 @@ public struct MapFlowFeature {
             return handle(courseDelegate: delegate, state: &state)
         case let .placeSearch(.delegate(delegate)):
             return handle(searchDelegate: delegate, state: &state)
-        case .detail, .alias:
+        case .detail, .alias, .postDetail:
             return handleChild(state: &state, action: action)
         case .map, .course, .placeSearch, .delegate:
             return .none
@@ -211,12 +220,30 @@ private extension MapFlowFeature {
             state.alias = nil
             return .none
 
+        case let .detail(.presented(.delegate(.contentSelected(id)))):
+            // 장소 상세를 닫지 않는다. 게시글을 닫으면 그 자리로 돌아가야 한다
+            state.postDetail = PostDetailFeature.State(contentID: id)
+            // 화면 등장에 안 기댄다. 내려가던 시트를 도로 올리면 등장이 안 온다
+            return .send(.postDetail(.presented(.onAppear)))
+
         case .detail(.presented(.delegate(.closed))), .detail(.dismiss):
             dismissDetail(state: &state)
             return .none
 
-        case .detail, .alias:
-            // 북마크·지도·게시물은 받는 쪽이 아직 없다. 삼킨다
+        case .postDetail(.presented(.delegate(.closeRequested))), .postDetail(.dismiss):
+            state.postDetail = nil
+            return .none
+
+        case .postDetail(.presented(.delegate(.sessionExpired))):
+            return .send(.delegate(.sessionExpired))
+
+        case .postDetail(.presented(.delegate(.placeSelected))),
+             .postDetail(.presented(.delegate(.instagramRequested))):
+            // 장소 상세로 가는 길은 이 Cycle 밖이다. 인스타 외부 전환도 밖이다
+            return .none
+
+        case .detail, .alias, .postDetail:
+            // 북마크·지도는 받는 쪽이 아직 없다. 삼킨다
             return .none
 
         default:
@@ -248,6 +275,8 @@ private extension MapFlowFeature {
             id: savedPlace.id,
             coordinate: savedPlace.place.coordinate
         )
+        // 게시글 상세가 떠 있으면 지운다. 두 상세가 동시에 살아 있으면 안 된다
+        state.postDetail = nil
     }
 
     func presentDetail(state: inout State, place: Place) {
@@ -258,6 +287,8 @@ private extension MapFlowFeature {
             id: place.id,
             coordinate: place.coordinate
         )
+        // 게시글 상세가 떠 있으면 지운다. 두 상세가 동시에 살아 있으면 안 된다
+        state.postDetail = nil
     }
 
     func dismissDetail(state: inout State) {

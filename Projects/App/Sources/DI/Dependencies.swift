@@ -23,6 +23,9 @@ enum Dependencies {
         values.placeClient = PlaceClientFactory.make(session: authSession)
         values.courseClient = CourseClientFactory.make(session: authSession)
 
+        // API 연동 전 임시 mock, 나중에 장소 API 연동에서 Factory 로 교체
+        values.postDetailContentClient = .mock
+
         values.recentSearchClient = RecentSearchClientFactory.make(
             userDefaults: infra.userDefaults
         )
