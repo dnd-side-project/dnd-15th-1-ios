@@ -69,14 +69,24 @@ private extension MapFlowView {
                 postDetailLayer
             }
         }
-        // 별칭 시트는 TabView 안이라 딤이 탭바를 못 덮는다. 시험 삼아 시트 동안 탭바를 숨긴다. 별로면 이 줄을 지운다
-        .toolbar(store.alias == nil ? .automatic : .hidden, for: .tabBar)
+        // 탭바는 저장한 장소 시트일 때만 보인다. 나머지 다섯은 숨긴다
+        // (분해 문서 `2026-08-13-map-course-ui-split.md:194-200` 표가 SSOT)
+        .toolbar(isTabBarShown ? .automatic : .hidden, for: .tabBar)
         // 키보드 영역까지 지운 지도 층 밖에 건다. 안에 걸면 저장 버튼이 키보드에 가린다
         .bottomSheet(isPresented: aliasSheetBinding) {
             if let aliasStore = store.scope(state: \.alias, action: \.alias.presented) {
                 PlaceAliasView(store: aliasStore)
             }
         }
+    }
+
+    /// 저장한 장소 시트만 탭바를 띄운다.
+    /// 별칭 · 장소 상세 · 게시글 상세는 지도 위에 얹히고, 검색 결과는 같은 시트를 갈아 쓴다
+    var isTabBarShown: Bool {
+        store.alias == nil
+            && store.detail == nil
+            && store.postDetail == nil
+            && !store.map.isSearching
     }
 
     /// 장소 상세 시트. 저장 목록 시트를 덮는다.
