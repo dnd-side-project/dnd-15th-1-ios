@@ -44,6 +44,7 @@ final class MapFeatureTests: XCTestCase {
             $0.places = places
             $0.bookmarkedPlaceIDs = ["1", "2"]
             $0.loadState = .loaded
+            $0.camera = .focusing(places[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
 
         XCTAssertEqual(
@@ -122,6 +123,7 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = .cafe
+            $0.camera = .focusing(self.mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["1", "3"])
         XCTAssertEqual(store.state.markers.count, store.state.filteredPlaces.count)
@@ -131,6 +133,7 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = .cafe
+            $0.camera = .focusing(self.mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = nil
@@ -145,6 +148,7 @@ final class MapFeatureFilterTests: XCTestCase {
         }
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = .cafe
+            $0.camera = .focusing(self.mixed[2].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["3"])
     }
@@ -480,4 +484,94 @@ final class MapFeatureSelectedPinTests: XCTestCase {
         let closed = TestStore(initialState: loadedState()) { MapFeature() }
         XCTAssertEqual(closed.state.markers.count, 2)
         XCTAssertFalse(closed.state.markers.contains { $0.kind == .selected })    }
+}
+
+@MainActor
+final class MapCameraMoveTests: XCTestCase {
+
+    func test_저장_장소를_받으면_첫_행으로_간다() async {
+        let places = PlaceFixtures.savedPlaces
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        }
+
+        await store.send(.savedPlacesResponse(.success(places))) {
+            $0.places = places
+            $0.bookmarkedPlaceIDs = Set(places.map(\.id))
+            $0.loadState = .loaded
+            $0.camera = .focusing(places[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_저장_장소가_없으면_서울_시청으로_간다() async {
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        }
+
+        await store.send(.savedPlacesResponse(.success([]))) {
+            $0.places = []
+            $0.loadState = .loaded
+            $0.camera = .seoulCityHall
+        }
+    }
+
+    func test_카테고리를_고르면_남은_목록의_첫_행으로_간다() async {
+        let places = PlaceFixtures.savedPlaces
+        var state = MapFeature.State()
+        state.places = places
+        state.loadState = .loaded
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        let category = places[1].place.category
+        await store.send(.categoryTapped(category)) {
+            $0.selectedCategory = category
+            $0.camera = .focusing(places[1].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_행을_고르면_줌은_그대로_두고_그_장소로_간다() async {
+        let places = PlaceFixtures.savedPlaces
+        var state = MapFeature.State()
+        state.places = places
+        state.loadState = .loaded
+        state.camera.zoomLevel = 12
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        let target = places[1]
+        await store.send(.rowTapped(target.id)) {
+            $0.camera = .focusing(target.place.coordinate, zoomLevel: 12)
+        }
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_핀을_고르면_줌은_그대로_두고_그_장소로_간다() async {
+        let places = PlaceFixtures.savedPlaces
+        var state = MapFeature.State()
+        state.places = places
+        state.loadState = .loaded
+        state.camera.zoomLevel = 12
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        let target = places[1]
+        await store.send(.markerTapped(target.id)) {
+            $0.camera = .focusing(target.place.coordinate, zoomLevel: 12)
+        }
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_검색_결과를_적용하면_첫_결과로_여러_장소용_줌으로_간다() async {
+        let results = PlaceFixtures.savedPlaces.map(\.place)
+        let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
+
+        await store.send(.searchResultsApplied(query: "카페", places: results)) {
+            $0.mode = .searchResult(query: "카페", places: results)
+            $0.camera = .focusing(results[0].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_서울_시청은_여러_장소용_줌을_쓴다() {
+        XCTAssertEqual(MapCamera.seoulCityHall.zoomLevel, MapCamera.multiPlaceZoom)
+        XCTAssertEqual(MapCamera.seoulCityHall.center.latitude, 37.5665, accuracy: 0.00001)
+        XCTAssertEqual(MapCamera.seoulCityHall.center.longitude, 126.9780, accuracy: 0.00001)
+    }
 }

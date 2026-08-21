@@ -16,7 +16,9 @@ final class MapFlowFeatureTests: XCTestCase {
             MapFlowFeature()
         }
 
-        await store.send(.map(.markerTapped("7")))
+        await store.send(.map(.markerTapped("7"))) {
+            $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
         await store.receive(\.map.delegate.placeDetailRequested) {
             $0.detail = PlaceDetailFeature.State(savedPlace: saved)
             $0.map.selectedPlace = MapFeature.State.SelectedPlace(
@@ -37,7 +39,9 @@ final class MapFlowFeatureTests: XCTestCase {
             MapFlowFeature()
         }
 
-        await store.send(.map(.rowTapped("7")))
+        await store.send(.map(.rowTapped("7"))) {
+            $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
         await store.receive(\.map.delegate.placeDetailRequested) {
             $0.detail = PlaceDetailFeature.State(savedPlace: saved)
             $0.map.selectedPlace = MapFeature.State.SelectedPlace(
@@ -72,7 +76,9 @@ final class MapFlowFeatureTests: XCTestCase {
             MapFlowFeature()
         }
 
-        await store.send(.map(.rowTapped("s1")))
+        await store.send(.map(.rowTapped("s1"))) {
+            $0.map.camera = .focusing(place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
         await store.receive(\.map.delegate.placeDetailRequested) {
             $0.detail = PlaceDetailFeature.State(place: place)
             $0.map.selectedPlace = MapFeature.State.SelectedPlace(
@@ -281,7 +287,9 @@ final class MapFlowPostDetailTests: XCTestCase {
             MapFlowFeature()
         }
 
-        await store.send(.map(.markerTapped("7")))
+        await store.send(.map(.markerTapped("7"))) {
+            $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
         await store.receive(\.map.delegate.placeDetailRequested) {
             $0.detail = PlaceDetailFeature.State(savedPlace: saved)
             $0.map.selectedPlace = MapFeature.State.SelectedPlace(

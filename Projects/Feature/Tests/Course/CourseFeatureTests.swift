@@ -524,3 +524,32 @@ private extension CoursePlaceCandidate {
         )
     }
 }
+
+@MainActor
+final class CoursePlacePickCameraTests: XCTestCase {
+
+    func test_장소_목록을_받으면_첫_행으로_간다() async {
+        let candidates = PlaceFixtures.coursePlaceCandidates
+        let store = TestStore(initialState: CourseFeature.State()) {
+            CourseFeature()
+        }
+
+        await store.send(.coursePlacesResponse(.success(candidates))) {
+            $0.places = candidates
+            $0.loadState = .loaded
+            $0.camera = .focusing(candidates[0].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_장소가_없으면_서울_시청으로_간다() async {
+        let store = TestStore(initialState: CourseFeature.State()) {
+            CourseFeature()
+        }
+
+        await store.send(.coursePlacesResponse(.success([]))) {
+            $0.places = []
+            $0.loadState = .loaded
+            $0.camera = .seoulCityHall
+        }
+    }
+}

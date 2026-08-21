@@ -40,10 +40,128 @@ final class SheetLayoutTests: XCTestCase {
         XCTAssertEqual(sut.top(forVisible: sut.height(for: .expanded)), 56)
     }
 
-    func test_접힘은_기기_화면_높이의_절반이다() {
+    func test_접힘은_기기_화면_높이의_45퍼센트다() {
         let sut = layout()
-        // 담는 층 797 이 아니라 화면 844 의 절반이다
-        XCTAssertEqual(sut.height(for: .collapsed), 422)
+        // 담는 층 797 이 아니라 화면 844 의 45% 다
+        XCTAssertEqual(sut.height(for: .collapsed), 844 * 0.45, accuracy: 0.001)
+    }
+
+    func test_손잡이_전용_시트는_접힘에서_목록을_쓸어도_안_움직인다() {
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(
+            kind: .b,
+            detent: .collapsed,
+            isContentAtTop: true,
+            translationY: -50
+        ))
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(
+            kind: .b,
+            detent: .collapsed,
+            isContentAtTop: false,
+            translationY: 50
+        ))
+    }
+
+    func test_손잡이_전용_시트도_펼침에서_맨위를_아래로_끌면_내려간다() {
+        // 목록이 더 갈 곳이 없다. 그 손짓은 시트가 받는다
+        XCTAssertTrue(SheetLayout.sheetTakesDrag(kind: .b, detent: .expanded, isContentAtTop: true, translationY: 50))
+    }
+
+    func test_손잡이_전용_시트는_펼침에서_그_밖의_손짓을_본문에_넘긴다() {
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(kind: .b, detent: .expanded, isContentAtTop: true, translationY: -50))
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(kind: .b, detent: .expanded, isContentAtTop: false, translationY: 50))
+    }
+
+    func test_목록을_끌면_오르는_시트는_지금_규칙_그대로다() {
+        XCTAssertTrue(SheetLayout.sheetTakesDrag(kind: .a, detent: .collapsed, isContentAtTop: true, translationY: -50))
+        XCTAssertTrue(SheetLayout.sheetTakesDrag(kind: .a, detent: .expanded, isContentAtTop: true, translationY: 50))
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(kind: .a, detent: .expanded, isContentAtTop: true, translationY: -50))
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(kind: .a, detent: .expanded, isContentAtTop: false, translationY: 50))
+    }
+
+    func test_손잡이에서_시작하면_종류와_무관하게_시트가_가져간다() {
+        XCTAssertEqual(
+            SheetLayout.dragOwner(
+                kind: .b,
+                detent: .collapsed,
+                isContentAtTop: true,
+                translation: CGSize(width: 0, height: -40),
+                startedInOpenMenu: false,
+                startedInGrabber: true
+            ),
+            .sheet
+        )
+        XCTAssertEqual(
+            SheetLayout.dragOwner(
+                kind: .a,
+                detent: .expanded,
+                isContentAtTop: false,
+                translation: CGSize(width: 0, height: -40),
+                startedInOpenMenu: false,
+                startedInGrabber: true
+            ),
+            .sheet
+        )
+    }
+
+    func test_손잡이_전용_시트는_접힘에서_손잡이_밖_세로_손짓을_본문에_넘긴다() {
+        XCTAssertEqual(
+            SheetLayout.dragOwner(
+                kind: .b,
+                detent: .collapsed,
+                isContentAtTop: true,
+                translation: CGSize(width: 0, height: -40),
+                startedInOpenMenu: false,
+                startedInGrabber: false
+            ),
+            .content
+        )
+    }
+
+    func test_열린_메뉴가_손잡이보다_먼저다() {
+        // 드롭다운이 손잡이 위로 펼쳐져도 그 안만 스크롤한다
+        XCTAssertEqual(
+            SheetLayout.dragOwner(
+                kind: .b,
+                detent: .collapsed,
+                isContentAtTop: true,
+                translation: CGSize(width: 0, height: -80),
+                startedInOpenMenu: true,
+                startedInGrabber: true
+            ),
+            .content
+        )
+    }
+
+    func test_손잡이_전용_시트는_접힘에서도_본문이_스크롤된다() {
+        XCTAssertTrue(SheetLayout.contentScrolls(kind: .b, detent: .collapsed, isDraggingSheet: false))
+        XCTAssertTrue(SheetLayout.contentScrolls(kind: .b, detent: .expanded, isDraggingSheet: false))
+    }
+
+    func test_목록을_끌면_오르는_시트는_펼침에서만_본문이_스크롤된다() {
+        XCTAssertFalse(SheetLayout.contentScrolls(kind: .a, detent: .collapsed, isDraggingSheet: false))
+        XCTAssertTrue(SheetLayout.contentScrolls(kind: .a, detent: .expanded, isDraggingSheet: false))
+    }
+
+    func test_시트를_끄는_동안은_본문이_안_스크롤된다() {
+        // 안 잠그면 시트가 오르내릴 때 목록도 같이 스크롤된다
+        XCTAssertFalse(SheetLayout.contentScrolls(kind: .a, detent: .expanded, isDraggingSheet: true))
+        XCTAssertFalse(SheetLayout.contentScrolls(kind: .b, detent: .collapsed, isDraggingSheet: true))
+    }
+
+    func test_접힘에서는_펼침과의_차이만큼_화면_밖에_있다() {
+        let sut = layout()
+        // 펼침 797, 접힘 844*0.45 = 379.8
+        XCTAssertEqual(sut.hiddenHeight(for: .collapsed), 797 - 844 * 0.45, accuracy: 0.001)
+    }
+
+    func test_펼침에서는_화면_밖이_없다() {
+        XCTAssertEqual(layout().hiddenHeight(for: .expanded), 0)
+    }
+
+    func test_접힘이_펼침과_같으면_화면_밖이_없다() {
+        // 화면이 담는 층보다 훨씬 클 때. 접힘이 펼침으로 잘린다
+        let sut = layout(containerHeight: 400, screenHeight: 1000, expandLimit: .belowSearchBar)
+        XCTAssertEqual(sut.hiddenHeight(for: .collapsed), 0)
     }
 
     func test_접힘이_펼침을_넘지_않는다() {
@@ -87,31 +205,38 @@ final class SheetLayoutTests: XCTestCase {
 
     func test_접힘에서는_시트가_손짓을_받는다() {
         // 접힘에서는 본문이 안 스크롤된다. 목록을 끌면 시트가 펼쳐진다
-        XCTAssertTrue(SheetLayout.sheetTakesDrag(detent: .collapsed, isContentAtTop: true, translationY: -50))
-        XCTAssertTrue(SheetLayout.sheetTakesDrag(detent: .collapsed, isContentAtTop: false, translationY: 50))
+        XCTAssertTrue(SheetLayout.sheetTakesDrag(kind: .a, detent: .collapsed, isContentAtTop: true, translationY: -50))
+        XCTAssertTrue(SheetLayout.sheetTakesDrag(kind: .a, detent: .collapsed, isContentAtTop: false, translationY: 50))
     }
 
     func test_펼침에서_본문이_맨위가_아니면_스크롤에_넘긴다() {
-        XCTAssertFalse(SheetLayout.sheetTakesDrag(detent: .expanded, isContentAtTop: false, translationY: 50))
-        XCTAssertFalse(SheetLayout.sheetTakesDrag(detent: .expanded, isContentAtTop: false, translationY: -50))
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(kind: .a, detent: .expanded, isContentAtTop: false, translationY: 50))
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(
+            kind: .a,
+            detent: .expanded,
+            isContentAtTop: false,
+            translationY: -50
+        ))
     }
 
     func test_펼침에서_맨위를_아래로_끌면_시트가_받는다() {
-        XCTAssertTrue(SheetLayout.sheetTakesDrag(detent: .expanded, isContentAtTop: true, translationY: 50))
+        XCTAssertTrue(SheetLayout.sheetTakesDrag(kind: .a, detent: .expanded, isContentAtTop: true, translationY: 50))
     }
 
     func test_펼침에서_맨위를_위로_끌면_스크롤에_넘긴다() {
         // 이미 맨 위라 스크롤은 안 움직인다. 시트가 받으면 펼침 위로 끌려 어색하다
-        XCTAssertFalse(SheetLayout.sheetTakesDrag(detent: .expanded, isContentAtTop: true, translationY: -50))
+        XCTAssertFalse(SheetLayout.sheetTakesDrag(kind: .a, detent: .expanded, isContentAtTop: true, translationY: -50))
     }
 
     func test_이동량이_문턱보다_짧으면_주인을_안_정한다() {
         // 4pt 는 방향이 안 미덥다. 다음 프레임에 다시 본다
         XCTAssertNil(SheetLayout.dragOwner(
+            kind: .a,
             detent: .collapsed,
             isContentAtTop: true,
             translation: CGSize(width: 3, height: 4),
-            startedInOpenMenu: false
+            startedInOpenMenu: false,
+            startedInGrabber: false
         ))
     }
 
@@ -119,10 +244,12 @@ final class SheetLayoutTests: XCTestCase {
         // 썸네일 가로 스크롤을 쓰는 손짓이다. 시트가 뺏으면 안 된다
         XCTAssertEqual(
             SheetLayout.dragOwner(
+                kind: .a,
                 detent: .collapsed,
                 isContentAtTop: true,
                 translation: CGSize(width: 60, height: 20),
-                startedInOpenMenu: false
+                startedInOpenMenu: false,
+                startedInGrabber: false
             ),
             .content
         )
@@ -131,10 +258,12 @@ final class SheetLayoutTests: XCTestCase {
     func test_세로로_끌면_접힘에서는_시트가_가져간다() {
         XCTAssertEqual(
             SheetLayout.dragOwner(
+                kind: .a,
                 detent: .collapsed,
                 isContentAtTop: true,
                 translation: CGSize(width: 5, height: -40),
-                startedInOpenMenu: false
+                startedInOpenMenu: false,
+                startedInGrabber: false
             ),
             .sheet
         )
@@ -143,10 +272,12 @@ final class SheetLayoutTests: XCTestCase {
     func test_펼침에서_목록이_맨위가_아니면_본문이_가져간다() {
         XCTAssertEqual(
             SheetLayout.dragOwner(
+                kind: .a,
                 detent: .expanded,
                 isContentAtTop: false,
                 translation: CGSize(width: 0, height: 40),
-                startedInOpenMenu: false
+                startedInOpenMenu: false,
+                startedInGrabber: false
             ),
             .content
         )
@@ -156,10 +287,12 @@ final class SheetLayoutTests: XCTestCase {
         // 드롭다운이 열려 있으면 그 안만 스크롤한다
         XCTAssertEqual(
             SheetLayout.dragOwner(
+                kind: .a,
                 detent: .collapsed,
                 isContentAtTop: true,
                 translation: CGSize(width: 0, height: -80),
-                startedInOpenMenu: true
+                startedInOpenMenu: true,
+                startedInGrabber: false
             ),
             .content
         )
