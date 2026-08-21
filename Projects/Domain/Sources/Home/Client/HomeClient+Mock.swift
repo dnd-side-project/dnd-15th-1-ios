@@ -20,6 +20,7 @@ public extension HomeClient {
             )
         },
         recentSavedPlaces: { _ in [] },
-        pastDates: { _ in [] }
+        pastDates: { _ in [] },
+        pastCourses: { _ in DateSchedule.mocks }
     )
 }

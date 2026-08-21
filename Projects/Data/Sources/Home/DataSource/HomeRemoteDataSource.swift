@@ -27,4 +27,8 @@ public struct HomeRemoteDataSource: Sendable {
     func pastDates(size: Int) async throws -> [DateCourseResponseDTO] {
         try await networkClient.request(HomeEndpoint.pastDates(size: size))
     }
+
+    func pastCourses(size: Int) async throws -> [DateCourseResponseDTO] {
+        try await networkClient.request(HomeEndpoint.pastCourses(size: size))
+    }
 }
