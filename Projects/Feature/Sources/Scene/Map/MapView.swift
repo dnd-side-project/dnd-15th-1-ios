@@ -2,6 +2,7 @@ import Domain
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
+import UIKit
 
 // MARK: - RowMenuOption
 
@@ -27,6 +28,9 @@ public struct MapView: View {
 
     /// 지금 열린 필터 메뉴. 하나만 열린다
     @State private var openFilterMenu: FilterMenu?
+
+    /// 설정 앱을 여는 통로. 위치 권한 안내의 「설정으로 가기」가 쓴다
+    @Environment(\.openURL) private var openURL
 
     /// 저장자 드롭다운 메뉴의 화면 좌표. 시트 손짓이 이 안에서는 시작하지 않는다
     @State private var ownershipMenuFrame: CGRect?
@@ -69,6 +73,21 @@ private extension MapView {
         .ignoresSafeArea(edges: .bottom)
         .toolbar(.hidden, for: .navigationBar)
         .toast(item: toastBinding) { store.send(.retryTapped) }
+        .modal(isPresented: permissionModalBinding) {
+            ModalContent(
+                title: "위치 권한이 꺼져 있어요",
+                content: "설정에서 위치 접근을 허용하면\n현재 위치로 이동할 수 있어요",
+                primaryTitle: "설정으로 가기",
+                primaryAction: {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                    store.send(.permissionModalDismissed)
+                },
+                secondaryTitle: "닫기",
+                secondaryAction: { store.send(.permissionModalDismissed) }
+            )
+        }
         .onAppear { store.send(.onAppear) }
     }
 
@@ -487,6 +506,17 @@ private extension MapView {
             set: { newValue in
                 if newValue == nil {
                     store.send(.dismissToast)
+                }
+            }
+        )
+    }
+
+    var permissionModalBinding: Binding<Bool> {
+        Binding(
+            get: { store.isLocationPermissionModalPresented },
+            set: { isPresented in
+                if !isPresented {
+                    store.send(.permissionModalDismissed)
                 }
             }
         )
