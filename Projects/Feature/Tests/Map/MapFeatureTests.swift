@@ -77,6 +77,122 @@ final class MapFeatureTests: XCTestCase {
             $0.camera = moved
         }
     }
+
+    // MARK: - 현재 위치
+
+    func test_위치권한이_미결정이면_권한을_요청한다() async {
+        let requested = LockIsolated(0)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .notDetermined }
+            $0.locationClient.requestAuthorization = {
+                requested.withValue { $0 += 1 }
+                return .denied
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.finish()
+
+        XCTAssertEqual(requested.value, 1)
+    }
+
+    func test_권한요청에서_거부하면_아무것도_안한다() async {
+        let coordinateCalls = LockIsolated(0)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .notDetermined }
+            $0.locationClient.requestAuthorization = { .denied }
+            $0.locationClient.currentCoordinate = {
+                coordinateCalls.withValue { $0 += 1 }
+                return Coordinate(latitude: 0, longitude: 0)
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.finish()
+
+        XCTAssertEqual(coordinateCalls.value, 0)
+        XCTAssertFalse(store.state.isLocationPermissionModalPresented)
+    }
+
+    func test_위치권한이_허용이면_내위치로_옮긴다() async {
+        let here = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .authorized }
+            $0.locationClient.currentCoordinate = { here }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.receive(\.currentLocationResponse) {
+            $0.camera = MapCamera.focusing(here, zoomLevel: MapCamera.singlePlaceZoom)
+        }
+        XCTAssertEqual(store.state.camera.zoomLevel, 16)
+    }
+
+    func test_위치권한이_거부면_설정이동_모달이_뜬다() async {
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .denied }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse) {
+            $0.isLocationPermissionModalPresented = true
+        }
+
+        await store.send(.permissionModalDismissed) {
+            $0.isLocationPermissionModalPresented = false
+        }
+    }
+
+    func test_좌표조회가_실패하면_토스트가_뜬다() async {
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .authorized }
+            $0.locationClient.currentCoordinate = { throw LocationError.unavailable }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.receive(\.currentLocationResponse) {
+            $0.toast = ToastState.error("현재 위치를 찾지 못했어요")
+        }
+        // 카메라는 안 움직인다
+        XCTAssertEqual(store.state.camera, MapCamera.seoulCityHall)
+    }
+
+    func test_미결정에서_허용하면_내위치로_옮긴다() async {
+        let here = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .notDetermined }
+            $0.locationClient.requestAuthorization = { .authorized }
+            $0.locationClient.currentCoordinate = { here }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.receive(\.currentLocationResponse) {
+            $0.camera = MapCamera.focusing(here, zoomLevel: MapCamera.singlePlaceZoom)
+        }
+    }
 }
 
 @MainActor

@@ -53,6 +53,9 @@ public struct MapFeature {
         /// 지금 열린 상세. `nil` 이면 선택 핀을 안 그린다
         public var selectedPlace: SelectedPlace?
 
+        /// 위치 권한이 거부된 채로 현재위치를 눌렀을 때 뜨는 설정 이동 안내
+        public var isLocationPermissionModalPresented = false
+
         /// 지도 핀과 시트 목록이 함께 보는 하나의 배열이다. 둘이 어긋날 수 없다
         public var filteredPlaces: [SavedPlace] {
             places
@@ -89,6 +92,9 @@ public struct MapFeature {
         case searchBarTapped
         case courseButtonTapped
         case currentLocationTapped
+        case locationAuthorizationResponse(LocationAuthorization)
+        case currentLocationResponse(Result<Coordinate, LocationError>)
+        case permissionModalDismissed
         case retryTapped
         case dismissToast
         case searchResultsApplied(query: String, places: [Place])
@@ -119,10 +125,12 @@ public struct MapFeature {
     private enum CancelID {
         case load
         case couple
+        case location
     }
 
     @Dependency(\.placeClient) var placeClient
     @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.locationClient) var locationClient
 
     public init() {}
 
@@ -135,7 +143,8 @@ public struct MapFeature {
         switch action {
         case .onAppear, .retryTapped, .savedPlacesResponse, .coupleResponse:
             return load(state: &state, action: action)
-        case .cameraChanged, .currentLocationTapped:
+        case .cameraChanged, .currentLocationTapped,
+             .locationAuthorizationResponse, .currentLocationResponse, .permissionModalDismissed:
             return updateMap(state: &state, action: action)
         case .categoryTapped, .ownershipSelected, .rowMenuTapped, .rowMenuDismissed, .dismissToast:
             return updateFilter(state: &state, action: action)
@@ -191,25 +200,6 @@ public struct MapFeature {
             if !isConnected {
                 state.selectedOwnership = .together
             }
-            return .none
-
-        default:
-            // core 가 이 묶음으로 안 보내는 액션이라 도달하지 않는다.
-            // 새 액션을 묶음에 넣고 여기 처리를 빠뜨리면 개발 빌드에서 바로 터진다
-            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
-            return .none
-        }
-    }
-
-    private func updateMap(state: inout State, action: Action) -> Effect<Action> {
-        switch action {
-        case let .cameraChanged(camera):
-            state.camera = camera
-            return .none
-
-        case .currentLocationTapped:
-            // 현재위치 권한과 GPS 는 Cycle 13(DND-70) 이다. 지금은 기본 자리로 되돌린다
-            state.camera = .seoulCityHall
             return .none
 
         default:
@@ -326,6 +316,77 @@ public struct MapFeature {
 }
 
 private extension MapFeature {
+    func updateMap(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .cameraChanged(camera):
+            state.camera = camera
+            return .none
+
+        case .currentLocationTapped:
+            return .run { [locationClient] send in
+                await send(.locationAuthorizationResponse(locationClient.authorization()))
+            }
+            .cancellable(id: CancelID.location, cancelInFlight: true)
+
+        case let .locationAuthorizationResponse(status):
+            switch status {
+            case .notDetermined:
+                return .run { [locationClient] send in
+                    let decided = await locationClient.requestAuthorization()
+                    // 방금 거부를 누른 사람에게 곧바로 설정 이동을 조르지 않는다.
+                    // 안내는 다음번에 버튼을 누를 때 뜬다
+                    guard decided == .authorized else { return }
+                    await Self.sendCoordinate(using: locationClient, to: send)
+                }
+                .cancellable(id: CancelID.location, cancelInFlight: true)
+
+            case .authorized:
+                return .run { [locationClient] send in
+                    await Self.sendCoordinate(using: locationClient, to: send)
+                }
+                .cancellable(id: CancelID.location, cancelInFlight: true)
+
+            case .denied:
+                state.isLocationPermissionModalPresented = true
+                return .none
+            }
+
+        case let .currentLocationResponse(.success(coordinate)):
+            // 오프셋은 안 건다. 화면 어디에 놓을지는 `DulpickMapView` 가 정한다
+            state.camera = .focusing(coordinate, zoomLevel: MapCamera.singlePlaceZoom)
+            return .none
+
+        case .currentLocationResponse(.failure):
+            // 실패는 종류를 안 가린다. 조회 도중 권한이 사라지는 경우는 드물고,
+            // 그때 모달을 띄우면 누른 적 없는 화면이 갑자기 뜬다
+            state.toast = ToastState.error("현재 위치를 찾지 못했어요")
+            return .none
+
+        case .permissionModalDismissed:
+            state.isLocationPermissionModalPresented = false
+            return .none
+
+        default:
+            // core 가 이 묶음으로 안 보내는 액션이라 도달하지 않는다.
+            // 새 액션을 묶음에 넣고 여기 처리를 빠뜨리면 개발 빌드에서 바로 터진다
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    /// 좌표를 한 번 읽어 결과 액션으로 보낸다. 미결정 갈래와 허용 갈래가 같이 쓴다
+    static func sendCoordinate(
+        using locationClient: LocationClient,
+        to send: Send<Action>
+    ) async {
+        do {
+            let coordinate = try await locationClient.currentCoordinate()
+            await send(.currentLocationResponse(.success(coordinate)))
+        } catch {
+            await send(.currentLocationResponse(.failure(error as? LocationError ?? .unavailable)))
+        }
+    }
+
     func updateSearch(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case let .searchResultsApplied(query, places):
