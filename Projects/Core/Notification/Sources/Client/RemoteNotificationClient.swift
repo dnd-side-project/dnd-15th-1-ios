@@ -30,16 +30,21 @@ public final class RemoteNotificationClient: NSObject {
 
     /// 이미 허용된 상태면 APNs 등록을 다시 부른다. 물어본 적 없으면 아무것도 하지 않는다.
     public func registerIfAuthorized() async {
-        let settings = await UNUserNotificationCenter.current().notificationSettings()
-        guard settings.authorizationStatus == .authorized else {
+        let status = await Self.authorizationStatus()
+        guard status == .authorized else {
             Logger.shared.info(
-                "알림 권한이 없어 APNs 등록을 건너뛴다 status=\(settings.authorizationStatus.rawValue)",
+                "알림 권한이 없어 APNs 등록을 건너뛴다 status=\(status.rawValue)",
                 category: .app
             )
             return
         }
         Logger.shared.info("이미 허용된 상태라 APNs 등록을 부른다", category: .app)
         UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    /// `UNNotificationSettings` 는 Sendable 이 아니라 격리 경계를 못 넘는다. 상태 값만 꺼내 넘긴다.
+    private nonisolated static func authorizationStatus() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
     /// FCM 등록 토큰을 내보낸다. 구독 시 마지막 토큰을 먼저 흘린다.
