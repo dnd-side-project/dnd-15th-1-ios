@@ -48,7 +48,7 @@ final class MapZoomTests: XCTestCase {
         XCTAssertEqual(fit([anchor, anchor, anchor]), MapCamera.singlePlaceZoom)
     }
 
-    func test_anchor_를_중심으로_잰다() {
+    func test_기준점을_중심으로_잰다() {
         // anchor 반대편으로 같은 거리만큼 떨어진 점을 더해도 결과가 같다.
         // 코스 한가운데가 아니라 anchor 가 중심이기 때문이다
         let east = Coordinate(latitude: 37.5665, longitude: 127.0780)
