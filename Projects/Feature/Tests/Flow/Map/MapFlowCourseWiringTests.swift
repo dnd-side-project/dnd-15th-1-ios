@@ -1,4 +1,6 @@
+import Domain
 import Feature
+import Foundation
 import ThirdParty
 import XCTest
 
@@ -15,10 +17,29 @@ final class MapFlowCourseWiringTests: XCTestCase {
             )
         ) {
             MapFlowFeature()
+        } withDependencies: {
+            $0.courseClient.createCourse = { _, _, _ in
+                DateCourse(
+                    id: "42",
+                    title: "t",
+                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    status: .draft,
+                    version: 0,
+                    stops: [],
+                    legs: []
+                )
+            }
         }
 
-        await store.send(.course(.nextTapped))
-        await store.receive(\.course.delegate.placePickRequested) {
+        await store.send(.course(.nextTapped)) {
+            $0.course?.isCreatingCourse = true
+        }
+        await store.receive(\.course.courseCreated) {
+            $0.course?.isCreatingCourse = false
+            $0.course?.dateCourseID = "42"
+            $0.course?.version = 0
+        }
+        await store.receive(.course(.delegate(.placePickRequested(dateCourseID: "42")))) {
             $0.path = [.course, .coursePlacePick]
         }
     }
@@ -38,6 +59,8 @@ final class MapFlowCourseWiringTests: XCTestCase {
             .course(
                 .delegate(
                     .buildRequested(
+                        dateCourseID: "42",
+                        version: 0,
                         date: DateComponents(year: 2030, month: 8, day: 5),
                         time: nil,
                         placeIDs: ["a"]
