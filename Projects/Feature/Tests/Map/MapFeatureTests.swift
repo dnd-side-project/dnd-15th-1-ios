@@ -479,6 +479,5 @@ final class MapFeatureSelectedPinTests: XCTestCase {
 
         let closed = TestStore(initialState: loadedState()) { MapFeature() }
         XCTAssertEqual(closed.state.markers.count, 2)
-        XCTAssertFalse(closed.state.markers.contains { $0.kind == .selected })
-    }
+        XCTAssertFalse(closed.state.markers.contains { $0.kind == .selected })    }
 }
