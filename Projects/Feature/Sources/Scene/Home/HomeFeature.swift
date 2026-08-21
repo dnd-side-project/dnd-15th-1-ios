@@ -64,8 +64,8 @@ public struct HomeFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case coupleLoaded(CoupleStatus?)
-        case coupleLoadFailed(CoupleError)
+        case homeLoaded(HomeSummary)
+        case homeLoadFailed(HomeError)
         case savedPlacesLoaded([SavedPlace])
         case recommendationsLoaded([Content])
         case connectFlowRequested
@@ -80,7 +80,7 @@ public struct HomeFeature {
     }
 
     @Dependency(\.placeClient) var placeClient
-    @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.homeClient) var homeClient
     @Dependency(\.exploreClient) var exploreClient
     @Dependency(\.profileClient) var profileClient
 
@@ -96,19 +96,14 @@ public struct HomeFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
-            return .merge(loadCouple(), loadSavedPlaces(), loadRecommendations())
+            return .merge(loadHome(), loadSavedPlaces(), loadRecommendations())
 
-        case let .coupleLoaded(status):
-            guard let status else {
-                // 성공했지만 커플 없음(404) — 미연결로 확정해 이전 파트너를 지운다
-                state.partnerName = nil
-                return .none
-            }
-            state.nickname = status.me.nickname
-            state.partnerName = status.connected ? status.partner?.nickname : nil
+        case let .homeLoaded(summary):
+            state.nickname = summary.myNickname
+            state.partnerName = summary.connected ? summary.partnerNickname : nil
             return .none
 
-        case let .coupleLoadFailed(error):
+        case let .homeLoadFailed(error):
             // 인증 만료만 상위로 올려 로그인으로 보내고, 다른 실패는 기존 화면을 유지한다
             if error == .unauthorized {
                 return .send(.delegate(.sessionExpired))
@@ -171,7 +166,7 @@ public struct HomeFeature {
             // 홈 진입엔 skip 이 없지만 방어적으로 같이 닫고 배너·헤더를 새로 받는다
             state.couple = nil
             state.couplePath = []
-            return loadCouple()
+            return loadHome()
         case .sessionExpired:
             state.couple = nil
             state.couplePath = []
@@ -179,15 +174,15 @@ public struct HomeFeature {
         }
     }
 
-    private func loadCouple() -> Effect<Action> {
-        .run { [coupleClient] send in
+    private func loadHome() -> Effect<Action> {
+        .run { [homeClient] send in
             do {
-                let status = try await coupleClient.current()
-                await send(.coupleLoaded(status))
-            } catch let error as CoupleError {
-                await send(.coupleLoadFailed(error))
+                let summary = try await homeClient.home()
+                await send(.homeLoaded(summary))
+            } catch let error as HomeError {
+                await send(.homeLoadFailed(error))
             } catch {
-                await send(.coupleLoadFailed(.unknown))
+                await send(.homeLoadFailed(.unknown))
             }
         }
     }

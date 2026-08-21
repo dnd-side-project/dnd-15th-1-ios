@@ -72,6 +72,7 @@ private final class Harness {
                 AuthSession(accessToken: "access", refreshToken: "refresh", userID: "1")
             }
             // mainTab 전환 시 홈 onAppear 가 호출하므로 네트워크 없이 응답만 준다
+            $0.homeClient.home = { HomeSummary(connected: false, myNickname: "둘픽", partnerNickname: nil) }
             $0.coupleClient.current = { nil }
             $0.placeClient.savedPlaces = { [] }
             $0.profileClient.member = { UserProfile(nickname: "둘픽", iconID: 0, datePreference: nil) }
