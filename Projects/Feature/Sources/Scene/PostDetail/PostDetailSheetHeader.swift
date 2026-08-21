@@ -1,8 +1,4 @@
-//
-//  PostDetailSheetHeader.swift
-//  Dulpick
-//
-
+import Domain
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -14,9 +10,9 @@ struct PostDetailSheetHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
             HStack(alignment: .top, spacing: Spacing.s8) {
-                // 제목이 없으면 줄을 안 그린다. 닫기 버튼은 남는다
-                if let title = store.detail?.title {
-                    Text(title)
+                // 부르는 중에는 줄을 안 그린다. `제목없음` 이 스쳤다 바뀌면 깜빡이는 것처럼 보인다
+                if let detail = store.detail {
+                    Text(displayTitle(of: detail))
                         .typography(.title3SB)
                         .foregroundStyle(Color.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -34,6 +30,12 @@ struct PostDetailSheetHeader: View {
         }
         .padding(.leading, Spacing.s20)
         .padding(.trailing, Spacing.s12)
+    }
+
+    /// 원본에 제목이 없거나 빈 글자면 없음을 알린다. 자리를 비우지 않는다
+    private func displayTitle(of detail: PostDetailContent) -> String {
+        guard let title = detail.title, !title.isEmpty else { return "제목없음" }
+        return title
     }
 
     private var closeButton: some View {
