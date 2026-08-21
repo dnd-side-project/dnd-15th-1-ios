@@ -16,7 +16,7 @@ struct DulpickMapView: UIViewRepresentable {
     var onMarkerTap: (String) -> Void = { _ in }
     var onMapTap: () -> Void = {}
     /// 접힘 시트 윗면의 화면 전체(global) 좌표 y.
-    /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 절반 지점에 놓는다.
+    /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 `focusRatio` 지점에 놓는다.
     /// `0` 이면 화면 한가운데에 그대로 둔다
     var collapsedSheetTop: CGFloat = 0
 
