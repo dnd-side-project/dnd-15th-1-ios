@@ -231,6 +231,8 @@ public struct MapFeature {
 
         case let .ownershipSelected(filter):
             state.selectedOwnership = filter
+            // 카테고리 필터와 같은 규칙이다. 안 옮기면 화면 한가운데 장소가 목록에서 사라진다
+            state.camera = Self.overview(of: state)
             return .none
 
         case let .rowMenuTapped(id):
