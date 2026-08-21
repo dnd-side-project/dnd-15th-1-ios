@@ -73,13 +73,13 @@ private extension MapView {
     /// 상세 시트는 `MapFlowView` 가 같은 스프링으로 얹는다.
     /// 껍데기에 숨김 단계가 없어(`SheetDetent` 가 접힘·펼침 둘뿐) 시트를 통째로 갈아
     /// 내려갔다 올라오게 만든다. 스프링은 껍데기의 `MapBottomSheetMetric.settle` 이다.
-    /// DND-62 게시글 상세와 같은 방식이고, 별로면 양쪽 다 없앤다
     @ViewBuilder
     var sheetSwap: some View {
         ZStack(alignment: .bottom) {
             if store.selectedPlace == nil {
                 sheet
-                    .transition(.move(edge: .bottom))
+                    // 올라오며 나타나고, 사라질 때는 안 움직인다. 안 주면 기본값인 페이드가 붙는다
+                    .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
             }
         }
         .animation(
