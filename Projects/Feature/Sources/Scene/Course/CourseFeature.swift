@@ -50,7 +50,7 @@ public struct CourseFeature {
         public var selectedCategory: PlaceCategory?
         /// 순서가 곧 번호다. Set 을 쓰면 번호를 못 매긴다
         public var selectedPlaceIDs: [String] = []
-        public var camera: MapCamera = .ansan
+        public var camera: MapCamera = .seoulCityHall
 
         public init() {
             let today = Calendar.current.dateComponents([.year, .month, .day], from: Date())
@@ -155,6 +155,7 @@ private extension CourseFeature {
         case let .coursePlacesResponse(.success(places)):
             state.places = places
             state.loadState = .loaded
+            state.camera = Self.overview(of: state)
             return .none
 
         case let .coursePlacesResponse(.failure(error)):
@@ -457,5 +458,14 @@ private extension CourseFeature.State {
     /// 시안 b03·c10 이 `오후 1:00` 을 보인다
     static var defaultTime: DateComponents {
         DateComponents(hour: 13, minute: 0)
+    }
+}
+
+private extension CourseFeature {
+
+    /// 여러 장소를 보는 자리. 첫 행이 없으면 서울 시청이다
+    static func overview(of state: State) -> MapCamera {
+        guard let first = state.filteredPlaces.first else { return .seoulCityHall }
+        return .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
     }
 }
