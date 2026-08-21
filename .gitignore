@@ -30,5 +30,5 @@ Config/Debug.xcconfig
 Config/Release.xcconfig
 
 # Firebase (실제 값은 커밋하지 않는다. Config/GoogleService-Info-Example.plist 를 복사해서 쓴다)
-Projects/App/Resources/GoogleService-Info-Debug.plist
-Projects/App/Resources/GoogleService-Info-Release.plist
+Config/GoogleService-Info-Debug.plist
+Config/GoogleService-Info-Release.plist
