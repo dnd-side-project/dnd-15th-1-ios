@@ -24,6 +24,8 @@ jobs:
         run: |
           cp Config/Example.xcconfig Config/Debug.xcconfig
           cp Config/Example.xcconfig Config/Release.xcconfig
+          cp Config/GoogleService-Info-Example.plist Projects/App/Resources/GoogleService-Info-Debug.plist
+          cp Config/GoogleService-Info-Example.plist Projects/App/Resources/GoogleService-Info-Release.plist
 
       - name: Generate project
         run: mise exec -- tuist generate --no-open
