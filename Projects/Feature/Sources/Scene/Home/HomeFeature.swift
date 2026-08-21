@@ -13,11 +13,14 @@ public struct HomeFeature {
     /// 지난 데이트 미리보기 수
     static let pastDateCount = 3
 
-    /// 커플 연결 세 화면. 모두 `couple` 스토어 하나를 공유하고 Route 로 무엇을 그릴지만 가른다
-    public enum CoupleRoute: Hashable {
+    /// 홈에서 push 되는 화면. 커플 세 화면은 `couple` 스토어를 공유, 지난 데이트는 별도 스토어
+    public enum HomeRoute: Hashable {
         case connect
         case codeInput
         case complete
+        case pastDateCourses
+
+        var isCouple: Bool { self != .pastDateCourses }
     }
 
     @ObservableState
@@ -29,7 +32,8 @@ public struct HomeFeature {
         public var pastSchedules: [DateSchedule]
         public var savedPlaces: [SavedPlace]
         public var couple: CoupleConnectFeature.State?
-        public var couplePath: [CoupleRoute]
+        public var pastDateCourses: PastDateCoursesFeature.State?
+        public var homePath: [HomeRoute]
 
         public var isConnected: Bool {
             partnerName != nil
@@ -55,7 +59,8 @@ public struct HomeFeature {
             pastSchedules: [DateSchedule] = [],
             savedPlaces: [SavedPlace] = [],
             couple: CoupleConnectFeature.State? = nil,
-            couplePath: [CoupleRoute] = []
+            pastDateCourses: PastDateCoursesFeature.State? = nil,
+            homePath: [HomeRoute] = []
         ) {
             self.nickname = nickname
             self.partnerName = partnerName
@@ -64,7 +69,8 @@ public struct HomeFeature {
             self.pastSchedules = pastSchedules
             self.savedPlaces = savedPlaces
             self.couple = couple
-            self.couplePath = couplePath
+            self.pastDateCourses = pastDateCourses
+            self.homePath = homePath
         }
     }
 
@@ -76,9 +82,11 @@ public struct HomeFeature {
         case recommendationsLoaded([Content])
         case pastDatesLoaded([DateSchedule])
         case savedPlacesSeeAllTapped
+        case calendarTapped
         case connectFlowRequested
-        case couplePathChanged([CoupleRoute])
+        case homePathChanged([HomeRoute])
         case couple(CoupleConnectFeature.Action)
+        case pastDateCourses(PastDateCoursesFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
@@ -98,6 +106,9 @@ public struct HomeFeature {
         Reduce(core)
             .ifLet(\.couple, action: \.couple) {
                 CoupleConnectFeature()
+            }
+            .ifLet(\.pastDateCourses, action: \.pastDateCourses) {
+                PastDateCoursesFeature()
             }
     }
 
@@ -136,30 +147,56 @@ public struct HomeFeature {
             // 전체보기는 지도 탭으로 이동. 실제 탭 전환은 상위(MainTab)가 처리
             return .send(.delegate(.showAllSavedPlaces))
 
-        case .connectFlowRequested, .couplePathChanged, .couple, .delegate:
-            return coupleNavCore(state: &state, action: action)
+        case .calendarTapped, .connectFlowRequested, .homePathChanged, .couple, .pastDateCourses, .delegate:
+            return homeNavCore(state: &state, action: action)
         }
     }
 
-    private func coupleNavCore(state: inout State, action: Action) -> Effect<Action> {
+    private func homeNavCore(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case .calendarTapped:
+            // 연결됐으면 지난 데이트 화면, 아니면 커플 연결로
+            guard state.isConnected else { return .send(.connectFlowRequested) }
+            state.pastDateCourses = PastDateCoursesFeature.State()
+            state.homePath.append(.pastDateCourses)
+            return .none
+
         case .connectFlowRequested:
             // 이미 연결된 경우 커플 연결로 보내지 않는다
             guard !state.isConnected else { return .none }
             state.couple = CoupleConnectFeature.State(myNickname: state.nickname, showsSkip: false)
-            state.couplePath = [.connect]
+            state.homePath = [.connect]
             return .none
 
-        case let .couplePathChanged(path):
-            state.couplePath = path
-            // 스택이 비면 공유 스토어도 내려 다음 진입이 새 상태로 시작하게 한다
-            if path.isEmpty { state.couple = nil }
+        case let .homePathChanged(path):
+            state.homePath = path
+            // 스택에서 빠지면 각 스토어도 내려 다음 진입이 새 상태로 시작하게 한다
+            if !path.contains(.pastDateCourses) { state.pastDateCourses = nil }
+            if !path.contains(where: \.isCouple) { state.couple = nil }
             return .none
 
         case let .couple(.delegate(delegate)):
             return handleCoupleDelegate(state: &state, delegate: delegate)
 
+        case let .pastDateCourses(.delegate(delegate)):
+            return handlePastDelegate(state: &state, delegate: delegate)
+
         default:
+            return .none
+        }
+    }
+
+    private func handlePastDelegate(
+        state: inout State,
+        delegate: PastDateCoursesFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .back:
+            if !state.homePath.isEmpty { state.homePath.removeLast() }
+            state.pastDateCourses = nil
+            return .none
+        case .createCourse:
+            // 코스 만들기 화면은 아직 없음
             return .none
         }
     }
@@ -170,24 +207,24 @@ public struct HomeFeature {
     ) -> Effect<Action> {
         switch delegate {
         case .showCodeInput:
-            state.couplePath.append(.codeInput)
+            state.homePath.append(.codeInput)
             return .none
         case .showComplete:
-            state.couplePath.append(.complete)
+            state.homePath.append(.complete)
             return .none
         case .back:
-            guard !state.couplePath.isEmpty else { return .none }
-            state.couplePath.removeLast()
-            if state.couplePath.isEmpty { state.couple = nil }
+            guard !state.homePath.isEmpty else { return .none }
+            state.homePath.removeLast()
+            if state.homePath.isEmpty { state.couple = nil }
             return .none
         case .connected, .skipped:
             // 홈 진입엔 skip 이 없지만 방어적으로 같이 닫고 배너·헤더를 새로 받는다
             state.couple = nil
-            state.couplePath = []
+            state.homePath = []
             return loadHome()
         case .sessionExpired:
             state.couple = nil
-            state.couplePath = []
+            state.homePath = []
             return .send(.delegate(.sessionExpired))
         }
     }
