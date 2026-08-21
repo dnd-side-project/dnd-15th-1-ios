@@ -7,6 +7,7 @@ let project = ProjectFactory.thirdParty(
         .package(url: "https://github.com/Alamofire/Alamofire", .exact("5.12.0")),
         .package(url: "https://github.com/kakao/kakao-ios-sdk", .exact("2.28.0")),
         .package(url: "https://github.com/google/GoogleSignIn-iOS", .exact("9.2.0")),
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", .exact("12.17.0")),
     ],
     productDependencies: [
         .package(product: "Alamofire"),
@@ -14,6 +15,7 @@ let project = ProjectFactory.thirdParty(
         .package(product: "KakaoSDKAuth"),
         .package(product: "KakaoSDKUser"),
         .package(product: "GoogleSignIn"),
+        .package(product: "FirebaseMessaging"),
     ],
     product: .framework
 )
