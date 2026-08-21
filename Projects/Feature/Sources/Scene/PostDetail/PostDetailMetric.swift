@@ -1,8 +1,3 @@
-//
-//  PostDetailMetric.swift
-//  Dulpick
-//
-
 import CoreGraphics
 
 /// 시안 값 중 `Spacing` 토큰에 없는 것들

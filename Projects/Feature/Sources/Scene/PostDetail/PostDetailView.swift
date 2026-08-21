@@ -1,12 +1,8 @@
-//
-//  PostDetailView.swift
-//  Dulpick
-//
-
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
 
+/// 게시글 상세 시트. 지도 위에 얹혀 제목 · 본문 · 저장할 수 있는 곳을 보인다
 public struct PostDetailView: View {
     public let store: StoreOf<PostDetailFeature>
 

@@ -1,8 +1,3 @@
-//
-//  PostPlaceRow.swift
-//  Dulpick
-//
-
 import Domain
 import SharedDesignSystem
 import SwiftUI
