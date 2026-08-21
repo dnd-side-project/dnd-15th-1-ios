@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Domain
 import Feature
+import SharedDesignSystem
 import XCTest
 
 @MainActor
@@ -20,6 +21,18 @@ final class CourseDateInputTests: XCTestCase {
     func test_날짜입력후_다음_장소화면() async {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
+        } withDependencies: {
+            $0.courseClient.createCourse = { _, _, _ in
+                DateCourse(
+                    id: "1",
+                    title: "t",
+                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    status: .draft,
+                    version: 0,
+                    stops: [],
+                    legs: []
+                )
+            }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -35,7 +48,8 @@ final class CourseDateInputTests: XCTestCase {
             $0.showsDateError = false
         }
         await store.send(.nextTapped)
-        await store.receive(.delegate(.placePickRequested))
+        await store.receive(\.courseCreated)
+        await store.receive(.delegate(.placePickRequested(dateCourseID: "1")))
     }
 
     func test_시간없이_다음_통과() async {
@@ -43,12 +57,131 @@ final class CourseDateInputTests: XCTestCase {
         initial.date = DateComponents(year: 2030, month: 8, day: 5)
         let store = TestStore(initialState: initial) {
             CourseFeature()
+        } withDependencies: {
+            $0.courseClient.createCourse = { _, _, _ in
+                DateCourse(
+                    id: "1",
+                    title: "t",
+                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    status: .draft,
+                    version: 0,
+                    stops: [],
+                    legs: []
+                )
+            }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.nextTapped)
-        await store.receive(.delegate(.placePickRequested))
+        await store.receive(\.courseCreated)
+        await store.receive(.delegate(.placePickRequested(dateCourseID: "1")))
         XCTAssertNil(store.state.time)
+    }
+
+    func test_다음을_누르면_코스를_만들고_ID를_들고_넘어간다() async {
+        let store = TestStore(initialState: CourseFeature.State()) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.createCourse = { title, date, time in
+                XCTAssertEqual(title, "30.08.05 데이트")
+                XCTAssertEqual(date.day, 5)
+                XCTAssertEqual(time.hour, 13)
+                return DateCourse(
+                    id: "42",
+                    title: title,
+                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    status: .draft,
+                    version: 0,
+                    stops: [],
+                    legs: []
+                )
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.dateFieldTapped)
+        await store.send(.wheelDraftChanged(DateComponents(year: 2030, month: 8, day: 5)))
+        await store.send(.wheelConfirmed)
+        await store.send(.nextTapped) {
+            $0.isCreatingCourse = true
+        }
+        await store.receive(\.courseCreated) {
+            $0.isCreatingCourse = false
+            $0.dateCourseID = "42"
+            $0.version = 0
+        }
+        await store.receive(.delegate(.placePickRequested(dateCourseID: "42")))
+    }
+
+    func test_시간을_안_고르면_오후_한시를_보낸다() async {
+        let store = TestStore(initialState: CourseFeature.State()) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.createCourse = { _, _, time in
+                XCTAssertEqual(time.hour, 13)
+                XCTAssertEqual(time.minute, 0)
+                return DateCourse(
+                    id: "1",
+                    title: "t",
+                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    status: .draft,
+                    version: 0,
+                    stops: [],
+                    legs: []
+                )
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.dateFieldTapped)
+        await store.send(.wheelDraftChanged(DateComponents(year: 2030, month: 8, day: 5)))
+        await store.send(.wheelConfirmed)
+        await store.send(.nextTapped)
+        await store.receive(\.courseCreated)
+        await store.receive(.delegate(.placePickRequested(dateCourseID: "1")))
+    }
+
+    func test_코스_만들기가_실패하면_화면에_남고_토스트를_띄운다() async {
+        let store = TestStore(initialState: CourseFeature.State()) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.createCourse = { _, _, _ in throw CourseError.network }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.dateFieldTapped)
+        await store.send(.wheelDraftChanged(DateComponents(year: 2030, month: 8, day: 5)))
+        await store.send(.wheelConfirmed)
+        await store.send(.nextTapped) {
+            $0.isCreatingCourse = true
+        }
+        await store.receive(\.courseCreated) {
+            $0.isCreatingCourse = false
+            $0.toast = ToastState(message: "잠시 뒤 다시 시도해주세요")
+        }
+        XCTAssertNil(store.state.dateCourseID)
+    }
+
+    func test_코스_만들기가_인증만료면_상위로_올린다() async {
+        let store = TestStore(initialState: CourseFeature.State()) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.createCourse = { _, _, _ in throw CourseError.unauthorized }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.dateFieldTapped)
+        await store.send(.wheelDraftChanged(DateComponents(year: 2030, month: 8, day: 5)))
+        await store.send(.wheelConfirmed)
+        await store.send(.nextTapped) {
+            $0.isCreatingCourse = true
+        }
+        await store.receive(\.courseCreated) {
+            $0.isCreatingCourse = false
+        }
+        await store.receive(.delegate(.sessionExpired))
+        XCTAssertNil(store.state.toast)
+        XCTAssertNil(store.state.dateCourseID)
     }
 
     func test_시트밖탭_임시값버림() async {
@@ -72,7 +205,7 @@ final class CourseDateInputTests: XCTestCase {
 
 @MainActor
 final class CoursePlacePickTests: XCTestCase {
-    private let savedPlaces: [SavedPlace] = [
+    private let savedPlaces: [CoursePlaceCandidate] = [
         .courseFixture(id: "a", latitude: 37.31, longitude: 126.90),
         .courseFixture(id: "b", latitude: 37.32, longitude: 126.91),
         .courseFixture(id: "c", latitude: 37.33, longitude: 126.92),
@@ -164,7 +297,7 @@ final class CoursePlacePickTests: XCTestCase {
     }
 
     func test_고른장소_필터밖_물방울핀남음() async {
-        let places: [SavedPlace] = [
+        let places: [CoursePlaceCandidate] = [
             .courseFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food),
             .courseFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe),
         ]
@@ -199,6 +332,8 @@ final class CoursePlacePickTests: XCTestCase {
         initial.date = DateComponents(year: 2030, month: 8, day: 5)
         initial.time = DateComponents(hour: 13, minute: 0)
         initial.selectedPlaceIDs = ["a", "b"]
+        initial.dateCourseID = "42"
+        initial.version = 0
         let store = TestStore(initialState: initial) { CourseFeature() }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -206,6 +341,8 @@ final class CoursePlacePickTests: XCTestCase {
         await store.receive(
             .delegate(
                 .buildRequested(
+                    dateCourseID: "42",
+                    version: 0,
                     date: DateComponents(year: 2030, month: 8, day: 5),
                     time: DateComponents(hour: 13, minute: 0),
                     placeIDs: ["a", "b"]
@@ -213,23 +350,35 @@ final class CoursePlacePickTests: XCTestCase {
             )
         )
     }
+
+    func test_장소를_안_고르면_코스짜기가_나가지_않는다() async {
+        var initial = CourseFeature.State()
+        initial.places = savedPlaces
+        initial.loadState = .loaded
+        initial.date = DateComponents(year: 2030, month: 8, day: 5)
+        initial.dateCourseID = "42"
+        initial.version = 0
+        let store = TestStore(initialState: initial) { CourseFeature() }
+
+        await store.send(.buildTapped)
+    }
 }
 
 @MainActor
 final class CourseLoadTests: XCTestCase {
 
     func test_onAppear_저장장소_상태반영() async {
-        let places: [SavedPlace] = [.courseFixture(id: "a", latitude: 37.31, longitude: 126.90)]
+        let places: [CoursePlaceCandidate] = [.courseFixture(id: "a", latitude: 37.31, longitude: 126.90)]
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
-            $0.placeClient.savedPlaces = { places }
+            $0.courseClient.coursePlaces = { places }
             $0.coupleClient.current = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.onAppear)
-        await store.receive(\.savedPlacesResponse) {
+        await store.receive(\.coursePlacesResponse) {
             $0.places = places
             $0.loadState = .loaded
         }
@@ -237,12 +386,12 @@ final class CourseLoadTests: XCTestCase {
 
     func test_로드실패_재시도() async {
         let shouldFail = LockIsolated(true)
-        let places: [SavedPlace] = [.courseFixture(id: "a", latitude: 37.31, longitude: 126.90)]
+        let places: [CoursePlaceCandidate] = [.courseFixture(id: "a", latitude: 37.31, longitude: 126.90)]
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
-            $0.placeClient.savedPlaces = {
-                if shouldFail.value { throw PlaceError.network }
+            $0.courseClient.coursePlaces = {
+                if shouldFail.value { throw CourseError.network }
                 return places
             }
             $0.coupleClient.current = { nil }
@@ -250,7 +399,7 @@ final class CourseLoadTests: XCTestCase {
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.onAppear)
-        await store.receive(\.savedPlacesResponse) {
+        await store.receive(\.coursePlacesResponse) {
             $0.loadState = .failed
         }
 
@@ -258,7 +407,7 @@ final class CourseLoadTests: XCTestCase {
         await store.send(.retryTapped) {
             $0.loadState = .loading
         }
-        await store.receive(\.savedPlacesResponse) {
+        await store.receive(\.coursePlacesResponse) {
             $0.places = places
             $0.loadState = .loaded
         }
@@ -274,7 +423,7 @@ final class CourseLoadTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
-            $0.placeClient.savedPlaces = { [] }
+            $0.courseClient.coursePlaces = { [] }
             $0.coupleClient.current = { status }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
@@ -292,7 +441,7 @@ final class CourseLoadTests: XCTestCase {
         let store = TestStore(initialState: initial) {
             CourseFeature()
         } withDependencies: {
-            $0.placeClient.savedPlaces = { [] }
+            $0.courseClient.coursePlaces = { [] }
             $0.coupleClient.current = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
@@ -309,7 +458,7 @@ final class CourseLoadTests: XCTestCase {
 final class CourseFilterTests: XCTestCase {
 
     func test_필터변경_목록반영() async {
-        let places: [SavedPlace] = [
+        let places: [CoursePlaceCandidate] = [
             .courseFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food),
             .courseFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe),
         ]
@@ -329,7 +478,7 @@ final class CourseFilterTests: XCTestCase {
     }
 
     func test_저장자필터_카테고리와_겹친다() async {
-        let places: [SavedPlace] = [
+        let places: [CoursePlaceCandidate] = [
             .courseFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food, ownership: .mine),
             .courseFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe, ownership: .partner),
             .courseFixture(id: "c", latitude: 37.33, longitude: 126.92, category: .food, ownership: .together),
@@ -355,30 +504,23 @@ final class CourseFilterTests: XCTestCase {
 
 // MARK: - Fixture
 
-private extension SavedPlace {
+private extension CoursePlaceCandidate {
     static func courseFixture(
         id: String,
         latitude: Double,
         longitude: Double,
         category: PlaceCategory = .food,
         ownership: PlaceOwnership = .together
-    ) -> SavedPlace {
-        SavedPlace(
-            place: Place(
-                id: id,
-                kakaoPlaceID: nil,
-                name: "장소명",
-                category: category,
-                address: "경기도 안산시 모모로 145길",
-                roadAddress: "경기도 안산시 모모로 145길",
-                coordinate: Coordinate(latitude: latitude, longitude: longitude),
-                bookmarkCount: 0,
-                thumbnailURLs: []
-            ),
+    ) -> CoursePlaceCandidate {
+        CoursePlaceCandidate(
+            id: id,
+            name: "장소명",
+            address: "경기도 안산시 모모로 145길",
+            category: category,
+            coordinate: Coordinate(latitude: latitude, longitude: longitude),
             ownership: ownership,
             alias: nil,
-            memo: nil,
-            savedAt: nil
+            thumbnailURLs: []
         )
     }
 }

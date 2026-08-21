@@ -43,6 +43,7 @@ public struct CourseDateView: View {
                     backButton
                 }
             }
+            .toast(item: toastBinding)
             .task { store.send(.onAppear) }
     }
 }
@@ -73,6 +74,7 @@ private extension CourseDateView {
                 AppButton("다음", style: .dark, size: .xl, fullWidth: true) {
                     store.send(.nextTapped)
                 }
+                .disabled(store.isCreatingCourse)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -163,6 +165,17 @@ private extension CourseDateView {
         Binding(
             get: { store.draftTime },
             set: { store.send(.wheelDraftChanged($0)) }
+        )
+    }
+
+    var toastBinding: Binding<ToastState?> {
+        Binding(
+            get: { store.toast },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.toastDismissed)
+                }
+            }
         )
     }
 }
