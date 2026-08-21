@@ -60,15 +60,16 @@ enum SheetDragOwner: Hashable, Sendable {
 /// 시트가 손짓을 받는 방식. 시트마다 하나를 고른다.
 ///
 /// 분해 문서 `2026-08-13-map-course-ui-split.md:194-200` 의 표가 SSOT 다.
+/// 표의 A 는 `followsContent`, B 는 `grabberOnly` 다.
 enum SheetGestureKind: Hashable, Sendable {
 
     /// 접힘에서 목록을 쓸면 시트가 먼저 오른다. 저장한 장소 · 장소 상세 · 게시글 상세 · 검색 결과가 쓴다
-    case a // swiftlint:disable:this identifier_name
+    case followsContent
 
     /// 접힘에서는 목록만 스크롤되고 시트는 손잡이로만 움직인다.
     /// 펼침에서는 목록 맨 위를 아래로 끌면 시트가 내려간다. 목록이 더 갈 곳이 없어서다.
     /// 코스 화면 둘이 쓴다
-    case b // swiftlint:disable:this identifier_name
+    case grabberOnly
 }
 
 // MARK: - SheetLayout
@@ -151,9 +152,9 @@ struct SheetLayout: Equatable {
 
     /// 세로 손짓을 시트가 받을지 본문 스크롤에 넘길지 정한다.
     ///
-    /// 종류 A 는 접힘에서 본문이 안 스크롤되므로 시트가 늘 받는다.
+    /// `followsContent` 는 접힘에서 본문이 안 스크롤되므로 시트가 늘 받는다.
     /// 펼침에서는 본문이 맨 위이고 아래로 끄는 손짓만 시트가 받는다.
-    /// 종류 B 는 접힘에서 손잡이 밖 손짓을 안 받는다. 펼침에서는 종류 A 와 같다.
+    /// `grabberOnly` 는 접힘에서 손잡이 밖 손짓을 안 받는다. 펼침에서는 `followsContent` 와 같다.
     /// 손잡이 판정은 `dragOwner` 가 먼저 한다.
     ///
     /// - Parameter translationY: 아래로 끌면 양수다
@@ -164,16 +165,16 @@ struct SheetLayout: Equatable {
         translationY: CGFloat
     ) -> Bool {
         switch kind {
-        case .a:
+        case .followsContent:
             guard detent == .expanded else { return true }
             return isContentAtTop && translationY > 0
-        case .b:
+        case .grabberOnly:
             guard detent == .expanded else { return false }
             return isContentAtTop && translationY > 0
         }
     }
 
-    /// 본문 스크롤을 열어둘지. 종류 B 는 접힘에서도 연다.
+    /// 본문 스크롤을 열어둘지. `grabberOnly` 는 접힘에서도 연다.
     ///
     /// 시트가 손짓을 들고 있는 동안에는 종류와 무관하게 잠근다.
     /// 안 잠그면 시트가 오르내릴 때 목록도 같이 스크롤된다
@@ -184,9 +185,9 @@ struct SheetLayout: Equatable {
     ) -> Bool {
         guard !isDraggingSheet else { return false }
         switch kind {
-        case .a:
+        case .followsContent:
             return detent == .expanded
-        case .b:
+        case .grabberOnly:
             return true
         }
     }
@@ -202,7 +203,7 @@ struct SheetLayout: Equatable {
     /// - Parameters:
     ///   - translation: 손짓의 누적 이동량. 아래로 끌면 `height` 가 양수다
     ///   - startedInOpenMenu: 손짓 시작점이 열린 드롭다운 안이었는지
-    ///   - startedInGrabber: 손짓 시작점이 손잡이 안이었는지. 종류 B 가 시트를 움직이는 유일한 길이다
+    ///   - startedInGrabber: 손짓 시작점이 손잡이 안이었는지. `grabberOnly` 가 시트를 움직이는 유일한 길이다
     static func dragOwner( // swiftlint:disable:this function_parameter_count
         kind: SheetGestureKind,
         detent: SheetDetent,

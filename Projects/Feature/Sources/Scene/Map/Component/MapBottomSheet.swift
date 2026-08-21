@@ -138,7 +138,7 @@ extension MapBottomSheet {
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
-        gestureKind: SheetGestureKind = .a,
+        gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
         @ViewBuilder above: () -> Above,
         @ViewBuilder header: () -> Header,
@@ -163,7 +163,7 @@ extension MapBottomSheet where Above == EmptyView {
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
-        gestureKind: SheetGestureKind = .a,
+        gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
@@ -189,7 +189,7 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
-        gestureKind: SheetGestureKind = .a,
+        gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
@@ -214,7 +214,7 @@ extension MapBottomSheet where Header == EmptyView {
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
-        gestureKind: SheetGestureKind = .a,
+        gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
         @ViewBuilder above: () -> Above,
         @ViewBuilder content: () -> Content
@@ -318,7 +318,7 @@ private extension MapBottomSheet {
 
     /// 손짓 종류에 따라 스크롤이 열리는 본문.
     ///
-    /// 종류 A 는 접힘에서 스크롤을 열어두면 목록을 쓸 때 시트가 안 펼쳐진다.
+    /// `followsContent` 는 접힘에서 스크롤을 열어두면 목록을 쓸 때 시트가 안 펼쳐진다.
     /// 맨 위인지는 손짓을 시트와 스크롤 중 어디로 보낼지 가르는 근거라 매번 받아둔다
     func scrollingContent(layout: SheetLayout) -> some View {
         ScrollView {

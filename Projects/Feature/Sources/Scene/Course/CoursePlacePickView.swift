@@ -96,9 +96,8 @@ private extension CoursePlacePickView {
             openMenuFrames: [ownershipMenuFrame, categoryMenuFrame].compactMap { $0 },
             // 끌기 시작하면 열린 메뉴를 닫는다. 열어둔 채 끌면 메뉴가 시트를 따라다녀 어색하다
             onDragBegan: { openFilterMenu = nil },
-            // 손잡이로만 오르내린다. 접힘에서도 목록이 스크롤된다 (분해 문서 `:194-200`)
-            gestureKind: .b,
-            onCollapsedTopChange: { collapsedSheetTop = $0 },
+            gestureKind: .grabberOnly,
+            onCollapsedTopChange: { collapsedSheetTop = $0 }
         ) {
             EmptyView()
         } header: {

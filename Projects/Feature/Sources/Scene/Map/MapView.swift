@@ -215,8 +215,8 @@ private extension MapView {
                 openFilterMenu = nil
                 store.send(.rowMenuDismissed)
             },
-            gestureKind: .a,
-            onCollapsedTopChange: { collapsedSheetTop = $0 },
+            gestureKind: .followsContent,
+            onCollapsedTopChange: { collapsedSheetTop = $0 }
         ) {
             floatingControls
         } header: {
