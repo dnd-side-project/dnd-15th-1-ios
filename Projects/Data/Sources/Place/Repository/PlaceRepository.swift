@@ -32,4 +32,22 @@ public struct PlaceRepository: Sendable {
             throw PlaceErrorMapper.map(error)
         }
     }
+
+    public func save(kakaoPlaceID: String, query: String, alias: String?) async throws -> SavedPlace {
+        do {
+            return PlaceDTOMapper.toDomain(
+                try await remote.save(kakaoPlaceID: kakaoPlaceID, query: query, alias: alias)
+            )
+        } catch {
+            throw PlaceErrorMapper.map(error)
+        }
+    }
+
+    public func remove(placeID: String) async throws {
+        do {
+            try await remote.remove(placeID: placeID)
+        } catch {
+            throw PlaceErrorMapper.map(error)
+        }
+    }
 }

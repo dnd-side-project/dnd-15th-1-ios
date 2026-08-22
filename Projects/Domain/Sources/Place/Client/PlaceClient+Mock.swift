@@ -26,7 +26,8 @@ public extension PlaceClient {
                 memo: memo,
                 savedAt: Date(timeIntervalSince1970: 1_786_000_000)
             )
-        }
+        },
+        removePlace: { _ in }
     )
 }
 
