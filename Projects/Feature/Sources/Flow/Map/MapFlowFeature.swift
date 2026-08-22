@@ -151,8 +151,11 @@ public struct MapFlowFeature {
             state.map.camera = .focusing(place.coordinate, zoomLevel: state.map.camera.zoomLevel)
             return .none
         case .showAllSaved:
-            // 걸려 있던 필터를 푸는 일은 지도가 한다. 카메라 계산이 그쪽에 있다
-            return .send(.map(.filtersReset))
+            // 어떤 모드에서 불려도 전체 저장 상태가 되도록 저장 목록 모드로 되돌린 뒤 필터를 푼다
+            return .merge(
+                .send(.map(.searchClearTapped)),
+                .send(.map(.filtersReset))
+            )
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
         case let .course(.delegate(delegate)):
