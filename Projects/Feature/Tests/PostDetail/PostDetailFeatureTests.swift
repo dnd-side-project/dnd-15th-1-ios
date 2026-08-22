@@ -53,6 +53,7 @@ final class PostDetailFeatureTests: XCTestCase {
             $0.savedPlaceIDs = ["101"]
             $0.isLoading = false
         }
+        await sut.receive(\.delegate.detailLoaded)
     }
 
     func test_인증만료면_상위로_올린다() async {
@@ -95,6 +96,7 @@ final class PostDetailFeatureTests: XCTestCase {
             $0.savedPlaceIDs = ["101"]
             $0.isLoading = false
         }
+        await sut.receive(\.delegate.detailLoaded)
     }
 
     func test_더보기가_본문만_펼친다() async {
@@ -155,6 +157,7 @@ final class PostDetailFeatureTests: XCTestCase {
             $0.savedPlaceIDs = ["101"]
             $0.isLoading = false
         }
+        await sut.receive(\.delegate.detailLoaded)
     }
 
     func test_이미_값이_있으면_onAppear가_아무일도_안한다() async {

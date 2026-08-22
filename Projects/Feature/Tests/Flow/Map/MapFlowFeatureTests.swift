@@ -257,6 +257,7 @@ final class MapFlowPostDetailTests: XCTestCase {
             $0.postDetail?.savedPlaceIDs = ["101", "103"]
             $0.postDetail?.isLoading = false
         }
+        await store.receive(\.postDetail.presented.delegate.detailLoaded)
         XCTAssertNotNil(store.state.detail)
         XCTAssertNotNil(store.state.postDetail)
     }
@@ -313,8 +314,10 @@ final class MapFlowPostDetailTests: XCTestCase {
             caption: "본문",
             canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
             places: [
-                PostDetailPlace(id: "101", name: "가게 하나", category: .cafe, isSaved: true),
-                PostDetailPlace(id: "102", name: "가게 둘", category: .food, isSaved: false),
+                PostDetailPlace(id: "101", name: "가게 하나", category: .cafe, isSaved: true,
+                                coordinate: Coordinate(latitude: 37.5, longitude: 127.0)),
+                PostDetailPlace(id: "102", name: "가게 둘", category: .food, isSaved: false,
+                                coordinate: Coordinate(latitude: 37.6, longitude: 127.1)),
             ]
         )
         var state = MapFlowFeature.State()
@@ -333,6 +336,7 @@ final class MapFlowPostDetailTests: XCTestCase {
             $0.postDetail?.savedPlaceIDs = ["101"]
             $0.postDetail?.isLoading = false
         }
+        await store.receive(\.postDetail.presented.delegate.detailLoaded)
     }
 }
 
