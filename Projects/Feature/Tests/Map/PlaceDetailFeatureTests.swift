@@ -64,6 +64,9 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.bookmarkCount = 124
         }
         await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkSaved) {
+            $0.savedServerID = SavedPlace.mocks[0].place.id
+        }
     }
 
     func test_카운트는_0_아래로_내려가지_않는다() async {

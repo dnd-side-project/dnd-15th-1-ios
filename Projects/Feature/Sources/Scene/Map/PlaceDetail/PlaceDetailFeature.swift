@@ -25,6 +25,9 @@ public struct PlaceDetailFeature {
         /// 시안의 `저장한 사람 N`. 서버에 이 값을 바꾸는 길이 없어 화면 안에서만 오르내린다
         public var bookmarkCount: Int
 
+        /// 저장 응답이 준 서버 placeId. 검색 장소는 place.id 가 kakaoId 라 삭제 경로엔 이걸 쓴다
+        public var savedServerID: String?
+
         public var isAddressExpanded = false
 
         public var visibleContentCount = PlaceDetailFeature.contentPageSize
@@ -56,6 +59,7 @@ public struct PlaceDetailFeature {
 
     public enum Action: Equatable {
         case bookmarkTapped
+        case bookmarkSaved(serverID: String)
         case bookmarkFailed(wasBookmarked: Bool)
         case addressToggled
         case mapButtonTapped
@@ -91,6 +95,10 @@ public struct PlaceDetailFeature {
         switch action {
         case .bookmarkTapped:
             return toggleBookmark(state: &state)
+
+        case let .bookmarkSaved(serverID):
+            state.savedServerID = serverID
+            return .none
 
         case let .bookmarkFailed(wasBookmarked):
             // 서버 실패 → 표시를 되돌리고 지도에도 원래 값을 알린다
@@ -131,17 +139,19 @@ public struct PlaceDetailFeature {
         state.bookmarkCount = max(0, state.bookmarkCount + (state.isBookmarked ? 1 : -1))
         return .merge(
             .send(.delegate(.bookmarkToggled(state.id, state.isBookmarked))),
-            runBookmark(place: state.place, wasBookmarked: wasBookmarked)
+            runBookmark(place: state.place, serverID: state.savedServerID, wasBookmarked: wasBookmarked)
         )
     }
 
-    private func runBookmark(place: Place, wasBookmarked: Bool) -> Effect<Action> {
+    private func runBookmark(place: Place, serverID: String?, wasBookmarked: Bool) -> Effect<Action> {
         .run { [placeClient] send in
             do {
                 if wasBookmarked {
-                    try await placeClient.removePlace(place.id)
+                    // 삭제엔 서버 placeId 를 쓴다. 검색 장소는 place.id 가 kakaoId 일 수 있다
+                    try await placeClient.removePlace(serverID ?? place.id)
                 } else if let kakaoID = place.kakaoPlaceID {
-                    _ = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
+                    let saved = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
+                    await send(.bookmarkSaved(serverID: saved.place.id))
                 }
             } catch {
                 await send(.bookmarkFailed(wasBookmarked: wasBookmarked))
