@@ -118,6 +118,8 @@ public struct MapFlowFeature {
             // 상세는 시트가 스스로 불러온다. 로드되면 그 places 로 핀을 세운다
             state.showsContentPins = true
             state.postDetail = PostDetailFeature.State(contentID: id)
+            // 상세가 뜨는 즉시 저장 시트·코스 버튼을 감추도록 핀 모드로 들어간다. 핀은 로드 후 채운다
+            state.map.mode = .content(places: [])
             return .send(.postDetail(.presented(.onAppear)))
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
@@ -287,9 +289,22 @@ private extension MapFlowFeature {
                 presentDetail(state: &state, place: place)
             }
         case .content:
-            // 게시글 핀 모드에선 상세 시트가 이미 떠 있어 핀 탭으로 다른 상세를 열지 않는다
-            break
+            // 게시글 핀을 누르면 그 장소 상세를 게시글 상세 위에 얹는다
+            if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
+                presentContentPlaceDetail(state: &state, place: place)
+            }
         }
+    }
+
+    /// 게시글 핀을 눌러 장소 상세를 연다. 게시글 상세는 남겨 둬 상세를 닫으면 그 자리로 돌아간다
+    func presentContentPlaceDetail(state: inout State, place: Place) {
+        var detail = PlaceDetailFeature.State(place: place)
+        detail.isBookmarked = state.map.bookmarkedPlaceIDs.contains(place.id)
+        state.detail = detail
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: place.id,
+            coordinate: place.coordinate
+        )
     }
 
     func presentDetail(state: inout State, savedPlace: SavedPlace) {

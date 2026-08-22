@@ -98,7 +98,7 @@ private extension MapView {
     @ViewBuilder
     var sheetSwap: some View {
         ZStack(alignment: .bottom) {
-            if store.selectedPlace == nil {
+            if store.showsSavedSheet {
                 sheet
                     // 올라오며 나타나고, 사라질 때는 안 움직인다. 안 주면 기본값인 페이드가 붙는다
                     .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
@@ -106,7 +106,7 @@ private extension MapView {
         }
         .animation(
             MapBottomSheetMetric.settle,
-            value: store.selectedPlace == nil
+            value: store.showsSavedSheet
         )
     }
 

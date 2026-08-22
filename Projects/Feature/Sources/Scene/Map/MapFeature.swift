@@ -492,6 +492,13 @@ public extension MapFeature.State {
         return false
     }
 
+    /// 저장 시트·코스 버튼 표시 여부.
+    /// 장소를 고르면(상세) 감추고, 게시글 핀 모드에선 상세가 덮으므로 통째로 감춘다
+    var showsSavedSheet: Bool {
+        if case .content = mode { return false }
+        return selectedPlace == nil
+    }
+
     var searchQuery: String? {
         if case let .searchResult(query, _) = mode { return query }
         return nil
@@ -499,6 +506,12 @@ public extension MapFeature.State {
 
     var searchResults: [Place] {
         if case let .searchResult(_, places) = mode { return places }
+        return []
+    }
+
+    /// 게시글 핀 모드에서 지도에 얹힌 장소들. 핀 탭으로 상세를 열 때 여기서 찾는다
+    var contentPlaces: [Place] {
+        if case let .content(places) = mode { return places }
         return []
     }
 
@@ -518,6 +531,9 @@ private extension MapFeature {
     /// 검색 결과와 저장 목록 어느 쪽에서든 그 id 의 좌표를 찾는다
     static func coordinate(of id: String, in state: State) -> Coordinate? {
         if let place = state.searchResults.first(where: { $0.id == id }) {
+            return place.coordinate
+        }
+        if let place = state.contentPlaces.first(where: { $0.id == id }) {
             return place.coordinate
         }
         return state.places.first { $0.id == id }?.place.coordinate
