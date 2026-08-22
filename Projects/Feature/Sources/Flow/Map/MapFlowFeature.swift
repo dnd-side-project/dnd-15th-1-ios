@@ -61,6 +61,8 @@ public struct MapFlowFeature {
         case pathChanged([Route])
         /// 다른 탭에서 고른 게시글 상세를 지도 위에 연다
         case presentContentDetail(String)
+        /// 홈에서 고른 저장 장소 상세를 지도 위에 연다
+        case presentPlaceDetail(SavedPlace)
         case map(MapFeature.Action)
         case course(CourseFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
@@ -121,6 +123,18 @@ public struct MapFlowFeature {
             // 상세가 뜨는 즉시 저장 시트·코스 버튼을 감추도록 핀 모드로 들어간다. 핀은 로드 후 채운다
             state.map.mode = .content(places: [])
             return .send(.postDetail(.presented(.onAppear)))
+        case let .presentPlaceDetail(savedPlace):
+            // 저장 장소라 북마크는 켜 둔다. 상세를 닫아도 지도 탭에 머무른다
+            state.detail = PlaceDetailFeature.State(savedPlace: savedPlace)
+            state.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: savedPlace.id,
+                coordinate: savedPlace.place.coordinate
+            )
+            state.map.camera = .focusing(
+                savedPlace.place.coordinate,
+                zoomLevel: state.map.camera.zoomLevel
+            )
+            return .none
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
         case let .course(.delegate(delegate)):

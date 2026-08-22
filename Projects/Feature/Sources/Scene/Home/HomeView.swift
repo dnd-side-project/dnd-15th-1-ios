@@ -223,7 +223,12 @@ public struct HomeView: View {
         } else {
             VStack(spacing: 8) {
                 ForEach(store.visibleSavedPlaces) { place in
-                    SavedPlaceRow(place: place)
+                    Button {
+                        store.send(.savedPlaceTapped(place.id))
+                    } label: {
+                        SavedPlaceRow(place: place)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 20)

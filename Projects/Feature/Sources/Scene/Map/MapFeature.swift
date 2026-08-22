@@ -179,8 +179,8 @@ public struct MapFeature {
             state.places = places
             state.bookmarkedPlaceIDs = Set(places.map(\.id))
             state.loadState = .loaded
-            // 게시글 핀을 보고 있을 땐 저장 목록 로딩이 카메라를 뺏지 않게 한다
-            if case .saved = state.mode {
+            // 게시글 핀·선택 장소를 보고 있을 땐 저장 목록 로딩이 카메라를 뺏지 않게 한다
+            if case .saved = state.mode, state.selectedPlace == nil {
                 state.camera = Self.overview(of: state)
             }
             return .none

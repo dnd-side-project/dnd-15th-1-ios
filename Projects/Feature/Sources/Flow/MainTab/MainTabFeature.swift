@@ -1,3 +1,4 @@
+import Domain
 import Foundation
 import ThirdParty
 
@@ -111,6 +112,10 @@ public struct MainTabFeature {
             return .none
         case let .showContentDetail(id):
             return presentContentDetail(state: &state, id: id)
+        case let .showPlaceDetail(place):
+            // 장소 상세는 지도 탭에서 연다. 닫아도 지도 탭에 머무른다(전체보기와 동일)
+            state.selectedTab = .map
+            return .send(.map(.presentPlaceDetail(place)))
         }
     }
 
