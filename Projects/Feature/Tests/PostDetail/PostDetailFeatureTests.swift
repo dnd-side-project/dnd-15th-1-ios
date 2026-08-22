@@ -134,23 +134,6 @@ final class PostDetailFeatureTests: XCTestCase {
         await sut.receive(\.delegate.closeRequested)
     }
 
-    func test_인스타는_링크가_있을_때만_올린다() async throws {
-        var state = PostDetailFeature.State(contentID: "1")
-        state.detail = detail
-        let sut = store(state: state)
-        let instagramURL = try XCTUnwrap(detail.canonicalURL)
-
-        await sut.send(.instagramTapped)
-        await sut.receive(.delegate(.instagramRequested(instagramURL)))
-
-        var noLink = PostDetailFeature.State(contentID: "1")
-        noLink.detail = PostDetailContent(
-            id: "1", title: nil, caption: nil, canonicalURL: nil, places: []
-        )
-        let quiet = store(state: noLink)
-        await quiet.send(.instagramTapped)
-    }
-
     func test_부르는중에_온_두번째_onAppear는_아무일도_안한다() async {
         let loaded = detail
         let gate = AsyncStream.makeStream(of: Void.self)

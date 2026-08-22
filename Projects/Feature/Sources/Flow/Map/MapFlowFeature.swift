@@ -262,9 +262,8 @@ private extension MapFlowFeature {
         case .postDetail(.presented(.delegate(.sessionExpired))):
             return .send(.delegate(.sessionExpired))
 
-        case .postDetail(.presented(.delegate(.placeSelected))),
-             .postDetail(.presented(.delegate(.instagramRequested))):
-            // 장소 상세로 가는 길은 이 Cycle 밖이다. 인스타 외부 전환도 밖이다
+        case .postDetail(.presented(.delegate(.placeSelected))):
+            // 장소 상세로 가는 길은 이 Cycle 밖이다
             return .none
 
         case .detail, .alias, .postDetail:

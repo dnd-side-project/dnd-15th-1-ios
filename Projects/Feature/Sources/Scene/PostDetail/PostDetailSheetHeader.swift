@@ -6,6 +6,7 @@ import ThirdParty
 /// 게시글 상세 시트의 머리. 제목 · 닫기 · 인스타 버튼
 struct PostDetailSheetHeader: View {
     let store: StoreOf<PostDetailFeature>
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
@@ -57,7 +58,9 @@ struct PostDetailSheetHeader: View {
 
     private var instagramButton: some View {
         Button {
-            store.send(.instagramTapped)
+            if let url = store.detail?.canonicalURL {
+                openURL(url)
+            }
         } label: {
             HStack(spacing: PostDetailMetric.instagramIconGap) {
                 Image.insta
