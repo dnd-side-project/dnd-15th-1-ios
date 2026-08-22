@@ -79,7 +79,7 @@ public struct SearchFeature {
     @Dependency(\.recentSearchClient) var recentSearchClient
     @Dependency(\.continuousClock) var clock
 
-    private enum CancelID { case search, loadMore }
+    private enum CancelID { case debounce, request, loadMore }
 
     public init() {}
 
@@ -217,19 +217,24 @@ public struct SearchFeature {
         state.contentsHasNext = true
         state.placesPage = 0
         state.placesHasNext = true
-        return .run { [exploreClient] send in
-            async let contents = exploreClient.searchContents(query, .popular, 0, Self.pageSize)
-            async let places = exploreClient.searchPlaces(query, 0, Self.pageSize)
-            // 로딩 → 결과/빈상태 전환을 페이드로 부드럽게 한다
-            await send(
-                .searchResponse(try await contents, try await places),
-                animation: .easeInOut(duration: 0.2)
-            )
-        } catch: { error, send in
-            // 취소는 실패로 보지 않는다
-            if error is CancellationError { return }
-            await send(.searchFailed, animation: .easeInOut(duration: 0.2))
-        }
+        // 새 검색이 시작되면 진행 중인 이전 검색·더보기 응답이 이 결과를 덮지 않게 취소한다
+        return .merge(
+            .cancel(id: CancelID.loadMore),
+            .run { [exploreClient] send in
+                async let contents = exploreClient.searchContents(query, .popular, 0, Self.pageSize)
+                async let places = exploreClient.searchPlaces(query, 0, Self.pageSize)
+                // 로딩 → 결과/빈상태 전환을 페이드로 부드럽게 한다
+                await send(
+                    .searchResponse(try await contents, try await places),
+                    animation: .easeInOut(duration: 0.2)
+                )
+            } catch: { error, send in
+                // 취소는 실패로 보지 않는다
+                if error is CancellationError { return }
+                await send(.searchFailed, animation: .easeInOut(duration: 0.2))
+            }
+            .cancellable(id: CancelID.request, cancelInFlight: true)
+        )
     }
 
     // 게시글 탭 스크롤 끝에서 다음 페이지를 append. 로딩 중·마지막·빈 검색어면 무시
@@ -279,6 +284,6 @@ public struct SearchFeature {
             try await clock.sleep(for: .milliseconds(300))
             await send(.queryChangeDebounced)
         }
-        .cancellable(id: CancelID.search, cancelInFlight: true)
+        .cancellable(id: CancelID.debounce, cancelInFlight: true)
     }
 }

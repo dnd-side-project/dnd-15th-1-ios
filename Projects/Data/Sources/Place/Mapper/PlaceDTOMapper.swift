@@ -26,10 +26,11 @@ enum PlaceDTOMapper {
         )
     }
 
-    // placeId 는 미저장 장소라 null → kakaoPlaceId 를 식별자로 쓴다
+    // placeId 는 미저장 장소라 null → kakaoPlaceId 를 식별자로 쓴다.
+    // 둘 다 없어도 매핑마다 달라지지 않게 좌표·이름으로 결정적 식별자를 만든다
     private static func toPlace(_ dto: PlaceSearchItemDTO) -> Place {
         Place(
-            id: dto.placeId.map(String.init) ?? dto.kakaoPlaceId ?? UUID().uuidString,
+            id: dto.placeId.map(String.init) ?? dto.kakaoPlaceId ?? "\(dto.name)|\(dto.latitude)|\(dto.longitude)",
             kakaoPlaceID: dto.kakaoPlaceId,
             name: dto.name,
             category: category(dto.categoryName),

@@ -30,7 +30,11 @@ public struct PastDateCoursesView: View {
 
     @ViewBuilder
     private var content: some View {
-        if store.hasLoaded, store.courses.isEmpty {
+        if !store.hasLoaded {
+            // 로딩 중엔 "총 0번" 이 번쩍이지 않게 로딩만 보여준다
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if store.courses.isEmpty {
             emptyState
         } else {
             listContent
