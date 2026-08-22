@@ -39,10 +39,14 @@ enum ContentDTOMapper {
     private static func toDetailPlace(_ dto: ContentDetailPlaceResponseDTO) -> PostDetailPlace {
         PostDetailPlace(
             id: String(dto.placeId),
+            kakaoPlaceID: dto.kakaoPlaceId,
             name: dto.name,
             category: category(dto.categoryName),
             isSaved: dto.savedByMe,
-            coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude)
+            address: dto.address,
+            roadAddress: dto.roadAddress,
+            coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
+            imageURLs: (dto.imageUrls ?? []).compactMap(URL.init(string:))
         )
     }
 

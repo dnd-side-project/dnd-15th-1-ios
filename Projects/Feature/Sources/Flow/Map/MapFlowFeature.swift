@@ -337,18 +337,18 @@ private extension MapFlowFeature {
         state.map.selectedPlace = nil
     }
 
-    /// 게시글 장소를 지도 핀용 Place 로 바꾼다. 핀엔 좌표·카테고리만 필요해 나머지는 비운다
+    /// 게시글 장소를 지도 핀·장소 상세용 Place 로 바꾼다. 저장수는 응답에 없어 0 으로 둔다
     func place(_ detailPlace: PostDetailPlace) -> Place {
         Place(
             id: detailPlace.id,
-            kakaoPlaceID: nil,
+            kakaoPlaceID: detailPlace.kakaoPlaceID,
             name: detailPlace.name,
             category: detailPlace.category,
-            address: "",
-            roadAddress: "",
+            address: detailPlace.address,
+            roadAddress: detailPlace.roadAddress,
             coordinate: detailPlace.coordinate,
             bookmarkCount: 0,
-            thumbnailURLs: []
+            thumbnailURLs: detailPlace.imageURLs
         )
     }
 }
