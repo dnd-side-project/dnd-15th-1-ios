@@ -15,6 +15,10 @@ struct DulpickMapView: UIViewRepresentable {
     var userLocation: Coordinate?
     var onMarkerTap: (String) -> Void = { _ in }
     var onMapTap: () -> Void = {}
+    /// 접힘 시트 윗면의 화면 전체(global) 좌표 y.
+    /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 `focusRatio` 지점에 놓는다.
+    /// `0` 이면 화면 한가운데에 그대로 둔다
+    var collapsedSheetTop: CGFloat = 0
 
     func makeCoordinator() -> Coordinator {
         Coordinator(camera: camera)
@@ -37,7 +41,8 @@ struct DulpickMapView: UIViewRepresentable {
             camera: camera,
             markers: markers,
             routes: routes,
-            userLocation: userLocation
+            userLocation: userLocation,
+            collapsedSheetTop: collapsedSheetTop
         )
     }
 
@@ -68,11 +73,13 @@ extension DulpickMapView {
         private var desiredMarkers: [MapMarker] = []
         private var desiredRoutes: [MapRoute] = []
         private var desiredUserLocation: Coordinate?
+        private var desiredCollapsedSheetTop: CGFloat = 0
 
         private var appliedCamera: MapCamera?
         private var appliedMarkers: [MapMarker]?
         private var appliedRoutes: [MapRoute]?
         private var appliedUserLocation: Coordinate?
+        private var appliedCollapsedSheetTop: CGFloat = 0
 
         private var registeredPoiStyleIDs: Set<String> = []
 
@@ -90,6 +97,8 @@ extension DulpickMapView {
             self.container = container
             let controller = KMController(viewContainer: container)
             controller.delegate = self
+            // 120Hz 기기에서 지도가 60Hz 로 묶이는 것을 푼다. SDK 기본값이 false 다
+            controller.proMotionSupport = true
             self.controller = controller
             controller.prepareEngine()
             controller.activateEngine()
@@ -116,12 +125,14 @@ extension DulpickMapView {
             camera: MapCamera,
             markers: [MapMarker],
             routes: [MapRoute],
-            userLocation: Coordinate?
+            userLocation: Coordinate?,
+            collapsedSheetTop: CGFloat
         ) {
             desiredCamera = camera
             desiredMarkers = markers
             desiredRoutes = routes
             desiredUserLocation = userLocation
+            desiredCollapsedSheetTop = collapsedSheetTop
             render()
         }
 
@@ -132,9 +143,10 @@ extension DulpickMapView {
         private func render() {
             guard isMapReady, let map = mapView else { return }
 
-            if desiredCamera != appliedCamera {
+            if desiredCamera != appliedCamera || desiredCollapsedSheetTop != appliedCollapsedSheetTop {
                 moveCamera(map, to: desiredCamera)
                 appliedCamera = desiredCamera
+                appliedCollapsedSheetTop = desiredCollapsedSheetTop
             }
 
             if desiredMarkers != appliedMarkers {
@@ -160,6 +172,7 @@ extension DulpickMapView {
             appliedMarkers = nil
             appliedRoutes = nil
             appliedUserLocation = nil
+            appliedCollapsedSheetTop = 0
         }
 
         // MARK: - 레이어 그리기
@@ -219,6 +232,7 @@ extension DulpickMapView {
 
                 let options = PoiOptions(styleID: styleID, poiID: marker.id)
                 options.clickable = true
+                options.rank = MapMarkerSymbol.rank(for: marker.kind)
                 layer.addPoi(option: options, at: marker.coordinate.mapPoint)?.show()
             }
 
@@ -276,7 +290,7 @@ extension DulpickMapView {
                         PerLevelPoiStyle(
                             iconStyle: PoiIconStyle(
                                 symbol: MapMarkerSymbol.image(for: kind),
-                                anchorPoint: CGPoint(x: 0.5, y: 0.5)
+                                anchorPoint: MapMarkerSymbol.anchorPoint(for: kind)
                             ),
                             level: 0
                         ),
@@ -397,25 +411,68 @@ private extension DulpickMapView.Coordinator {
 private extension DulpickMapView.Coordinator {
     func moveCamera(_ map: KakaoMap, to camera: MapCamera) {
         let update = CameraUpdate.make(
-            target: camera.center.mapPoint,
+            target: focusedCenter(map, to: camera),
             zoomLevel: camera.zoomLevel,
             mapView: map
         )
         map.animateCamera(
             cameraUpdate: update,
             options: CameraAnimationOptions(
-                autoElevation: false,
+                // 멀리 옮길 때 카메라를 들어 올렸다 내린다. 화면이 당겨진 채 미끄러지면 어지럽다
+                autoElevation: true,
                 consecutive: false,
-                durationInMillis: 250
+                durationInMillis: 150
             )
         )
     }
 
+    /// 접힘 시트 윗면 대비 초점 지점의 자리.
+    ///
+    /// 절반이 아니다. 검색바와 카테고리 칩이 지도 위쪽을 덮어, 온전히 보이는 띠의
+    /// 한가운데가 그보다 아래다. 아이폰 14 기준 칩 바닥 139pt ~ 시트 윗면 464pt 의
+    /// 한가운데가 302pt 이고 그것이 시트 윗면의 0.65 다 (2026-08-21 실측)
+    private static let focusRatio: CGFloat = 0.65
+
+    /// 초점 지점의 y. 시트 윗면이 안 왔거나 뷰 밖이면 화면 한가운데다
+    private func focusY(in rect: CGRect) -> CGFloat {
+        guard desiredCollapsedSheetTop > 0, desiredCollapsedSheetTop <= rect.height else {
+            return rect.midY
+        }
+        return desiredCollapsedSheetTop * Self.focusRatio
+    }
+
+    /// 목표 좌표가 시트 위 영역의 한가운데에 보이도록 카메라 중심을 남쪽으로 민다.
+    ///
+    /// 지도를 먼저 옮겨 재면 화면이 한 번 튄다. 그래서 **지금 자리에서** 픽셀당 위도를 재고,
+    /// 줌이 다르면 한 단계에 두 배인 성질로 환산한다.
+    private func focusedCenter(_ map: KakaoMap, to camera: MapCamera) -> MapPoint {
+        let target = camera.center
+        let rect = map.viewRect
+        let focusY = focusY(in: rect)
+        // 초점이 화면 한가운데면 오프셋이 0 이므로 목표 좌표를 그대로 돌려준다
+        guard focusY != rect.midY else {
+            return target.mapPoint
+        }
+
+        let centerLatitude = map.getPosition(CGPoint(x: rect.midX, y: rect.midY)).wgsCoord.latitude
+        let focusLatitude = map.getPosition(CGPoint(x: rect.midX, y: focusY)).wgsCoord.latitude
+
+        // 줌이 한 단계 오르면 같은 픽셀이 덮는 위도 폭이 절반이 된다
+        let scale = pow(2.0, Double(map.zoomLevel - camera.zoomLevel))
+        let offset = (centerLatitude - focusLatitude) * scale
+
+        return Coordinate(
+            latitude: target.latitude + offset,
+            longitude: target.longitude
+        ).mapPoint
+    }
+
     func reportCamera(of map: KakaoMap) {
         let rect = map.viewRect
-        let center = map.getPosition(CGPoint(x: rect.midX, y: rect.midY)).wgsCoord
+        let focusY = focusY(in: rect)
+        let focus = map.getPosition(CGPoint(x: rect.midX, y: focusY)).wgsCoord
         let updated = MapCamera(
-            center: Coordinate(latitude: center.latitude, longitude: center.longitude),
+            center: Coordinate(latitude: focus.latitude, longitude: focus.longitude),
             zoomLevel: map.zoomLevel
         )
 
@@ -495,8 +552,10 @@ private extension DulpickMapView {
 
 // MARK: - 기본 마커 심볼
 
-/// `place` `numbered` `selected` 는 여기서 그린 최소 심볼을 쓴다.
-/// 저장한 장소 핀(`category`)만 시안 에셋을 그대로 얹는다.
+/// `place` `numbered` 는 여기서 그린 최소 심볼을 쓴다.
+/// 고른 장소(`selected`)와 코스 후보(`candidate`)는 `MapPlacePin` 을 얹는다.
+/// 저장한 장소 핀(`category`)은 시안 에셋을 20 으로 줄여 쓴다.
+@MainActor
 private enum MapMarkerSymbol {
     static let routeColor = UIColor(red: 0.98, green: 0.31, blue: 0.44, alpha: 1.0)
 
@@ -504,12 +563,19 @@ private enum MapMarkerSymbol {
     private static let selectedColor = UIColor(red: 0.14, green: 0.14, blue: 0.16, alpha: 1.0)
     private static let userLocationColor = UIColor(red: 0.16, green: 0.47, blue: 0.96, alpha: 1.0)
 
+    /// 그림자 radius 2 + offsetY 1 을 담는 여백
+    private static let pinShadowInset: CGFloat = 4
+
+    /// 물방울 높이. `MapPlacePin` 의 피그마 Vector 28 × 31.86 에서 온 값이다
+    private static let pinHeight: CGFloat = 31.86
+
     static func styleID(for kind: MapMarker.Kind) -> String {
         switch kind {
         case .place: "dulpick.map.style.place"
         case .selected: "dulpick.map.style.selected"
         case let .numbered(number): "dulpick.map.style.numbered.\(number)"
         case let .category(category): "dulpick.map.style.category.\(category.rawValue)"
+        case .candidate: "dulpick.map.style.candidate"
         }
     }
 
@@ -518,12 +584,59 @@ private enum MapMarkerSymbol {
         case .place:
             circle(diameter: 22, fill: placeColor, text: nil)
         case .selected:
-            circle(diameter: 30, fill: selectedColor, text: nil)
+            rendered(MapPlacePin(content: .selected))
         case let .numbered(number):
             circle(diameter: 28, fill: selectedColor, text: "\(number)")
         case let .category(category):
-            category.pin
+            resized(category.pin, to: categoryPinSide)
+        case .candidate:
+            rendered(MapPlacePin(content: .candidate))
         }
+    }
+
+    /// 저장한 장소 핀. 에셋은 24 로 그려져 있고 시안 대조에서 20 으로 정했다.
+    /// 에셋을 고치면 일곱 카테고리와 다른 화면까지 같이 바뀌어 여기서 줄인다
+    private static let categoryPinSide: CGFloat = 20
+
+    private static func resized(_ image: UIImage, to side: CGFloat) -> UIImage {
+        let size = CGSize(width: side, height: side)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
+    /// 같은 자리의 카테고리·장소 배지 위에 고른 핀이 앉는다. rank 가 큰 쪽이 위다.
+    static func rank(for kind: MapMarker.Kind) -> Int {
+        switch kind {
+        case .place, .category:
+            0
+        case .numbered, .selected, .candidate:
+            1
+        }
+    }
+
+    /// 마커 이미지의 어느 점이 좌표에 놓이는지.
+    ///
+    /// 원형 마커는 중심이 좌표다. 물방울은 뾰족한 아래 끝이 좌표다.
+    static func anchorPoint(for kind: MapMarker.Kind) -> CGPoint {
+        switch kind {
+        case .selected, .candidate:
+            // 그림자 여백만큼 이미지가 커졌다. 1.0 을 주면 끝이 좌표보다 그만큼 위에 앉는다
+            CGPoint(x: 0.5, y: (pinShadowInset + pinHeight) / (pinShadowInset * 2 + pinHeight))
+        // default 를 쓰지 않는다. 물방울 심볼이 늘면 여기서 컴파일이 막혀야 한다
+        case .place, .numbered, .category:
+            CGPoint(x: 0.5, y: 0.5)
+        }
+    }
+
+    /// SwiftUI 부품을 지도가 받는 `UIImage` 로 굽는다.
+    ///
+    /// `MapPlacePin` 은 그림자를 달고 있어 프레임 밖으로 잉크가 번진다.
+    /// `ImageRenderer` 는 프레임까지만 그리므로 여백을 둘러 잘리지 않게 한다.
+    private static func rendered(_ view: some View) -> UIImage {
+        let renderer = ImageRenderer(content: view.padding(pinShadowInset))
+        renderer.scale = UIScreen.main.scale
+        return renderer.uiImage ?? UIImage()
     }
 
     static func userLocationImage() -> UIImage {
@@ -573,7 +686,7 @@ private extension Coordinate {
 #if DEBUG
 /// `MapView` 프리뷰가 안 쓰는 표면(번호 핀·선택 핀·경로선·현재위치)까지 한 번에 보여준다.
 #Preview("코스 마커 + 경로") {
-    @Previewable @State var camera: MapCamera = .ansan
+    @Previewable @State var camera: MapCamera = .seoulCityHall
 
     let places = SavedPlace.mocks.prefix(4)
 
@@ -590,7 +703,7 @@ private extension Coordinate {
             routes: [
                 MapRoute(id: "preview.course", coordinates: places.map(\.place.coordinate)),
             ],
-            userLocation: MapCamera.ansan.center
+            userLocation: MapCamera.seoulCityHall.center
         )
         .ignoresSafeArea()
     }

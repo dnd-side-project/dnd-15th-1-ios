@@ -205,6 +205,8 @@ final class RootFlowFeatureTests: XCTestCase {
             )
         ) {
             RootFlowFeature()
+        } withDependencies: {
+            $0.notificationClient.requestAuthorization = { true }
         }
         store.exhaustivity = .off
 
@@ -316,6 +318,8 @@ final class RootFlowOnboardingTests: XCTestCase {
             )
         ) {
             RootFlowFeature()
+        } withDependencies: {
+            $0.notificationClient.requestAuthorization = { true }
         }
 
         await store.send(
@@ -330,6 +334,68 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .onboardingFlow(OnboardingFlowFeature.State(path: [.nickname]))
         }
         await store.receive(\.onboardingFlow.delegate.authenticated)
+    }
+
+    func test_로그인성공_온보딩완료_알림_권한_요청() async {
+        let authorizationCount = LockIsolated(0)
+        let session = sampleSession
+        let store = TestStore(
+            initialState: RootFlowFeature.State(
+                phase: .onboardingFlow(OnboardingFlowFeature.State())
+            )
+        ) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.notificationClient.requestAuthorization = {
+                authorizationCount.withValue { $0 += 1 }
+                return true
+            }
+        }
+
+        await store.send(
+            .onboardingFlow(
+                .delegate(
+                    .authenticated(userID: session.userID, isOnboardingCompleted: true)
+                )
+            )
+        ) {
+            $0.phase = .mainTab(
+                MainTabFeature.State(
+                    selectedTab: .home,
+                    myPage: MyPageFeature.State(userID: session.userID)
+                )
+            )
+        }
+        await store.receive(\.flushPendingDeepLink)
+        await store.finish()
+        XCTAssertEqual(authorizationCount.value, 1)
+    }
+
+    func test_로그인성공_온보딩미완료_알림_권한_요청() async {
+        let authorizationCount = LockIsolated(0)
+        let session = sampleSession
+        let store = TestStore(
+            initialState: RootFlowFeature.State(
+                phase: .onboardingFlow(OnboardingFlowFeature.State())
+            )
+        ) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.notificationClient.requestAuthorization = {
+                authorizationCount.withValue { $0 += 1 }
+                return true
+            }
+        }
+
+        await store.send(
+            .onboardingFlow(
+                .delegate(
+                    .authenticated(userID: session.userID, isOnboardingCompleted: false)
+                )
+            )
+        )
+        await store.finish()
+        XCTAssertEqual(authorizationCount.value, 1)
     }
 
     func test_온보딩에서_로그아웃되면_로그인화면_그대로다() async {

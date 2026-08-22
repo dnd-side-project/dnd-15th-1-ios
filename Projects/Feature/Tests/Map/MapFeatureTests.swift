@@ -44,6 +44,7 @@ final class MapFeatureTests: XCTestCase {
             $0.places = places
             $0.bookmarkedPlaceIDs = ["1", "2"]
             $0.loadState = .loaded
+            $0.camera = .focusing(places[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
 
         XCTAssertEqual(
@@ -76,6 +77,122 @@ final class MapFeatureTests: XCTestCase {
             $0.camera = moved
         }
     }
+
+    // MARK: - 현재 위치
+
+    func test_위치권한이_미결정이면_권한을_요청한다() async {
+        let requested = LockIsolated(0)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .notDetermined }
+            $0.locationClient.requestAuthorization = {
+                requested.withValue { $0 += 1 }
+                return .denied
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.finish()
+
+        XCTAssertEqual(requested.value, 1)
+    }
+
+    func test_권한요청에서_거부하면_아무것도_안한다() async {
+        let coordinateCalls = LockIsolated(0)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .notDetermined }
+            $0.locationClient.requestAuthorization = { .denied }
+            $0.locationClient.currentCoordinate = {
+                coordinateCalls.withValue { $0 += 1 }
+                return Coordinate(latitude: 0, longitude: 0)
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.finish()
+
+        XCTAssertEqual(coordinateCalls.value, 0)
+        XCTAssertFalse(store.state.isLocationPermissionModalPresented)
+    }
+
+    func test_위치권한이_허용이면_내위치로_옮긴다() async {
+        let here = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .authorized }
+            $0.locationClient.currentCoordinate = { here }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.receive(\.currentLocationResponse) {
+            $0.camera = MapCamera.focusing(here, zoomLevel: MapCamera.singlePlaceZoom)
+        }
+        XCTAssertEqual(store.state.camera.zoomLevel, 16)
+    }
+
+    func test_위치권한이_거부면_설정이동_모달이_뜬다() async {
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .denied }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse) {
+            $0.isLocationPermissionModalPresented = true
+        }
+
+        await store.send(.permissionModalDismissed) {
+            $0.isLocationPermissionModalPresented = false
+        }
+    }
+
+    func test_좌표조회가_실패하면_토스트가_뜬다() async {
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .authorized }
+            $0.locationClient.currentCoordinate = { throw LocationError.unavailable }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.receive(\.currentLocationResponse) {
+            $0.toast = ToastState.error("현재 위치를 찾지 못했어요")
+        }
+        // 카메라는 안 움직인다
+        XCTAssertEqual(store.state.camera, MapCamera.seoulCityHall)
+    }
+
+    func test_미결정에서_허용하면_내위치로_옮긴다() async {
+        let here = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.authorization = { .notDetermined }
+            $0.locationClient.requestAuthorization = { .authorized }
+            $0.locationClient.currentCoordinate = { here }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentLocationTapped)
+        await store.receive(\.locationAuthorizationResponse)
+        await store.receive(\.currentLocationResponse) {
+            $0.camera = MapCamera.focusing(here, zoomLevel: MapCamera.singlePlaceZoom)
+        }
+    }
 }
 
 @MainActor
@@ -104,6 +221,7 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.ownershipSelected(.mine)) {
             $0.selectedOwnership = .mine
+            $0.camera = .focusing(self.mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         // 둘 다 저장한 장소도 내가 저장한 것이다
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["1", "3"])
@@ -114,14 +232,39 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.ownershipSelected(.partner)) {
             $0.selectedOwnership = .partner
+            $0.camera = .focusing(self.mixed[1].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["2", "3"])
+    }
+
+    func test_저장자를_고르면_남은_목록의_첫_행으로_간다() async {
+        let store = loadedStore(mixed)
+        await store.send(.ownershipSelected(.partner)) {
+            $0.selectedOwnership = .partner
+            $0.camera = .focusing(self.mixed[1].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+        XCTAssertEqual(store.state.filteredPlaces.first?.id, "2")
+    }
+
+    func test_저장자를_골라_목록이_비면_서울_시청으로_간다() async {
+        var state = MapFeature.State()
+        state.places = [mixed[0]]
+        state.loadState = .loaded
+        state.camera = .focusing(mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        await store.send(.ownershipSelected(.partner)) {
+            $0.selectedOwnership = .partner
+            $0.camera = .seoulCityHall
+        }
+        XCTAssertTrue(store.state.filteredPlaces.isEmpty)
     }
 
     func test_카테고리를_고르면_핀과_목록이_같이_줄어든다() async {
         let store = loadedStore(mixed)
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = .cafe
+            $0.camera = .focusing(self.mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["1", "3"])
         XCTAssertEqual(store.state.markers.count, store.state.filteredPlaces.count)
@@ -131,6 +274,7 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = .cafe
+            $0.camera = .focusing(self.mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = nil
@@ -142,9 +286,11 @@ final class MapFeatureFilterTests: XCTestCase {
         let store = loadedStore(mixed)
         await store.send(.ownershipSelected(.partner)) {
             $0.selectedOwnership = .partner
+            $0.camera = .focusing(self.mixed[1].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         await store.send(.categoryTapped(.cafe)) {
             $0.selectedCategory = .cafe
+            $0.camera = .focusing(self.mixed[2].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["3"])
     }
@@ -272,7 +418,7 @@ final class MapFeatureDelegateTests: XCTestCase {
         await store.send(.markerTapped("7")) {
             $0.menuTargetPlaceID = nil
         }
-        await store.receive(\.delegate.placeSelected)
+        await store.receive(\.delegate.placeDetailRequested)
     }
 
     func test_행을_누르면_팝오버가_닫히고_상위로_올린다() async {
@@ -283,7 +429,7 @@ final class MapFeatureDelegateTests: XCTestCase {
         await store.send(.rowTapped("7")) {
             $0.menuTargetPlaceID = nil
         }
-        await store.receive(\.delegate.placeSelected)
+        await store.receive(\.delegate.placeDetailRequested)
     }
 
     func test_수정을_고르면_팝오버가_닫히고_상위로_올린다() async {
@@ -294,7 +440,7 @@ final class MapFeatureDelegateTests: XCTestCase {
         await store.send(.editTapped("7")) {
             $0.menuTargetPlaceID = nil
         }
-        await store.receive(\.delegate.editRequested)
+        await store.receive(\.delegate.aliasRequested)
     }
 
     func test_삭제를_고르면_팝오버가_닫히고_상위로_올린다() async {
@@ -327,5 +473,247 @@ final class MapFeatureDelegateTests: XCTestCase {
 
         await store.send(.courseButtonTapped)
         await store.receive(\.delegate.courseRequested)
+    }
+}
+
+@MainActor
+final class MapFeatureChildTests: XCTestCase {
+    private var savedPlaces: [SavedPlace] {
+        [
+            .fixture(id: "7", latitude: 37.3, longitude: 126.9),
+            .fixture(id: "8", latitude: 37.4, longitude: 126.8),
+        ]
+    }
+
+    func test_행을_누르면_상세_요청을_올린다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.rowTapped("7"))
+        XCTAssertNil(store.state.selectedPlace)
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_핀을_누르면_상세_요청을_올린다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.markerTapped("7"))
+        XCTAssertNil(store.state.selectedPlace)
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_목록에_없는_id_여도_상세_요청을_올린다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.rowTapped("없는id"))
+        XCTAssertNil(store.state.selectedPlace)
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_검색_결과에서_행을_누르면_상세_요청을_올린다() async {
+        let place = Place.fixture(id: "s1", name: "검색 장소")
+        var state = MapFeature.State()
+        state.mode = .searchResult(query: "카페", places: [place])
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.rowTapped("s1"))
+        XCTAssertNil(store.state.selectedPlace)
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_수정을_누르면_별칭_요청을_올리고_팝오버가_닫힌다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        state.menuTargetPlaceID = "7"
+        let store = TestStore(initialState: state) { MapFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.editTapped("7")) {
+            $0.menuTargetPlaceID = nil
+        }
+        await store.receive(\.delegate.aliasRequested)
+    }
+
+    func test_별칭을_저장하면_목록이_바뀌고_토스트가_뜬다() async {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        await store.send(.aliasSaved(id: "7", alias: "우리 첫 카페")) {
+            let old = $0.places[0]
+            $0.places[0] = SavedPlace(
+                place: old.place,
+                ownership: old.ownership,
+                alias: "우리 첫 카페",
+                memo: old.memo,
+                savedAt: old.savedAt
+            )
+            $0.toast = ToastState(message: "별칭을 저장했어요")
+        }
+    }
+
+    func test_선택_핀을_누르면_요청을_안_올린다() async {
+        let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
+
+        await store.send(.markerTapped(MapFeature.State.selectedMarkerID))
+    }
+}
+
+@MainActor
+final class MapFeatureSelectedPinTests: XCTestCase {
+    private let savedPlaces: [SavedPlace] = [
+        .fixture(id: "1", latitude: 37.3128, longitude: 126.9040),
+        .fixture(id: "2", latitude: 37.3141, longitude: 126.9068),
+    ]
+
+    private func loadedState(selected: MapFeature.State.SelectedPlace? = nil) -> MapFeature.State {
+        var state = MapFeature.State()
+        state.places = savedPlaces
+        state.loadState = .loaded
+        state.selectedPlace = selected
+        return state
+    }
+
+    func test_상세가_없으면_마커개수가_기존과_같다() async {
+        let store = TestStore(initialState: loadedState()) { MapFeature() }
+        XCTAssertEqual(store.state.markers.count, store.state.filteredPlaces.count)
+        XCTAssertEqual(store.state.markers.map(\.kind), [.category(.cafe), .category(.cafe)])
+    }
+
+    func test_선택된_장소가_있으면_선택핀이_맨뒤에_붙는다() async {
+        let selected = MapFeature.State.SelectedPlace(
+            id: savedPlaces[0].id,
+            coordinate: savedPlaces[0].place.coordinate
+        )
+        let store = TestStore(initialState: loadedState(selected: selected)) { MapFeature() }
+
+        XCTAssertEqual(store.state.markers.count, 3)
+        XCTAssertEqual(store.state.markers.last?.kind, .selected)
+        XCTAssertEqual(
+            store.state.markers.last?.coordinate,
+            savedPlaces[0].place.coordinate
+        )
+    }
+
+    func test_선택된_장소가_있어도_기존_카테고리핀은_그대로다() async {
+        let before = TestStore(initialState: loadedState()) { MapFeature() }.state.markers
+        let selected = MapFeature.State.SelectedPlace(
+            id: savedPlaces[0].id,
+            coordinate: savedPlaces[0].place.coordinate
+        )
+        let store = TestStore(initialState: loadedState(selected: selected)) { MapFeature() }
+
+        XCTAssertEqual(Array(store.state.markers.dropLast()), before)
+    }
+
+    func test_선택된_장소를_지우면_선택핀이_빠진다() async {
+        let selected = MapFeature.State.SelectedPlace(
+            id: savedPlaces[0].id,
+            coordinate: savedPlaces[0].place.coordinate
+        )
+        let open = TestStore(initialState: loadedState(selected: selected)) { MapFeature() }
+        XCTAssertEqual(open.state.markers.count, 3)
+
+        let closed = TestStore(initialState: loadedState()) { MapFeature() }
+        XCTAssertEqual(closed.state.markers.count, 2)
+        XCTAssertFalse(closed.state.markers.contains { $0.kind == .selected })    }
+}
+
+@MainActor
+final class MapCameraMoveTests: XCTestCase {
+
+    func test_저장_장소를_받으면_첫_행으로_간다() async {
+        let places = PlaceFixtures.savedPlaces
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        }
+
+        await store.send(.savedPlacesResponse(.success(places))) {
+            $0.places = places
+            $0.bookmarkedPlaceIDs = Set(places.map(\.id))
+            $0.loadState = .loaded
+            $0.camera = .focusing(places[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_저장_장소가_없으면_서울_시청으로_간다() async {
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        }
+
+        await store.send(.savedPlacesResponse(.success([]))) {
+            $0.places = []
+            $0.loadState = .loaded
+            $0.camera = .seoulCityHall
+        }
+    }
+
+    func test_카테고리를_고르면_남은_목록의_첫_행으로_간다() async {
+        let places = PlaceFixtures.savedPlaces
+        var state = MapFeature.State()
+        state.places = places
+        state.loadState = .loaded
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        let category = places[1].place.category
+        await store.send(.categoryTapped(category)) {
+            $0.selectedCategory = category
+            $0.camera = .focusing(places[1].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_행을_고르면_줌은_그대로_두고_그_장소로_간다() async {
+        let places = PlaceFixtures.savedPlaces
+        var state = MapFeature.State()
+        state.places = places
+        state.loadState = .loaded
+        state.camera.zoomLevel = 12
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        let target = places[1]
+        await store.send(.rowTapped(target.id)) {
+            $0.camera = .focusing(target.place.coordinate, zoomLevel: 12)
+        }
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_핀을_고르면_줌은_그대로_두고_그_장소로_간다() async {
+        let places = PlaceFixtures.savedPlaces
+        var state = MapFeature.State()
+        state.places = places
+        state.loadState = .loaded
+        state.camera.zoomLevel = 12
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        let target = places[1]
+        await store.send(.markerTapped(target.id)) {
+            $0.camera = .focusing(target.place.coordinate, zoomLevel: 12)
+        }
+        await store.receive(\.delegate.placeDetailRequested)
+    }
+
+    func test_검색_결과를_적용하면_첫_결과로_여러_장소용_줌으로_간다() async {
+        let results = PlaceFixtures.savedPlaces.map(\.place)
+        let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
+
+        await store.send(.searchResultsApplied(query: "카페", places: results)) {
+            $0.mode = .searchResult(query: "카페", places: results)
+            $0.camera = .focusing(results[0].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_서울_시청은_여러_장소용_줌을_쓴다() {
+        XCTAssertEqual(MapCamera.seoulCityHall.zoomLevel, MapCamera.multiPlaceZoom)
+        XCTAssertEqual(MapCamera.seoulCityHall.center.latitude, 37.5665, accuracy: 0.00001)
+        XCTAssertEqual(MapCamera.seoulCityHall.center.longitude, 126.9780, accuracy: 0.00001)
     }
 }

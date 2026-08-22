@@ -6,6 +6,7 @@ let project = ProjectFactory.framework(
     dependencies: [
         .domain,
         .coreNetwork,
+        .coreNotification,
         .coreSocialAuth,
         .coreStorage,
         .sharedLogger,

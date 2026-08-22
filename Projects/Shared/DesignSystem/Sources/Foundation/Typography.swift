@@ -72,9 +72,19 @@ public struct Typography: Sendable {
         size * letterSpacingRatio
     }
 
-    // 폰트 기본 줄높이에 더해지는 값이라 디자인 툴 line-height 와는 근사치임
+    /// Pretendard 네 굵기가 공유하는 줄높이 배수.
+    /// `.otf` 실측 — unitsPerEm 2048, ascender 1950, descender -494, lineGap 0
+    private static let fontLineHeightRatio: CGFloat = (1950 + 494) / 2048.0
+
+    // SwiftUI `.lineSpacing` 은 폰트 기본 줄높이 위에 더하므로, 시안 배수에서 폰트 메트릭 배수를 뺀다
     public var lineSpacing: CGFloat {
-        size * (lineHeightMultiple - 1)
+        max(0, size * (lineHeightMultiple - Self.fontLineHeightRatio))
+    }
+
+    /// 시안이 잡는 글자 한 줄 상자 높이 (`size * lineHeightMultiple`).
+    /// `lineSpacing` 은 줄 사이에 더하는 값이고, 이건 한 줄이 차지하는 상자 자체다.
+    public var lineHeight: CGFloat {
+        size * lineHeightMultiple
     }
 
     /// UIKit 으로 그리는 입력칸이 SwiftUI 쪽과 같은 글꼴을 쓰게 하는 통로.

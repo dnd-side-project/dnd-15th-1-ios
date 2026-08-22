@@ -10,7 +10,7 @@ import SwiftUI
 public struct ModalContent: View {
     private let title: String
     private let content: String
-    private let image: Image
+    private let image: Image?
     private let primaryTitle: String
     private let primaryAction: () -> Void
     private let secondaryTitle: String?
@@ -19,7 +19,7 @@ public struct ModalContent: View {
     public init(
         title: String,
         content: String,
-        image: Image,
+        image: Image? = nil,
         primaryTitle: String,
         primaryAction: @escaping () -> Void,
         secondaryTitle: String? = nil,
@@ -45,10 +45,13 @@ public struct ModalContent: View {
                 .foregroundStyle(Color.textSecondary)
                 .padding(.top, 8)
 
-            image
-                .frame(maxWidth: .infinity)
-                .frame(height: 300)
-                .padding(.top, 20)
+            // 위치 권한 안내처럼 넣을 그림이 없는 자리를 위해서다
+            if let image {
+                image
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 300)
+                    .padding(.top, 20)
+            }
 
             buttons
                 .padding(.top, 20)

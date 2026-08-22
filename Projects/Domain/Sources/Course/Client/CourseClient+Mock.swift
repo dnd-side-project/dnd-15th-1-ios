@@ -1,22 +1,38 @@
 import Foundation
 import ThirdParty
 
-/// 임시 mock 데이터. 서버 명세가 나오면 통째로 걷어낸다
+/// 아직 서버를 안 붙인 포트가 쓰는 mock. `course` · `updateCourse` · `notifyPartner` 셋이다
 public extension CourseClient {
     static let mock = CourseClient(
-        createCourse: { scheduledAt, placeIDs in
+        createCourse: { title, date, time in
             mockCourse(
                 id: "course-mock",
-                title: mockTitle(for: scheduledAt),
-                scheduledAt: scheduledAt,
-                placeIDs: placeIDs
+                title: title,
+                scheduledAt: mockDate(date: date, time: time),
+                status: .draft,
+                placeIDs: []
             )
+        },
+        coursePlaces: {
+            SavedPlace.mocks.map { saved in
+                CoursePlaceCandidate(
+                    id: saved.place.id,
+                    name: saved.place.name,
+                    address: saved.place.address,
+                    category: saved.place.category,
+                    coordinate: saved.place.coordinate,
+                    ownership: saved.ownership,
+                    alias: saved.alias,
+                    thumbnailURLs: saved.place.thumbnailURLs
+                )
+            }
         },
         course: { id in
             mockCourse(
                 id: id,
-                title: mockTitle(for: mockScheduledAt),
+                title: DateCourseTitle.make(date: mockDateComponents),
                 scheduledAt: mockScheduledAt,
+                status: .confirmed,
                 placeIDs: ["3", "4", "5"]
             )
         },
@@ -25,6 +41,7 @@ public extension CourseClient {
                 id: id,
                 title: title,
                 scheduledAt: scheduledAt,
+                status: .confirmed,
                 placeIDs: placeIDs
             )
         },
@@ -43,13 +60,25 @@ private let mockLegValues: [(walkingMinutes: Int, distanceMeters: Int)] = [
 
 /// 시안 `26.08.05 데이트`
 private let mockScheduledAt = Date(timeIntervalSince1970: 1_785_931_200)
+private let mockDateComponents = DateComponents(year: 2026, month: 8, day: 5)
+
+private func mockDate(date: DateComponents, time: DateComponents) -> Date {
+    var merged = date
+    merged.hour = time.hour
+    merged.minute = time.minute
+    merged.timeZone = TimeZone(identifier: "Asia/Seoul")
+    return Calendar(identifier: .gregorian).date(from: merged) ?? mockScheduledAt
+}
 
 private func mockCourse(
     id: String,
     title: String,
     scheduledAt: Date,
+    status: CourseStatus,
     placeIDs: [String]
 ) -> DateCourse {
+    // 확정된 코스는 한 번은 저장된 것이라 버전이 1 이다
+    let version = status == .draft ? 0 : 1
     let stops = placeIDs
         .compactMap { placeID in Place.mocks.first { $0.id == placeID } }
         .map(CourseStop.init(place:))
@@ -66,15 +95,9 @@ private func mockCourse(
         id: id,
         title: title,
         scheduledAt: scheduledAt,
+        status: status,
+        version: version,
         stops: stops,
         legs: legs
     )
-}
-
-private func mockTitle(for scheduledAt: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "ko_KR")
-    formatter.dateFormat = "yy.MM.dd"
-
-    return "\(formatter.string(from: scheduledAt)) 데이트"
 }

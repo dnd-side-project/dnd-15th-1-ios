@@ -22,9 +22,10 @@ enum Dependencies {
         values.exploreClient = ExploreClientFactory.make(session: authSession)
 
         values.placeClient = PlaceClientFactory.make(session: authSession)
+        values.courseClient = CourseClientFactory.make(session: authSession)
 
-        // API 연동 전 임시 mock, 나중에 CourseClientFactory 로 교체
-        values.courseClient = .mock
+        // API 연동 전 임시 mock, 나중에 장소 API 연동에서 Factory 로 교체
+        values.postDetailContentClient = .mock
 
         values.recentSearchClient = RecentSearchClientFactory.make(
             userDefaults: infra.userDefaults
@@ -38,6 +39,12 @@ enum Dependencies {
         values.onboardingClient = OnboardingClientFactory.make(
             userDefaults: infra.userDefaults
         )
+
+        values.notificationClient = NotificationClientFactory.make(
+            client: infra.remoteNotificationClient
+        )
+
+        values.locationClient = LocationClientFactory.make()
 
         #if DEBUG
         DebugLaunchOverride.apply(to: &values)

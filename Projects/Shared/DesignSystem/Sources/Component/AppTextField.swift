@@ -73,7 +73,7 @@ public struct AppTextField: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .typography(.caption1M)
+                    .typography(.body2M)
                     .foregroundStyle(Color.statusError)
                     .padding(.leading, Spacing.s8)
             }
@@ -149,14 +149,22 @@ public struct AppTextField: View {
                 .frame(width: 24, height: 24)
                 .foregroundStyle(Color.textTertiary)
         case .clear:
-            Button {
-                text = ""
-            } label: {
-                Image.x
-                    .renderingMode(.template)
-                    .resizable()
+            if text.isEmpty {
+                // 칸이 비면 버튼을 안 그린다. 입력칸이 늘어나지 않게 아이콘 자리만 남긴다
+                Color.clear
                     .frame(width: 24, height: 24)
-                    .foregroundStyle(Color.textTertiary)
+            } else {
+                Button {
+                    text = ""
+                } label: {
+                    // 시안 대조에서 정한 지우기 아이콘. cancel · gray300
+                    Image.cancel
+                        .renderingMode(.template)
+                        .resizable()
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(Color.gray300)
+                        .accessibilityLabel("입력 지우기")
+                }
             }
         }
     }

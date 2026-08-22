@@ -37,6 +37,10 @@ public enum AppInfo {
         requiredString(.googleClientID)
     }
 
+    public static var firebaseOptionsResourceName: String {
+        requiredString(.firebaseOptionsResource)
+    }
+
     public static var googleReversedClientID: String? {
         string(.googleReversedClientID)
     }

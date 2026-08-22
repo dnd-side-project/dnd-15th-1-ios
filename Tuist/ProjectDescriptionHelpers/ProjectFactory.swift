@@ -171,7 +171,11 @@ public enum ProjectFactory {
         packages: [Package] = [],
         infoPlist: InfoPlist = DefaultInfoPlist.app,
         sources: SourceFilesList = ["Sources/**"],
-        resources: ResourceFileElements = ["Resources/**"]
+        resources: ResourceFileElements = [
+            "Resources/**",
+            .glob(pattern: .relativeToRoot("Config/GoogleService-Info-Debug.plist")),
+            .glob(pattern: .relativeToRoot("Config/GoogleService-Info-Release.plist")),
+        ]
     ) -> Project {
         let shareExtension = shareExtensionTarget()
 
@@ -184,7 +188,6 @@ public enum ProjectFactory {
             infoPlist: infoPlist,
             sources: sources,
             resources: resources,
-            entitlements: "Dulpick.entitlements",
             dependencies: dependencies + [.target(name: shareExtension.name)],
             settings: ProjectSettings.app()
         )

@@ -7,17 +7,20 @@ public enum DefaultInfoPlist {
         "CFBundleVersion": .string(ProjectEnvironment.appBuildNumber),
         // 수출 규제 면제 대상. OS 가 주는 HTTPS 와 애플 프레임워크만 쓴다
         "ITSAppUsesNonExemptEncryption": false,
+        "FirebaseAppDelegateProxyEnabled": false,
 
         "API_BASE_URL": "$(API_BASE_URL)",
         "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
         "GOOGLE_CLIENT_ID": "$(GOOGLE_CLIENT_ID)",
         "GOOGLE_REVERSED_CLIENT_ID": "$(GOOGLE_REVERSED_CLIENT_ID)",
+        "FIREBASE_OPTIONS_RESOURCE": "$(FIREBASE_OPTIONS_RESOURCE)",
 
         "UILaunchStoryboardName": "LaunchScreen",
         "UISupportedInterfaceOrientations": [
             "UIInterfaceOrientationPortrait",
         ],
         "UIUserInterfaceStyle": "Light",
+        "NSLocationWhenInUseUsageDescription": .string("현재 위치로 지도를 옮기기 위해 위치를 사용해요"),
         "UIApplicationSceneManifest": [
             "UIApplicationSupportsMultipleScenes": false,
             "UISceneConfigurations": [:],

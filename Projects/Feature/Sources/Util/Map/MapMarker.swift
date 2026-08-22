@@ -13,6 +13,8 @@ public struct MapMarker: Equatable, Identifiable, Sendable {
         case selected
         /// 저장한 장소 핀. 카테고리마다 다른 에셋을 쓴다
         case category(PlaceCategory)
+        /// 코스에 담을 후보로 고른 장소. 흰 하트가 든 물방울이다 (시안 b06)
+        case candidate
     }
 
     public init(id: String, coordinate: Coordinate, kind: Kind) {

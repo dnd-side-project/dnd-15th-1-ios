@@ -56,6 +56,8 @@ public struct AppButtonStyle: ButtonStyle {
             configuration.label
                 .typography(size.typography)
                 .foregroundStyle(foreground)
+                // 한 줄 글자에 lineSpacing 이 안 붙으므로, 시안 상자 높이를 최소로 고정한다
+                .frame(minHeight: size.typography.lineHeight)
                 .padding(.horizontal, size.horizontalPadding)
                 .padding(.vertical, size.verticalPadding)
                 .frame(maxWidth: fullWidth ? .infinity : nil)

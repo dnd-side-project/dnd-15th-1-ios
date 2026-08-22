@@ -2,6 +2,7 @@ import Domain
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
+import UIKit
 
 // MARK: - RowMenuOption
 
@@ -9,16 +10,6 @@ import ThirdParty
 private enum RowMenuOption: String, CaseIterable {
     case edit = "수정"
     case delete = "삭제"
-}
-
-private enum CategoryDropdown {
-    static let allOption = "전체"
-}
-
-/// 시트 헤더의 필터 메뉴. 한 번에 하나만 열린다
-private enum FilterMenu {
-    case ownership
-    case category
 }
 
 // MARK: - MapView
@@ -32,8 +23,14 @@ public struct MapView: View {
     /// 아래 안전영역(탭바 + 홈 인디케이터). 시트가 그 뒤로 이어지므로 목록 아래 여백에 더한다
     @State private var bottomInset: CGFloat = 0
 
+    /// 접힘 시트 윗면의 화면 좌표 y. 지도가 초점 자리를 잡는 근거다
+    @State private var collapsedSheetTop: CGFloat = 0
+
     /// 지금 열린 필터 메뉴. 하나만 열린다
     @State private var openFilterMenu: FilterMenu?
+
+    /// 설정 앱을 여는 통로. 위치 권한 안내의 「설정으로 가기」가 쓴다
+    @Environment(\.openURL) private var openURL
 
     /// 저장자 드롭다운 메뉴의 화면 좌표. 시트 손짓이 이 안에서는 시작하지 않는다
     @State private var ownershipMenuFrame: CGRect?
@@ -70,13 +67,47 @@ private extension MapView {
             map
             categoryChipLayer
             searchBarLayer
-            sheet
+            sheetSwap
         }
         // 시트 흰 배경이 탭바 뒤로 이어지는 근거다. 빼면 시트 아래로 지도가 비친다
         .ignoresSafeArea(edges: .bottom)
         .toolbar(.hidden, for: .navigationBar)
         .toast(item: toastBinding) { store.send(.retryTapped) }
+        .modal(isPresented: permissionModalBinding) {
+            ModalContent(
+                title: "위치 권한이 꺼져 있어요",
+                content: "설정에서 위치 접근을 허용하면\n현재 위치로 이동할 수 있어요",
+                primaryTitle: "설정으로 가기",
+                primaryAction: {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                    store.send(.permissionModalDismissed)
+                },
+                secondaryTitle: "닫기",
+                secondaryAction: { store.send(.permissionModalDismissed) }
+            )
+        }
         .onAppear { store.send(.onAppear) }
+    }
+
+    /// 상세가 뜨면 목록을 치운다. 접힘 위에 목록이 남으면 시안 a06·a07 과 어긋난다.
+    /// 상세 시트는 `MapFlowView` 가 같은 스프링으로 얹는다.
+    /// 껍데기에 숨김 단계가 없어(`SheetDetent` 가 접힘·펼침 둘뿐) 시트를 통째로 갈아
+    /// 내려갔다 올라오게 만든다. 스프링은 껍데기의 `MapBottomSheetMetric.settle` 이다.
+    @ViewBuilder
+    var sheetSwap: some View {
+        ZStack(alignment: .bottom) {
+            if store.selectedPlace == nil {
+                sheet
+                    // 올라오며 나타나고, 사라질 때는 안 움직인다. 안 주면 기본값인 페이드가 붙는다
+                    .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
+            }
+        }
+        .animation(
+            MapBottomSheetMetric.settle,
+            value: store.selectedPlace == nil
+        )
     }
 
     /// 아래 안전영역(탭바 + 홈 인디케이터)을 재는 층.
@@ -104,7 +135,8 @@ private extension MapView {
             ),
             markers: store.markers,
             onMarkerTap: { store.send(.markerTapped($0)) },
-            onMapTap: { store.send(.rowMenuDismissed) }
+            onMapTap: { store.send(.rowMenuDismissed) },
+            collapsedSheetTop: collapsedSheetTop
         )
         .ignoresSafeArea()
     }
@@ -201,7 +233,9 @@ private extension MapView {
             onDragBegan: {
                 openFilterMenu = nil
                 store.send(.rowMenuDismissed)
-            }
+            },
+            gestureKind: .followsContent,
+            onCollapsedTopChange: { collapsedSheetTop = $0 }
         ) {
             floatingControls
         } header: {
@@ -241,8 +275,8 @@ private extension MapView {
                 AppDropdown(
                     selection: categoryBinding,
                     isExpanded: filterMenuBinding(.category),
-                    placeholder: CategoryDropdown.allOption,
-                    options: [CategoryDropdown.allOption] + PlaceCategory.mapDisplayOrder.map(\.displayName),
+                    placeholder: PlaceCategory.unfilteredName,
+                    options: [PlaceCategory.unfilteredName] + PlaceCategory.mapDisplayOrder.map(\.displayName),
                     onMenuFrameChange: { categoryMenuFrame = $0 }
                 )
             }
@@ -453,7 +487,7 @@ private extension MapView {
         Binding(
             get: { store.selectedCategory?.displayName },
             set: { newValue in
-                guard let newValue, newValue != CategoryDropdown.allOption else {
+                guard let newValue, newValue != PlaceCategory.unfilteredName else {
                     store.send(.categoryTapped(nil))
                     return
                 }
@@ -472,6 +506,17 @@ private extension MapView {
             set: { newValue in
                 if newValue == nil {
                     store.send(.dismissToast)
+                }
+            }
+        )
+    }
+
+    var permissionModalBinding: Binding<Bool> {
+        Binding(
+            get: { store.isLocationPermissionModalPresented },
+            set: { isPresented in
+                if !isPresented {
+                    store.send(.permissionModalDismissed)
                 }
             }
         )

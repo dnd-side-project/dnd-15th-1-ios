@@ -10,17 +10,18 @@ final class MainTabMapDelegateTests: XCTestCase {
         }
 
         // 화면 이동은 MapFlowFeature 가 자기 path 로 삼킨다. MainTab 은 탭만 지킨다
-        await store.send(.map(.map(.delegate(.placeSelected("7"))))) {
-            $0.map.path = [.placeDetail("7")]
-        }
+        // 장소 상세는 지도 위 시트라 경로를 안 쌓는다
+        await store.send(.map(.map(.delegate(.placeDetailRequested("7")))))
+        XCTAssertEqual(store.state.map.path, [])
         await store.send(.map(.map(.delegate(.searchRequested)))) {
-            $0.map.path = [.placeDetail("7"), .search]
+            $0.map.path = [.search]
             $0.map.placeSearch = PlaceSearchFeature.State()
         }
         await store.send(.map(.map(.delegate(.courseRequested)))) {
-            $0.map.path = [.placeDetail("7"), .search, .course]
+            $0.map.course = CourseFeature.State()
+            $0.map.path = [.search, .course]
         }
-        await store.send(.map(.map(.delegate(.editRequested("7")))))
+        await store.send(.map(.map(.delegate(.aliasRequested("7")))))
         await store.send(.map(.map(.delegate(.deleteRequested("7")))))
 
         XCTAssertEqual(store.state.selectedTab, .home)

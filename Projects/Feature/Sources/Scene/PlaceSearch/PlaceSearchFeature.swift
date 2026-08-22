@@ -53,7 +53,7 @@ public struct PlaceSearchFeature {
         public enum Delegate: Equatable {
             case dismissed
             case searchConfirmed(query: String, places: [Place])
-            case placeSelected(String)
+            case placeSelected(Place)
             case sessionExpired
         }
     }
@@ -167,14 +167,17 @@ public struct PlaceSearchFeature {
             )
 
         case let .rowTapped(id):
+            guard let place = state.results.first(where: { $0.id == id }) else {
+                return .none
+            }
             let query = state.query.trimmingCharacters(in: .whitespaces)
             guard !query.isEmpty else {
-                return .send(.delegate(.placeSelected(id)))
+                return .send(.delegate(.placeSelected(place)))
             }
             // 부모가 화면을 닫으면 ifLet 이 남은 효과를 취소하므로 저장을 먼저 끝낸다
             return .concatenate(
                 remember(query),
-                .send(.delegate(.placeSelected(id)))
+                .send(.delegate(.placeSelected(place)))
             )
 
         default:
