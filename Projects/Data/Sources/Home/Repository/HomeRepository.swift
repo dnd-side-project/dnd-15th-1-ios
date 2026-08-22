@@ -39,9 +39,9 @@ public struct HomeRepository: Sendable {
         }
     }
 
-    public func pastCourses(size: Int) async throws -> [DateSchedule] {
+    public func pastCourses(page: Int, size: Int) async throws -> PastDateCoursePage {
         do {
-            return HomeDTOMapper.toPastDates(try await remote.pastCourses(size: size))
+            return HomeDTOMapper.toPastCoursePage(try await remote.pastCourses(page: page, size: size))
         } catch {
             throw HomeErrorMapper.map(error)
         }

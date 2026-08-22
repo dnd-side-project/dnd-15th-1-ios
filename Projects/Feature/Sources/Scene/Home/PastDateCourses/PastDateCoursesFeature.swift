@@ -10,25 +10,40 @@ import ThirdParty
 
 @Reducer
 public struct PastDateCoursesFeature {
-    /// 서버가 최대 50개만 주므로 넉넉히 요청한다. 총 횟수 필드가 없어 받은 개수로 카운트한다
+    /// 한 번에 받아올 코스 수
     static let pageSize = 20
 
     @ObservableState
     public struct State: Equatable {
         public var courses: [DateSchedule]
+        public var totalCount: Int
+        public var page: Int
+        public var hasNext: Bool
         public var hasLoaded: Bool
+        public var isLoadingMore: Bool
 
-        public var count: Int { courses.count }
-
-        public init(courses: [DateSchedule] = [], hasLoaded: Bool = false) {
+        public init(
+            courses: [DateSchedule] = [],
+            totalCount: Int = 0,
+            page: Int = 0,
+            hasNext: Bool = true,
+            hasLoaded: Bool = false,
+            isLoadingMore: Bool = false
+        ) {
             self.courses = courses
+            self.totalCount = totalCount
+            self.page = page
+            self.hasNext = hasNext
             self.hasLoaded = hasLoaded
+            self.isLoadingMore = isLoadingMore
         }
     }
 
     public enum Action: Equatable {
         case onAppear
-        case coursesLoaded([DateSchedule])
+        case coursesLoaded(PastDateCoursePage?)
+        case reachedEnd
+        case moreCoursesLoaded(PastDateCoursePage?)
         case backButtonTapped
         case createCourseTapped
         case delegate(Delegate)
@@ -48,14 +63,28 @@ public struct PastDateCoursesFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                return .run { [homeClient] send in
-                    let courses = (try? await homeClient.pastCourses(Self.pageSize)) ?? []
-                    await send(.coursesLoaded(courses))
-                }
+                return loadPage(0, action: Action.coursesLoaded)
 
-            case let .coursesLoaded(courses):
-                state.courses = courses
+            case let .coursesLoaded(page):
                 state.hasLoaded = true
+                state.courses = page?.courses ?? []
+                state.totalCount = page?.totalCount ?? 0
+                state.hasNext = page?.hasNext ?? false
+                state.page = 1
+                return .none
+
+            case .reachedEnd:
+                guard state.hasLoaded, state.hasNext, !state.isLoadingMore else { return .none }
+                state.isLoadingMore = true
+                return loadPage(state.page, action: Action.moreCoursesLoaded)
+
+            case let .moreCoursesLoaded(page):
+                state.isLoadingMore = false
+                guard let page else { return .none }
+                state.courses += page.courses
+                state.totalCount = page.totalCount
+                state.hasNext = page.hasNext
+                state.page += 1
                 return .none
 
             case .backButtonTapped:
@@ -67,6 +96,14 @@ public struct PastDateCoursesFeature {
             case .delegate:
                 return .none
             }
+        }
+    }
+
+    // 지정한 페이지를 받아 지정한 액션으로 돌려준다
+    private func loadPage(_ page: Int, action: @escaping @Sendable (PastDateCoursePage?) -> Action) -> Effect<Action> {
+        .run { [homeClient] send in
+            let result = try? await homeClient.pastCourses(page, Self.pageSize)
+            await send(action(result))
         }
     }
 }

@@ -21,3 +21,10 @@ struct HomeDateCourseResponseDTO: Decodable, Sendable {
     let date: String
     let totalPlaceCount: Int
 }
+
+// 지난 데이트 코스 목록(GET /date-courses/past). totalCount 는 전체 데이트 횟수
+struct PastDateCoursesResponseDTO: Decodable, Sendable {
+    let dateCourses: [HomeDateCourseResponseDTO]
+    let totalCount: Int
+    let hasNext: Bool
+}

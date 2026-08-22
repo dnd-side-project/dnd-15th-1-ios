@@ -49,6 +49,13 @@ public struct PastDateCoursesView: View {
 
                 ForEach(store.courses) { course in
                     PastDateCourseRow(schedule: course)
+                        .onAppear { prefetchIfNeeded(course) }
+                }
+
+                if store.isLoadingMore {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
                 }
             }
             .padding(.horizontal, 20)
@@ -57,11 +64,18 @@ public struct PastDateCoursesView: View {
         }
     }
 
-    // 총 데이트 횟수 = 받은 리스트 개수
+    // 끝에서 세 번째 카드가 보이면 미리 다음 페이지를 받아 스크롤이 끊기지 않게 한다
+    private func prefetchIfNeeded(_ course: DateSchedule) {
+        if course.id == store.courses.suffix(3).first?.id {
+            store.send(.reachedEnd)
+        }
+    }
+
+    // 총 데이트 횟수는 서버가 준 totalCount 를 쓴다
     private var countBanner: some View {
         ZStack(alignment: .bottomTrailing) {
             HStack {
-                Text("지금까지 총 \(store.count)번\n데이트 일정을 함께 했어요")
+                Text("지금까지 총 \(store.totalCount)번\n데이트 일정을 함께 했어요")
                     .typography(.title3SB)
                     .foregroundStyle(Color.textInverse)
                     .fixedSize(horizontal: false, vertical: true)

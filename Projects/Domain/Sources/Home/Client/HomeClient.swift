@@ -13,7 +13,7 @@ public struct HomeClient: Sendable {
     public var home: @Sendable () async throws -> HomeSummary
     public var recentSavedPlaces: @Sendable (_ size: Int) async throws -> [SavedPlace]
     public var pastDates: @Sendable (_ size: Int) async throws -> [DateSchedule]
-    public var pastCourses: @Sendable (_ size: Int) async throws -> [DateSchedule]
+    public var pastCourses: @Sendable (_ page: Int, _ size: Int) async throws -> PastDateCoursePage
 }
 
 extension HomeClient: TestDependencyKey {

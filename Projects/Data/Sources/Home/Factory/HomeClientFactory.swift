@@ -17,7 +17,7 @@ public enum HomeClientFactory {
             home: { try await repository.home() },
             recentSavedPlaces: { size in try await repository.recentSavedPlaces(size: size) },
             pastDates: { size in try await repository.pastDates(size: size) },
-            pastCourses: { size in try await repository.pastCourses(size: size) }
+            pastCourses: { page, size in try await repository.pastCourses(page: page, size: size) }
         )
     }
 }
