@@ -262,8 +262,9 @@ private extension MapFlowFeature {
         case .postDetail(.presented(.delegate(.sessionExpired))):
             return .send(.delegate(.sessionExpired))
 
-        case .postDetail(.presented(.delegate(.placeSelected))):
-            // 장소 상세로 가는 길은 이 Cycle 밖이다
+        case let .postDetail(.presented(.delegate(.placeSelected(id)))):
+            // 리스트 아이템 탭도 핀 탭과 똑같이 카메라를 옮기고 그 장소 상세를 얹는다
+            focusContentPlaceDetail(state: &state, id: id)
             return .none
 
         case .detail, .alias, .postDetail:
@@ -293,6 +294,13 @@ private extension MapFlowFeature {
                 presentContentPlaceDetail(state: &state, place: place)
             }
         }
+    }
+
+    /// 리스트에서 고른 장소로 카메라를 옮기고 상세를 연다. 지도에 없는 id 면 무시한다
+    func focusContentPlaceDetail(state: inout State, id: String) {
+        guard let place = state.map.contentPlaces.first(where: { $0.id == id }) else { return }
+        state.map.camera = .focusing(place.coordinate, zoomLevel: state.map.camera.zoomLevel)
+        presentContentPlaceDetail(state: &state, place: place)
     }
 
     /// 게시글 핀을 눌러 장소 상세를 연다. 게시글 상세는 남겨 둬 상세를 닫으면 그 자리로 돌아간다
