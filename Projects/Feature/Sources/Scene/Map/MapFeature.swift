@@ -492,6 +492,12 @@ public extension MapFeature.State {
         return false
     }
 
+    /// 게시글 핀 모드 여부. 이때는 지도 검색·필터 UI 를 감춘다
+    var isContentMode: Bool {
+        if case .content = mode { return true }
+        return false
+    }
+
     /// 저장 시트·코스 버튼 표시 여부.
     /// 장소를 고르면(상세) 감추고, 게시글 핀 모드에선 상세가 덮으므로 통째로 감춘다
     var showsSavedSheet: Bool {
