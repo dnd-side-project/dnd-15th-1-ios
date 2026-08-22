@@ -12,9 +12,13 @@ import ThirdParty
 
 public extension ExploreClient {
     static let mock = ExploreClient(
-        contents: { _, _ in ContentPage(items: Content.mocks, hasNext: false) },
-        searchContents: { _ in Content.mocks },
-        searchPlaces: { _ in Place.mocks }
+        contents: { _, _, _ in
+            ContentPage(items: Content.mocks, hasNext: false, popularTags: ["성수", "강남", "을지로"])
+        },
+        searchContents: { _, _, _, _ in
+            ContentPage(items: Content.mocks, hasNext: false, popularTags: [])
+        },
+        searchPlaces: { _, _, _ in PlacePage(items: Place.mocks, hasNext: false) }
     )
 }
 

@@ -4,11 +4,35 @@ import ThirdParty
 
 @Reducer
 public struct HomeFeature {
-    /// 커플 연결 세 화면. 모두 `couple` 스토어 하나를 공유하고 Route 로 무엇을 그릴지만 가른다
-    public enum CoupleRoute: Hashable {
+    /// 추천 섹션에 보여줄 게시물 수
+    static let recommendationCount = 10
+
+    /// 최근 저장 장소 미리보기 수
+    static let recentSavedPlaceCount = 5
+
+    /// 지난 데이트 미리보기 수
+    static let pastDateCount = 3
+
+    /// 홈에서 push 되는 화면. 커플 세 화면은 `couple` 스토어를 공유, 지난 데이트는 별도 스토어,
+    /// 코스 짜기 두 화면은 `course` 스토어를 공유한다
+    public enum HomeRoute: Hashable {
         case connect
         case codeInput
         case complete
+        case pastDateCourses
+        case course
+        case coursePlacePick
+
+        var isCouple: Bool {
+            switch self {
+            case .connect, .codeInput, .complete: return true
+            case .pastDateCourses, .course, .coursePlacePick: return false
+            }
+        }
+
+        var isCourse: Bool {
+            self == .course || self == .coursePlacePick
+        }
     }
 
     @ObservableState
@@ -20,7 +44,9 @@ public struct HomeFeature {
         public var pastSchedules: [DateSchedule]
         public var savedPlaces: [SavedPlace]
         public var couple: CoupleConnectFeature.State?
-        public var couplePath: [CoupleRoute]
+        public var pastDateCourses: PastDateCoursesFeature.State?
+        public var course: CourseFeature.State?
+        public var homePath: [HomeRoute]
 
         public var isConnected: Bool {
             partnerName != nil
@@ -41,12 +67,14 @@ public struct HomeFeature {
         public init(
             nickname: String = "듀가나디햄햄",
             partnerName: String? = nil,
-            upcomingSchedule: UpcomingSchedule? = .mock,
-            recommendations: [Content] = Content.mocks,
-            pastSchedules: [DateSchedule] = DateSchedule.mocks,
+            upcomingSchedule: UpcomingSchedule? = nil,
+            recommendations: [Content] = [],
+            pastSchedules: [DateSchedule] = [],
             savedPlaces: [SavedPlace] = [],
             couple: CoupleConnectFeature.State? = nil,
-            couplePath: [CoupleRoute] = []
+            pastDateCourses: PastDateCoursesFeature.State? = nil,
+            course: CourseFeature.State? = nil,
+            homePath: [HomeRoute] = []
         ) {
             self.nickname = nickname
             self.partnerName = partnerName
@@ -55,28 +83,39 @@ public struct HomeFeature {
             self.pastSchedules = pastSchedules
             self.savedPlaces = savedPlaces
             self.couple = couple
-            self.couplePath = couplePath
+            self.pastDateCourses = pastDateCourses
+            self.course = course
+            self.homePath = homePath
         }
     }
 
     public enum Action: Equatable {
         case onAppear
-        case coupleLoaded(CoupleStatus?)
-        case coupleLoadFailed(CoupleError)
+        case homeLoaded(HomeSummary)
+        case homeLoadFailed(HomeError)
         case savedPlacesLoaded([SavedPlace])
+        case recommendationsLoaded([Content])
+        case pastDatesLoaded([DateSchedule])
+        case savedPlacesSeeAllTapped
+        case calendarTapped
         case connectFlowRequested
-        case couplePathChanged([CoupleRoute])
+        case courseFlowRequested
+        case homePathChanged([HomeRoute])
         case couple(CoupleConnectFeature.Action)
+        case pastDateCourses(PastDateCoursesFeature.Action)
+        case course(CourseFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
             case sessionExpired
+            case showAllSavedPlaces
         }
     }
 
-    @Dependency(\.placeClient) var placeClient
-    @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.homeClient) var homeClient
+    @Dependency(\.exploreClient) var exploreClient
+    @Dependency(\.profileClient) var profileClient
 
     public init() {}
 
@@ -85,24 +124,27 @@ public struct HomeFeature {
             .ifLet(\.couple, action: \.couple) {
                 CoupleConnectFeature()
             }
+            .ifLet(\.pastDateCourses, action: \.pastDateCourses) {
+                PastDateCoursesFeature()
+            }
+            .ifLet(\.course, action: \.course) {
+                CourseFeature()
+            }
     }
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
-            return .merge(loadCouple(), loadSavedPlaces())
+            return .merge(loadHome(), loadSavedPlaces(), loadRecommendations())
 
-        case let .coupleLoaded(status):
-            guard let status else {
-                // 성공했지만 커플 없음(404) — 미연결로 확정해 이전 파트너를 지운다
-                state.partnerName = nil
-                return .none
-            }
-            state.nickname = status.me.nickname
-            state.partnerName = status.connected ? status.partner?.nickname : nil
-            return .none
+        case let .homeLoaded(summary):
+            state.nickname = summary.myNickname
+            state.partnerName = summary.connected ? summary.partnerNickname : nil
+            state.upcomingSchedule = summary.currentDateCourse
+            // 지난 데이트는 연결됐을 때만 있다
+            return summary.connected ? loadPastDates() : .none
 
-        case let .coupleLoadFailed(error):
+        case let .homeLoadFailed(error):
             // 인증 만료만 상위로 올려 로그인으로 보내고, 다른 실패는 기존 화면을 유지한다
             if error == .unauthorized {
                 return .send(.delegate(.sessionExpired))
@@ -113,24 +155,113 @@ public struct HomeFeature {
             state.savedPlaces = places
             return .none
 
+        case let .recommendationsLoaded(contents):
+            state.recommendations = contents
+            return .none
+
+        case let .pastDatesLoaded(schedules):
+            state.pastSchedules = schedules
+            return .none
+
+        case .savedPlacesSeeAllTapped:
+            // 전체보기는 지도 탭으로 이동. 실제 탭 전환은 상위(MainTab)가 처리
+            return .send(.delegate(.showAllSavedPlaces))
+
+        case .calendarTapped, .connectFlowRequested, .courseFlowRequested, .homePathChanged,
+             .couple, .pastDateCourses, .course, .delegate:
+            return homeNavCore(state: &state, action: action)
+        }
+    }
+
+    private func homeNavCore(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .calendarTapped:
+            // 연결됐으면 지난 데이트 화면, 아니면 커플 연결로
+            guard state.isConnected else { return .send(.connectFlowRequested) }
+            state.pastDateCourses = PastDateCoursesFeature.State()
+            state.homePath.append(.pastDateCourses)
+            return .none
+
         case .connectFlowRequested:
             // 이미 연결된 경우 커플 연결로 보내지 않는다
             guard !state.isConnected else { return .none }
             state.couple = CoupleConnectFeature.State(myNickname: state.nickname, showsSkip: false)
-            state.couplePath = [.connect]
+            state.homePath = [.connect]
             return .none
 
-        case let .couplePathChanged(path):
-            state.couplePath = path
-            // 스택이 비면 공유 스토어도 내려 다음 진입이 새 상태로 시작하게 한다
-            if path.isEmpty { state.couple = nil }
+        case .courseFlowRequested:
+            // 지난 진입의 날짜·장소를 물려받지 않게 새 상태로 연다
+            state.course = CourseFeature.State()
+            state.homePath.append(.course)
+            return .none
+
+        case let .homePathChanged(path):
+            applyHomePath(path, state: &state)
             return .none
 
         case let .couple(.delegate(delegate)):
             return handleCoupleDelegate(state: &state, delegate: delegate)
 
-        case .couple, .delegate:
+        case let .pastDateCourses(.delegate(delegate)):
+            return handlePastDelegate(state: &state, delegate: delegate)
+
+        case let .course(.delegate(delegate)):
+            return handleCourseDelegate(state: &state, delegate: delegate)
+
+        default:
             return .none
+        }
+    }
+}
+
+// MARK: - 네비게이션 · 로딩 헬퍼
+
+private extension HomeFeature {
+    /// 스택에서 빠진 화면의 스토어를 내려 다음 진입이 새 상태로 시작하게 한다
+    func applyHomePath(_ path: [HomeRoute], state: inout State) {
+        state.homePath = path
+        if !path.contains(.pastDateCourses) { state.pastDateCourses = nil }
+        if !path.contains(where: \.isCouple) { state.couple = nil }
+        if !path.contains(where: \.isCourse) { state.course = nil }
+    }
+
+    func handleCourseDelegate(
+        state: inout State,
+        delegate: CourseFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .placePickRequested:
+            state.homePath.append(.coursePlacePick)
+            return .none
+        case .dismissed:
+            var next = state.homePath
+            // 코스 화면이 스스로 닫는 신호라, 맨 위가 코스 경로일 때만 뺀다
+            if let last = next.last, last.isCourse {
+                next.removeLast()
+            }
+            return .send(.homePathChanged(next))
+        case .buildRequested:
+            // 코스 결과 화면은 아직 없음
+            return .none
+        case .sessionExpired:
+            state.course = nil
+            state.homePath = []
+            return .send(.delegate(.sessionExpired))
+        }
+    }
+
+    private func handlePastDelegate(
+        state: inout State,
+        delegate: PastDateCoursesFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .back:
+            if !state.homePath.isEmpty { state.homePath.removeLast() }
+            state.pastDateCourses = nil
+            return .none
+        case .createCourse:
+            // 지난 데이트 위로 코스 짜기를 밀어 뒤로가기 시 지난 데이트로 돌아오게 한다
+            return .send(.courseFlowRequested)
         }
     }
 
@@ -140,45 +271,62 @@ public struct HomeFeature {
     ) -> Effect<Action> {
         switch delegate {
         case .showCodeInput:
-            state.couplePath.append(.codeInput)
+            state.homePath.append(.codeInput)
             return .none
         case .showComplete:
-            state.couplePath.append(.complete)
+            state.homePath.append(.complete)
             return .none
         case .back:
-            guard !state.couplePath.isEmpty else { return .none }
-            state.couplePath.removeLast()
-            if state.couplePath.isEmpty { state.couple = nil }
+            guard !state.homePath.isEmpty else { return .none }
+            state.homePath.removeLast()
+            if state.homePath.isEmpty { state.couple = nil }
             return .none
         case .connected, .skipped:
             // 홈 진입엔 skip 이 없지만 방어적으로 같이 닫고 배너·헤더를 새로 받는다
             state.couple = nil
-            state.couplePath = []
-            return loadCouple()
+            state.homePath = []
+            return loadHome()
         case .sessionExpired:
             state.couple = nil
-            state.couplePath = []
+            state.homePath = []
             return .send(.delegate(.sessionExpired))
         }
     }
 
-    private func loadCouple() -> Effect<Action> {
-        .run { [coupleClient] send in
+    private func loadHome() -> Effect<Action> {
+        .run { [homeClient] send in
             do {
-                let status = try await coupleClient.current()
-                await send(.coupleLoaded(status))
-            } catch let error as CoupleError {
-                await send(.coupleLoadFailed(error))
+                let summary = try await homeClient.home()
+                await send(.homeLoaded(summary))
+            } catch let error as HomeError {
+                await send(.homeLoadFailed(error))
             } catch {
-                await send(.coupleLoadFailed(.unknown))
+                await send(.homeLoadFailed(.unknown))
             }
         }
     }
 
     private func loadSavedPlaces() -> Effect<Action> {
-        .run { [placeClient] send in
-            let places = (try? await placeClient.savedPlaces()) ?? []
+        .run { [homeClient] send in
+            let places = (try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount)) ?? []
             await send(.savedPlacesLoaded(places))
+        }
+    }
+
+    private func loadPastDates() -> Effect<Action> {
+        .run { [homeClient] send in
+            let dates = (try? await homeClient.pastDates(Self.pastDateCount)) ?? []
+            await send(.pastDatesLoaded(dates))
+        }
+    }
+
+    private func loadRecommendations() -> Effect<Action> {
+        .run { [profileClient, exploreClient] send in
+            // datePreference 를 등록한 사용자만 취향(PREFERENCE) 정렬을 쓰고, 아니면 POPULAR
+            let hasPreference = (try? await profileClient.member())?.datePreference != nil
+            let sort: ContentSort = hasPreference ? .preference : .popular
+            let page = try? await exploreClient.contents(sort, 0, Self.recommendationCount)
+            await send(.recommendationsLoaded(page?.items ?? []))
         }
     }
 }

@@ -8,6 +8,18 @@ public struct ProfileRepository: Sendable {
         self.profileRemote = profileRemote
     }
 
+    public func member() async throws -> UserProfile {
+        do {
+            let member = try await profileRemote.member()
+            guard let profile = ProfileDTOMapper.toDomain(member) else {
+                throw ProfileError.unknown
+            }
+            return profile
+        } catch {
+            throw ProfileErrorMapper.map(error)
+        }
+    }
+
     public func updateNickname(nickname: String, iconID: Int) async throws -> UserProfile {
         do {
             let member = try await profileRemote.member()

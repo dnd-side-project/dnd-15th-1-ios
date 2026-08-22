@@ -94,7 +94,7 @@ public struct ExploreView: View {
 
     private var popularSection: some View {
         VStack(alignment: .leading, spacing: Spacing.s12) {
-            Text("지금 인기있는 장소")
+            Text(store.sectionTitle)
                 .typography(.title2B)
                 .foregroundStyle(Color.textPrimary)
 

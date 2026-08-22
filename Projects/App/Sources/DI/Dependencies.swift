@@ -16,6 +16,7 @@ enum Dependencies {
         values.authClient = AuthClientFactory.make(session: authSession)
         values.profileClient = ProfileClientFactory.make(session: authSession)
         values.coupleClient = CoupleClientFactory.make(session: authSession)
+        values.homeClient = HomeClientFactory.make(session: authSession)
         values.placeImportClient = PlaceImportClientFactory.make(session: authSession)
 
         values.exploreClient = ExploreClientFactory.make(session: authSession)

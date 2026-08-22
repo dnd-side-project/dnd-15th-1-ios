@@ -10,9 +10,13 @@ import ThirdParty
 
 @DependencyClient
 public struct ExploreClient: Sendable {
-    public var contents: @Sendable (_ page: Int, _ size: Int) async throws -> ContentPage
-    public var searchContents: @Sendable (_ query: String) async throws -> [Content]
-    public var searchPlaces: @Sendable (_ query: String) async throws -> [Place]
+    public var contents: @Sendable (_ sort: ContentSort, _ page: Int, _ size: Int) async throws -> ContentPage
+    public var searchContents: @Sendable (
+        _ query: String, _ sort: ContentSort, _ page: Int, _ size: Int
+    ) async throws -> ContentPage
+    public var searchPlaces: @Sendable (
+        _ query: String, _ page: Int, _ size: Int
+    ) async throws -> PlacePage
 }
 
 extension ExploreClient: TestDependencyKey {

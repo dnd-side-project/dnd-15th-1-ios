@@ -13,6 +13,7 @@ struct HomeBanner: View {
     let isConnected: Bool
     let upcomingSchedule: UpcomingSchedule?
     let connectTapped: () -> Void
+    let createCourseTapped: () -> Void
     let bannerTapped: () -> Void
 
     var body: some View {
@@ -78,7 +79,7 @@ struct HomeBanner: View {
     }
 
     private var courseBanner: some View {
-        Button(action: bannerTapped) {
+        Button(action: createCourseTapped) {
             HStack {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("이번주 데이트 코스를")
@@ -114,7 +115,7 @@ struct HomeBanner: View {
         Button(action: bannerTapped) {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("\(schedule.date) 데이트 일정")
+                    Text(schedule.title)
                         .typography(.title3SB)
                         .foregroundStyle(Color.commonWhite)
 

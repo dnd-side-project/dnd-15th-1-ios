@@ -22,4 +22,14 @@ public struct PlaceRepository: Sendable {
             throw PlaceErrorMapper.map(error)
         }
     }
+
+    public func searchPlaces(query: String, page: Int, size: Int) async throws -> PlacePage {
+        do {
+            return PlaceDTOMapper.toSearchPage(
+                try await remote.searchPlaces(query: query, page: page, size: size)
+            )
+        } catch {
+            throw PlaceErrorMapper.map(error)
+        }
+    }
 }

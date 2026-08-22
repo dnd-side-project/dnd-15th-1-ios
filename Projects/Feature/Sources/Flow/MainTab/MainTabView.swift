@@ -11,7 +11,7 @@ public struct MainTabView: View {
 
     public var body: some View {
         TabView(selection: $store.selectedTab.sending(\.tabSelected)) {
-            NavigationStack(path: homeCouplePath) {
+            NavigationStack(path: homePathBinding) {
                 HomeView(store: homeStore)
             }
             .tabItem { tabLabel("홈", icon: .home) }
@@ -42,11 +42,11 @@ public struct MainTabView: View {
         store.scope(state: \.home, action: \.home)
     }
 
-    private var homeCouplePath: Binding<[HomeFeature.CoupleRoute]> {
+    private var homePathBinding: Binding<[HomeFeature.HomeRoute]> {
         let homeStore = homeStore
         return Binding(
-            get: { homeStore.couplePath },
-            set: { homeStore.send(.couplePathChanged($0)) }
+            get: { homeStore.homePath },
+            set: { homeStore.send(.homePathChanged($0)) }
         )
     }
 

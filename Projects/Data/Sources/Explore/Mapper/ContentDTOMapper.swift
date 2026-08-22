@@ -12,7 +12,8 @@ enum ContentDTOMapper {
     static func toDomain(_ dto: ContentPageResponseDTO) -> ContentPage {
         ContentPage(
             items: dto.contents.map(toContent),
-            hasNext: dto.hasNext
+            hasNext: dto.hasNext,
+            popularTags: dto.popularTags ?? []
         )
     }
 

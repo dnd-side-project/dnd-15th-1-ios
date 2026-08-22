@@ -79,6 +79,9 @@ public struct MainTabFeature {
                 switch delegate {
                 case .sessionExpired:
                     return .send(.delegate(.sessionExpired))
+                case .showAllSavedPlaces:
+                    state.selectedTab = .map
+                    return .none
                 }
             case let .map(.delegate(delegate)):
                 switch delegate {

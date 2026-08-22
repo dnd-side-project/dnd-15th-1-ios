@@ -11,6 +11,7 @@ import Foundation
 struct ContentPageResponseDTO: Decodable, Sendable {
     let contents: [ContentResponseDTO]
     let hasNext: Bool
+    let popularTags: [String]?
 }
 
 struct ContentResponseDTO: Decodable, Sendable {

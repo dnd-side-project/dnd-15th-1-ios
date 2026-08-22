@@ -13,13 +13,19 @@ public enum ExploreClientFactory {
         let repository = ContentRepository(
             remote: ContentRemoteDataSource(networkClient: session.authedClient)
         )
-        // searchContents / searchPlaces 는 아직 서버 연동 전이라 mock 유지
+        let placeRepository = PlaceRepository(
+            remote: PlaceRemoteDataSource(networkClient: session.authedClient)
+        )
         return ExploreClient(
-            contents: { page, size in
-                try await repository.contents(page: page, size: size)
+            contents: { sort, page, size in
+                try await repository.contents(sort: sort, page: page, size: size)
             },
-            searchContents: ExploreClient.mock.searchContents,
-            searchPlaces: ExploreClient.mock.searchPlaces
+            searchContents: { query, sort, page, size in
+                try await repository.searchContents(query: query, sort: sort, page: page, size: size)
+            },
+            searchPlaces: { query, page, size in
+                try await placeRepository.searchPlaces(query: query, page: page, size: size)
+            }
         )
     }
 }
