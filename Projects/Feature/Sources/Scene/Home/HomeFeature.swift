@@ -97,6 +97,7 @@ public struct HomeFeature {
         case recommendationsLoaded([Content])
         case pastDatesLoaded([DateSchedule])
         case savedPlacesSeeAllTapped
+        case savedPlaceTapped(String)
         case calendarTapped
         case connectFlowRequested
         case courseFlowRequested
@@ -113,6 +114,8 @@ public struct HomeFeature {
             case showAllSavedPlaces
             /// 추천 카드 탭. MainTab 이 지도 탭으로 옮겨 상세를 연다
             case showContentDetail(String)
+            /// 최근 저장 장소 탭. MainTab 이 지도 탭으로 옮겨 장소 상세를 연다
+            case showPlaceDetail(SavedPlace)
         }
     }
 
@@ -169,6 +172,11 @@ public struct HomeFeature {
         case .savedPlacesSeeAllTapped:
             // 전체보기는 지도 탭으로 이동. 실제 탭 전환은 상위(MainTab)가 처리
             return .send(.delegate(.showAllSavedPlaces))
+
+        case let .savedPlaceTapped(id):
+            // 장소 상세는 지도 탭에서 연다. 전체보기와 같은 길
+            guard let place = state.savedPlaces.first(where: { $0.id == id }) else { return .none }
+            return .send(.delegate(.showPlaceDetail(place)))
 
         case let .recommendationTapped(id):
             // 표시는 지도 탭 위에서. MainTab 까지 올린다

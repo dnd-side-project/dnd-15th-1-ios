@@ -209,8 +209,13 @@ public struct SearchView: View {
     private var placeList: some View {
         LazyVStack(spacing: Spacing.s8) {
             ForEach(store.places) { place in
-                PlaceRow(place: place)
-                    .onAppear { prefetchIfNeeded(place) }
+                Button {
+                    store.send(.placeTapped(place.id))
+                } label: {
+                    PlaceRow(place: place)
+                }
+                .buttonStyle(.plain)
+                .onAppear { prefetchIfNeeded(place) }
             }
         }
 

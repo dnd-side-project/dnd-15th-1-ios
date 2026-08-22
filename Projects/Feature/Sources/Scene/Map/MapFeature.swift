@@ -85,6 +85,7 @@ public struct MapFeature {
         case cameraChanged(MapCamera)
         case categoryTapped(PlaceCategory?)
         case ownershipSelected(PlaceOwnership)
+        case filtersReset
         case rowMenuTapped(String)
         case rowMenuDismissed
         case editTapped(String)
@@ -149,7 +150,7 @@ public struct MapFeature {
         case .cameraChanged, .currentLocationTapped,
              .locationAuthorizationResponse, .currentLocationResponse, .permissionModalDismissed:
             return updateMap(state: &state, action: action)
-        case .categoryTapped, .ownershipSelected, .rowMenuTapped, .rowMenuDismissed, .dismissToast:
+        case .categoryTapped, .ownershipSelected, .filtersReset, .rowMenuTapped, .rowMenuDismissed, .dismissToast:
             return updateFilter(state: &state, action: action)
         case .editTapped, .deleteTapped, .markerTapped, .rowTapped, .searchBarTapped, .courseButtonTapped:
             return raise(state: &state, action: action)
@@ -179,8 +180,8 @@ public struct MapFeature {
             state.places = places
             state.bookmarkedPlaceIDs = Set(places.map(\.id))
             state.loadState = .loaded
-            // 게시글 핀을 보고 있을 땐 저장 목록 로딩이 카메라를 뺏지 않게 한다
-            if case .saved = state.mode {
+            // 게시글 핀·선택 장소를 보고 있을 땐 저장 목록 로딩이 카메라를 뺏지 않게 한다
+            if case .saved = state.mode, state.selectedPlace == nil {
                 state.camera = Self.overview(of: state)
             }
             return .none
@@ -228,6 +229,13 @@ public struct MapFeature {
         case let .ownershipSelected(filter):
             state.selectedOwnership = filter
             // 카테고리 필터와 같은 규칙이다. 안 옮기면 화면 한가운데 장소가 목록에서 사라진다
+            state.camera = Self.overview(of: state)
+            return .none
+
+        case .filtersReset:
+            // 홈 전체보기로 들어올 때 걸린 필터를 기본으로 되돌리고 전체를 비춘다
+            state.selectedCategory = nil
+            state.selectedOwnership = .together
             state.camera = Self.overview(of: state)
             return .none
 

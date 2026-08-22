@@ -1,3 +1,4 @@
+import Domain
 import Foundation
 import ThirdParty
 
@@ -107,10 +108,15 @@ public struct MainTabFeature {
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         case .showAllSavedPlaces:
+            // 전체보기는 필터 없는 전체 상태로 지도를 연다
             state.selectedTab = .map
-            return .none
+            return .send(.map(.showAllSaved))
         case let .showContentDetail(id):
             return presentContentDetail(state: &state, id: id)
+        case let .showPlaceDetail(place):
+            // 장소 상세는 지도 탭에서 연다. 닫아도 지도 탭에 머무른다(전체보기와 동일)
+            state.selectedTab = .map
+            return .send(.map(.presentPlaceDetail(place)))
         }
     }
 
@@ -140,6 +146,8 @@ public struct MainTabFeature {
             return .send(.delegate(.sessionExpired))
         case let .showContentDetail(id):
             return presentContentDetail(state: &state, id: id)
+        case let .showPlaceDetail(place):
+            return presentSearchPlaceDetail(state: &state, place: place)
         }
     }
 
@@ -148,5 +156,12 @@ public struct MainTabFeature {
         state.contentReturnTab = state.selectedTab
         state.selectedTab = .map
         return .send(.map(.presentContentDetail(id)))
+    }
+
+    /// 지금 탭을 기억해 두고 지도 탭으로 옮겨 검색 장소 상세를 연다. 닫으면 그 탭으로 돌아온다
+    private func presentSearchPlaceDetail(state: inout State, place: Place) -> Effect<Action> {
+        state.contentReturnTab = state.selectedTab
+        state.selectedTab = .map
+        return .send(.map(.presentSearchPlaceDetail(place)))
     }
 }
