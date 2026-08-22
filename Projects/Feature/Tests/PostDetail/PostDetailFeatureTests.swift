@@ -11,8 +11,10 @@ final class PostDetailFeatureTests: XCTestCase {
         caption: "본문",
         canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
         places: [
-            PostDetailPlace(id: "101", name: "가게 하나", category: .cafe, isSaved: true),
-            PostDetailPlace(id: "102", name: "가게 둘", category: .food, isSaved: false),
+            PostDetailPlace(id: "101", name: "가게 하나", category: .cafe, isSaved: true,
+                            coordinate: Coordinate(latitude: 37.5, longitude: 127.0)),
+            PostDetailPlace(id: "102", name: "가게 둘", category: .food, isSaved: false,
+                            coordinate: Coordinate(latitude: 37.6, longitude: 127.1)),
         ]
     )
 

@@ -20,3 +20,22 @@ struct ContentResponseDTO: Decodable, Sendable {
     let thumbnailUrl: String?
     let placeCount: Int
 }
+
+// 상세가 쓰는 필드만 선언. sourceType/author/engagement/publishedOn/thumbnailUrl 등은 무시됨
+struct ContentDetailResponseDTO: Decodable, Sendable {
+    let contentId: Int
+    let title: String?
+    let caption: String?
+    let canonicalUrl: String?
+    let places: [ContentDetailPlaceResponseDTO]?
+}
+
+// 인스타 추출(ImportPlace)과 동일한 형태. 쓰는 필드만 선언
+struct ContentDetailPlaceResponseDTO: Decodable, Sendable {
+    let placeId: Int
+    let name: String
+    let categoryName: String
+    let latitude: Double
+    let longitude: Double
+    let savedByMe: Bool
+}

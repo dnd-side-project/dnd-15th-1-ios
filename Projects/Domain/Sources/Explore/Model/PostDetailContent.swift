@@ -30,16 +30,20 @@ public struct PostDetailPlace: Equatable, Identifiable, Sendable {
     public let name: String
     public let category: PlaceCategory
     public let isSaved: Bool
+    /// 지도 핀·카메라에 쓰는 좌표
+    public let coordinate: Coordinate
 
     public init(
         id: String,
         name: String,
         category: PlaceCategory,
-        isSaved: Bool
+        isSaved: Bool,
+        coordinate: Coordinate
     ) {
         self.id = id
         self.name = name
         self.category = category
         self.isSaved = isSaved
+        self.coordinate = coordinate
     }
 }

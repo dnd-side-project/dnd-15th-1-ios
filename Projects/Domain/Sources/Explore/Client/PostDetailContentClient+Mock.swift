@@ -23,11 +23,16 @@ public extension PostDetailContent {
             """,
             canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
             places: [
-                PostDetailPlace(id: "101", name: "한강뷰 감성카페", category: .cafe, isSaved: true),
-                PostDetailPlace(id: "102", name: "성수동 브런치집", category: .food, isSaved: false),
-                PostDetailPlace(id: "103", name: "야경 좋은 전망대", category: .tourism, isSaved: true),
-                PostDetailPlace(id: "104", name: "소품샵 골목", category: .shopping, isSaved: false),
-                PostDetailPlace(id: "105", name: "심야 보드게임 카페", category: .activity, isSaved: false),
+                PostDetailPlace(id: "101", name: "한강뷰 감성카페", category: .cafe, isSaved: true,
+                                coordinate: Coordinate(latitude: 37.5299, longitude: 126.9648)),
+                PostDetailPlace(id: "102", name: "성수동 브런치집", category: .food, isSaved: false,
+                                coordinate: Coordinate(latitude: 37.5445, longitude: 127.0559)),
+                PostDetailPlace(id: "103", name: "야경 좋은 전망대", category: .tourism, isSaved: true,
+                                coordinate: Coordinate(latitude: 37.5512, longitude: 126.9882)),
+                PostDetailPlace(id: "104", name: "소품샵 골목", category: .shopping, isSaved: false,
+                                coordinate: Coordinate(latitude: 37.5561, longitude: 126.9236)),
+                PostDetailPlace(id: "105", name: "심야 보드게임 카페", category: .activity, isSaved: false,
+                                coordinate: Coordinate(latitude: 37.5637, longitude: 126.9860)),
             ]
         )
     }
