@@ -13,14 +13,26 @@ public struct HomeFeature {
     /// 지난 데이트 미리보기 수
     static let pastDateCount = 3
 
-    /// 홈에서 push 되는 화면. 커플 세 화면은 `couple` 스토어를 공유, 지난 데이트는 별도 스토어
+    /// 홈에서 push 되는 화면. 커플 세 화면은 `couple` 스토어를 공유, 지난 데이트는 별도 스토어,
+    /// 코스 짜기 두 화면은 `course` 스토어를 공유한다
     public enum HomeRoute: Hashable {
         case connect
         case codeInput
         case complete
         case pastDateCourses
+        case course
+        case coursePlacePick
 
-        var isCouple: Bool { self != .pastDateCourses }
+        var isCouple: Bool {
+            switch self {
+            case .connect, .codeInput, .complete: return true
+            case .pastDateCourses, .course, .coursePlacePick: return false
+            }
+        }
+
+        var isCourse: Bool {
+            self == .course || self == .coursePlacePick
+        }
     }
 
     @ObservableState
@@ -33,6 +45,7 @@ public struct HomeFeature {
         public var savedPlaces: [SavedPlace]
         public var couple: CoupleConnectFeature.State?
         public var pastDateCourses: PastDateCoursesFeature.State?
+        public var course: CourseFeature.State?
         public var homePath: [HomeRoute]
 
         public var isConnected: Bool {
@@ -60,6 +73,7 @@ public struct HomeFeature {
             savedPlaces: [SavedPlace] = [],
             couple: CoupleConnectFeature.State? = nil,
             pastDateCourses: PastDateCoursesFeature.State? = nil,
+            course: CourseFeature.State? = nil,
             homePath: [HomeRoute] = []
         ) {
             self.nickname = nickname
@@ -70,6 +84,7 @@ public struct HomeFeature {
             self.savedPlaces = savedPlaces
             self.couple = couple
             self.pastDateCourses = pastDateCourses
+            self.course = course
             self.homePath = homePath
         }
     }
@@ -84,9 +99,11 @@ public struct HomeFeature {
         case savedPlacesSeeAllTapped
         case calendarTapped
         case connectFlowRequested
+        case courseFlowRequested
         case homePathChanged([HomeRoute])
         case couple(CoupleConnectFeature.Action)
         case pastDateCourses(PastDateCoursesFeature.Action)
+        case course(CourseFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
@@ -109,6 +126,9 @@ public struct HomeFeature {
             }
             .ifLet(\.pastDateCourses, action: \.pastDateCourses) {
                 PastDateCoursesFeature()
+            }
+            .ifLet(\.course, action: \.course) {
+                CourseFeature()
             }
     }
 
@@ -147,7 +167,8 @@ public struct HomeFeature {
             // 전체보기는 지도 탭으로 이동. 실제 탭 전환은 상위(MainTab)가 처리
             return .send(.delegate(.showAllSavedPlaces))
 
-        case .calendarTapped, .connectFlowRequested, .homePathChanged, .couple, .pastDateCourses, .delegate:
+        case .calendarTapped, .connectFlowRequested, .courseFlowRequested, .homePathChanged,
+             .couple, .pastDateCourses, .course, .delegate:
             return homeNavCore(state: &state, action: action)
         }
     }
@@ -168,11 +189,14 @@ public struct HomeFeature {
             state.homePath = [.connect]
             return .none
 
+        case .courseFlowRequested:
+            // 지난 진입의 날짜·장소를 물려받지 않게 새 상태로 연다
+            state.course = CourseFeature.State()
+            state.homePath.append(.course)
+            return .none
+
         case let .homePathChanged(path):
-            state.homePath = path
-            // 스택에서 빠지면 각 스토어도 내려 다음 진입이 새 상태로 시작하게 한다
-            if !path.contains(.pastDateCourses) { state.pastDateCourses = nil }
-            if !path.contains(where: \.isCouple) { state.couple = nil }
+            applyHomePath(path, state: &state)
             return .none
 
         case let .couple(.delegate(delegate)):
@@ -181,8 +205,48 @@ public struct HomeFeature {
         case let .pastDateCourses(.delegate(delegate)):
             return handlePastDelegate(state: &state, delegate: delegate)
 
+        case let .course(.delegate(delegate)):
+            return handleCourseDelegate(state: &state, delegate: delegate)
+
         default:
             return .none
+        }
+    }
+}
+
+// MARK: - 네비게이션 · 로딩 헬퍼
+
+private extension HomeFeature {
+    /// 스택에서 빠진 화면의 스토어를 내려 다음 진입이 새 상태로 시작하게 한다
+    func applyHomePath(_ path: [HomeRoute], state: inout State) {
+        state.homePath = path
+        if !path.contains(.pastDateCourses) { state.pastDateCourses = nil }
+        if !path.contains(where: \.isCouple) { state.couple = nil }
+        if !path.contains(where: \.isCourse) { state.course = nil }
+    }
+
+    func handleCourseDelegate(
+        state: inout State,
+        delegate: CourseFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .placePickRequested:
+            state.homePath.append(.coursePlacePick)
+            return .none
+        case .dismissed:
+            var next = state.homePath
+            // 코스 화면이 스스로 닫는 신호라, 맨 위가 코스 경로일 때만 뺀다
+            if let last = next.last, last.isCourse {
+                next.removeLast()
+            }
+            return .send(.homePathChanged(next))
+        case .buildRequested:
+            // 코스 결과 화면은 아직 없음
+            return .none
+        case .sessionExpired:
+            state.course = nil
+            state.homePath = []
+            return .send(.delegate(.sessionExpired))
         }
     }
 
@@ -196,8 +260,8 @@ public struct HomeFeature {
             state.pastDateCourses = nil
             return .none
         case .createCourse:
-            // 코스 만들기 화면은 아직 없음
-            return .none
+            // 지난 데이트 위로 코스 짜기를 밀어 뒤로가기 시 지난 데이트로 돌아오게 한다
+            return .send(.courseFlowRequested)
         }
     }
 

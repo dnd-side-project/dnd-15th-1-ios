@@ -45,6 +45,15 @@ public struct HomeView: View {
             if let pastStore {
                 PastDateCoursesView(store: pastStore)
             }
+        case .course:
+            // 코스 두 화면도 tabBar 숨김을 스스로 하므로 직접 렌더한다
+            if let courseStore {
+                CourseDateView(store: courseStore)
+            }
+        case .coursePlacePick:
+            if let courseStore {
+                CoursePlacePickView(store: courseStore)
+            }
         }
     }
 
@@ -74,6 +83,10 @@ public struct HomeView: View {
         store.scope(state: \.pastDateCourses, action: \.pastDateCourses)
     }
 
+    private var courseStore: StoreOf<CourseFeature>? {
+        store.scope(state: \.course, action: \.course)
+    }
+
     private var topSection: some View {
         VStack(spacing: 0) {
             HomeHeader(
@@ -86,6 +99,7 @@ public struct HomeView: View {
                 isConnected: store.isConnected,
                 upcomingSchedule: store.upcomingSchedule,
                 connectTapped: { store.send(.connectFlowRequested) },
+                createCourseTapped: { store.send(.courseFlowRequested) },
                 bannerTapped: {}
             )
             .padding(.bottom, 20)
