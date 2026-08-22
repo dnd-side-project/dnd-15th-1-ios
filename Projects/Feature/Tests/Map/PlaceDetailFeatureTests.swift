@@ -48,6 +48,9 @@ final class PlaceDetailFeatureTests: XCTestCase {
             initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 124))
         ) {
             PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
         }
 
         await store.send(.bookmarkTapped) {
@@ -68,6 +71,9 @@ final class PlaceDetailFeatureTests: XCTestCase {
             initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 0))
         ) {
             PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
         }
 
         await store.send(.bookmarkTapped) {

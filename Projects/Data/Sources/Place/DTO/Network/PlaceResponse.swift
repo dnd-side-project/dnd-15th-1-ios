@@ -10,6 +10,7 @@ import Foundation
 struct SavedPlaceResponseDTO: Decodable, Sendable {
     let memberId: Int
     let placeId: Int
+    let kakaoPlaceId: String?
     let name: String
     let address: String
     let roadAddress: String

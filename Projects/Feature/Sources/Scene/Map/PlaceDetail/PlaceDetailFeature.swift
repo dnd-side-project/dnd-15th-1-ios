@@ -56,6 +56,7 @@ public struct PlaceDetailFeature {
 
     public enum Action: Equatable {
         case bookmarkTapped
+        case bookmarkFailed(wasBookmarked: Bool)
         case addressToggled
         case mapButtonTapped
         case contentTapped(String)
@@ -73,6 +74,12 @@ public struct PlaceDetailFeature {
         }
     }
 
+    @Dependency(\.placeClient) var placeClient
+
+    private enum CancelID {
+        case bookmark
+    }
+
     public init() {}
 
     public var body: some ReducerOf<Self> {
@@ -83,10 +90,13 @@ public struct PlaceDetailFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .bookmarkTapped:
-            state.isBookmarked.toggle()
-            // 서버가 준 수가 0 일 때 끄면 음수가 된다. 화면에 -1 이 뜨는 것을 막는다
-            state.bookmarkCount = max(0, state.bookmarkCount + (state.isBookmarked ? 1 : -1))
-            return .send(.delegate(.bookmarkToggled(state.id, state.isBookmarked)))
+            return toggleBookmark(state: &state)
+
+        case let .bookmarkFailed(wasBookmarked):
+            // 서버 실패 → 표시를 되돌리고 지도에도 원래 값을 알린다
+            state.isBookmarked = wasBookmarked
+            state.bookmarkCount = max(0, state.bookmarkCount + (wasBookmarked ? 1 : -1))
+            return .send(.delegate(.bookmarkToggled(state.id, wasBookmarked)))
 
         case .addressToggled:
             state.isAddressExpanded.toggle()
@@ -108,5 +118,36 @@ public struct PlaceDetailFeature {
         case .delegate:
             return .none
         }
+    }
+
+    /// 저장 버튼. 저장 안 된 상태면 저장, 저장된 상태면 삭제.
+    /// 표시를 먼저 뒤집고 서버를 부른 뒤, 실패하면 되돌린다
+    private func toggleBookmark(state: inout State) -> Effect<Action> {
+        let wasBookmarked = state.isBookmarked
+        // 저장하려는데 카카오 식별자가 없으면 부를 수 없다
+        if !wasBookmarked, state.place.kakaoPlaceID == nil { return .none }
+        state.isBookmarked.toggle()
+        // 서버가 준 수가 0 일 때 끄면 음수가 된다. 화면에 -1 이 뜨는 것을 막는다
+        state.bookmarkCount = max(0, state.bookmarkCount + (state.isBookmarked ? 1 : -1))
+        return .merge(
+            .send(.delegate(.bookmarkToggled(state.id, state.isBookmarked))),
+            runBookmark(place: state.place, wasBookmarked: wasBookmarked)
+        )
+    }
+
+    private func runBookmark(place: Place, wasBookmarked: Bool) -> Effect<Action> {
+        .run { [placeClient] send in
+            do {
+                if wasBookmarked {
+                    try await placeClient.removePlace(place.id)
+                } else if let kakaoID = place.kakaoPlaceID {
+                    _ = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
+                }
+            } catch {
+                await send(.bookmarkFailed(wasBookmarked: wasBookmarked))
+            }
+        }
+        // 같은 장소를 연달아 누르면 앞 요청은 버린다
+        .cancellable(id: CancelID.bookmark, cancelInFlight: true)
     }
 }

@@ -45,7 +45,7 @@ enum PlaceDTOMapper {
     private static func toPlace(_ dto: SavedPlaceResponseDTO) -> Place {
         Place(
             id: String(dto.placeId),
-            kakaoPlaceID: nil,
+            kakaoPlaceID: dto.kakaoPlaceId,
             name: dto.name,
             category: category(dto.categoryName),
             address: dto.address,
