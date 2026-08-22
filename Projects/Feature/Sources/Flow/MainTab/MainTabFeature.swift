@@ -108,8 +108,9 @@ public struct MainTabFeature {
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         case .showAllSavedPlaces:
+            // 전체보기는 필터 없는 전체 상태로 지도를 연다
             state.selectedTab = .map
-            return .none
+            return .send(.map(.showAllSaved))
         case let .showContentDetail(id):
             return presentContentDetail(state: &state, id: id)
         case let .showPlaceDetail(place):

@@ -63,6 +63,8 @@ public struct MapFlowFeature {
         case presentContentDetail(String)
         /// 홈에서 고른 저장 장소 상세를 지도 위에 연다
         case presentPlaceDetail(SavedPlace)
+        /// 홈 전체보기로 들어온다. 걸린 필터를 풀고 전체를 보여준다
+        case showAllSaved
         case map(MapFeature.Action)
         case course(CourseFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
@@ -135,6 +137,9 @@ public struct MapFlowFeature {
                 zoomLevel: state.map.camera.zoomLevel
             )
             return .none
+        case .showAllSaved:
+            // 걸려 있던 필터를 푸는 일은 지도가 한다. 카메라 계산이 그쪽에 있다
+            return .send(.map(.filtersReset))
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
         case let .course(.delegate(delegate)):
