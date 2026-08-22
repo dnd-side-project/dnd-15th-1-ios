@@ -43,8 +43,8 @@ enum ContentDTOMapper {
             name: dto.name,
             category: category(dto.categoryName),
             isSaved: dto.savedByMe,
-            address: dto.address,
-            roadAddress: dto.roadAddress,
+            address: dto.address ?? "",
+            roadAddress: dto.roadAddress ?? "",
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
             imageURLs: (dto.imageUrls ?? []).compactMap(URL.init(string:))
         )

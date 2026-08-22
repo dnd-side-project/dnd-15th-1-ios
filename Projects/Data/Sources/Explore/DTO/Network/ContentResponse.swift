@@ -35,8 +35,9 @@ struct ContentDetailPlaceResponseDTO: Decodable, Sendable {
     let placeId: Int
     let kakaoPlaceId: String?
     let name: String
-    let address: String
-    let roadAddress: String
+    // 주소·도로명은 없는 장소가 있어 옵셔널
+    let address: String?
+    let roadAddress: String?
     let categoryName: String
     let latitude: Double
     let longitude: Double
