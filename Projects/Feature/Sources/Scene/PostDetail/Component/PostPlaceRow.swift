@@ -45,7 +45,13 @@ struct PostPlaceRow: View {
 #Preview("저장됨 · 미저장") {
     VStack(spacing: Spacing.s8) {
         PostPlaceRow(
-            place: PostDetailPlace(id: "1", name: "한강뷰 감성카페", category: .cafe, isSaved: true),
+            place: PostDetailPlace(
+                id: "1",
+                name: "한강뷰 감성카페",
+                category: .cafe,
+                isSaved: true,
+                coordinate: Coordinate(latitude: 37.5, longitude: 127.0)
+            ),
             isSavedLocally: true,
             onTap: {},
             onBookmarkTap: {}
@@ -55,7 +61,8 @@ struct PostPlaceRow: View {
                 id: "2",
                 name: "이름이 아주 길어서 한 줄에 다 들어가지 않는 장소 이름",
                 category: .food,
-                isSaved: false
+                isSaved: false,
+                coordinate: Coordinate(latitude: 37.6, longitude: 127.1)
             ),
             isSavedLocally: false,
             onTap: {},

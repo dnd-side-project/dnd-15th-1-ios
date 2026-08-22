@@ -11,6 +11,9 @@ public struct MapFlowView: View {
     /// 상세 시트 층의 높이. 게시글이 뜰 때 장소 상세를 이만큼 아래로 치운다
     @State private var layerHeight: CGFloat = 0
 
+    /// 게시글 상세 층의 높이. 핀 탭으로 장소 상세가 올라올 때 게시글을 이만큼 아래로 치운다
+    @State private var postLayerHeight: CGFloat = 0
+
     public init(store: StoreOf<MapFlowFeature>) {
         self.store = store
     }
@@ -101,15 +104,16 @@ private extension MapFlowView {
                     .id(detailStore.id)
                     .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
                     .ignoresSafeArea(edges: .bottom)
-                    // 게시글이 떠도 장소 상세를 트리에서 빼지 않는다. 빼면 시트 단계와 스크롤이 날아간다.
-                    // 대신 화면 아래로 치워둔다. 게시글을 닫으면 보던 자리 그대로 다시 올라온다
-                    .offset(y: store.postDetail == nil ? 0 : layerHeight)
+                    // 게시글이 위에 뜨면(장소 상세 → 게시글 순서) 장소 상세를 트리에서 빼지 않고 아래로 치운다.
+                    // 빼면 시트 단계와 스크롤이 날아간다. 게시글을 닫으면 보던 자리 그대로 다시 올라온다.
+                    // 게시글 핀 모드에선 장소 상세가 위라 치우지 않는다
+                    .offset(y: isPlaceDetailCovered ? layerHeight : 0)
                     // 치울 때는 즉시, 올릴 때만 스프링. 사라지는 시트는 안 움직인다는 규칙에 맞춘다
                     .animation(
-                        store.postDetail == nil ? MapBottomSheetMetric.settle : nil,
-                        value: store.postDetail == nil
+                        isPlaceDetailCovered ? nil : MapBottomSheetMetric.settle,
+                        value: isPlaceDetailCovered
                     )
-                    .allowsHitTesting(store.postDetail == nil)
+                    .allowsHitTesting(!isPlaceDetailCovered)
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { layerHeight = $0 }
@@ -128,12 +132,32 @@ private extension MapFlowView {
                 PostDetailView(store: postDetailStore, bottomInset: bottomInset)
                     .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
                     .ignoresSafeArea(edges: .bottom)
+                    // 게시글 핀을 눌러 장소 상세가 위로 올라오면 게시글 상세를 아래로 치운다.
+                    // 트리에 남겨 둬 장소 상세를 닫으면 보던 자리 그대로 다시 올라온다
+                    .offset(y: isPostDetailCovered ? postLayerHeight : 0)
+                    .allowsHitTesting(!isPostDetailCovered)
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { postLayerHeight = $0 }
+        // 치울 때는 즉시, 올릴 때만 스프링. 등장·퇴장도 같은 스프링을 탄다
+        .animation(
+            isPostDetailCovered ? nil : MapBottomSheetMetric.settle,
+            value: isPostDetailCovered
+        )
         .animation(
             MapBottomSheetMetric.settle,
             value: store.postDetail == nil
         )
+    }
+
+    /// 원래 흐름(장소 상세 → 게시글)에서 게시글이 위에 떠 장소 상세가 아래로 치워지는 상태
+    var isPlaceDetailCovered: Bool {
+        store.postDetail != nil && !store.showsContentPins
+    }
+
+    /// 게시글 핀 모드에서 장소 상세가 위로 올라와 게시글 상세가 아래로 치워지는 상태
+    var isPostDetailCovered: Bool {
+        store.detail != nil && store.showsContentPins
     }
 
     /// 아래 안전영역(탭바 + 홈 인디케이터)을 재는 층.

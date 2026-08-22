@@ -26,6 +26,9 @@ public struct MapFlowFeature {
         public var path: [Route]
         public var placeSearch: PlaceSearchFeature.State?
 
+        /// 게시글 상세를 다른 탭에서 열어 지도 핀 모드로 들어온 경우. 닫을 때 원래 탭으로 되돌린다
+        public var showsContentPins: Bool = false
+
         /// 핀·행·검색에서 뜬 장소 상세. 시트 표시는 `MapFlowView` 가 한다
         @Presents public var detail: PlaceDetailFeature.State?
 
@@ -56,6 +59,8 @@ public struct MapFlowFeature {
 
     public enum Action: Equatable {
         case pathChanged([Route])
+        /// 다른 탭에서 고른 게시글 상세를 지도 위에 연다
+        case presentContentDetail(String)
         case map(MapFeature.Action)
         case course(CourseFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
@@ -68,6 +73,8 @@ public struct MapFlowFeature {
         public enum Delegate: Equatable {
             /// 세션 만료. RootFlow 까지 올라가 로그인으로 되돌린다
             case sessionExpired
+            /// 게시글 상세 시트를 닫았다. MainTab 이 게시글을 고르기 전 탭으로 되돌린다
+            case contentDetailClosed
         }
     }
 
@@ -107,6 +114,13 @@ public struct MapFlowFeature {
                 state.course = nil
             }
             return .none
+        case let .presentContentDetail(id):
+            // 상세는 시트가 스스로 불러온다. 로드되면 그 places 로 핀을 세운다
+            state.showsContentPins = true
+            state.postDetail = PostDetailFeature.State(contentID: id)
+            // 상세가 뜨는 즉시 저장 시트·코스 버튼을 감추도록 핀 모드로 들어간다. 핀은 로드 후 채운다
+            state.map.mode = .content(places: [])
+            return .send(.postDetail(.presented(.onAppear)))
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
         case let .course(.delegate(delegate)):
@@ -220,6 +234,44 @@ private extension MapFlowFeature {
             state.alias = nil
             return .none
 
+        case .detail:
+            return handleDetail(state: &state, action: action)
+
+        case let .postDetail(.presented(.delegate(.detailLoaded(detail)))):
+            // 다른 탭에서 열어 핀 모드로 들어온 경우에만 상세의 places 로 핀·카메라를 세운다
+            guard state.showsContentPins else { return .none }
+            return .send(.map(.contentPlacesApplied(places: detail.places.map(place))))
+
+        case .postDetail(.presented(.delegate(.closeRequested))), .postDetail(.dismiss):
+            state.postDetail = nil
+            guard state.showsContentPins else { return .none }
+            // 핀 모드를 풀고 지도를 저장 목록으로 되돌린 뒤, 게시글 고르기 전 탭으로 되돌리도록 올린다
+            state.showsContentPins = false
+            return .merge(
+                .send(.map(.searchClearTapped)),
+                .send(.delegate(.contentDetailClosed))
+            )
+
+        case .postDetail(.presented(.delegate(.sessionExpired))):
+            return .send(.delegate(.sessionExpired))
+
+        case let .postDetail(.presented(.delegate(.placeSelected(id)))):
+            // 리스트 아이템 탭도 핀 탭과 똑같이 카메라를 옮기고 그 장소 상세를 얹는다
+            focusContentPlaceDetail(state: &state, id: id)
+            return .none
+
+        case .alias, .postDetail:
+            return .none
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    /// 장소 상세가 올린 신호 처리. 게시글로 넘어가기·닫기·저장 상태 동기화
+    func handleDetail(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case let .detail(.presented(.delegate(.contentSelected(id)))):
             // 장소 상세를 닫지 않는다. 게시글을 닫으면 그 자리로 돌아가야 한다
             state.postDetail = PostDetailFeature.State(contentID: id)
@@ -230,25 +282,24 @@ private extension MapFlowFeature {
             dismissDetail(state: &state)
             return .none
 
-        case .postDetail(.presented(.delegate(.closeRequested))), .postDetail(.dismiss):
-            state.postDetail = nil
-            return .none
-
-        case .postDetail(.presented(.delegate(.sessionExpired))):
-            return .send(.delegate(.sessionExpired))
-
-        case .postDetail(.presented(.delegate(.placeSelected))),
-             .postDetail(.presented(.delegate(.instagramRequested))):
-            // 장소 상세로 가는 길은 이 Cycle 밖이다. 인스타 외부 전환도 밖이다
-            return .none
-
-        case .detail, .alias, .postDetail:
-            // 북마크·지도는 받는 쪽이 아직 없다. 삼킨다
+        case let .detail(.presented(.delegate(.bookmarkToggled(id, isSaved)))):
+            // 장소 상세에서 바뀐 저장 상태를 게시글 상세 목록·지도 핀에 맞춘다
+            syncPlaceSaved(state: &state, id: id, isSaved: isSaved)
             return .none
 
         default:
-            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
+        }
+    }
+
+    /// 게시글 상세 목록·지도 핀의 저장 상태를 한곳에서 맞춘다
+    func syncPlaceSaved(state: inout State, id: String, isSaved: Bool) {
+        if isSaved {
+            state.postDetail?.savedPlaceIDs.insert(id)
+            state.map.bookmarkedPlaceIDs.insert(id)
+        } else {
+            state.postDetail?.savedPlaceIDs.remove(id)
+            state.map.bookmarkedPlaceIDs.remove(id)
         }
     }
 
@@ -263,7 +314,32 @@ private extension MapFlowFeature {
             if let place = state.map.searchResults.first(where: { $0.id == id }) {
                 presentDetail(state: &state, place: place)
             }
+        case .content:
+            // 게시글 핀을 누르면 그 장소 상세를 게시글 상세 위에 얹는다
+            if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
+                presentContentPlaceDetail(state: &state, place: place)
+            }
         }
+    }
+
+    /// 리스트에서 고른 장소로 카메라를 옮기고 상세를 연다. 지도에 없는 id 면 무시한다
+    func focusContentPlaceDetail(state: inout State, id: String) {
+        guard let place = state.map.contentPlaces.first(where: { $0.id == id }) else { return }
+        state.map.camera = .focusing(place.coordinate, zoomLevel: state.map.camera.zoomLevel)
+        presentContentPlaceDetail(state: &state, place: place)
+    }
+
+    /// 게시글 핀을 눌러 장소 상세를 연다. 게시글 상세는 남겨 둬 상세를 닫으면 그 자리로 돌아간다
+    func presentContentPlaceDetail(state: inout State, place: Place) {
+        var detail = PlaceDetailFeature.State(place: place)
+        // 저장 상태는 게시글 상세 목록을 기준으로 물려받는다. 없으면 지도 저장 목록을 본다
+        detail.isBookmarked = state.postDetail?.savedPlaceIDs.contains(place.id)
+            ?? state.map.bookmarkedPlaceIDs.contains(place.id)
+        state.detail = detail
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: place.id,
+            coordinate: place.coordinate
+        )
     }
 
     func presentDetail(state: inout State, savedPlace: SavedPlace) {
@@ -294,5 +370,20 @@ private extension MapFlowFeature {
     func dismissDetail(state: inout State) {
         state.detail = nil
         state.map.selectedPlace = nil
+    }
+
+    /// 게시글 장소를 지도 핀·장소 상세용 Place 로 바꾼다. 저장수는 응답에 없어 0 으로 둔다
+    func place(_ detailPlace: PostDetailPlace) -> Place {
+        Place(
+            id: detailPlace.id,
+            kakaoPlaceID: detailPlace.kakaoPlaceID,
+            name: detailPlace.name,
+            category: detailPlace.category,
+            address: detailPlace.address,
+            roadAddress: detailPlace.roadAddress,
+            coordinate: detailPlace.coordinate,
+            bookmarkCount: 0,
+            thumbnailURLs: detailPlace.imageURLs
+        )
     }
 }

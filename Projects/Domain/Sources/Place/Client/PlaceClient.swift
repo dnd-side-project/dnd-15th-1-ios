@@ -16,6 +16,9 @@ public struct PlaceClient: Sendable {
         _ alias: String?,
         _ memo: String?
     ) async throws -> SavedPlace
+
+    /// DELETE /api/v1/places/{placeId}
+    public var removePlace: @Sendable (_ placeID: String) async throws -> Void
 }
 
 extension PlaceClient: TestDependencyKey {

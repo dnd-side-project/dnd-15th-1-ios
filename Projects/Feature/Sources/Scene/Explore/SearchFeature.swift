@@ -73,6 +73,14 @@ public struct SearchFeature {
         case moreContentsLoaded(ContentPage)
         case morePlacesLoaded(PlacePage)
         case searchFailed
+        case contentTapped(String)
+        case delegate(Delegate)
+
+        @CasePathable
+        public enum Delegate: Equatable {
+            /// 결과 카드 탭. 탐색 → MainTab 으로 올라가 지도 탭에서 상세를 연다
+            case showContentDetail(String)
+        }
     }
 
     @Dependency(\.exploreClient) var exploreClient
@@ -111,11 +119,7 @@ public struct SearchFeature {
             return .none
 
         case .reachedEnd:
-            // 보고 있는 탭의 다음 페이지를 받는다
-            switch state.selectedTab {
-            case .post: return loadMoreContents(state: &state)
-            case .place: return loadMorePlaces(state: &state)
-            }
+            return loadMore(state: &state)
 
         case let .moreContentsLoaded(page):
             state.contents += page.items
@@ -138,9 +142,23 @@ public struct SearchFeature {
             state.isFirstSearch = false
             return .none
 
+        case let .contentTapped(id):
+            return .send(.delegate(.showContentDetail(id)))
+
+        case .delegate:
+            return .none
+
         case .onAppear, .searchSubmitted, .recentSearchTapped, .recentSearchDeleted,
              .clearRecentTapped, .recentSearchesUpdated, .tabSelected:
             return recentCore(state: &state, action: action)
+        }
+    }
+
+    // 보고 있는 탭의 다음 페이지를 받는다
+    private func loadMore(state: inout State) -> Effect<Action> {
+        switch state.selectedTab {
+        case .post: return loadMoreContents(state: &state)
+        case .place: return loadMorePlaces(state: &state)
         }
     }
 

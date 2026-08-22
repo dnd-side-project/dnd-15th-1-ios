@@ -144,8 +144,13 @@ public struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 8) {
                     ForEach(store.recommendations) { content in
-                        ContentCard(content: content)
-                            .frame(width: 170)
+                        Button {
+                            store.send(.recommendationTapped(content.id))
+                        } label: {
+                            ContentCard(content: content)
+                                .frame(width: 170)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)

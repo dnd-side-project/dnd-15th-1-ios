@@ -35,7 +35,7 @@ enum PlaceDTOMapper {
             name: dto.name,
             category: category(dto.categoryName),
             address: dto.address,
-            roadAddress: dto.roadAddress,
+            roadAddress: dto.roadAddress ?? "",
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
             bookmarkCount: 0,
             thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
@@ -45,11 +45,11 @@ enum PlaceDTOMapper {
     private static func toPlace(_ dto: SavedPlaceResponseDTO) -> Place {
         Place(
             id: String(dto.placeId),
-            kakaoPlaceID: nil,
+            kakaoPlaceID: dto.kakaoPlaceId,
             name: dto.name,
             category: category(dto.categoryName),
             address: dto.address,
-            roadAddress: dto.roadAddress,
+            roadAddress: dto.roadAddress ?? "",
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
             bookmarkCount: 0,
             thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))

@@ -13,13 +13,18 @@ public enum PlaceClientFactory {
         let repository = PlaceRepository(
             remote: PlaceRemoteDataSource(networkClient: session.authedClient)
         )
-        // searchPlaces / savePlace 는 아직 서버 연동 전이라 mock 유지
+        // searchPlaces 는 아직 서버 연동 전이라 mock 유지
         return PlaceClient(
             savedPlaces: {
                 try await repository.savedPlaces()
             },
             searchPlaces: PlaceClient.mock.searchPlaces,
-            savePlace: PlaceClient.mock.savePlace
+            savePlace: { kakaoPlaceID, query, alias, _ in
+                try await repository.save(kakaoPlaceID: kakaoPlaceID, query: query, alias: alias)
+            },
+            removePlace: { placeID in
+                try await repository.remove(placeID: placeID)
+            }
         )
     }
 }

@@ -30,4 +30,8 @@ public struct ContentRemoteDataSource: Sendable {
             ContentEndpoint.search(query: query, sort: sort, page: page, size: size)
         )
     }
+
+    func contentDetail(id: String) async throws -> ContentDetailResponseDTO {
+        try await networkClient.request(ContentEndpoint.detail(id: id))
+    }
 }

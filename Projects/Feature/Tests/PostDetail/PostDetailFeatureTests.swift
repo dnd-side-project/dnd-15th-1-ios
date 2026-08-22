@@ -11,8 +11,10 @@ final class PostDetailFeatureTests: XCTestCase {
         caption: "본문",
         canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
         places: [
-            PostDetailPlace(id: "101", name: "가게 하나", category: .cafe, isSaved: true),
-            PostDetailPlace(id: "102", name: "가게 둘", category: .food, isSaved: false),
+            PostDetailPlace(id: "101", kakaoPlaceID: "k101", name: "가게 하나", category: .cafe,
+                            isSaved: true, coordinate: Coordinate(latitude: 37.5, longitude: 127.0)),
+            PostDetailPlace(id: "102", kakaoPlaceID: "k102", name: "가게 둘", category: .food,
+                            isSaved: false, coordinate: Coordinate(latitude: 37.6, longitude: 127.1)),
         ]
     )
 
@@ -33,6 +35,8 @@ final class PostDetailFeatureTests: XCTestCase {
                 guard let loaded else { throw ExploreError.unknown }
                 return loaded
             }
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
         }
     }
 
@@ -49,6 +53,7 @@ final class PostDetailFeatureTests: XCTestCase {
             $0.savedPlaceIDs = ["101"]
             $0.isLoading = false
         }
+        await sut.receive(\.delegate.detailLoaded)
     }
 
     func test_인증만료면_상위로_올린다() async {
@@ -91,6 +96,7 @@ final class PostDetailFeatureTests: XCTestCase {
             $0.savedPlaceIDs = ["101"]
             $0.isLoading = false
         }
+        await sut.receive(\.delegate.detailLoaded)
     }
 
     func test_더보기가_본문만_펼친다() async {
@@ -132,23 +138,6 @@ final class PostDetailFeatureTests: XCTestCase {
         await sut.receive(\.delegate.closeRequested)
     }
 
-    func test_인스타는_링크가_있을_때만_올린다() async throws {
-        var state = PostDetailFeature.State(contentID: "1")
-        state.detail = detail
-        let sut = store(state: state)
-        let instagramURL = try XCTUnwrap(detail.canonicalURL)
-
-        await sut.send(.instagramTapped)
-        await sut.receive(.delegate(.instagramRequested(instagramURL)))
-
-        var noLink = PostDetailFeature.State(contentID: "1")
-        noLink.detail = PostDetailContent(
-            id: "1", title: nil, caption: nil, canonicalURL: nil, places: []
-        )
-        let quiet = store(state: noLink)
-        await quiet.send(.instagramTapped)
-    }
-
     func test_부르는중에_온_두번째_onAppear는_아무일도_안한다() async {
         let loaded = detail
         let gate = AsyncStream.makeStream(of: Void.self)
@@ -168,6 +157,7 @@ final class PostDetailFeatureTests: XCTestCase {
             $0.savedPlaceIDs = ["101"]
             $0.isLoading = false
         }
+        await sut.receive(\.delegate.detailLoaded)
     }
 
     func test_이미_값이_있으면_onAppear가_아무일도_안한다() async {

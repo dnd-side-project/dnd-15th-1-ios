@@ -12,6 +12,7 @@ import Foundation
 enum ContentEndpoint: APIEndpoint {
     case contents(sort: ContentSort, page: Int, size: Int)
     case search(query: String, sort: ContentSort, page: Int, size: Int)
+    case detail(id: String)
 
     var path: String {
         switch self {
@@ -19,18 +20,22 @@ enum ContentEndpoint: APIEndpoint {
             return "/api/v1/contents"
         case .search:
             return "/api/v1/contents/search"
+        case let .detail(id):
+            return "/api/v1/contents/\(id)"
         }
     }
 
     var method: HTTPMethod {
         switch self {
-        case .contents, .search:
+        case .contents, .search, .detail:
             return .get
         }
     }
 
     var queryItems: [URLQueryItem] {
         switch self {
+        case .detail:
+            return []
         case let .contents(sort, page, size):
             return [
                 URLQueryItem(name: "sort", value: sort.rawValue),

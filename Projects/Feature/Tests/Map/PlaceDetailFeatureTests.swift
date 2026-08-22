@@ -48,6 +48,9 @@ final class PlaceDetailFeatureTests: XCTestCase {
             initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 124))
         ) {
             PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
         }
 
         await store.send(.bookmarkTapped) {
@@ -61,6 +64,9 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.bookmarkCount = 124
         }
         await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkSaved) {
+            $0.savedServerID = SavedPlace.mocks[0].place.id
+        }
     }
 
     func test_카운트는_0_아래로_내려가지_않는다() async {
@@ -68,6 +74,9 @@ final class PlaceDetailFeatureTests: XCTestCase {
             initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 0))
         ) {
             PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
         }
 
         await store.send(.bookmarkTapped) {

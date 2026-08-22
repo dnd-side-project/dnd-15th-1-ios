@@ -100,6 +100,7 @@ public struct HomeFeature {
         case calendarTapped
         case connectFlowRequested
         case courseFlowRequested
+        case recommendationTapped(String)
         case homePathChanged([HomeRoute])
         case couple(CoupleConnectFeature.Action)
         case pastDateCourses(PastDateCoursesFeature.Action)
@@ -110,6 +111,8 @@ public struct HomeFeature {
         public enum Delegate: Equatable {
             case sessionExpired
             case showAllSavedPlaces
+            /// 추천 카드 탭. MainTab 이 지도 탭으로 옮겨 상세를 연다
+            case showContentDetail(String)
         }
     }
 
@@ -166,6 +169,10 @@ public struct HomeFeature {
         case .savedPlacesSeeAllTapped:
             // 전체보기는 지도 탭으로 이동. 실제 탭 전환은 상위(MainTab)가 처리
             return .send(.delegate(.showAllSavedPlaces))
+
+        case let .recommendationTapped(id):
+            // 표시는 지도 탭 위에서. MainTab 까지 올린다
+            return .send(.delegate(.showContentDetail(id)))
 
         case .calendarTapped, .connectFlowRequested, .courseFlowRequested, .homePathChanged,
              .couple, .pastDateCourses, .course, .delegate:

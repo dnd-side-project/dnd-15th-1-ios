@@ -47,7 +47,16 @@ public struct ExploreFeature {
         case filterTapped(String)
         case searchButtonTapped
         case searchPathChanged([Route])
+        case contentTapped(String)
         case search(SearchFeature.Action)
+        case delegate(Delegate)
+
+        @CasePathable
+        public enum Delegate: Equatable {
+            case sessionExpired
+            /// 카드 탭. MainTab 이 지도 탭으로 옮겨 상세를 연다
+            case showContentDetail(String)
+        }
     }
 
     @Dependency(\.exploreClient) var exploreClient
@@ -97,6 +106,14 @@ public struct ExploreFeature {
             state.isLoadingContents = false
             return loadNext(state: &state)
 
+        case .searchButtonTapped, .searchPathChanged, .contentTapped,
+             .search, .delegate:
+            return navCore(state: &state, action: action)
+        }
+    }
+
+    private func navCore(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .searchButtonTapped:
             state.search = SearchFeature.State()
             state.path = [.search]
@@ -107,7 +124,15 @@ public struct ExploreFeature {
             if path.isEmpty { state.search = nil }
             return .none
 
-        case .search:
+        case let .contentTapped(id):
+            // 표시는 지도 탭 위에서. MainTab 까지 올린다
+            return .send(.delegate(.showContentDetail(id)))
+
+        case let .search(.delegate(.showContentDetail(id))):
+            // 검색 결과 카드도 같은 길을 탄다
+            return .send(.delegate(.showContentDetail(id)))
+
+        default:
             return .none
         }
     }

@@ -37,4 +37,12 @@ public struct ContentRepository: Sendable {
             throw ExploreErrorMapper.map(error)
         }
     }
+
+    public func contentDetail(id: String) async throws -> PostDetailContent {
+        do {
+            return ContentDTOMapper.toDetail(try await remote.contentDetail(id: id))
+        } catch {
+            throw ExploreErrorMapper.map(error)
+        }
+    }
 }

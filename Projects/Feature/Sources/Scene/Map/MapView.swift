@@ -98,7 +98,7 @@ private extension MapView {
     @ViewBuilder
     var sheetSwap: some View {
         ZStack(alignment: .bottom) {
-            if store.selectedPlace == nil {
+            if store.showsSavedSheet {
                 sheet
                     // 올라오며 나타나고, 사라질 때는 안 움직인다. 안 주면 기본값인 페이드가 붙는다
                     .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
@@ -106,7 +106,7 @@ private extension MapView {
         }
         .animation(
             MapBottomSheetMetric.settle,
-            value: store.selectedPlace == nil
+            value: store.showsSavedSheet
         )
     }
 
@@ -147,7 +147,8 @@ private extension MapView {
 private extension MapView {
     @ViewBuilder
     var categoryChipLayer: some View {
-        if !store.isSearching {
+        // 게시글 핀 모드에선 필터 칩을 감춘다
+        if !store.isSearching, !store.isContentMode {
             savedChipLayer
         }
     }
@@ -171,8 +172,15 @@ private extension MapView {
         .frame(maxHeight: .infinity, alignment: .top)
     }
 
-    /// 시트 아래층. 시트를 펼치면 덮인다
+    /// 시트 아래층. 시트를 펼치면 덮인다. 게시글 핀 모드에선 감춘다
+    @ViewBuilder
     var searchBarLayer: some View {
+        if !store.isContentMode {
+            searchBar
+        }
+    }
+
+    private var searchBar: some View {
         MapSearchBar(
             placeholder: "원하는 장소를 검색하세요",
             text: store.searchQuery,

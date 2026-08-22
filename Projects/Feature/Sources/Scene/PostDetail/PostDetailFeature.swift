@@ -39,29 +39,31 @@ public struct PostDetailFeature {
         case retryTapped
         case expandToggled
         case closeTapped
-        case instagramTapped
         case placeTapped(String)
         case placeBookmarkTapped(String)
+        case placeSaveFailed(id: String, wasSaved: Bool)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
+            /// 상세를 받아왔다. 지도가 이 places 로 핀·카메라를 세운다
+            case detailLoaded(PostDetailContent)
             /// `X` 탭. 지도가 시트를 `저장한 장소` 로 되돌린다
             case closeRequested
             /// 행 탭. 받는 쪽은 Cycle 2 다
             case placeSelected(String)
-            /// 인스타 버튼. 외부 앱 전환은 이 Cycle 밖이다
-            case instagramRequested(URL)
             /// 세션 만료. RootFlow 까지 올라가 로그인으로 되돌린다
             case sessionExpired
         }
     }
 
-    private enum CancelID {
+    private enum CancelID: Hashable {
         case load
+        case save(String)
     }
 
     @Dependency(\.postDetailContentClient) var postDetailContentClient
+    @Dependency(\.placeClient) var placeClient
 
     public init() {}
 
@@ -80,7 +82,8 @@ public struct PostDetailFeature {
             state.savedPlaceIDs = Set(detail.places.filter(\.isSaved).map(\.id))
             state.isLoading = false
             state.loadFailed = false
-            return .none
+            // 지도가 이 상세의 places 로 핀·카메라를 세우도록 올린다. 지도 밖 표시자는 무시한다
+            return .send(.delegate(.detailLoaded(detail)))
 
         case let .detailFailed(error):
             state.isLoading = false
@@ -98,25 +101,54 @@ public struct PostDetailFeature {
         case .closeTapped:
             return .send(.delegate(.closeRequested))
 
-        case .instagramTapped:
-            // 링크가 없으면 버튼 자체를 안 그리지만, 액션이 와도 조용히 삼킨다
-            guard let url = state.detail?.canonicalURL else { return .none }
-            return .send(.delegate(.instagramRequested(url)))
-
         case let .placeTapped(id):
             return .send(.delegate(.placeSelected(id)))
 
         case let .placeBookmarkTapped(id):
-            if state.savedPlaceIDs.contains(id) {
-                state.savedPlaceIDs.remove(id)
-            } else {
+            return toggleSave(state: &state, id: id)
+
+        case let .placeSaveFailed(id, wasSaved):
+            // 서버 실패 → 미리 뒤집었던 표시를 되돌린다
+            if wasSaved {
                 state.savedPlaceIDs.insert(id)
+            } else {
+                state.savedPlaceIDs.remove(id)
             }
             return .none
 
         case .delegate:
             return .none
         }
+    }
+
+    /// 저장 버튼. 먼저 표시를 뒤집고 서버를 부른다. 실패하면 되돌린다
+    private func toggleSave(state: inout State, id: String) -> Effect<Action> {
+        guard let place = state.detail?.places.first(where: { $0.id == id }) else { return .none }
+        let wasSaved = state.savedPlaceIDs.contains(id)
+        // 저장하려는데 카카오 식별자가 없으면 부를 수 없다
+        if !wasSaved, place.kakaoPlaceID == nil { return .none }
+        if wasSaved {
+            state.savedPlaceIDs.remove(id)
+        } else {
+            state.savedPlaceIDs.insert(id)
+        }
+        return runSave(place, wasSaved: wasSaved)
+    }
+
+    private func runSave(_ place: PostDetailPlace, wasSaved: Bool) -> Effect<Action> {
+        .run { [placeClient] send in
+            do {
+                if wasSaved {
+                    try await placeClient.removePlace(place.id)
+                } else if let kakaoID = place.kakaoPlaceID {
+                    _ = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
+                }
+            } catch {
+                await send(.placeSaveFailed(id: place.id, wasSaved: wasSaved))
+            }
+        }
+        // 같은 장소를 연달아 누르면 앞 요청은 버린다
+        .cancellable(id: CancelID.save(place.id), cancelInFlight: true)
     }
 
     /// 흐름과 화면이 각자 `onAppear` 를 보낸다. 두 번째는 버린다.

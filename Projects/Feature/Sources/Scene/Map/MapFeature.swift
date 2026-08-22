@@ -17,6 +17,8 @@ public struct MapFeature {
         public enum Mode: Equatable, Sendable {
             case saved
             case searchResult(query: String, places: [Place])
+            /// 게시글 상세가 올린 장소들. 검색 UI 없이 핀만 얹는다
+            case content(places: [Place])
         }
 
         /// 지금 열린 상세의 장소. 흐름이 채우고, 지도는 선택 핀만 이걸로 그린다
@@ -98,6 +100,7 @@ public struct MapFeature {
         case retryTapped
         case dismissToast
         case searchResultsApplied(query: String, places: [Place])
+        case contentPlacesApplied(places: [Place])
         case searchClearTapped
         case searchBackTapped
         case bookmarkTapped(String)
@@ -150,7 +153,7 @@ public struct MapFeature {
             return updateFilter(state: &state, action: action)
         case .editTapped, .deleteTapped, .markerTapped, .rowTapped, .searchBarTapped, .courseButtonTapped:
             return raise(state: &state, action: action)
-        case .searchResultsApplied, .searchClearTapped, .searchBackTapped, .bookmarkTapped:
+        case .searchResultsApplied, .contentPlacesApplied, .searchClearTapped, .searchBackTapped, .bookmarkTapped:
             return updateSearch(state: &state, action: action)
         case .aliasSaved:
             return applyAlias(state: &state, action: action)
@@ -176,7 +179,10 @@ public struct MapFeature {
             state.places = places
             state.bookmarkedPlaceIDs = Set(places.map(\.id))
             state.loadState = .loaded
-            state.camera = Self.overview(of: state)
+            // 게시글 핀을 보고 있을 땐 저장 목록 로딩이 카메라를 뺏지 않게 한다
+            if case .saved = state.mode {
+                state.camera = Self.overview(of: state)
+            }
             return .none
 
         case let .savedPlacesResponse(.failure(error)):
@@ -396,6 +402,14 @@ private extension MapFeature {
                 state.camera = .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
             }
             return .none
+        case let .contentPlacesApplied(places):
+            state.mode = .content(places: places)
+            state.menuTargetPlaceID = nil
+            // 카메라는 맨 첫 장소를 가운데로 고정한다
+            if let first = places.first {
+                state.camera = .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+            }
+            return .none
         case .searchClearTapped:
             state.mode = .saved
             return .none
@@ -449,6 +463,8 @@ public extension MapFeature.State {
             markers = filteredPlaces.map { categoryMarker($0.place) }
         case let .searchResult(_, places):
             markers = places.map(categoryMarker)
+        case let .content(places):
+            markers = places.map(categoryMarker)
         }
         // 고른 장소의 기존 핀은 지우지 않는다. 시안처럼 그 위에 선택 핀을 얹는다
         if let selectedPlace {
@@ -476,6 +492,19 @@ public extension MapFeature.State {
         return false
     }
 
+    /// 게시글 핀 모드 여부. 이때는 지도 검색·필터 UI 를 감춘다
+    var isContentMode: Bool {
+        if case .content = mode { return true }
+        return false
+    }
+
+    /// 저장 시트·코스 버튼 표시 여부.
+    /// 장소를 고르면(상세) 감추고, 게시글 핀 모드에선 상세가 덮으므로 통째로 감춘다
+    var showsSavedSheet: Bool {
+        if case .content = mode { return false }
+        return selectedPlace == nil
+    }
+
     var searchQuery: String? {
         if case let .searchResult(query, _) = mode { return query }
         return nil
@@ -483,6 +512,12 @@ public extension MapFeature.State {
 
     var searchResults: [Place] {
         if case let .searchResult(_, places) = mode { return places }
+        return []
+    }
+
+    /// 게시글 핀 모드에서 지도에 얹힌 장소들. 핀 탭으로 상세를 열 때 여기서 찾는다
+    var contentPlaces: [Place] {
+        if case let .content(places) = mode { return places }
         return []
     }
 
@@ -502,6 +537,9 @@ private extension MapFeature {
     /// 검색 결과와 저장 목록 어느 쪽에서든 그 id 의 좌표를 찾는다
     static func coordinate(of id: String, in state: State) -> Coordinate? {
         if let place = state.searchResults.first(where: { $0.id == id }) {
+            return place.coordinate
+        }
+        if let place = state.contentPlaces.first(where: { $0.id == id }) {
             return place.coordinate
         }
         return state.places.first { $0.id == id }?.place.coordinate
