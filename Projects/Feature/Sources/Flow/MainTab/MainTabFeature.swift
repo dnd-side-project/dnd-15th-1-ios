@@ -78,43 +78,68 @@ public struct MainTabFeature {
             state.selectedTab = tab
             return .none
         case let .myPage(.delegate(delegate)):
-            switch delegate {
-            case .logoutSucceeded:
-                return .send(.delegate(.logoutSucceeded))
-            case .sessionExpired:
-                return .send(.delegate(.sessionExpired))
-            }
+            return handleMyPage(delegate)
         case let .home(.delegate(delegate)):
-            switch delegate {
-            case .sessionExpired:
-                return .send(.delegate(.sessionExpired))
-            case .showAllSavedPlaces:
-                state.selectedTab = .map
-                return .none
-            case let .showContentDetail(id):
-                return presentContentDetail(state: &state, id: id)
-            }
+            return handleHome(state: &state, delegate: delegate)
         case let .map(.delegate(delegate)):
-            switch delegate {
-            case .sessionExpired:
-                return .send(.delegate(.sessionExpired))
-            case .contentDetailClosed:
-                // 게시글을 고르기 전 탭으로 되돌린다
-                if let tab = state.contentReturnTab {
-                    state.selectedTab = tab
-                    state.contentReturnTab = nil
-                }
-                return .none
-            }
+            return handleMap(state: &state, delegate: delegate)
         case let .explore(.delegate(delegate)):
-            switch delegate {
-            case .sessionExpired:
-                return .send(.delegate(.sessionExpired))
-            case let .showContentDetail(id):
-                return presentContentDetail(state: &state, id: id)
-            }
+            return handleExplore(state: &state, delegate: delegate)
         case .home, .explore, .map, .myPage, .delegate:
             return .none
+        }
+    }
+
+    private func handleMyPage(_ delegate: MyPageFeature.Action.Delegate) -> Effect<Action> {
+        switch delegate {
+        case .logoutSucceeded:
+            return .send(.delegate(.logoutSucceeded))
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        }
+    }
+
+    private func handleHome(
+        state: inout State,
+        delegate: HomeFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        case .showAllSavedPlaces:
+            state.selectedTab = .map
+            return .none
+        case let .showContentDetail(id):
+            return presentContentDetail(state: &state, id: id)
+        }
+    }
+
+    private func handleMap(
+        state: inout State,
+        delegate: MapFlowFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        case .contentDetailClosed:
+            // 게시글을 고르기 전 탭으로 되돌린다
+            if let tab = state.contentReturnTab {
+                state.selectedTab = tab
+                state.contentReturnTab = nil
+            }
+            return .none
+        }
+    }
+
+    private func handleExplore(
+        state: inout State,
+        delegate: ExploreFeature.Action.Delegate
+    ) -> Effect<Action> {
+        switch delegate {
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        case let .showContentDetail(id):
+            return presentContentDetail(state: &state, id: id)
         }
     }
 

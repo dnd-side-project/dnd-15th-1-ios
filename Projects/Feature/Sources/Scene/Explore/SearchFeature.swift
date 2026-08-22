@@ -119,11 +119,7 @@ public struct SearchFeature {
             return .none
 
         case .reachedEnd:
-            // 보고 있는 탭의 다음 페이지를 받는다
-            switch state.selectedTab {
-            case .post: return loadMoreContents(state: &state)
-            case .place: return loadMorePlaces(state: &state)
-            }
+            return loadMore(state: &state)
 
         case let .moreContentsLoaded(page):
             state.contents += page.items
@@ -155,6 +151,14 @@ public struct SearchFeature {
         case .onAppear, .searchSubmitted, .recentSearchTapped, .recentSearchDeleted,
              .clearRecentTapped, .recentSearchesUpdated, .tabSelected:
             return recentCore(state: &state, action: action)
+        }
+    }
+
+    // 보고 있는 탭의 다음 페이지를 받는다
+    private func loadMore(state: inout State) -> Effect<Action> {
+        switch state.selectedTab {
+        case .post: return loadMoreContents(state: &state)
+        case .place: return loadMorePlaces(state: &state)
         }
     }
 

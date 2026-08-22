@@ -181,38 +181,46 @@ public struct SearchView: View {
         ScrollView {
             switch store.selectedTab {
             case .post:
-                LazyVGrid(columns: columns, spacing: Spacing.s32) {
-                    ForEach(store.contents) { content in
-                        Button {
-                            store.send(.contentTapped(content.id))
-                        } label: {
-                            ContentCard(content: content)
-                        }
-                        .buttonStyle(.plain)
-                        .onAppear { prefetchIfNeeded(content) }
-                    }
-                }
-
-                if store.isLoadingMore {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                }
+                contentGrid
             case .place:
-                LazyVStack(spacing: Spacing.s8) {
-                    ForEach(store.places) { place in
-                        PlaceRow(place: place)
-                            .onAppear { prefetchIfNeeded(place) }
-                    }
-                }
-
-                if store.isLoadingMore {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                }
+                placeList
             }
         }
+    }
+
+    @ViewBuilder
+    private var contentGrid: some View {
+        LazyVGrid(columns: columns, spacing: Spacing.s32) {
+            ForEach(store.contents) { content in
+                Button {
+                    store.send(.contentTapped(content.id))
+                } label: {
+                    ContentCard(content: content)
+                }
+                .buttonStyle(.plain)
+                .onAppear { prefetchIfNeeded(content) }
+            }
+        }
+
+        if store.isLoadingMore { loadingMore }
+    }
+
+    @ViewBuilder
+    private var placeList: some View {
+        LazyVStack(spacing: Spacing.s8) {
+            ForEach(store.places) { place in
+                PlaceRow(place: place)
+                    .onAppear { prefetchIfNeeded(place) }
+            }
+        }
+
+        if store.isLoadingMore { loadingMore }
+    }
+
+    private var loadingMore: some View {
+        ProgressView()
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
     }
 
     private func recentChip(_ term: String) -> some View {
