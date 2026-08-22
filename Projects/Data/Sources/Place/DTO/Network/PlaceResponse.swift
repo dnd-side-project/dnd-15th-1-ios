@@ -13,7 +13,8 @@ struct SavedPlaceResponseDTO: Decodable, Sendable {
     let kakaoPlaceId: String?
     let name: String
     let address: String
-    let roadAddress: String
+    // 도로명이 없는 장소가 있어 옵셔널
+    let roadAddress: String?
     let latitude: Double
     let longitude: Double
     let category: String
@@ -36,7 +37,7 @@ struct PlaceSearchItemDTO: Decodable, Sendable {
     let kakaoPlaceId: String?
     let name: String
     let address: String
-    let roadAddress: String
+    let roadAddress: String?
     let latitude: Double
     let longitude: Double
     let categoryName: String

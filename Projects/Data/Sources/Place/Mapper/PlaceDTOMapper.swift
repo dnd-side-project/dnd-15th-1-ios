@@ -35,7 +35,7 @@ enum PlaceDTOMapper {
             name: dto.name,
             category: category(dto.categoryName),
             address: dto.address,
-            roadAddress: dto.roadAddress,
+            roadAddress: dto.roadAddress ?? "",
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
             bookmarkCount: 0,
             thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
@@ -49,7 +49,7 @@ enum PlaceDTOMapper {
             name: dto.name,
             category: category(dto.categoryName),
             address: dto.address,
-            roadAddress: dto.roadAddress,
+            roadAddress: dto.roadAddress ?? "",
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
             bookmarkCount: 0,
             thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
