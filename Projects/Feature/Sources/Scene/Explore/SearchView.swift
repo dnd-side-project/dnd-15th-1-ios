@@ -183,8 +183,13 @@ public struct SearchView: View {
             case .post:
                 LazyVGrid(columns: columns, spacing: Spacing.s32) {
                     ForEach(store.contents) { content in
-                        ContentCard(content: content)
-                            .onAppear { prefetchIfNeeded(content) }
+                        Button {
+                            store.send(.contentTapped(content.id))
+                        } label: {
+                            ContentCard(content: content)
+                        }
+                        .buttonStyle(.plain)
+                        .onAppear { prefetchIfNeeded(content) }
                     }
                 }
 

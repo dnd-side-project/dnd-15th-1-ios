@@ -73,6 +73,14 @@ public struct SearchFeature {
         case moreContentsLoaded(ContentPage)
         case morePlacesLoaded(PlacePage)
         case searchFailed
+        case contentTapped(String)
+        case delegate(Delegate)
+
+        @CasePathable
+        public enum Delegate: Equatable {
+            /// 결과 카드 탭. 탐색 → MainTab 으로 올라가 지도 탭에서 상세를 연다
+            case showContentDetail(String)
+        }
     }
 
     @Dependency(\.exploreClient) var exploreClient
@@ -136,6 +144,12 @@ public struct SearchFeature {
             state.isSearching = false
             state.isLoadingMore = false
             state.isFirstSearch = false
+            return .none
+
+        case let .contentTapped(id):
+            return .send(.delegate(.showContentDetail(id)))
+
+        case .delegate:
             return .none
 
         case .onAppear, .searchSubmitted, .recentSearchTapped, .recentSearchDeleted,
