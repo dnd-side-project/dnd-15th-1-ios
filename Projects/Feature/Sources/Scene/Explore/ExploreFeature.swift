@@ -56,6 +56,8 @@ public struct ExploreFeature {
             case sessionExpired
             /// 카드 탭. MainTab 이 지도 탭으로 옮겨 상세를 연다
             case showContentDetail(String)
+            /// 장소 결과 탭. MainTab 이 지도 탭으로 옮겨 장소 상세를 연다
+            case showPlaceDetail(Place)
         }
     }
 
@@ -131,6 +133,10 @@ public struct ExploreFeature {
         case let .search(.delegate(.showContentDetail(id))):
             // 검색 결과 카드도 같은 길을 탄다
             return .send(.delegate(.showContentDetail(id)))
+
+        case let .search(.delegate(.showPlaceDetail(place))):
+            // 검색 장소 결과는 지도 탭에서 장소 상세를 연다
+            return .send(.delegate(.showPlaceDetail(place)))
 
         default:
             return .none

@@ -74,12 +74,15 @@ public struct SearchFeature {
         case morePlacesLoaded(PlacePage)
         case searchFailed
         case contentTapped(String)
+        case placeTapped(String)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
             /// 결과 카드 탭. 탐색 → MainTab 으로 올라가 지도 탭에서 상세를 연다
             case showContentDetail(String)
+            /// 장소 결과 탭. 지도 탭에서 장소 상세를 연다
+            case showPlaceDetail(Place)
         }
     }
 
@@ -145,6 +148,9 @@ public struct SearchFeature {
         case let .contentTapped(id):
             return .send(.delegate(.showContentDetail(id)))
 
+        case let .placeTapped(id):
+            return placeTapped(state: &state, id: id)
+
         case .delegate:
             return .none
 
@@ -160,6 +166,12 @@ public struct SearchFeature {
         case .post: return loadMoreContents(state: &state)
         case .place: return loadMorePlaces(state: &state)
         }
+    }
+
+    // 장소 결과 탭. 지도 탭에서 장소 상세를 열도록 상위에 올린다
+    private func placeTapped(state: inout State, id: String) -> Effect<Action> {
+        guard let place = state.places.first(where: { $0.id == id }) else { return .none }
+        return .send(.delegate(.showPlaceDetail(place)))
     }
 
     // 최근 검색어·탭 전환 처리

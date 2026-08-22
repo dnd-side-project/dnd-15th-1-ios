@@ -146,6 +146,8 @@ public struct MainTabFeature {
             return .send(.delegate(.sessionExpired))
         case let .showContentDetail(id):
             return presentContentDetail(state: &state, id: id)
+        case let .showPlaceDetail(place):
+            return presentSearchPlaceDetail(state: &state, place: place)
         }
     }
 
@@ -154,5 +156,12 @@ public struct MainTabFeature {
         state.contentReturnTab = state.selectedTab
         state.selectedTab = .map
         return .send(.map(.presentContentDetail(id)))
+    }
+
+    /// 지금 탭을 기억해 두고 지도 탭으로 옮겨 검색 장소 상세를 연다. 닫으면 그 탭으로 돌아온다
+    private func presentSearchPlaceDetail(state: inout State, place: Place) -> Effect<Action> {
+        state.contentReturnTab = state.selectedTab
+        state.selectedTab = .map
+        return .send(.map(.presentSearchPlaceDetail(place)))
     }
 }

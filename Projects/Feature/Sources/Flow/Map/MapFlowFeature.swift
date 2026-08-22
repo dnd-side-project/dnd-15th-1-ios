@@ -29,6 +29,9 @@ public struct MapFlowFeature {
         /// 게시글 상세를 다른 탭에서 열어 지도 핀 모드로 들어온 경우. 닫을 때 원래 탭으로 되돌린다
         public var showsContentPins: Bool = false
 
+        /// 탐색 검색에서 장소 상세를 열어 들어온 경우. 상세를 닫으면 원래 탭으로 되돌린다
+        public var returnsAfterDetailClose: Bool = false
+
         /// 핀·행·검색에서 뜬 장소 상세. 시트 표시는 `MapFlowView` 가 한다
         @Presents public var detail: PlaceDetailFeature.State?
 
@@ -63,6 +66,8 @@ public struct MapFlowFeature {
         case presentContentDetail(String)
         /// 홈에서 고른 저장 장소 상세를 지도 위에 연다
         case presentPlaceDetail(SavedPlace)
+        /// 탐색 검색에서 고른 장소 상세를 지도 위에 연다. 닫으면 원래 탭으로 되돌린다
+        case presentSearchPlaceDetail(Place)
         /// 홈 전체보기로 들어온다. 걸린 필터를 풀고 전체를 보여준다
         case showAllSaved
         case map(MapFeature.Action)
@@ -136,6 +141,14 @@ public struct MapFlowFeature {
                 savedPlace.place.coordinate,
                 zoomLevel: state.map.camera.zoomLevel
             )
+            return .none
+        case let .presentSearchPlaceDetail(place):
+            // 검색 장소 상세. 닫으면 탐색 탭으로 되돌리도록 표시해 둔다
+            state.returnsAfterDetailClose = true
+            // 저장 핀·검색 UI 를 감추고 이 장소만 지도에 얹는다
+            state.map.mode = .content(places: [place])
+            presentDetail(state: &state, place: place)
+            state.map.camera = .focusing(place.coordinate, zoomLevel: state.map.camera.zoomLevel)
             return .none
         case .showAllSaved:
             // 걸려 있던 필터를 푸는 일은 지도가 한다. 카메라 계산이 그쪽에 있다
@@ -299,7 +312,13 @@ private extension MapFlowFeature {
 
         case .detail(.presented(.delegate(.closed))), .detail(.dismiss):
             dismissDetail(state: &state)
-            return .none
+            // 탐색 검색에서 열린 상세면 지도를 저장 목록으로 되돌린 뒤 원래 탭으로 되돌린다
+            guard state.returnsAfterDetailClose else { return .none }
+            state.returnsAfterDetailClose = false
+            return .merge(
+                .send(.map(.searchClearTapped)),
+                .send(.delegate(.contentDetailClosed))
+            )
 
         case let .detail(.presented(.delegate(.bookmarkToggled(id, isSaved)))):
             // 장소 상세에서 바뀐 저장 상태를 게시글 상세 목록·지도 핀에 맞춘다
