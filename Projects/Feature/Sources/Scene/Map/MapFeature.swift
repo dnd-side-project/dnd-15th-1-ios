@@ -17,6 +17,8 @@ public struct MapFeature {
         public enum Mode: Equatable, Sendable {
             case saved
             case searchResult(query: String, places: [Place])
+            /// 게시글 상세가 올린 장소들. 검색 UI 없이 핀만 얹는다
+            case content(places: [Place])
         }
 
         /// 지금 열린 상세의 장소. 흐름이 채우고, 지도는 선택 핀만 이걸로 그린다
@@ -98,6 +100,7 @@ public struct MapFeature {
         case retryTapped
         case dismissToast
         case searchResultsApplied(query: String, places: [Place])
+        case contentPlacesApplied(places: [Place])
         case searchClearTapped
         case searchBackTapped
         case bookmarkTapped(String)
@@ -150,7 +153,7 @@ public struct MapFeature {
             return updateFilter(state: &state, action: action)
         case .editTapped, .deleteTapped, .markerTapped, .rowTapped, .searchBarTapped, .courseButtonTapped:
             return raise(state: &state, action: action)
-        case .searchResultsApplied, .searchClearTapped, .searchBackTapped, .bookmarkTapped:
+        case .searchResultsApplied, .contentPlacesApplied, .searchClearTapped, .searchBackTapped, .bookmarkTapped:
             return updateSearch(state: &state, action: action)
         case .aliasSaved:
             return applyAlias(state: &state, action: action)
@@ -176,7 +179,10 @@ public struct MapFeature {
             state.places = places
             state.bookmarkedPlaceIDs = Set(places.map(\.id))
             state.loadState = .loaded
-            state.camera = Self.overview(of: state)
+            // 게시글 핀을 보고 있을 땐 저장 목록 로딩이 카메라를 뺏지 않게 한다
+            if case .saved = state.mode {
+                state.camera = Self.overview(of: state)
+            }
             return .none
 
         case let .savedPlacesResponse(.failure(error)):
@@ -396,6 +402,14 @@ private extension MapFeature {
                 state.camera = .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
             }
             return .none
+        case let .contentPlacesApplied(places):
+            state.mode = .content(places: places)
+            state.menuTargetPlaceID = nil
+            // 카메라는 맨 첫 장소를 가운데로 고정한다
+            if let first = places.first {
+                state.camera = .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+            }
+            return .none
         case .searchClearTapped:
             state.mode = .saved
             return .none
@@ -448,6 +462,8 @@ public extension MapFeature.State {
         case .saved:
             markers = filteredPlaces.map { categoryMarker($0.place) }
         case let .searchResult(_, places):
+            markers = places.map(categoryMarker)
+        case let .content(places):
             markers = places.map(categoryMarker)
         }
         // 고른 장소의 기존 핀은 지우지 않는다. 시안처럼 그 위에 선택 핀을 얹는다

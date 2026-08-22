@@ -26,6 +26,9 @@ public struct MapFlowFeature {
         public var path: [Route]
         public var placeSearch: PlaceSearchFeature.State?
 
+        /// 게시글 상세를 다른 탭에서 열어 지도 핀 모드로 들어온 경우. 닫을 때 원래 탭으로 되돌린다
+        public var showsContentPins: Bool = false
+
         /// 핀·행·검색에서 뜬 장소 상세. 시트 표시는 `MapFlowView` 가 한다
         @Presents public var detail: PlaceDetailFeature.State?
 
@@ -56,6 +59,8 @@ public struct MapFlowFeature {
 
     public enum Action: Equatable {
         case pathChanged([Route])
+        /// 다른 탭에서 고른 게시글 상세를 지도 위에 연다
+        case presentContentDetail(String)
         case map(MapFeature.Action)
         case course(CourseFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
@@ -68,6 +73,8 @@ public struct MapFlowFeature {
         public enum Delegate: Equatable {
             /// 세션 만료. RootFlow 까지 올라가 로그인으로 되돌린다
             case sessionExpired
+            /// 게시글 상세 시트를 닫았다. MainTab 이 게시글을 고르기 전 탭으로 되돌린다
+            case contentDetailClosed
         }
     }
 
@@ -107,6 +114,11 @@ public struct MapFlowFeature {
                 state.course = nil
             }
             return .none
+        case let .presentContentDetail(id):
+            // 상세는 시트가 스스로 불러온다. 로드되면 그 places 로 핀을 세운다
+            state.showsContentPins = true
+            state.postDetail = PostDetailFeature.State(contentID: id)
+            return .send(.postDetail(.presented(.onAppear)))
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
         case let .course(.delegate(delegate)):
@@ -230,9 +242,20 @@ private extension MapFlowFeature {
             dismissDetail(state: &state)
             return .none
 
+        case let .postDetail(.presented(.delegate(.detailLoaded(detail)))):
+            // 다른 탭에서 열어 핀 모드로 들어온 경우에만 상세의 places 로 핀·카메라를 세운다
+            guard state.showsContentPins else { return .none }
+            return .send(.map(.contentPlacesApplied(places: detail.places.map(place))))
+
         case .postDetail(.presented(.delegate(.closeRequested))), .postDetail(.dismiss):
             state.postDetail = nil
-            return .none
+            guard state.showsContentPins else { return .none }
+            // 핀 모드를 풀고 지도를 저장 목록으로 되돌린 뒤, 게시글 고르기 전 탭으로 되돌리도록 올린다
+            state.showsContentPins = false
+            return .merge(
+                .send(.map(.searchClearTapped)),
+                .send(.delegate(.contentDetailClosed))
+            )
 
         case .postDetail(.presented(.delegate(.sessionExpired))):
             return .send(.delegate(.sessionExpired))
@@ -263,6 +286,9 @@ private extension MapFlowFeature {
             if let place = state.map.searchResults.first(where: { $0.id == id }) {
                 presentDetail(state: &state, place: place)
             }
+        case .content:
+            // 게시글 핀 모드에선 상세 시트가 이미 떠 있어 핀 탭으로 다른 상세를 열지 않는다
+            break
         }
     }
 
@@ -294,5 +320,20 @@ private extension MapFlowFeature {
     func dismissDetail(state: inout State) {
         state.detail = nil
         state.map.selectedPlace = nil
+    }
+
+    /// 게시글 장소를 지도 핀용 Place 로 바꾼다. 핀엔 좌표·카테고리만 필요해 나머지는 비운다
+    func place(_ detailPlace: PostDetailPlace) -> Place {
+        Place(
+            id: detailPlace.id,
+            kakaoPlaceID: nil,
+            name: detailPlace.name,
+            category: detailPlace.category,
+            address: "",
+            roadAddress: "",
+            coordinate: detailPlace.coordinate,
+            bookmarkCount: 0,
+            thumbnailURLs: []
+        )
     }
 }

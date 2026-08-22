@@ -46,6 +46,8 @@ public struct PostDetailFeature {
 
         @CasePathable
         public enum Delegate: Equatable {
+            /// 상세를 받아왔다. 지도가 이 places 로 핀·카메라를 세운다
+            case detailLoaded(PostDetailContent)
             /// `X` 탭. 지도가 시트를 `저장한 장소` 로 되돌린다
             case closeRequested
             /// 행 탭. 받는 쪽은 Cycle 2 다
@@ -80,7 +82,8 @@ public struct PostDetailFeature {
             state.savedPlaceIDs = Set(detail.places.filter(\.isSaved).map(\.id))
             state.isLoading = false
             state.loadFailed = false
-            return .none
+            // 지도가 이 상세의 places 로 핀·카메라를 세우도록 올린다. 지도 밖 표시자는 무시한다
+            return .send(.delegate(.detailLoaded(detail)))
 
         case let .detailFailed(error):
             state.isLoading = false
