@@ -184,15 +184,21 @@ final class MapFlowFeatureTests: XCTestCase {
         }
     }
 
-    func test_북마크_신호는_삼킨다() async {
+    func test_장소상세_북마크는_지도_저장목록에_반영된다() async {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var state = MapFlowFeature.State()
         state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.map.bookmarkedPlaceIDs = ["7"]
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         }
 
-        await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", false)))))
+        await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", false))))) {
+            $0.map.bookmarkedPlaceIDs = []
+        }
+        await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", true))))) {
+            $0.map.bookmarkedPlaceIDs = ["7"]
+        }
     }
 
     func test_별칭을_저장하면_목록을_지도에_넘긴다() async {

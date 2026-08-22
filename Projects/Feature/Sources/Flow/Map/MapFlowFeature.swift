@@ -234,15 +234,8 @@ private extension MapFlowFeature {
             state.alias = nil
             return .none
 
-        case let .detail(.presented(.delegate(.contentSelected(id)))):
-            // 장소 상세를 닫지 않는다. 게시글을 닫으면 그 자리로 돌아가야 한다
-            state.postDetail = PostDetailFeature.State(contentID: id)
-            // 화면 등장에 안 기댄다. 내려가던 시트를 도로 올리면 등장이 안 온다
-            return .send(.postDetail(.presented(.onAppear)))
-
-        case .detail(.presented(.delegate(.closed))), .detail(.dismiss):
-            dismissDetail(state: &state)
-            return .none
+        case .detail:
+            return handleDetail(state: &state, action: action)
 
         case let .postDetail(.presented(.delegate(.detailLoaded(detail)))):
             // 다른 탭에서 열어 핀 모드로 들어온 경우에만 상세의 places 로 핀·카메라를 세운다
@@ -267,13 +260,46 @@ private extension MapFlowFeature {
             focusContentPlaceDetail(state: &state, id: id)
             return .none
 
-        case .detail, .alias, .postDetail:
-            // 북마크·지도는 받는 쪽이 아직 없다. 삼킨다
+        case .alias, .postDetail:
             return .none
 
         default:
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
+        }
+    }
+
+    /// 장소 상세가 올린 신호 처리. 게시글로 넘어가기·닫기·저장 상태 동기화
+    func handleDetail(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .detail(.presented(.delegate(.contentSelected(id)))):
+            // 장소 상세를 닫지 않는다. 게시글을 닫으면 그 자리로 돌아가야 한다
+            state.postDetail = PostDetailFeature.State(contentID: id)
+            // 화면 등장에 안 기댄다. 내려가던 시트를 도로 올리면 등장이 안 온다
+            return .send(.postDetail(.presented(.onAppear)))
+
+        case .detail(.presented(.delegate(.closed))), .detail(.dismiss):
+            dismissDetail(state: &state)
+            return .none
+
+        case let .detail(.presented(.delegate(.bookmarkToggled(id, isSaved)))):
+            // 장소 상세에서 바뀐 저장 상태를 게시글 상세 목록·지도 핀에 맞춘다
+            syncPlaceSaved(state: &state, id: id, isSaved: isSaved)
+            return .none
+
+        default:
+            return .none
+        }
+    }
+
+    /// 게시글 상세 목록·지도 핀의 저장 상태를 한곳에서 맞춘다
+    func syncPlaceSaved(state: inout State, id: String, isSaved: Bool) {
+        if isSaved {
+            state.postDetail?.savedPlaceIDs.insert(id)
+            state.map.bookmarkedPlaceIDs.insert(id)
+        } else {
+            state.postDetail?.savedPlaceIDs.remove(id)
+            state.map.bookmarkedPlaceIDs.remove(id)
         }
     }
 
@@ -306,7 +332,9 @@ private extension MapFlowFeature {
     /// 게시글 핀을 눌러 장소 상세를 연다. 게시글 상세는 남겨 둬 상세를 닫으면 그 자리로 돌아간다
     func presentContentPlaceDetail(state: inout State, place: Place) {
         var detail = PlaceDetailFeature.State(place: place)
-        detail.isBookmarked = state.map.bookmarkedPlaceIDs.contains(place.id)
+        // 저장 상태는 게시글 상세 목록을 기준으로 물려받는다. 없으면 지도 저장 목록을 본다
+        detail.isBookmarked = state.postDetail?.savedPlaceIDs.contains(place.id)
+            ?? state.map.bookmarkedPlaceIDs.contains(place.id)
         state.detail = detail
         state.map.selectedPlace = MapFeature.State.SelectedPlace(
             id: place.id,
