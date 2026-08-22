@@ -11,11 +11,11 @@ struct HomeSummaryResponseDTO: Decodable, Sendable {
     let connected: Bool
     let myNickname: String?
     let partnerNickname: String?
-    let currentDateCourse: DateCourseResponseDTO?
+    let currentDateCourse: HomeDateCourseResponseDTO?
 }
 
 // 현재 데이트 코스·지난 데이트가 같은 형태로 온다. 쓰는 필드만 선언
-struct DateCourseResponseDTO: Decodable, Sendable {
+struct HomeDateCourseResponseDTO: Decodable, Sendable {
     let dateCourseId: Int
     let title: String
     let date: String

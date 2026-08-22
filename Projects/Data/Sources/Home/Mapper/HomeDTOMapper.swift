@@ -19,16 +19,16 @@ enum HomeDTOMapper {
         )
     }
 
-    static func toPastDates(_ dtos: [DateCourseResponseDTO]) -> [DateSchedule] {
+    static func toPastDates(_ dtos: [HomeDateCourseResponseDTO]) -> [DateSchedule] {
         dtos.map(toDateSchedule)
     }
 
-    private static func toUpcoming(_ dto: DateCourseResponseDTO) -> UpcomingSchedule {
+    private static func toUpcoming(_ dto: HomeDateCourseResponseDTO) -> UpcomingSchedule {
         // 배너는 코스 제목을 보여준다
         UpcomingSchedule(title: dto.title, placeCount: dto.totalPlaceCount)
     }
 
-    private static func toDateSchedule(_ dto: DateCourseResponseDTO) -> DateSchedule {
+    private static func toDateSchedule(_ dto: HomeDateCourseResponseDTO) -> DateSchedule {
         DateSchedule(
             id: String(dto.dateCourseId),
             title: dto.title,
