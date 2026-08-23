@@ -219,26 +219,6 @@ extension DulpickMapView {
             _ = routeManager.addRouteLayer(layerID: Layout.routeLayerID, zOrder: 1_000)
         }
 
-        /// 개수가 수십 개 수준이라 레이어를 통째로 다시 그린다
-        private func drawMarkers(_ map: KakaoMap) {
-            let manager = map.getLabelManager()
-            guard let layer = manager.getLabelLayer(layerID: Layout.markerLayerID) else { return }
-
-            layer.clearAllItems()
-
-            for marker in desiredMarkers {
-                let styleID = MapMarkerSymbol.styleID(for: marker.kind)
-                registerMarkerStyleIfNeeded(styleID: styleID, kind: marker.kind, manager: manager)
-
-                let options = PoiOptions(styleID: styleID, poiID: marker.id)
-                options.clickable = true
-                options.rank = MapMarkerSymbol.rank(for: marker.kind)
-                layer.addPoi(option: options, at: marker.coordinate.mapPoint)?.show()
-            }
-
-            layer.setClickable(true)
-        }
-
         private func drawRoutes(_ map: KakaoMap) {
             let manager = map.getRouteManager()
             guard let layer = manager.getRouteLayer(layerID: Layout.routeLayerID) else { return }
@@ -403,6 +383,64 @@ private extension DulpickMapView.Coordinator {
             center.removeObserver(observer)
         }
         lifecycleObservers.removeAll()
+    }
+}
+
+// MARK: - 마커
+
+private extension DulpickMapView.Coordinator {
+    /// 엔진이 막 준비됐을 때만 레이어를 비운다.
+    /// 그 다음부터는 바뀐 핀만 더하거나 지운다. 고를 때마다 전부 지워 다시 찍으면
+    /// 카메라가 움직이는 동안 핀이 사라진다
+    func drawMarkers(_ map: KakaoMap) {
+        let manager = map.getLabelManager()
+        guard let layer = manager.getLabelLayer(layerID: DulpickMapView.Layout.markerLayerID) else { return }
+
+        if appliedMarkers == nil {
+            layer.clearAllItems()
+            for marker in desiredMarkers {
+                addMarker(marker, on: layer, manager: manager)
+            }
+            layer.setClickable(true)
+            return
+        }
+
+        let change = MapMarkerDiff.change(from: appliedMarkers ?? [], to: desiredMarkers)
+        for id in change.removedIDs {
+            layer.removePoi(poiID: id)
+        }
+        for marker in change.added {
+            addMarker(marker, on: layer, manager: manager)
+        }
+        for marker in change.moved {
+            layer.getPoi(poiID: marker.id)?
+                .moveAt(marker.coordinate.mapPoint, duration: 0)
+        }
+        for marker in change.restyled {
+            let styleID = MapMarkerSymbol.styleID(for: marker.kind)
+            registerMarkerStyleIfNeeded(
+                styleID: styleID,
+                kind: marker.kind,
+                manager: manager
+            )
+            guard let poi = layer.getPoi(poiID: marker.id) else { continue }
+            poi.changeStyle(styleID: styleID, enableTransition: false)
+            poi.rank = MapMarkerSymbol.rank(for: marker.kind)
+        }
+        layer.setClickable(true)
+    }
+
+    func addMarker(
+        _ marker: MapMarker,
+        on layer: LabelLayer,
+        manager: LabelManager
+    ) {
+        let styleID = MapMarkerSymbol.styleID(for: marker.kind)
+        registerMarkerStyleIfNeeded(styleID: styleID, kind: marker.kind, manager: manager)
+        let options = PoiOptions(styleID: styleID, poiID: marker.id)
+        options.clickable = true
+        options.rank = MapMarkerSymbol.rank(for: marker.kind)
+        layer.addPoi(option: options, at: marker.coordinate.mapPoint)?.show()
     }
 }
 
