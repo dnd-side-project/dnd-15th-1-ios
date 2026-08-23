@@ -266,6 +266,7 @@ private enum CourseResultPreviewData {
     )
 }
 
+@MainActor
 private func courseResultStore(course: DateCourse) -> StoreOf<CourseResultFeature> {
     Store(
         initialState: CourseResultFeature.State(
