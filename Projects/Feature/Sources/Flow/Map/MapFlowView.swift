@@ -168,13 +168,11 @@ private extension MapFlowView {
     /// 아래 안전영역(탭바 + 홈 인디케이터)을 재는 층.
     /// `ignoresSafeArea` 안쪽에서 물으면 안전영역이 이미 먹혀 0 이 오므로, 아무 것도 걸지 않는다
     var bottomInsetProbe: some View {
-        GeometryReader { proxy in
-            Color.clear
-                .onGeometryChange(for: CGFloat.self) { _ in proxy.safeAreaInsets.bottom } action: {
-                    bottomInset = $0
-                }
-        }
-        .allowsHitTesting(false)
+        Color.clear
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: {
+                bottomInset = $0
+            }
+            .allowsHitTesting(false)
     }
 
     var aliasSheetBinding: Binding<Bool> {
