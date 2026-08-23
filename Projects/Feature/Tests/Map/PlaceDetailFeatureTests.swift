@@ -118,15 +118,12 @@ final class PlaceDetailFeatureTests: XCTestCase {
         XCTAssertFalse(store.state.canLoadMore)
     }
 
-    func test_지도버튼과_게시물과_닫기는_상위로_올린다() async {
+    func test_게시물과_닫기는_상위로_올린다() async {
         let store = TestStore(
             initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 1))
         ) {
             PlaceDetailFeature()
         }
-
-        await store.send(.mapButtonTapped)
-        await store.receive(\.delegate.mapRequested)
 
         await store.send(.contentTapped("1"))
         await store.receive(\.delegate.contentSelected)
@@ -148,13 +145,14 @@ final class PlaceDetailFeatureTests: XCTestCase {
         XCTAssertFalse(state.canLoadMore)
     }
 
-    func test_저장_장소로_열면_서버_상세를_부르고_세_값을_갱신한다() async {
+    func test_저장_장소로_열면_서버_상세를_부르고_네_값을_갱신한다() async {
         let saved = SavedPlace.mocks[0]
         let updated = PlaceDetail(
             place: saved.place,
             savedByMe: true,
             savedMemberCount: 77,
-            ownership: .mine
+            ownership: .mine,
+            kakaoPlaceURL: URL(string: "https://place.map.kakao.com/26338954")
         )
         let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: saved)) {
             PlaceDetailFeature()
@@ -177,6 +175,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
             )
             $0.bookmarkCount = 77
             $0.isBookmarked = true
+            $0.kakaoPlaceURL = updated.kakaoPlaceURL
         }
     }
 
@@ -191,7 +190,11 @@ final class PlaceDetailFeatureTests: XCTestCase {
                 XCTAssertEqual(kakaoID, place.kakaoPlaceID ?? "")
                 XCTAssertEqual(query, "성수 카페")
                 return PlaceDetail(
-                    place: place, savedByMe: false, savedMemberCount: 3, ownership: nil
+                    place: place,
+                    savedByMe: false,
+                    savedMemberCount: 3,
+                    ownership: nil,
+                    kakaoPlaceURL: URL(string: "https://place.map.kakao.com/26338954")
                 )
             }
         }
@@ -210,6 +213,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
                 thumbnailURLs: place.thumbnailURLs
             )
             $0.bookmarkCount = 3
+            $0.kakaoPlaceURL = URL(string: "https://place.map.kakao.com/26338954")
         }
     }
 
@@ -262,5 +266,96 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.bookmarkCount = 5
         }
         XCTAssertEqual(store.state.id, originalID)
+    }
+}
+
+@MainActor
+final class PlaceDetailFeatureMapTests: XCTestCase {
+    func test_카카오_장소ID_가_있으면_앱_주소를_만든다() {
+        let state = PlaceDetailFeature.State(savedPlace: .fixture(id: "7"))
+
+        XCTAssertEqual(state.kakaoMapAppURL, URL(string: "kakaomap://place?id=kakao-7"))
+        XCTAssertTrue(state.canOpenKakaoMap)
+    }
+
+    func test_카카오_장소ID_가_없으면_앱_주소가_없고_버튼이_안_눌린다() {
+        let state = PlaceDetailFeature.State(place: .fixture(id: "s1"), query: "검색어")
+
+        XCTAssertNil(state.kakaoMapAppURL)
+        XCTAssertNil(state.kakaoMapWebURL)
+        XCTAssertFalse(state.canOpenKakaoMap)
+    }
+
+    func test_서버가_준_웹_주소를_그대로_쓴다() async {
+        let saved = SavedPlace.fixture(id: "7")
+        let serverURL = URL(string: "https://place.map.kakao.com/26338954")
+        let detail = PlaceDetail(
+            place: saved.place,
+            savedByMe: true,
+            savedMemberCount: 1,
+            ownership: .mine,
+            kakaoPlaceURL: serverURL
+        )
+        let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: saved)) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.placeDetail = { _ in detail }
+        }
+
+        await store.send(.onAppear)
+        await store.receive(\.detailLoaded) {
+            $0.place = Place(
+                id: $0.id,
+                kakaoPlaceID: detail.place.kakaoPlaceID,
+                name: detail.place.name,
+                category: detail.place.category,
+                address: detail.place.address,
+                roadAddress: detail.place.roadAddress,
+                coordinate: detail.place.coordinate,
+                bookmarkCount: 1,
+                thumbnailURLs: detail.place.thumbnailURLs
+            )
+            $0.bookmarkCount = 1
+            $0.kakaoPlaceURL = serverURL
+        }
+
+        XCTAssertEqual(store.state.kakaoMapWebURL, serverURL)
+    }
+
+    func test_서버가_웹_주소를_안_주면_장소ID_로_만든다() {
+        let state = PlaceDetailFeature.State(savedPlace: .fixture(id: "7"))
+
+        XCTAssertNil(state.kakaoPlaceURL)
+        XCTAssertEqual(
+            state.kakaoMapWebURL,
+            URL(string: "https://place.map.kakao.com/kakao-7")
+        )
+    }
+
+    func test_조회가_실패하면_웹_주소를_장소ID_로_만든다() async {
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7"))
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+        }
+
+        await store.send(.onAppear)
+
+        XCTAssertNil(store.state.kakaoPlaceURL)
+        XCTAssertEqual(
+            store.state.kakaoMapWebURL,
+            URL(string: "https://place.map.kakao.com/kakao-7")
+        )
+    }
+
+    func test_앱_주소가_없어도_웹_주소가_있으면_버튼이_눌린다() {
+        var state = PlaceDetailFeature.State(place: .fixture(id: "s1"), query: "검색어")
+        state.kakaoPlaceURL = URL(string: "https://place.map.kakao.com/26338954")
+
+        XCTAssertNil(state.kakaoMapAppURL)
+        XCTAssertEqual(state.kakaoMapWebURL, URL(string: "https://place.map.kakao.com/26338954"))
+        XCTAssertTrue(state.canOpenKakaoMap)
     }
 }

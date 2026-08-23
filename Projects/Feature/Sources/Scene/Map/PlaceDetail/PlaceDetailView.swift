@@ -11,6 +11,9 @@ import ThirdParty
 public struct PlaceDetailView: View {
     public let store: StoreOf<PlaceDetailFeature>
 
+    /// 카카오맵을 여는 통로. 앱이 없으면 웹으로 보낸다
+    @Environment(\.openURL) private var openURL
+
     /// 탭바 + 홈 인디케이터. `ignoresSafeArea` 안쪽이라 여기서 재면 0 이다
     private let bottomInset: CGFloat
 
@@ -107,7 +110,17 @@ private extension PlaceDetailView {
     }
 
     var mapButton: some View {
-        Button { store.send(.mapButtonTapped) } label: {
+        Button {
+            if let appURL = store.kakaoMapAppURL {
+                let webURL = store.kakaoMapWebURL
+                openURL(appURL) { accepted in
+                    guard !accepted, let webURL else { return }
+                    openURL(webURL)
+                }
+            } else if let webURL = store.kakaoMapWebURL {
+                openURL(webURL)
+            }
+        } label: {
             HStack(spacing: Spacing.s4) {
                 Image.mappin
                     .renderingMode(.template)
@@ -116,15 +129,19 @@ private extension PlaceDetailView {
                 Text("지도")
                     .typography(.caption1M)
             }
-            .foregroundStyle(Color.textSecondary)
+            .foregroundStyle(store.canOpenKakaoMap ? Color.textSecondary : Color.textDisabled)
             .frame(width: PlaceDetailMetric.mapButtonWidth, height: 32)
             .background(Color.commonWhite)
             .overlay {
                 RoundedRectangle(cornerRadius: PlaceDetailMetric.buttonCornerRadius)
-                    .stroke(Color.gray200, lineWidth: 1)
+                    .stroke(
+                        store.canOpenKakaoMap ? Color.gray200 : Color.gray100,
+                        lineWidth: 1
+                    )
             }
         }
         .buttonStyle(StaticButtonStyle())
+        .disabled(!store.canOpenKakaoMap)
         .padding(.leading, Spacing.s20)
     }
 }

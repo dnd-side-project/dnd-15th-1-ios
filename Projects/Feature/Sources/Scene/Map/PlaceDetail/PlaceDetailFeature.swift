@@ -39,6 +39,9 @@ public struct PlaceDetailFeature {
         /// 저장 응답이 준 서버 placeId. 검색 장소는 place.id 가 kakaoId 라 삭제 경로엔 이걸 쓴다
         public var savedServerID: String?
 
+        /// 카카오맵 앱이 없을 때 열 웹 주소. 상세 조회가 끝나면 채워진다
+        public var kakaoPlaceURL: URL?
+
         public var isAddressExpanded = false
 
         public var visibleContentCount = PlaceDetailFeature.contentPageSize
@@ -52,6 +55,21 @@ public struct PlaceDetailFeature {
         }
 
         public var title: String { alias ?? place.name }
+
+        public var kakaoMapAppURL: URL? {
+            guard let kakaoPlaceID = place.kakaoPlaceID else { return nil }
+            return URL(string: "kakaomap://place?id=\(kakaoPlaceID)")
+        }
+
+        /// 앱이 없을 때 여는 웹 주소. 서버가 준 값이 먼저다
+        public var kakaoMapWebURL: URL? {
+            if let kakaoPlaceURL { return kakaoPlaceURL }
+            guard let kakaoPlaceID = place.kakaoPlaceID else { return nil }
+            return URL(string: "https://place.map.kakao.com/\(kakaoPlaceID)")
+        }
+
+        /// 앱이든 웹이든 열 곳이 있는지. 없으면 지도 버튼이 안 눌린다
+        public var canOpenKakaoMap: Bool { kakaoMapAppURL != nil || kakaoMapWebURL != nil }
 
         public init(savedPlace: SavedPlace) {
             id = savedPlace.place.id
@@ -90,7 +108,6 @@ public struct PlaceDetailFeature {
         case bookmarkSaved(serverID: String)
         case bookmarkFailed(wasBookmarked: Bool)
         case addressToggled
-        case mapButtonTapped
         case contentTapped(String)
         case moreTapped
         case closeTapped
@@ -100,7 +117,6 @@ public struct PlaceDetailFeature {
         public enum Delegate: Equatable {
             /// 장소 id 와 바뀐 뒤 상태. 서버 계약이 없어 받는 쪽도 지금은 삼킨다
             case bookmarkToggled(String, Bool)
-            case mapRequested(String)
             case contentSelected(String)
             case closed
         }
@@ -126,7 +142,7 @@ public struct PlaceDetailFeature {
             return loadDetail(state: &state, action: action)
         case .bookmarkTapped, .bookmarkSaved, .bookmarkFailed:
             return updateBookmark(state: &state, action: action)
-        case .addressToggled, .moreTapped, .mapButtonTapped, .contentTapped, .closeTapped, .delegate:
+        case .addressToggled, .moreTapped, .contentTapped, .closeTapped, .delegate:
             return updateSheet(state: &state, action: action)
         }
     }
@@ -165,6 +181,7 @@ public struct PlaceDetailFeature {
                 thumbnailURLs: detail.place.thumbnailURLs
             )
             state.bookmarkCount = detail.savedMemberCount
+            state.kakaoPlaceURL = detail.kakaoPlaceURL
             // 조회 중에 북마크를 눌렀으면 응답의 savedByMe 는 이미 낡은 값이다
             if !state.didToggleBookmark {
                 state.isBookmarked = detail.savedByMe
@@ -208,9 +225,6 @@ public struct PlaceDetailFeature {
         case .moreTapped:
             state.visibleContentCount += Self.contentPageSize
             return .none
-
-        case .mapButtonTapped:
-            return .send(.delegate(.mapRequested(state.id)))
 
         case let .contentTapped(id):
             return .send(.delegate(.contentSelected(id)))
