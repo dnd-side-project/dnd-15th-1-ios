@@ -2,6 +2,7 @@ import Domain
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
+import UIKit
 
 public struct HomeView: View {
     @Bindable public var store: StoreOf<HomeFeature>
@@ -19,6 +20,9 @@ public struct HomeView: View {
             VStack(spacing: 0) {
                 topSection
                 contentSheet
+            }
+            .background {
+                HomeRefreshControlColor()
             }
         }
         .background {
@@ -280,4 +284,70 @@ private extension HomeView {
 private enum HomeSkeletonMetric {
     // 연결(짧은) 배너 이미지 높이에 맞춘 스켈레톤 배너 높이
     static let bannerHeight: CGFloat = 110
+}
+
+// MARK: - 당겨서 새로고침
+
+/// `.tint(Color.commonWhite)` 만으로는 새로고침 원 색이 안 바뀐다.
+private struct HomeRefreshControlColor: UIViewRepresentable {
+    func makeUIView(context: Context) -> HomeRefreshControlColorView {
+        HomeRefreshControlColorView()
+    }
+
+    func updateUIView(_ uiView: HomeRefreshControlColorView, context: Context) {
+        uiView.applyColor()
+    }
+}
+
+private final class HomeRefreshControlColorView: UIView {
+    private let color = UIColor(Color.commonWhite)
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        applyColor()
+    }
+
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        applyColor()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        applyColor()
+    }
+
+    func applyColor() {
+        var current: UIView? = self
+        while let view = current {
+            if let scrollView = view as? UIScrollView {
+                applyColor(in: scrollView)
+                return
+            }
+            current = view.superview
+        }
+    }
+
+    private func applyColor(in root: UIView) {
+        if let scrollView = root as? UIScrollView {
+            scrollView.refreshControl?.tintColor = color
+        }
+        if let refreshControl = root as? UIRefreshControl {
+            refreshControl.tintColor = color
+            return
+        }
+        for subview in root.subviews {
+            applyColor(in: subview)
+        }
+    }
 }
