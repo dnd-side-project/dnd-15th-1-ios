@@ -92,16 +92,26 @@ public struct HomeView: View {
             HomeHeader(
                 nickname: store.nickname,
                 partnerName: store.partnerName,
-                calendarTapped: { store.send(.calendarTapped) }
+                calendarTapped: {
+                    // 로딩 중엔 달력 동작을 막는다
+                    guard store.didLoadSummary else { return }
+                    store.send(.calendarTapped)
+                }
             )
 
-            HomeBanner(
-                isConnected: store.isConnected,
-                upcomingSchedule: store.upcomingSchedule,
-                connectTapped: { store.send(.connectFlowRequested) },
-                createCourseTapped: { store.send(.courseFlowRequested) },
-                bannerTapped: {}
-            )
+            Group {
+                if store.didLoadSummary {
+                    HomeBanner(
+                        isConnected: store.isConnected,
+                        upcomingSchedule: store.upcomingSchedule,
+                        connectTapped: { store.send(.connectFlowRequested) },
+                        createCourseTapped: { store.send(.courseFlowRequested) },
+                        bannerTapped: {}
+                    )
+                } else {
+                    skeletonBanner
+                }
+            }
             .padding(.bottom, 20)
         }
         .background(Color.gray900.ignoresSafeArea(edges: .top))
@@ -132,29 +142,43 @@ public struct HomeView: View {
 
     private var recommendationSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            (
-                Text("\(store.nickname)님을 위한 ")
-                    .foregroundColor(Color.textPrimary)
-                    + Text("장소 추천")
-                    .foregroundColor(Color.primaryPink)
-            )
-            .typography(.title2B)
-            .padding(.horizontal, 20)
+            recommendationTitle
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(store.recommendations) { content in
-                        Button {
-                            store.send(.recommendationTapped(content.id))
-                        } label: {
-                            ContentCard(content: content)
-                                .frame(width: 170)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 20)
+            if store.recommendations.isEmpty {
+                recommendationSkeletonRow
+            } else {
+                recommendationScroll
             }
+        }
+    }
+
+    private var recommendationTitle: some View {
+        (
+            Text("\(store.nickname)님을 위한 ")
+                .foregroundColor(Color.textPrimary)
+                + Text("장소 추천")
+                .foregroundColor(Color.primaryPink)
+        )
+        .typography(.title2B)
+        // 닉네임 로드 전 빈 값이 그려졌다 리플로우되는 걸 막고, 자리만 잡아둔다
+        .opacity(store.didLoadSummary ? 1 : 0)
+        .padding(.horizontal, 20)
+    }
+
+    private var recommendationScroll: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(store.recommendations) { content in
+                    Button {
+                        store.send(.recommendationTapped(content.id))
+                    } label: {
+                        ContentCard(content: content)
+                            .frame(width: 170)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 20)
         }
     }
 
@@ -213,7 +237,15 @@ public struct HomeView: View {
 
     @ViewBuilder
     private var savedPlaceContent: some View {
-        if store.visibleSavedPlaces.isEmpty {
+        if !store.didLoadSaved {
+            // 로드 전엔 빈 상태·리스트를 모르니 행 시머로 자리를 잡는다
+            VStack(spacing: 8) {
+                ForEach(0 ..< 3, id: \.self) { _ in
+                    savedPlaceSkeletonRow
+                }
+            }
+            .padding(.horizontal, 20)
+        } else if store.visibleSavedPlaces.isEmpty {
             EmptyStateView(
                 image: .placeEmpty,
                 title: "최근 저장된 장소가 없어요!",
@@ -234,4 +266,51 @@ public struct HomeView: View {
             .padding(.horizontal, 20)
         }
     }
+}
+
+// MARK: - 첫 로딩 스켈레톤
+
+private extension HomeView {
+    // 연결 배너 크기로 고정. 요약이 오면 실제 배너로 교체된다
+    var skeletonBanner: some View {
+        ShimmerBlock(cornerRadius: 16, baseColor: .gray700)
+            .frame(height: HomeSkeletonMetric.bannerHeight)
+            .padding(.horizontal, 20)
+    }
+
+    // 추천은 항상 데이터가 있어 비어있으면 로딩. 카드 폭 170으로 실제와 맞춘다
+    var recommendationSkeletonRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(0 ..< 3, id: \.self) { _ in
+                    ContentCardSkeleton()
+                        .frame(width: 170)
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    // SavedPlaceRow 와 같은 높이·패딩. 아이콘·이름 자리를 시머로 채운다
+    var savedPlaceSkeletonRow: some View {
+        HStack(spacing: 8) {
+            ShimmerBlock(cornerRadius: 4, baseColor: .gray300)
+                .frame(width: 24, height: 24)
+
+            ShimmerBlock(cornerRadius: 4, baseColor: .gray300)
+                .frame(width: 140, height: 16)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.bgSubtle)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private enum HomeSkeletonMetric {
+    // 연결(짧은) 배너 이미지 높이에 맞춘 스켈레톤 배너 높이
+    static let bannerHeight: CGFloat = 110
 }

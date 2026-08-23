@@ -47,6 +47,10 @@ public struct HomeFeature {
         public var pastDateCourses: PastDateCoursesFeature.State?
         public var course: CourseFeature.State?
         public var homePath: [HomeRoute]
+        // 요약(GET /home) 로드 완료. 헤더·배너를 이 이후 실제로 그린다
+        public var didLoadSummary = false
+        // 최근 저장 장소 로드 완료. 로딩과 빈 상태를 구분한다
+        public var didLoadSaved = false
 
         public var isConnected: Bool {
             partnerName != nil
@@ -65,7 +69,7 @@ public struct HomeFeature {
         }
 
         public init(
-            nickname: String = "듀가나디햄햄",
+            nickname: String = "",
             partnerName: String? = nil,
             upcomingSchedule: UpcomingSchedule? = nil,
             recommendations: [Content] = [],
@@ -145,6 +149,7 @@ public struct HomeFeature {
             return .merge(loadHome(), loadSavedPlaces(), loadRecommendations())
 
         case let .homeLoaded(summary):
+            state.didLoadSummary = true
             state.nickname = summary.myNickname
             state.partnerName = summary.connected ? summary.partnerNickname : nil
             state.upcomingSchedule = summary.currentDateCourse
@@ -152,13 +157,15 @@ public struct HomeFeature {
             return summary.connected ? loadPastDates() : .none
 
         case let .homeLoadFailed(error):
-            // 인증 만료만 상위로 올려 로그인으로 보내고, 다른 실패는 기존 화면을 유지한다
+            // 실패해도 스켈레톤은 걷는다. 인증 만료만 상위로 올려 로그인으로 보낸다
+            state.didLoadSummary = true
             if error == .unauthorized {
                 return .send(.delegate(.sessionExpired))
             }
             return .none
 
         case let .savedPlacesLoaded(places):
+            state.didLoadSaved = true
             state.savedPlaces = places
             return .none
 
