@@ -12,7 +12,7 @@ struct CreateDateCourseRequestDTO: Encodable, Sendable {
     /// `yyyy-MM-dd`
     let date: String
     /// `HH:mm:ss`
-    let time: String
+    let time: String?
 }
 
 struct SaveDateCourseRequestDTO: Encodable, Sendable {

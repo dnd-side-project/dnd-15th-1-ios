@@ -18,13 +18,13 @@ public struct CourseRepository: Sendable {
     public func createCourse(
         title: String,
         date: DateComponents,
-        time: DateComponents
+        time: DateComponents?
     ) async throws -> DateCourse {
         do {
             let request = CreateDateCourseRequestDTO(
                 title: title,
                 date: CourseDateFormat.dateText(date),
-                time: CourseDateFormat.timeText(time)
+                time: time.map(CourseDateFormat.timeText)
             )
             return try CourseDTOMapper.toDomain(try await remote.create(request))
         } catch {
@@ -58,17 +58,15 @@ public struct CourseRepository: Sendable {
 
     public func updateCourse(
         id: String,
-        title: String,
-        scheduledAt: Date,
-        placeIDs: [String],
+        content: DateCourseContent,
         version: Int
     ) async throws -> DateCourse {
         do {
             let request = SaveDateCourseRequestDTO(
-                title: title,
-                date: CourseDateFormat.dateText(scheduledAt),
-                time: CourseDateFormat.timeText(scheduledAt),
-                placeIds: try placeIDs.map { try Self.placeID(from: $0) },
+                title: content.title,
+                date: CourseDateFormat.dateText(content.date),
+                time: content.time.map(CourseDateFormat.timeText),
+                placeIds: try content.placeIDs.map { try Self.placeID(from: $0) },
                 version: version
             )
             return try CourseDTOMapper.toDomain(try await remote.save(id: id, body: request))
