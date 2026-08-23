@@ -8,6 +8,8 @@ public enum DefaultInfoPlist {
         // 수출 규제 면제 대상. OS 가 주는 HTTPS 와 애플 프레임워크만 쓴다
         "ITSAppUsesNonExemptEncryption": false,
         "FirebaseAppDelegateProxyEnabled": false,
+        // 없으면 CA 가 아이폰을 60Hz 로 묶는다. 실기기 실측 평균이 58.2Hz 에서 74Hz 로 올랐다
+        "CADisableMinimumFrameDurationOnPhone": true,
 
         "API_BASE_URL": "$(API_BASE_URL)",
         "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",

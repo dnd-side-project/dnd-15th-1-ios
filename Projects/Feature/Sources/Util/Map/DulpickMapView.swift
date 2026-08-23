@@ -64,6 +64,8 @@ extension DulpickMapView {
 
         private var controller: KMController?
         private weak var container: KMViewContainer?
+        /// 링크를 놓으면 요청도 사라진다. 지도가 살아 있는 동안 붙잡는다
+        private var frameRateLink: UIUpdateLink?
         private var isMapReady = false
 
         /// SDK 가 마지막으로 통보한 컨테이너 크기. 지도 뷰 생성 전에도 올 수 있어 들고 있는다
@@ -99,6 +101,12 @@ extension DulpickMapView {
             controller.delegate = self
             // 120Hz 기기에서 지도가 60Hz 로 묶이는 것을 푼다. SDK 기본값이 false 다
             controller.proMotionSupport = true
+            // 가변 주사율이 낮은 값으로 내려앉으면 프레임 간격이 고르지 않다.
+            // 실기기에서 이 링크를 빼면 평균 73.8Hz 가 58.5Hz 로, 프레임 떨굼이 35% 에서 54% 로 나빠졌다
+            let frameRateLink = UIUpdateLink(view: container)
+            frameRateLink.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
+            frameRateLink.isEnabled = true
+            self.frameRateLink = frameRateLink
             self.controller = controller
             controller.prepareEngine()
             controller.activateEngine()
@@ -107,6 +115,8 @@ extension DulpickMapView {
 
         func teardown() {
             stopObservingAppLifecycle()
+            frameRateLink?.isEnabled = false
+            frameRateLink = nil
             controller?.pauseEngine()
             controller?.resetEngine()
             controller = nil
