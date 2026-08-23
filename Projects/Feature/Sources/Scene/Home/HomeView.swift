@@ -68,7 +68,7 @@ public struct HomeView: View {
                         upcomingSchedule: store.upcomingSchedule,
                         connectTapped: { store.send(.connectFlowRequested) },
                         createCourseTapped: { store.send(.courseFlowRequested) },
-                        bannerTapped: {}
+                        bannerTapped: { store.send(.bannerTapped) }
                     )
                 } else {
                     skeletonBanner
@@ -154,7 +154,12 @@ public struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(store.visiblePastSchedules) { schedule in
-                        DateScheduleCard(schedule: schedule)
+                        Button {
+                            store.send(.pastScheduleTapped(schedule.id))
+                        } label: {
+                            DateScheduleCard(schedule: schedule)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)

@@ -171,4 +171,54 @@ final class HomeFeatureTests: XCTestCase {
 
         XCTAssertNil(store.state.toast)
     }
+
+    func test_배너를_누르면_코스결과를_올린다() async {
+        let store = TestStore(
+            initialState: HomeFeature.State(
+                nickname: "나",
+                partnerName: "짝",
+                upcomingSchedule: bannerCourse
+            )
+        ) {
+            HomeFeature()
+        }
+
+        await store.send(.bannerTapped)
+        await store.receive(.delegate(.showCourseResult(dateCourseID: bannerCourse.id, origin: .courseBuilt)))
+    }
+
+    func test_지난일정을_누르면_지난데이트_출처로_코스결과를_올린다() async {
+        let schedule = DateSchedule(id: "77", title: "성수역 데이트", placeCount: 5, date: "26.08.06")
+        let store = TestStore(
+            initialState: HomeFeature.State(
+                nickname: "나",
+                partnerName: "짝",
+                pastSchedules: [schedule]
+            )
+        ) {
+            HomeFeature()
+        }
+
+        await store.send(.pastScheduleTapped("77"))
+        await store.receive(.delegate(.showCourseResult(dateCourseID: "77", origin: .pastDate)))
+    }
+
+    func test_예정코스가_없으면_배너탭은_아무일도_안한다() async {
+        let store = TestStore(
+            initialState: HomeFeature.State(nickname: "나", partnerName: "짝")
+        ) {
+            HomeFeature()
+        }
+
+        await store.send(.bannerTapped)
+    }
 }
+
+private let bannerCourse = DateCourseSummary(
+    id: "42",
+    title: "성수동 데이트",
+    scheduledAt: Date(timeIntervalSince1970: 0),
+    status: .confirmed,
+    version: 1,
+    totalPlaceCount: 5
+)

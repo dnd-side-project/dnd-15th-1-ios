@@ -46,12 +46,15 @@ public struct PastDateCoursesFeature {
         case moreCoursesLoaded(PastDateCoursePage?)
         case backButtonTapped
         case createCourseTapped
+        case courseTapped(String)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
             case back
             case createCourse
+            /// 목록의 행 탭. 코스 결과 화면은 HomeFlow 가 연다
+            case courseSelected(dateCourseID: String)
         }
     }
 
@@ -60,42 +63,47 @@ public struct PastDateCoursesFeature {
     public init() {}
 
     public var body: some ReducerOf<Self> {
-        Reduce { state, action in
-            switch action {
-            case .onAppear:
-                return loadPage(0, action: Action.coursesLoaded)
+        Reduce(core)
+    }
 
-            case let .coursesLoaded(page):
-                state.hasLoaded = true
-                state.courses = page?.courses ?? []
-                state.totalCount = page?.totalCount ?? 0
-                state.hasNext = page?.hasNext ?? false
-                state.page = 1
-                return .none
+    private func core(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .onAppear:
+            return loadPage(0, action: Action.coursesLoaded)
 
-            case .reachedEnd:
-                guard state.hasLoaded, state.hasNext, !state.isLoadingMore else { return .none }
-                state.isLoadingMore = true
-                return loadPage(state.page, action: Action.moreCoursesLoaded)
+        case let .coursesLoaded(page):
+            state.hasLoaded = true
+            state.courses = page?.courses ?? []
+            state.totalCount = page?.totalCount ?? 0
+            state.hasNext = page?.hasNext ?? false
+            state.page = 1
+            return .none
 
-            case let .moreCoursesLoaded(page):
-                state.isLoadingMore = false
-                guard let page else { return .none }
-                state.courses += page.courses
-                state.totalCount = page.totalCount
-                state.hasNext = page.hasNext
-                state.page += 1
-                return .none
+        case .reachedEnd:
+            guard state.hasLoaded, state.hasNext, !state.isLoadingMore else { return .none }
+            state.isLoadingMore = true
+            return loadPage(state.page, action: Action.moreCoursesLoaded)
 
-            case .backButtonTapped:
-                return .send(.delegate(.back))
+        case let .moreCoursesLoaded(page):
+            state.isLoadingMore = false
+            guard let page else { return .none }
+            state.courses += page.courses
+            state.totalCount = page.totalCount
+            state.hasNext = page.hasNext
+            state.page += 1
+            return .none
 
-            case .createCourseTapped:
-                return .send(.delegate(.createCourse))
+        case .backButtonTapped:
+            return .send(.delegate(.back))
 
-            case .delegate:
-                return .none
-            }
+        case .createCourseTapped:
+            return .send(.delegate(.createCourse))
+
+        case let .courseTapped(id):
+            return .send(.delegate(.courseSelected(dateCourseID: id)))
+
+        case .delegate:
+            return .none
         }
     }
 

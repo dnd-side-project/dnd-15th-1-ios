@@ -87,6 +87,8 @@ public struct HomeFeature {
         case calendarTapped
         case connectFlowRequested
         case courseFlowRequested
+        case bannerTapped
+        case pastScheduleTapped(String)
         case recommendationTapped(String)
         case delegate(Delegate)
 
@@ -104,6 +106,8 @@ public struct HomeFeature {
             case pastDateCoursesRequested
             /// 코스 짜기를 연다
             case courseFlowRequested
+            /// 예정 코스(배너) 또는 지난 데이트 결과를 연다
+            case showCourseResult(dateCourseID: String, origin: CourseResultFeature.State.Origin)
         }
     }
 
@@ -143,8 +147,13 @@ public struct HomeFeature {
             // 표시는 지도 탭 위에서. MainTab 까지 올린다
             return .send(.delegate(.showContentDetail(id)))
 
+        case let .pastScheduleTapped(id):
+            // 지난 데이트라 수정·알리기를 숨긴다
+            guard state.pastSchedules.contains(where: { $0.id == id }) else { return .none }
+            return .send(.delegate(.showCourseResult(dateCourseID: id, origin: .pastDate)))
+
         case .placesImported, .reloadRequested, .calendarTapped, .connectFlowRequested,
-             .courseFlowRequested, .delegate:
+             .courseFlowRequested, .bannerTapped, .delegate:
             return homeNavCore(state: &state, action: action)
         }
     }
@@ -247,6 +256,10 @@ public struct HomeFeature {
 
         case .courseFlowRequested:
             return .send(.delegate(.courseFlowRequested))
+
+        case .bannerTapped:
+            guard let id = state.upcomingSchedule?.id else { return .none }
+            return .send(.delegate(.showCourseResult(dateCourseID: id, origin: .courseBuilt)))
 
         default:
             return .none

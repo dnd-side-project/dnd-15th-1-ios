@@ -166,6 +166,16 @@ private extension HomeFlowFeature {
         case .courseFlowRequested:
             return openCourse(state: &state)
 
+        case let .showCourseResult(dateCourseID, origin):
+            // 코스를 안 실어 보낸다. 결과 화면이 onAppear 에서 스스로 조회한다
+            state.courseResult = CourseResultFeature.State(
+                course: nil,
+                dateCourseID: dateCourseID,
+                partnerNickname: state.home.partnerName,
+                origin: origin
+            )
+            return applyPath(state.path + [.courseResult], state: &state)
+
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
 
@@ -220,6 +230,15 @@ private extension HomeFlowFeature {
         case .createCourse:
             // 지난 데이트 위로 코스 짜기를 밀어 뒤로가기 시 지난 데이트로 돌아오게 한다
             return openCourse(state: &state)
+        case let .courseSelected(dateCourseID):
+            // 코스를 안 실어 보낸다. 결과 화면이 onAppear 에서 스스로 조회한다
+            state.courseResult = CourseResultFeature.State(
+                course: nil,
+                dateCourseID: dateCourseID,
+                partnerNickname: state.home.partnerName,
+                origin: .pastDate
+            )
+            return applyPath(state.path + [.courseResult], state: &state)
         }
     }
 

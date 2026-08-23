@@ -48,8 +48,13 @@ public struct PastDateCoursesView: View {
                     .padding(.bottom, 12)
 
                 ForEach(store.courses) { course in
-                    PastDateCourseRow(schedule: course)
-                        .onAppear { prefetchIfNeeded(course) }
+                    Button {
+                        store.send(.courseTapped(course.id))
+                    } label: {
+                        PastDateCourseRow(schedule: course)
+                    }
+                    .buttonStyle(.plain)
+                    .onAppear { prefetchIfNeeded(course) }
                 }
 
                 if store.isLoadingMore {
