@@ -310,6 +310,17 @@ private extension MyPageFeature {
         case let .couple(.delegate(delegate)):
             return handleCoupleDelegate(state: &state, delegate: delegate)
 
+        case .connection(.delegate(.disconnected)):
+            // 연결 해제 성공 → 마이페이지로 돌아간다
+            state.connection = nil
+            if !state.path.isEmpty { state.path.removeLast() }
+            return .none
+
+        case .connection(.delegate(.sessionExpired)):
+            state.connection = nil
+            state.path = []
+            return .send(.delegate(.sessionExpired))
+
         case .connection, .couple:
             return .none
 

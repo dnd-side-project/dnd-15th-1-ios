@@ -41,7 +41,41 @@ public struct ConnectionManageView: View {
         }
         .frame(maxWidth: .infinity)
         .background(Color.bgDefault)
+        .toast(item: toastBinding)
+        .modal(isPresented: disconnectModalBinding) {
+            ModalContent(
+                title: "잠깐!\n정말 커플 연결을 끊으시겠어요?",
+                content: "지금까지 저장된 데이터가 모두 날아가요",
+                image: .disconnect,
+                primaryTitle: "연결 끊기",
+                primaryAction: { store.send(.disconnectConfirmed) },
+                secondaryTitle: "취소",
+                secondaryAction: { store.send(.dismissDisconnectModal) }
+            )
+        }
         .task { store.send(.onAppear) }
+    }
+
+    private var disconnectModalBinding: Binding<Bool> {
+        Binding(
+            get: { store.isDisconnectModalPresented },
+            set: { isPresented in
+                if !isPresented {
+                    store.send(.dismissDisconnectModal)
+                }
+            }
+        )
+    }
+
+    private var toastBinding: Binding<ToastState?> {
+        Binding(
+            get: { store.toast },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.dismissToast)
+                }
+            }
+        )
     }
 
     private var coupleCard: some View {
