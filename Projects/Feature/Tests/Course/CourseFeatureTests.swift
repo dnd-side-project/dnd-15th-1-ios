@@ -700,6 +700,8 @@ final class CourseSaveTests: XCTestCase {
         store.dependencies.courseClient.updateCourse = { id, content, version in
             XCTAssertEqual(id, "42")
             XCTAssertEqual(content.title, "30.08.05 데이트")
+            XCTAssertEqual(content.date, seoulMidnight(year: 2030, month: 8, day: 5))
+            XCTAssertEqual(content.time, DateComponents(hour: 13, minute: 0))
             XCTAssertEqual(content.placeIDs, ["a", "b"])
             XCTAssertEqual(version, 0)
             return saved
@@ -709,6 +711,22 @@ final class CourseSaveTests: XCTestCase {
             $0.isSavingCourse = false
             $0.version = saved.version
         }
+        await store.receive(.delegate(.buildRequested(saved)))
+    }
+
+    func test_시간없이_코스짜기를_누르면_저장에_시간을_안_보낸다() async {
+        let saved = confirmedCourse
+        var initial = loadedPlacePickState()
+        initial.time = nil
+        let store = TestStore(initialState: initial) { CourseFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        store.dependencies.courseClient.updateCourse = { _, content, _ in
+            XCTAssertEqual(content.date, seoulMidnight(year: 2030, month: 8, day: 5))
+            XCTAssertNil(content.time)
+            return saved
+        }
+        await store.send(.buildTapped) { $0.isSavingCourse = true }
+        await store.receive(\.courseSaved.success)
         await store.receive(.delegate(.buildRequested(saved)))
     }
 
@@ -800,4 +818,13 @@ final class CourseSaveTests: XCTestCase {
         }
         await store.receive(.delegate(.dismissed))
     }
+}
+
+private func seoulMidnight(year: Int, month: Int, day: Int) -> Date {
+    var midnight = DateComponents(year: year, month: month, day: day)
+    midnight.hour = 0
+    midnight.minute = 0
+    midnight.second = 0
+    midnight.timeZone = TimeZone(identifier: "Asia/Seoul")
+    return Calendar(identifier: .gregorian).date(from: midnight) ?? Date.distantPast
 }
