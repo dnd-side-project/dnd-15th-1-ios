@@ -25,6 +25,9 @@ public enum ExploreClientFactory {
             },
             searchPlaces: { query, page, size in
                 try await placeRepository.searchPlaces(query: query, page: page, size: size)
+            },
+            placeContents: { placeID, page, size in
+                try await repository.placeContents(placeID: placeID, page: page, size: size)
             }
         )
     }

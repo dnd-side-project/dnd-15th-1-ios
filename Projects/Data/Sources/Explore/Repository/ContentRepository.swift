@@ -45,4 +45,14 @@ public struct ContentRepository: Sendable {
             throw ExploreErrorMapper.map(error)
         }
     }
+
+    public func placeContents(placeID: Int, page: Int, size: Int) async throws -> ContentPage {
+        do {
+            return ContentDTOMapper.toDomain(
+                try await remote.placeContents(placeID: placeID, page: page, size: size)
+            )
+        } catch {
+            throw ExploreErrorMapper.map(error)
+        }
+    }
 }

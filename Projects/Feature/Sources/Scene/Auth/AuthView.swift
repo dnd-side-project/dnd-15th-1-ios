@@ -89,7 +89,7 @@ public struct AuthView: View {
     }
 
     private var headline: some View {
-        Text("우리 둘만의 데이트 장소 저장부터 코스짜기까지")
+        Text("우리 둘이서 만드는 데이트 둘픽")
             .typography(.body1SB)
             .foregroundStyle(Color.textPrimary)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -14,7 +14,7 @@ public struct PlaceDetail: Equatable, Identifiable, Sendable {
     public let ownership: PlaceOwnership?
     /// 지금 화면이 쓰지 않는다. 응답에 있어 담아만 둔다
     public let phone: String?
-    /// 지금 화면이 쓰지 않는다. 응답에 있어 담아만 둔다
+    /// 카카오맵 앱이 없을 때 여는 웹 주소
     public let kakaoPlaceURL: URL?
 
     public init(

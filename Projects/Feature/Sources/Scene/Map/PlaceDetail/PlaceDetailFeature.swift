@@ -9,7 +9,13 @@ import ThirdParty
 
 @Reducer
 public struct PlaceDetailFeature {
-    /// 더보기 한 번에 붙는 게시물 수
+    public enum LoadState: Equatable {
+        case loading
+        case loaded
+        case failed
+    }
+
+    /// 한 번에 받는 게시물 수. 「더보기」가 다음 장을 부른다
     static let contentPageSize = 4
 
     @ObservableState
@@ -39,19 +45,35 @@ public struct PlaceDetailFeature {
         /// 저장 응답이 준 서버 placeId. 검색 장소는 place.id 가 kakaoId 라 삭제 경로엔 이걸 쓴다
         public var savedServerID: String?
 
+        /// 카카오맵 앱이 없을 때 열 웹 주소. 상세 조회가 끝나면 채워진다
+        public var kakaoPlaceURL: URL?
+
+        /// 서버가 아는 공용 장소 ID. 이것이 없으면 게시물을 못 부른다
+        public var serverPlaceID: Int?
+
+        public var contents: [Content] = []
+        public var contentsPage = 0
+        public var hasNextContents = true
+        public var contentsLoadState: LoadState = .loaded
+
         public var isAddressExpanded = false
 
-        public var visibleContentCount = PlaceDetailFeature.contentPageSize
-
-        public var visibleContents: [Content] {
-            Array(RelatedContentMock.contents(for: place.id).prefix(visibleContentCount))
-        }
-
-        public var canLoadMore: Bool {
-            visibleContentCount < RelatedContentMock.contents(for: place.id).count
-        }
-
         public var title: String { alias ?? place.name }
+
+        public var kakaoMapAppURL: URL? {
+            guard let kakaoPlaceID = place.kakaoPlaceID else { return nil }
+            return URL(string: "kakaomap://place?id=\(kakaoPlaceID)")
+        }
+
+        /// 앱이 없을 때 여는 웹 주소. 서버가 준 값이 먼저다
+        public var kakaoMapWebURL: URL? {
+            if let kakaoPlaceURL { return kakaoPlaceURL }
+            guard let kakaoPlaceID = place.kakaoPlaceID else { return nil }
+            return URL(string: "https://place.map.kakao.com/\(kakaoPlaceID)")
+        }
+
+        /// 앱이든 웹이든 열 곳이 있는지. 없으면 지도 버튼이 안 눌린다
+        public var canOpenKakaoMap: Bool { kakaoMapAppURL != nil || kakaoMapWebURL != nil }
 
         public init(savedPlace: SavedPlace) {
             id = savedPlace.place.id
@@ -60,6 +82,7 @@ public struct PlaceDetailFeature {
             isBookmarked = true
             bookmarkCount = savedPlace.place.bookmarkCount
             source = Int(savedPlace.place.id).map { .server(placeID: $0) }
+            serverPlaceID = Int(savedPlace.place.id)
         }
 
         /// 게시글 상세의 장소. 게시글 응답의 placeId 가 항상 있어 서버 ID 로 조회한다
@@ -70,6 +93,7 @@ public struct PlaceDetailFeature {
             isBookmarked = false
             bookmarkCount = place.bookmarkCount
             source = Int(place.id).map { .server(placeID: $0) }
+            serverPlaceID = Int(place.id)
         }
 
         /// 검색 결과에서 고른 장소. 카카오 상세는 검색어가 필수다
@@ -86,11 +110,14 @@ public struct PlaceDetailFeature {
     public enum Action: Equatable {
         case onAppear
         case detailLoaded(PlaceDetail)
+        case detailLoadFailed
+        case contentsResponse(ContentPage)
+        case contentsLoadFailed
+        case retryContentsTapped
         case bookmarkTapped
         case bookmarkSaved(serverID: String)
         case bookmarkFailed(wasBookmarked: Bool)
         case addressToggled
-        case mapButtonTapped
         case contentTapped(String)
         case moreTapped
         case closeTapped
@@ -100,18 +127,13 @@ public struct PlaceDetailFeature {
         public enum Delegate: Equatable {
             /// 장소 id 와 바뀐 뒤 상태. 서버 계약이 없어 받는 쪽도 지금은 삼킨다
             case bookmarkToggled(String, Bool)
-            case mapRequested(String)
             case contentSelected(String)
             case closed
         }
     }
 
     @Dependency(\.placeClient) var placeClient
-
-    private enum CancelID {
-        case bookmark
-        case detail
-    }
+    @Dependency(\.exploreClient) var exploreClient
 
     public init() {}
 
@@ -122,11 +144,13 @@ public struct PlaceDetailFeature {
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
-        case .onAppear, .detailLoaded:
+        case .onAppear, .detailLoaded, .detailLoadFailed:
             return loadDetail(state: &state, action: action)
+        case .contentsResponse, .contentsLoadFailed, .retryContentsTapped, .moreTapped:
+            return handleContents(state: &state, action: action)
         case .bookmarkTapped, .bookmarkSaved, .bookmarkFailed:
             return updateBookmark(state: &state, action: action)
-        case .addressToggled, .moreTapped, .mapButtonTapped, .contentTapped, .closeTapped, .delegate:
+        case .addressToggled, .contentTapped, .closeTapped, .delegate:
             return updateSheet(state: &state, action: action)
         }
     }
@@ -146,7 +170,9 @@ public struct PlaceDetailFeature {
                     }
                     await send(.detailLoaded(detail))
                 } catch {
-                    // 넘겨받은 값을 그대로 둔다. 사용자에게 알리지 않는다
+                    // 넘겨받은 값을 그대로 둔다. 사용자에게 알리지 않는다.
+                    // 다만 게시물은 아는 서버 ID 로 부를 수 있어 신호를 보낸다
+                    await send(.detailLoadFailed)
                 }
             }
             .cancellable(id: CancelID.detail, cancelInFlight: true)
@@ -165,16 +191,67 @@ public struct PlaceDetailFeature {
                 thumbnailURLs: detail.place.thumbnailURLs
             )
             state.bookmarkCount = detail.savedMemberCount
+            state.kakaoPlaceURL = detail.kakaoPlaceURL
             // 조회 중에 북마크를 눌렀으면 응답의 savedByMe 는 이미 낡은 값이다
             if !state.didToggleBookmark {
                 state.isBookmarked = detail.savedByMe
             }
-            return .none
+            // 매퍼가 placeId 없을 때 카카오 ID 를 place.id 에 넣는다. 둘이 같으면 서버가 모르는 장소다
+            let mappedServerID = detail.place.id == detail.place.kakaoPlaceID
+                ? nil
+                : Int(detail.place.id)
+            state.serverPlaceID = state.serverPlaceID ?? mappedServerID
+            return loadContents(state: &state)
+
+        case .detailLoadFailed:
+            return loadContents(state: &state)
 
         default:
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
+    }
+
+    private func handleContents(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .contentsResponse(page):
+            state.contents += page.items
+            state.hasNextContents = page.hasNext
+            state.contentsPage += 1
+            state.contentsLoadState = .loaded
+            return .none
+
+        case .contentsLoadFailed:
+            state.contentsLoadState = .failed
+            return .none
+
+        case .retryContentsTapped, .moreTapped:
+            return loadContents(state: &state)
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    /// 게시물 한 장을 받는다. 서버 ID 가 없으면 섹션이 안 보이므로 부르지 않는다
+    private func loadContents(state: inout State) -> Effect<Action> {
+        guard let placeID = state.serverPlaceID else {
+            state.contentsLoadState = .loaded
+            return .none
+        }
+        guard state.hasNextContents, state.contentsLoadState != .loading else { return .none }
+        state.contentsLoadState = .loading
+        let page = state.contentsPage
+        return .run { [exploreClient] send in
+            do {
+                let result = try await exploreClient.placeContents(placeID, page, Self.contentPageSize)
+                await send(.contentsResponse(result))
+            } catch {
+                await send(.contentsLoadFailed)
+            }
+        }
+        .cancellable(id: CancelID.contents, cancelInFlight: true)
     }
 
     private func updateBookmark(state: inout State, action: Action) -> Effect<Action> {
@@ -204,13 +281,6 @@ public struct PlaceDetailFeature {
         case .addressToggled:
             state.isAddressExpanded.toggle()
             return .none
-
-        case .moreTapped:
-            state.visibleContentCount += Self.contentPageSize
-            return .none
-
-        case .mapButtonTapped:
-            return .send(.delegate(.mapRequested(state.id)))
 
         case let .contentTapped(id):
             return .send(.delegate(.contentSelected(id)))
@@ -258,5 +328,13 @@ public struct PlaceDetailFeature {
         }
         // 같은 장소를 연달아 누르면 앞 요청은 버린다
         .cancellable(id: CancelID.bookmark, cancelInFlight: true)
+    }
+}
+
+private extension PlaceDetailFeature {
+    enum CancelID {
+        case bookmark
+        case detail
+        case contents
     }
 }
