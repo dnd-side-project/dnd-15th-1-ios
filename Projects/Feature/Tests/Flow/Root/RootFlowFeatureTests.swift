@@ -1,5 +1,6 @@
 import Domain
 import Feature
+import SharedDesignSystem
 import ThirdParty
 import XCTest
 
@@ -193,7 +194,11 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.mainTab(.delegate(.logoutSucceeded))) {
-            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(
+                OnboardingFlowFeature.State(
+                    auth: AuthFeature.State(toast: ToastState(message: "로그아웃 되었습니다."))
+                )
+            )
         }
     }
 
