@@ -160,6 +160,7 @@ private extension PlaceDetailView {
             }
 
             addressRow
+                .padding(.top, hasPhotos ? 0 : Spacing.s20)
                 .padding(.bottom, Spacing.s16)
 
             if hasRelatedContents {
