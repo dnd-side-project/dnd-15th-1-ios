@@ -7,22 +7,20 @@ import ThirdParty
 /// 화면을 안 그린다. 경로와 자식만 갖는다
 @Reducer
 public struct MapFlowFeature {
-    /// 지도(root) 위로 쌓이는 화면. 각 case 의 화면은 담당 Cycle 이 자기 PR 에서 채운다
+    /// 지도(root) 위로 쌓이는 화면.
     public enum Route: Hashable {
-        /// Cycle 7 (미배정)
         case postDetail(String)
-        /// Cycle 3 (DND-50)
         case search
-        /// Cycle 4 (DND-51)
         case course
-        /// Cycle 4 (DND-51)
         case coursePlacePick
+        case courseResult
     }
 
     @ObservableState
     public struct State: Equatable {
         public var map: MapFeature.State
         public var course: CourseFeature.State?
+        public var courseResult: CourseResultFeature.State?
         public var path: [Route]
         public var placeSearch: PlaceSearchFeature.State?
 
@@ -44,6 +42,7 @@ public struct MapFlowFeature {
         public init(
             map: MapFeature.State = MapFeature.State(),
             course: CourseFeature.State? = nil,
+            courseResult: CourseResultFeature.State? = nil,
             path: [Route] = [],
             placeSearch: PlaceSearchFeature.State? = nil,
             detail: PlaceDetailFeature.State? = nil,
@@ -52,6 +51,7 @@ public struct MapFlowFeature {
         ) {
             self.map = map
             self.course = course
+            self.courseResult = courseResult
             self.path = path
             self.placeSearch = placeSearch
             self.detail = detail
@@ -72,6 +72,7 @@ public struct MapFlowFeature {
         case showAllSaved
         case map(MapFeature.Action)
         case course(CourseFeature.Action)
+        case courseResult(CourseResultFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
         case detail(PresentationAction<PlaceDetailFeature.Action>)
         case alias(PresentationAction<PlaceAliasFeature.Action>)
@@ -97,6 +98,9 @@ public struct MapFlowFeature {
             .ifLet(\.course, action: \.course) {
                 CourseFeature()
             }
+            .ifLet(\.courseResult, action: \.courseResult) {
+                CourseResultFeature()
+            }
             .ifLet(\.$detail, action: \.detail) {
                 PlaceDetailFeature()
             }
@@ -115,14 +119,7 @@ public struct MapFlowFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case let .pathChanged(path):
-            state.path = path
-            if !path.contains(.search) {
-                state.placeSearch = nil
-            }
-            if !path.contains(.course), !path.contains(.coursePlacePick) {
-                state.course = nil
-            }
-            return .none
+            return applyPath(path, state: &state)
         case let .presentContentDetail(id):
             // 상세는 시트가 스스로 불러온다. 로드되면 그 places 로 핀을 세운다
             state.showsContentPins = true
@@ -160,17 +157,33 @@ public struct MapFlowFeature {
             return handle(mapDelegate: delegate, state: &state)
         case let .course(.delegate(delegate)):
             return handle(courseDelegate: delegate, state: &state)
+        case let .courseResult(.delegate(delegate)):
+            return handle(courseResultDelegate: delegate, state: &state)
         case let .placeSearch(.delegate(delegate)):
             return handle(searchDelegate: delegate, state: &state)
         case .detail, .alias, .postDetail:
             return handleChild(state: &state, action: action)
-        case .map, .course, .placeSearch, .delegate:
+        case .map, .course, .courseResult, .placeSearch, .delegate:
             return .none
         }
     }
 }
 
 private extension MapFlowFeature {
+    func applyPath(_ path: [Route], state: inout State) -> Effect<Action> {
+        state.path = path
+        if !path.contains(.search) {
+            state.placeSearch = nil
+        }
+        if !path.contains(.course), !path.contains(.coursePlacePick) {
+            state.course = nil
+        }
+        if !path.contains(.courseResult) {
+            state.courseResult = nil
+        }
+        return .none
+    }
+
     /// 지도가 올린 신호로 시트나 경로를 연다. 화면 이동이 아닌 것은 여기서 삼킨다
     func handle(
         mapDelegate: MapFeature.Action.Delegate,
@@ -223,8 +236,28 @@ private extension MapFlowFeature {
                 next.removeLast()
             }
             return .send(.pathChanged(next))
-        case .buildRequested:
-            // Cycle 5 (DND-52) 가 코스 결과 화면을 붙일 때까지 삼킨다
+        case let .buildRequested(course):
+            state.courseResult = CourseResultFeature.State(
+                course: course,
+                dateCourseID: course.id,
+                partnerNickname: state.course?.partnerNickname
+            )
+            state.path.append(.courseResult)
+            return .none
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        }
+    }
+
+    func handle(
+        courseResultDelegate: CourseResultFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch courseResultDelegate {
+        case .dismissed:
+            // 결과에서 뒤로 가면 코스 흐름을 닫는다. 장소 선택으로 돌아가지 않는다
+            return .send(.pathChanged([]))
+        case .editRequested:
             return .none
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
