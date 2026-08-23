@@ -96,6 +96,7 @@ public struct HomeFeature {
         case savedPlacesLoaded([SavedPlace])
         case recommendationsLoaded([Content])
         case pastDatesLoaded([DateSchedule])
+        case placesImported
         case savedPlacesSeeAllTapped
         case savedPlaceTapped(String)
         case calendarTapped
@@ -182,14 +183,18 @@ public struct HomeFeature {
             // 표시는 지도 탭 위에서. MainTab 까지 올린다
             return .send(.delegate(.showContentDetail(id)))
 
-        case .calendarTapped, .connectFlowRequested, .courseFlowRequested, .homePathChanged,
-             .couple, .pastDateCourses, .course, .delegate:
+        case .placesImported, .calendarTapped, .connectFlowRequested, .courseFlowRequested,
+             .homePathChanged, .couple, .pastDateCourses, .course, .delegate:
             return homeNavCore(state: &state, action: action)
         }
     }
 
     private func homeNavCore(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case .placesImported:
+            // 인스타 장소 저장 후 최근 저장 장소·추천 게시글을 새로 받는다
+            return .merge(loadSavedPlaces(), loadRecommendations())
+
         case .calendarTapped:
             // 연결됐으면 지난 데이트 화면, 아니면 커플 연결로
             guard state.isConnected else { return .send(.connectFlowRequested) }

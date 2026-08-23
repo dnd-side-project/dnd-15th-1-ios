@@ -52,6 +52,13 @@ public struct PlaceImportFeature {
         case saveTapped
         case confirmed(Result<Bool, PlaceImportError>)
         case closeTapped
+        case delegate(Delegate)
+
+        @CasePathable
+        public enum Delegate: Equatable {
+            // 장소 저장 완료. 상위가 홈 데이터를 갱신하게 한다
+            case placesSaved
+        }
     }
 
     // retryAfterSeconds 가 없을 때 쓰는 기본 폴링 간격
@@ -64,41 +71,50 @@ public struct PlaceImportFeature {
     public init() {}
 
     public var body: some ReducerOf<Self> {
-        Reduce { state, action in
-            switch action {
-            case .onAppear:
-                guard !state.started else { return .none }
-                state.started = true
-                return start(link: state.link)
+        Reduce(core)
+    }
 
-            case let .importUpdated(.success(placeImport)):
-                return applyImport(state: &state, placeImport: placeImport)
+    private func core(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .onAppear:
+            guard !state.started else { return .none }
+            state.started = true
+            return start(link: state.link)
 
-            case .importUpdated(.failure):
-                state.phase = .failed
-                return .none
+        case let .importUpdated(.success(placeImport)):
+            return applyImport(state: &state, placeImport: placeImport)
 
-            case let .candidateToggled(id):
-                if state.selectedIDs.contains(id) {
-                    state.selectedIDs.remove(id)
-                } else {
-                    state.selectedIDs.insert(id)
-                }
-                return .none
+        case .importUpdated(.failure):
+            state.phase = .failed
+            return .none
 
-            case .saveTapped:
-                guard let importId = state.importId else { return .none }
-                return confirm(importId: importId, candidateIDs: Array(state.selectedIDs))
-
-            case .confirmed(.success):
-                return .run { [dismiss] _ in await dismiss() }
-
-            case .confirmed(.failure):
-                return .none
-
-            case .closeTapped:
-                return .run { [dismiss] _ in await dismiss() }
+        case let .candidateToggled(id):
+            if state.selectedIDs.contains(id) {
+                state.selectedIDs.remove(id)
+            } else {
+                state.selectedIDs.insert(id)
             }
+            return .none
+
+        case .saveTapped:
+            guard let importId = state.importId else { return .none }
+            return confirm(importId: importId, candidateIDs: Array(state.selectedIDs))
+
+        case .confirmed(.success):
+            // 저장 완료를 상위에 먼저 알리고 시트를 닫는다
+            return .run { [dismiss] send in
+                await send(.delegate(.placesSaved))
+                await dismiss()
+            }
+
+        case .confirmed(.failure):
+            return .none
+
+        case .delegate:
+            return .none
+
+        case .closeTapped:
+            return .run { [dismiss] _ in await dismiss() }
         }
     }
 
