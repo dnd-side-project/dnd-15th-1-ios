@@ -6,23 +6,44 @@ import ThirdParty
 public struct MyPageFeature {
     @ObservableState
     public struct State: Equatable {
-        public var userID: String?
-        public var isLoading = false
+        public var nickname: String
+        public var iconID: Int
+        // 알림 토글. 서버 연동 전까지 화면 상태만 유지
+        public var savedContentAlarmOn: Bool
+        public var dateScheduleAlarmOn: Bool
+        public var marketingAlarmOn: Bool
+        public var isLoading: Bool
         public var errorMessage: String?
 
         public init(
-            userID: String? = nil,
+            nickname: String = "",
+            iconID: Int = 1,
+            savedContentAlarmOn: Bool = true,
+            dateScheduleAlarmOn: Bool = true,
+            marketingAlarmOn: Bool = false,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
-            self.userID = userID
+            self.nickname = nickname
+            self.iconID = iconID
+            self.savedContentAlarmOn = savedContentAlarmOn
+            self.dateScheduleAlarmOn = dateScheduleAlarmOn
+            self.marketingAlarmOn = marketingAlarmOn
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
     }
 
-    public enum Action: Equatable {
+    public enum Action: Equatable, BindableAction {
+        case binding(BindingAction<State>)
         case onAppear
+        case profileLoaded(UserProfile)
+        case profileEditTapped
+        case dateTypeTapped
+        case connectionTapped
+        case feedbackTapped
+        case termsLinkTapped(TermsType)
+        case withdrawTapped
         case logoutButtonTapped
         case logoutResponse(Result<EquatableVoid, AuthError>)
         case delegate(Delegate)
@@ -39,46 +60,67 @@ public struct MyPageFeature {
     }
 
     @Dependency(\.authClient) var authClient
+    @Dependency(\.profileClient) var profileClient
 
     public init() {}
 
     public var body: some ReducerOf<Self> {
-        Reduce { state, action in
-            switch action {
-            case .onAppear:
-                return .none
+        BindingReducer()
+        Reduce(core)
+            .logged(as: Self.self)
+    }
 
-            case .logoutButtonTapped:
-                guard !state.isLoading else { return .none }
-                state.isLoading = true
-                state.errorMessage = nil
-                return .run { [authClient] send in
-                    do {
-                        try await authClient.logout()
-                        await send(.logoutResponse(.success(EquatableVoid())))
-                    } catch {
-                        await send(.logoutResponse(.failure(mapAuthError(error))))
-                    }
-                }
+    private func core(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .onAppear:
+            return loadProfile()
 
-            case .logoutResponse(.success):
-                state.isLoading = false
-                state.userID = nil
-                return .send(.delegate(.logoutSucceeded))
+        case let .profileLoaded(profile):
+            state.nickname = profile.nickname
+            state.iconID = profile.iconID
+            return .none
 
-            case let .logoutResponse(.failure(error)):
-                state.isLoading = false
-                state.errorMessage = "로그아웃에 실패했습니다."
-                if error == .unauthorized {
-                    return .send(.delegate(.sessionExpired))
-                }
-                return .none
+        case .logoutButtonTapped:
+            guard !state.isLoading else { return .none }
+            state.isLoading = true
+            state.errorMessage = nil
+            return logout()
 
-            case .delegate:
-                return .none
+        case .logoutResponse(.success):
+            state.isLoading = false
+            return .send(.delegate(.logoutSucceeded))
+
+        case let .logoutResponse(.failure(error)):
+            state.isLoading = false
+            state.errorMessage = "로그아웃에 실패했습니다."
+            if error == .unauthorized {
+                return .send(.delegate(.sessionExpired))
+            }
+            return .none
+
+        case .binding, .profileEditTapped, .dateTypeTapped, .connectionTapped,
+             .feedbackTapped, .termsLinkTapped, .withdrawTapped, .delegate:
+            // 이동할 화면들은 아직 없음. 붙는 대로 연결
+            return .none
+        }
+    }
+
+    private func loadProfile() -> Effect<Action> {
+        .run { [profileClient] send in
+            guard let profile = try? await profileClient.member() else { return }
+            await send(.profileLoaded(profile))
+        }
+    }
+
+    private func logout() -> Effect<Action> {
+        .run { [authClient] send in
+            do {
+                try await authClient.logout()
+                await send(.logoutResponse(.success(EquatableVoid())))
+            } catch {
+                await send(.logoutResponse(.failure(mapAuthError(error))))
             }
         }
-        .logged(as: Self.self)
     }
 }
 

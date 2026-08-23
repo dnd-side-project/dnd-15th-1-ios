@@ -29,7 +29,6 @@ public struct MainTabView: View {
 
             NavigationStack {
                 MyPageView(store: store.scope(state: \.myPage, action: \.myPage))
-                    .navigationTitle("마이페이지")
             }
             .tabItem { tabLabel("마이", icon: .my) }
             .tag(MainTabFeature.Tab.myPage)
