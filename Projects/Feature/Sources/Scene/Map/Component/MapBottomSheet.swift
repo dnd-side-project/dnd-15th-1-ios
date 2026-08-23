@@ -19,7 +19,7 @@ enum MapBottomSheetMetric {
     static let gapAboveSheet: CGFloat = 16
 
     /// 손 뗀 뒤 단계에 붙는 움직임
-    static let settle: Animation = .spring(response: 0.32, dampingFraction: 0.86)
+    static let settle: Animation = .spring(response: 0.22, dampingFraction: 0.90)
 
     /// 스크롤을 맨 위로 보는 여유. 부동소수 오차와 튕김 잔여를 넘긴다
     static let contentTopTolerance: CGFloat = 0.5
@@ -274,6 +274,8 @@ private extension MapBottomSheet {
             radius: MapBottomSheetMetric.shadowRadius,
             y: MapBottomSheetMetric.shadowOffsetY
         )
+        // 클립·그림자를 한 레이어로 굳힌 뒤 offset 이 GPU 로 옮긴다
+        .compositingGroup()
         .simultaneousGesture(dragGesture(layout: layout))
         // above 는 시트에 얹어야 시트 윗면을 따라 움직인다.
         // 아래 .frame 은 담는 층 전체라, 그 뒤에 얹으면 화면 맨 위에 박힌다
@@ -311,7 +313,11 @@ private extension MapBottomSheet {
                 .frame(maxWidth: .infinity)
                 .padding(.top, MapBottomSheetMetric.grabberTopInset)
                 .padding(.bottom, MapBottomSheetMetric.grabberBottomInset)
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { grabberFrame = $0 }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    if grabberFrame != $0 {
+                        grabberFrame = $0
+                    }
+                }
             header
         }
     }
@@ -393,6 +399,10 @@ private extension MapBottomSheet {
     func placeSheet(layout: SheetLayout, animated: Bool) {
         guard layout.isResolved, !isDraggingSheet else { return }
         let target = layout.height(for: selection)
+        if didPlaceSheet,
+           abs(visibleHeight - target) <= MapBottomSheetMetric.contentTopTolerance {
+            return
+        }
         didPlaceSheet = true
         guard animated else {
             visibleHeight = target
@@ -466,8 +476,8 @@ private extension MapBottomSheet {
         withAnimation(MapBottomSheetMetric.settle) {
             visibleHeight = layout.height(for: target)
             dragTranslation = 0
-            selection = target
         }
+        selection = target
     }
 
     /// 이번 손짓의 주인을 정한다. 판정은 `SheetLayout` 이 하고 여기는 뷰 상태만 모은다
