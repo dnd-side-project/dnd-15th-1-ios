@@ -143,3 +143,16 @@ public extension Image {
     static var dateTypeStatic: Image { Asset.DateType.`static`.swiftUIImage }
     static var dateTypeGraphic: Image { Asset.dateTypeGraphic.swiftUIImage }
 }
+
+// MARK: - MyPage
+
+public extension Image {
+    // profile1 만 선택/비선택 두 벌, 나머지는 한 벌
+    static var profile1: Image { Asset.profile1.swiftUIImage }
+    static var profile1Selected: Image { Asset.profile1Selected.swiftUIImage }
+    static var profile2: Image { Asset.profile2.swiftUIImage }
+    static var profile3: Image { Asset.profile3.swiftUIImage }
+    static var profile4: Image { Asset.profile4.swiftUIImage }
+    static var profile5: Image { Asset.profile5.swiftUIImage }
+    static var disconnect: Image { Asset.disconnect.swiftUIImage }
+}
