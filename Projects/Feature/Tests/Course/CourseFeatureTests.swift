@@ -22,6 +22,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in
                 DateCourse(
                     id: "1",
@@ -58,6 +59,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: initial) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in
                 DateCourse(
                     id: "1",
@@ -82,6 +84,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { title, date, time in
                 XCTAssertEqual(title, "30.08.05 데이트")
                 XCTAssertEqual(date.day, 5)
@@ -117,6 +120,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, time in
                 XCTAssertEqual(time.hour, 13)
                 XCTAssertEqual(time.minute, 0)
@@ -145,6 +149,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in throw CourseError.network }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
@@ -166,6 +171,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in throw CourseError.unauthorized }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)

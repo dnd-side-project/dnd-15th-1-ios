@@ -17,7 +17,7 @@ private enum CourseDateViewMetric {
 
 /// 데이트 날짜 선택 화면. 시안 b01 · b02 · b03.
 ///
-/// 날짜는 필수, 시간은 선택이다. `다음` 은 늘 눌리고 누를 때 날짜만 검증한다.
+/// 날짜는 필수, 시간은 선택이다. `다음` 은 늘 눌리고 누를 때 날짜와 지난 시각을 검증한다.
 public struct CourseDateView: View {
     @Bindable private var store: StoreOf<CourseFeature>
 
@@ -108,7 +108,8 @@ private extension CourseDateView {
             CourseInputField(
                 value: store.timeText,
                 placeholder: "시간을 입력하세요",
-                icon: .clock
+                icon: .clock,
+                errorMessage: store.showsTimeError ? "지난 시간은 선택할 수 없어요" : nil
             ) {
                 store.send(.timeFieldTapped)
             }
@@ -149,7 +150,8 @@ private extension CourseDateView {
                 activeWheel: store.activeWheel,
                 draftDate: draftDateBinding,
                 draftTime: draftTimeBinding,
-                today: store.today
+                today: store.today,
+                timeMinimum: store.timeWheelMinimum
             )
         }
     }
@@ -189,6 +191,7 @@ private struct DeferredWheel: View {
     @Binding var draftDate: DateComponents
     @Binding var draftTime: DateComponents
     let today: DateComponents
+    let timeMinimum: DateComponents?
     @State private var isReady = false
 
     var body: some View {
@@ -206,7 +209,11 @@ private struct DeferredWheel: View {
                         minimum: today
                     )
                 case .time:
-                    TimeWheelPicker(selection: $draftTime, minuteStep: 5)
+                    TimeWheelPicker(
+                        selection: $draftTime,
+                        minuteStep: 5,
+                        minimum: timeMinimum
+                    )
                 case .none:
                     EmptyView()
                 }

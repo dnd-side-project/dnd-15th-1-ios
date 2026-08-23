@@ -18,6 +18,7 @@ final class MapFlowCourseWiringTests: XCTestCase {
         ) {
             MapFlowFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in
                 DateCourse(
                     id: "42",
