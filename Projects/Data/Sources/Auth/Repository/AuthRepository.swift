@@ -8,17 +8,21 @@ public struct AuthRepository: Sendable {
     private let authLocal: AuthLocalDataSource
     private let socialAuth: SocialAuthCredentialProvider
     private let profileRemote: ProfileRemoteDataSource
+    /// 로그아웃 때 이 기기의 푸시 등록을 뗀다. 실패는 삼킨다
+    private let notificationRepository: NotificationRepository?
 
     public init(
         authRemote: AuthRemoteDataSource,
         authLocal: AuthLocalDataSource,
         socialAuth: SocialAuthCredentialProvider,
-        profileRemote: ProfileRemoteDataSource
+        profileRemote: ProfileRemoteDataSource,
+        notificationRepository: NotificationRepository? = nil
     ) {
         self.authRemote = authRemote
         self.authLocal = authLocal
         self.socialAuth = socialAuth
         self.profileRemote = profileRemote
+        self.notificationRepository = notificationRepository
     }
 
     public func restoreSession() async throws -> AuthBootstrap? {
@@ -89,6 +93,8 @@ public struct AuthRepository: Sendable {
 
     public func logout() async throws {
         do {
+            // 서버 로그아웃이 액세스 토큰을 무효화할 수 있다. 그 전에 불러야 401 을 피한다
+            try? await notificationRepository?.unregisterDevice()
             if let session = try await authLocal.loadSession() {
                 try? await authRemote.logout(refreshToken: session.refreshToken)
             }
