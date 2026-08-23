@@ -3,6 +3,7 @@
 //  Dulpick
 //
 
+import ComposableArchitecture
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -163,7 +164,7 @@ private extension PlaceDetailView {
                 .padding(.top, hasPhotos ? 0 : Spacing.s20)
                 .padding(.bottom, Spacing.s16)
 
-            if hasRelatedContents {
+            if showsRelatedSection {
                 relatedContents
                     .padding(.top, Spacing.s16)
             }
@@ -176,8 +177,16 @@ private extension PlaceDetailView {
         !store.place.thumbnailURLs.isEmpty
     }
 
-    var hasRelatedContents: Bool {
-        !store.visibleContents.isEmpty
+    /// 서버 ID 가 없으면 부를 수가 없다. 다 부르고 0건이면 지금처럼 통째로 숨긴다
+    var showsRelatedSection: Bool {
+        guard store.serverPlaceID != nil else { return false }
+        if !store.contents.isEmpty { return true }
+        switch store.contentsLoadState {
+        case .loading, .failed:
+            return true
+        case .loaded:
+            return false
+        }
     }
 
     /// 시안 a07. 화살표를 누르면 `[지번] …` 이 한 줄 아래로 붙는다
@@ -221,8 +230,26 @@ private extension PlaceDetailView {
                 .foregroundStyle(Color.textPrimary)
                 .padding(.bottom, Spacing.s16)
 
+            if store.contents.isEmpty {
+                switch store.contentsLoadState {
+                case .loading:
+                    contentsSkeleton
+                case .failed:
+                    contentsFailure
+                case .loaded:
+                    contentsGrid
+                }
+            } else {
+                contentsGrid
+            }
+        }
+        .padding(.horizontal, Spacing.s20)
+    }
+
+    var contentsGrid: some View {
+        VStack(alignment: .leading, spacing: 0) {
             LazyVGrid(columns: columns, spacing: Spacing.s20) {
-                ForEach(store.visibleContents) { content in
+                ForEach(store.contents) { content in
                     Button { store.send(.contentTapped(content.id)) } label: {
                         RelatedContentCard(content: content)
                     }
@@ -230,13 +257,39 @@ private extension PlaceDetailView {
                 }
             }
 
-            if store.canLoadMore {
+            if store.hasNextContents {
                 moreButton
                     .frame(maxWidth: .infinity)
                     .padding(.top, Spacing.s20)
+                    .disabled(store.contentsLoadState == .loading)
+                    .opacity(store.contentsLoadState == .loading ? 0.4 : 1)
             }
         }
-        .padding(.horizontal, Spacing.s20)
+    }
+
+    /// 첫 장을 기다리는 자리. 카드 네 개 자리를 그대로 채운다
+    var contentsSkeleton: some View {
+        LazyVGrid(columns: columns, spacing: Spacing.s20) {
+            ForEach(0..<PlaceDetailFeature.contentPageSize, id: \.self) { _ in
+                ShimmerBlock(cornerRadius: PlaceDetailMetric.buttonCornerRadius, baseColor: .gray300)
+                    .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            }
+        }
+    }
+
+    var contentsFailure: some View {
+        VStack(spacing: Spacing.s16) {
+            EmptyStateView(
+                image: .placeEmpty,
+                title: "게시물을 불러오지 못했어요",
+                message: "잠시 뒤 다시 시도해주세요"
+            )
+
+            AppButton("다시 시도", style: .outlined, size: .md) {
+                store.send(.retryContentsTapped)
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 
     var moreButton: some View {
@@ -285,7 +338,7 @@ private struct StaticButtonStyle: ButtonStyle {
 #Preview("사진·게시물 없음") {
     let source = Place.mocks.first { $0.thumbnailURLs.isEmpty } ?? Place.mocks[0]
     let place = Place(
-        id: RelatedContentMock.emptyPlaceID,
+        id: source.id,
         kakaoPlaceID: source.kakaoPlaceID,
         name: source.name,
         category: source.category,
@@ -309,6 +362,8 @@ private struct StaticButtonStyle: ButtonStyle {
             )
         ) {
             PlaceDetailFeature()
+        } withDependencies: {
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         },
         bottomInset: 0
     )
