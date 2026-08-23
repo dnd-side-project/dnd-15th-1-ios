@@ -50,7 +50,7 @@ public struct PostDetailFeature {
             case detailLoaded(PostDetailContent)
             /// `X` 탭. 지도가 시트를 `저장한 장소` 로 되돌린다
             case closeRequested
-            /// 행 탭. 받는 쪽은 Cycle 2 다
+            /// 행 탭
             case placeSelected(String)
             /// 세션 만료. RootFlow 까지 올라가 로그인으로 되돌린다
             case sessionExpired

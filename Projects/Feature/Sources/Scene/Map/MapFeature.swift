@@ -113,10 +113,10 @@ public struct MapFeature {
         public enum Delegate: Equatable {
             /// 핀·행 탭. 흐름이 상세 시트를 연다
             case placeDetailRequested(String)
-            /// 검색바 탭. 받는 쪽은 Cycle 3 이다
+            /// 검색바 탭
             case searchRequested
             case searchReopenRequested(query: String)
-            /// `데이트 코스 짜러가기`. 받는 쪽은 Cycle 4 다
+            /// `데이트 코스 짜러가기`
             case courseRequested
             /// 행 메뉴 수정. 흐름이 별칭 시트를 연다
             case aliasRequested(String)
