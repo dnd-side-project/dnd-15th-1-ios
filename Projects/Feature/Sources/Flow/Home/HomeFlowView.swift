@@ -28,19 +28,26 @@ public struct HomeFlowView: View {
             if let pastStore {
                 PastDateCoursesView(store: pastStore)
             }
+        case .course, .coursePlacePick, .courseResult, .courseEdit, .coursePlaceAdd:
+            courseDestination(route)
+        }
+    }
+
+    @ViewBuilder
+    private func courseDestination(_ route: HomeFlowFeature.Route) -> some View {
+        switch route {
         case .course:
-            // 코스 두 화면도 tabBar 숨김을 스스로 하므로 직접 렌더한다
-            if let courseStore {
-                CourseDateView(store: courseStore)
-            }
+            if let courseStore { CourseDateView(store: courseStore) }
         case .coursePlacePick:
-            if let courseStore {
-                CoursePlacePickView(store: courseStore)
-            }
+            if let courseStore { CoursePlacePickView(store: courseStore) }
         case .courseResult:
-            if let courseResultStore {
-                CourseResultView(store: courseResultStore)
-            }
+            if let courseResultStore { CourseResultView(store: courseResultStore) }
+        case .courseEdit:
+            if let courseEditStore { CourseEditView(store: courseEditStore) }
+        case .coursePlaceAdd:
+            if let coursePlaceAddStore { CoursePlacePickView(store: coursePlaceAddStore) }
+        default:
+            EmptyView()
         }
     }
 
@@ -76,6 +83,14 @@ public struct HomeFlowView: View {
 
     private var courseResultStore: StoreOf<CourseResultFeature>? {
         store.scope(state: \.courseResult, action: \.courseResult)
+    }
+
+    private var courseEditStore: StoreOf<CourseEditFeature>? {
+        store.scope(state: \.courseEdit, action: \.courseEdit)
+    }
+
+    private var coursePlaceAddStore: StoreOf<CourseFeature>? {
+        store.scope(state: \.coursePlaceAdd, action: \.coursePlaceAdd)
     }
 
     // 홈 목적지 스택은 HomeFlowFeature 가 소유하고, NavigationStack 이 그 path 를 그대로 민다

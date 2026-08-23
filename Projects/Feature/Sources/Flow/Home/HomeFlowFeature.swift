@@ -8,7 +8,8 @@ import ThirdParty
 @Reducer
 public struct HomeFlowFeature {
     /// 홈(root) 위로 쌓이는 화면. 커플 세 화면은 `couple` 스토어를 공유,
-    /// 지난 데이트는 별도 스토어, 코스 짜기 두 화면은 `course` 스토어를 공유한다
+    /// 지난 데이트는 별도 스토어, 코스 짜기 두 화면은 `course` 스토어를 공유한다.
+    /// 수정은 `courseEdit`, 장소 추가는 `coursePlaceAdd` 가 따로 갖는다
     public enum Route: Hashable {
         case connect
         case codeInput
@@ -17,11 +18,14 @@ public struct HomeFlowFeature {
         case course
         case coursePlacePick
         case courseResult
+        case courseEdit
+        case coursePlaceAdd
 
         var isCouple: Bool {
             switch self {
             case .connect, .codeInput, .complete: return true
-            case .pastDateCourses, .course, .coursePlacePick, .courseResult: return false
+            case .pastDateCourses, .course, .coursePlacePick, .courseResult,
+                 .courseEdit, .coursePlaceAdd: return false
             }
         }
 
@@ -37,6 +41,8 @@ public struct HomeFlowFeature {
         public var pastDateCourses: PastDateCoursesFeature.State?
         public var course: CourseFeature.State?
         public var courseResult: CourseResultFeature.State?
+        public var courseEdit: CourseEditFeature.State?
+        public var coursePlaceAdd: CourseFeature.State?
         public var path: [Route]
 
         public init(
@@ -45,6 +51,8 @@ public struct HomeFlowFeature {
             pastDateCourses: PastDateCoursesFeature.State? = nil,
             course: CourseFeature.State? = nil,
             courseResult: CourseResultFeature.State? = nil,
+            courseEdit: CourseEditFeature.State? = nil,
+            coursePlaceAdd: CourseFeature.State? = nil,
             path: [Route] = []
         ) {
             self.home = home
@@ -52,6 +60,8 @@ public struct HomeFlowFeature {
             self.pastDateCourses = pastDateCourses
             self.course = course
             self.courseResult = courseResult
+            self.courseEdit = courseEdit
+            self.coursePlaceAdd = coursePlaceAdd
             self.path = path
         }
     }
@@ -65,6 +75,8 @@ public struct HomeFlowFeature {
         case pastDateCourses(PastDateCoursesFeature.Action)
         case course(CourseFeature.Action)
         case courseResult(CourseResultFeature.Action)
+        case courseEdit(CourseEditFeature.Action)
+        case coursePlaceAdd(CourseFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
@@ -98,6 +110,12 @@ public struct HomeFlowFeature {
             .ifLet(\.courseResult, action: \.courseResult) {
                 CourseResultFeature()
             }
+            .ifLet(\.courseEdit, action: \.courseEdit) {
+                CourseEditFeature()
+            }
+            .ifLet(\.coursePlaceAdd, action: \.coursePlaceAdd) {
+                CourseFeature()
+            }
             .logged(as: Self.self)
     }
 
@@ -124,7 +142,14 @@ public struct HomeFlowFeature {
         case let .courseResult(.delegate(delegate)):
             return handle(courseResultDelegate: delegate, state: &state)
 
-        case .home, .couple, .pastDateCourses, .course, .courseResult, .delegate:
+        case let .courseEdit(.delegate(delegate)):
+            return handle(courseEditDelegate: delegate, state: &state)
+
+        case let .coursePlaceAdd(.delegate(delegate)):
+            return handle(coursePlaceAddDelegate: delegate, state: &state)
+
+        case .home, .couple, .pastDateCourses, .course, .courseResult,
+             .courseEdit, .coursePlaceAdd, .delegate:
             return .none
         }
     }
@@ -139,6 +164,8 @@ private extension HomeFlowFeature {
         if !path.contains(where: \.isCouple) { state.couple = nil }
         if !path.contains(where: \.isCourse) { state.course = nil }
         if !path.contains(.courseResult) { state.courseResult = nil }
+        if !path.contains(.courseEdit) { state.courseEdit = nil }
+        if !path.contains(.coursePlaceAdd) { state.coursePlaceAdd = nil }
         guard leftCourseResult else { return .none }
         return .send(.home(.reloadRequested))
     }
@@ -252,7 +279,7 @@ private extension HomeFlowFeature {
         case .placePickRequested:
             return applyPath(state.path + [.coursePlacePick], state: &state)
         case .placesPicked:
-            // 홈 만들기는 고르기 모드를 안 쓴다. 고르기는 지도 수정 흐름이 받는다
+            // 만들기 모드는 이 신호를 안 쏜다. 고르기는 coursePlaceAdd 가 받는다
             return .none
         case .dismissed:
             var next = state.path
@@ -288,14 +315,85 @@ private extension HomeFlowFeature {
                 next.removeLast()
             }
             return .send(.pathChanged(next))
-        case .editRequested:
-            // 코스 수정 화면은 feat/DND-53/course-edit 머지 뒤에 붙인다
+        case let .editRequested(course):
+            state.courseEdit = CourseEditFeature.State(dateCourseID: course.id)
+            state.path.append(.courseEdit)
             return .none
         case .sessionExpired:
             return .concatenate(
                 applyPath([], state: &state),
                 .send(.delegate(.sessionExpired))
             )
+        }
+    }
+
+    func handle(
+        courseEditDelegate: CourseEditFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch courseEditDelegate {
+        case let .placeAddRequested(excluding):
+            state.coursePlaceAdd = CourseFeature.State(mode: .pick(excluding: excluding))
+            state.path.append(.coursePlaceAdd)
+            return .none
+
+        case let .saved(course):
+            // PUT 응답이 최신 코스라 결과 화면이 서버를 다시 부르지 않는다
+            var next = state.path
+            if next.last == .courseEdit {
+                next.removeLast()
+            }
+            return .concatenate(
+                .send(.pathChanged(next)),
+                .send(.courseResult(.courseResponse(.success(course))))
+            )
+
+        case .dismissed:
+            var next = state.path
+            if next.last == .courseEdit {
+                next.removeLast()
+            }
+            return .send(.pathChanged(next))
+
+        case .conflicted:
+            var next = state.path
+            if next.last == .courseEdit {
+                next.removeLast()
+            }
+            return .concatenate(
+                .send(.pathChanged(next)),
+                .send(.courseResult(.conflictReloadRequested))
+            )
+
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        }
+    }
+
+    func handle(
+        coursePlaceAddDelegate: CourseFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch coursePlaceAddDelegate {
+        case let .placesPicked(candidates):
+            var next = state.path
+            if next.last == .coursePlaceAdd {
+                next.removeLast()
+            }
+            return .concatenate(
+                .send(.pathChanged(next)),
+                .send(.courseEdit(.placesAdded(candidates)))
+            )
+        case .dismissed:
+            var next = state.path
+            if next.last == .coursePlaceAdd {
+                next.removeLast()
+            }
+            return .send(.pathChanged(next))
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        case .placePickRequested, .buildRequested:
+            return .none
         }
     }
 }
