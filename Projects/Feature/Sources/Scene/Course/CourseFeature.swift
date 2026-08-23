@@ -14,6 +14,11 @@ public struct CourseFeature {
         case time
     }
 
+    public enum Mode: Equatable, Sendable {
+        case create
+        case pick(excluding: [String])
+    }
+
     public enum LoadState: Equatable {
         case loading
         case loaded
@@ -35,6 +40,7 @@ public struct CourseFeature {
         /// 시트 안에서 굴리는 임시값. `확인` 을 눌러야 date/time 으로 넘어간다
         public var draftDate: DateComponents
         public var draftTime: DateComponents
+        public var mode: Mode
         /// POST /api/v1/date-courses 응답. 다음 화면이 들고 간다
         public var dateCourseID: String?
         /// 낙관적 락 번호. 서버 응답 값을 그대로 들고 다닌다
@@ -55,7 +61,7 @@ public struct CourseFeature {
         public var selectedPlaceIDs: [String] = []
         public var camera: MapCamera = .seoulCityHall
 
-        public init(now: Date = Date()) {
+        public init(now: Date = Date(), mode: Mode = .create) {
             let calendar = Calendar.current
             let tomorrowDate = calendar.date(byAdding: .day, value: 1, to: now) ?? now
             let tomorrow = calendar.dateComponents([.year, .month, .day], from: tomorrowDate)
@@ -63,6 +69,7 @@ public struct CourseFeature {
             self.tomorrow = tomorrow
             self.draftDate = tomorrow
             self.draftTime = nowTime
+            self.mode = mode
         }
     }
 
@@ -103,6 +110,7 @@ public struct CourseFeature {
             /// 확정 저장된 코스. 결과 화면이 받아 그린다
             case buildRequested(DateCourse)
             case placePickRequested(dateCourseID: String)
+            case placesPicked([CoursePlaceCandidate])
             case dismissed
             case sessionExpired
         }
@@ -242,8 +250,8 @@ private extension CourseFeature {
         }
         state.showsDateError = false
 
-        let time = state.time ?? State.defaultTime
         state.isCreatingCourse = true
+        let time = state.time
 
         let title = DateCourseTitle.make(date: date)
 
@@ -306,6 +314,12 @@ private extension CourseFeature {
     func save(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .buildTapped:
+            if case .pick = state.mode {
+                let picked = state.selectedPlaceIDs.compactMap { id in
+                    state.places.first { $0.id == id }
+                }
+                return .send(.delegate(.placesPicked(picked)))
+            }
             return startSaveCourse(state: &state)
 
         case let .courseSaved(.success(course)):
@@ -366,18 +380,18 @@ private extension CourseFeature {
         }
         state.isSavingCourse = true
 
-        let time = state.time ?? State.defaultTime
-        let title = DateCourseTitle.make(date: date)
-        let scheduledAt = Self.scheduledAt(date: date, time: time)
-        let placeIDs = state.selectedPlaceIDs
+        let content = DateCourseContent(
+            title: DateCourseTitle.make(date: date),
+            date: Self.dateOnly(from: date),
+            time: state.time,
+            placeIDs: state.selectedPlaceIDs
+        )
 
         return .run { [courseClient] send in
             do {
                 let course = try await courseClient.updateCourse(
                     dateCourseID,
-                    title,
-                    scheduledAt,
-                    placeIDs,
+                    content,
                     version
                 )
                 await send(.courseSaved(.success(course)))
@@ -404,14 +418,13 @@ private extension CourseFeature {
         .cancellable(id: CancelID.reloadCourse, cancelInFlight: true)
     }
 
-    /// `createCourse` 는 날짜·시간을 나눠 보내고, 저장은 `Date` 하나로 보낸다
-    static func scheduledAt(date: DateComponents, time: DateComponents) -> Date {
-        var merged = date
-        merged.hour = time.hour
-        merged.minute = time.minute
-        merged.second = 0
-        merged.timeZone = TimeZone(identifier: "Asia/Seoul")
-        return Calendar(identifier: .gregorian).date(from: merged) ?? Date.distantPast
+    static func dateOnly(from date: DateComponents) -> Date {
+        var midnight = date
+        midnight.hour = 0
+        midnight.minute = 0
+        midnight.second = 0
+        midnight.timeZone = TimeZone(identifier: "Asia/Seoul")
+        return Calendar(identifier: .gregorian).date(from: midnight) ?? Date.distantPast
     }
 
     func loadPlaces() -> Effect<Action> {
@@ -490,9 +503,14 @@ private enum CourseMarkerID {
 public extension CourseFeature.State {
 
     var filteredPlaces: [CoursePlaceCandidate] {
-        places
+        let base = places
             .filter { selectedOwnership.matches($0.ownership) }
             .filter { selectedCategory == nil || $0.category == selectedCategory }
+        if case let .pick(excluding) = mode {
+            let taken = Set(excluding)
+            return base.filter { !taken.contains($0.id) }
+        }
+        return base
     }
 
     /// 카테고리 핀을 먼저 두고 고른 물방울을 뒤에 둔다. 지도가 배열 순서로 그려 물방울이 위에 온다
@@ -522,7 +540,10 @@ public extension CourseFeature.State {
     var selectedCount: Int { selectedPlaceIDs.count }
 
     var ctaTitle: String {
-        selectedCount == 0 ? "장소를 선택해주세요" : "\(selectedCount)곳으로 코스짜기"
+        if case .pick = mode {
+            return "추가"
+        }
+        return selectedCount == 0 ? "장소를 선택해주세요" : "\(selectedCount)곳으로 코스짜기"
     }
 
     var isCTAEnabled: Bool { selectedCount >= 1 && !isSavingCourse }
@@ -555,16 +576,6 @@ public extension CourseFeature.State {
     func badgeState(for id: String) -> PlaceNumberBadgeState {
         guard let index = selectedPlaceIDs.firstIndex(of: id) else { return .unselected }
         return .number(index + 1)
-    }
-}
-
-// MARK: - Default
-
-private extension CourseFeature.State {
-
-    /// 시안 b03·c10 이 `오후 1:00` 을 보인다
-    static var defaultTime: DateComponents {
-        DateComponents(hour: 13, minute: 0)
     }
 }
 
