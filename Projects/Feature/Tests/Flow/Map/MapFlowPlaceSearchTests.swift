@@ -148,8 +148,8 @@ final class MapFlowPlaceSearchTests: XCTestCase {
         }
         store.exhaustivity = .off
 
-        await store.send(.placeSearch(.delegate(.placeSelected(place)))) {
-            $0.detail = PlaceDetailFeature.State(place: place)
+        await store.send(.placeSearch(.delegate(.placeSelected(place, query: "고른 장소")))) {
+            $0.detail = PlaceDetailFeature.State(place: place, query: "고른 장소")
             $0.map.selectedPlace = MapFeature.State.SelectedPlace(
                 id: place.id,
                 coordinate: place.coordinate

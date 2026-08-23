@@ -19,6 +19,10 @@ public struct PlaceSearchFeature {
         public var recentSearches: [String] = []
         public var results: [Place] = []
         public var loadState: LoadState = .idle
+        /// 지금까지 받은 마지막 페이지 번호. 0 부터 센다
+        public var page = 0
+        public var hasNext = false
+        public var isLoadingMore = false
 
         /// 검색어가 비면 최근 검색어를 보여준다
         public var showsRecent: Bool {
@@ -41,7 +45,9 @@ public struct PlaceSearchFeature {
         case backTapped
         case submitted
         case queryChangeDebounced
-        case searchResponse(Result<[Place], PlaceError>)
+        case searchResponse(Result<PlacePage, PlaceError>)
+        case reachedEnd
+        case moreResponse(Result<PlacePage, PlaceError>)
         case rowTapped(String)
         case recentSearchTapped(String)
         case recentSearchDeleted(String)
@@ -53,7 +59,7 @@ public struct PlaceSearchFeature {
         public enum Delegate: Equatable {
             case dismissed
             case searchConfirmed(query: String, places: [Place])
-            case placeSelected(Place)
+            case placeSelected(Place, query: String)
             case sessionExpired
         }
     }
@@ -61,6 +67,7 @@ public struct PlaceSearchFeature {
     private enum CancelID {
         case debounce
         case request
+        case more
     }
 
     @Dependency(\.placeClient) var placeClient
@@ -77,7 +84,7 @@ public struct PlaceSearchFeature {
         switch action {
         case .onAppear, .recentSearchTapped, .recentSearchDeleted, .clearRecentTapped, .recentSearchesUpdated:
             return updateRecent(state: &state, action: action)
-        case .binding, .queryChangeDebounced, .searchResponse:
+        case .binding, .queryChangeDebounced, .searchResponse, .reachedEnd, .moreResponse:
             return updateSearch(state: &state, action: action)
         case .backTapped, .submitted, .rowTapped:
             return raise(state: &state, action: action)
@@ -132,8 +139,10 @@ public struct PlaceSearchFeature {
         case .queryChangeDebounced:
             return search(state: &state)
 
-        case let .searchResponse(.success(places)):
-            state.results = places
+        case let .searchResponse(.success(page)):
+            state.results = page.items
+            state.hasNext = page.hasNext
+            state.page = 0
             state.loadState = .loaded
             return .none
 
@@ -143,6 +152,21 @@ public struct PlaceSearchFeature {
             if error == .unauthorized {
                 return .send(.delegate(.sessionExpired))
             }
+            return .none
+
+        case .reachedEnd:
+            return loadMore(state: &state)
+
+        case let .moreResponse(.success(page)):
+            state.results += page.items
+            state.hasNext = page.hasNext
+            state.page += 1
+            state.isLoadingMore = false
+            return .none
+
+        case .moreResponse(.failure):
+            // 첫 페이지는 화면에 남긴다. hasNext 를 끄면 일시 실패가 영구 정지가 된다
+            state.isLoadingMore = false
             return .none
 
         default:
@@ -172,12 +196,12 @@ public struct PlaceSearchFeature {
             }
             let query = state.query.trimmingCharacters(in: .whitespaces)
             guard !query.isEmpty else {
-                return .send(.delegate(.placeSelected(place)))
+                return .send(.delegate(.placeSelected(place, query: query)))
             }
             // 부모가 화면을 닫으면 ifLet 이 남은 효과를 취소하므로 저장을 먼저 끝낸다
             return .concatenate(
                 remember(query),
-                .send(.delegate(.placeSelected(place)))
+                .send(.delegate(.placeSelected(place, query: query)))
             )
 
         default:
@@ -194,12 +218,14 @@ public struct PlaceSearchFeature {
             state.loadState = .idle
             return .merge(
                 .cancel(id: CancelID.debounce),
-                .cancel(id: CancelID.request)
+                .cancel(id: CancelID.request),
+                .cancel(id: CancelID.more)
             )
         }
         // 새 검색어를 치면 돌던 요청도 끊는다. 안 끊으면 옛 응답이 새 검색어 화면에 얹힌다
         return .merge(
             .cancel(id: CancelID.request),
+            .cancel(id: CancelID.more),
             .run { [clock] send in
                 try await clock.sleep(for: .milliseconds(300))
                 await send(.queryChangeDebounced)
@@ -211,11 +237,14 @@ public struct PlaceSearchFeature {
     private func search(state: inout State) -> Effect<Action> {
         let query = state.query.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return .none }
+        state.page = 0
+        state.hasNext = false
+        state.isLoadingMore = false
         state.loadState = .loading
         return .run { [placeClient] send in
             do {
-                let places = try await placeClient.searchPlaces(query)
-                await send(.searchResponse(.success(places)))
+                let page = try await placeClient.searchPlaces(query, 0)
+                await send(.searchResponse(.success(page)))
             } catch let error as PlaceError {
                 await send(.searchResponse(.failure(error)))
             } catch {
@@ -223,6 +252,28 @@ public struct PlaceSearchFeature {
             }
         }
         .cancellable(id: CancelID.request, cancelInFlight: true)
+    }
+
+    private func loadMore(state: inout State) -> Effect<Action> {
+        let query = state.query.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty,
+              state.hasNext,
+              !state.isLoadingMore,
+              state.loadState != .loading
+        else { return .none }
+        let next = state.page + 1
+        state.isLoadingMore = true
+        return .run { [placeClient] send in
+            do {
+                let page = try await placeClient.searchPlaces(query, next)
+                await send(.moreResponse(.success(page)))
+            } catch let error as PlaceError {
+                await send(.moreResponse(.failure(error)))
+            } catch {
+                await send(.moreResponse(.failure(.unknown)))
+            }
+        }
+        .cancellable(id: CancelID.more, cancelInFlight: true)
     }
 
     private func remember(_ query: String) -> Effect<Action> {

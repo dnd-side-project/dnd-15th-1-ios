@@ -548,15 +548,16 @@ final class MapFeatureChildTests: XCTestCase {
         state.places = savedPlaces
         let store = TestStore(initialState: state) { MapFeature() }
 
-        await store.send(.aliasSaved(id: "7", alias: "우리 첫 카페")) {
-            let old = $0.places[0]
-            $0.places[0] = SavedPlace(
-                place: old.place,
-                ownership: old.ownership,
-                alias: "우리 첫 카페",
-                memo: old.memo,
-                savedAt: old.savedAt
-            )
+        let old = savedPlaces[0]
+        let updated = SavedPlace(
+            place: old.place,
+            ownership: old.ownership,
+            alias: "우리 첫 카페",
+            memo: old.memo,
+            savedAt: old.savedAt
+        )
+        await store.send(.aliasSaved(updated)) {
+            $0.places[0] = updated
             $0.toast = ToastState(message: "별칭을 저장했어요")
         }
     }

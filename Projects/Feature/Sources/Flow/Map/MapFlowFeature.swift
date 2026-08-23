@@ -67,7 +67,7 @@ public struct MapFlowFeature {
         /// 홈에서 고른 저장 장소 상세를 지도 위에 연다
         case presentPlaceDetail(SavedPlace)
         /// 탐색 검색에서 고른 장소 상세를 지도 위에 연다. 닫으면 원래 탭으로 되돌린다
-        case presentSearchPlaceDetail(Place)
+        case presentSearchPlaceDetail(Place, query: String)
         /// 홈 전체보기로 들어온다. 걸린 필터를 풀고 전체를 보여준다
         case showAllSaved
         case map(MapFeature.Action)
@@ -142,12 +142,12 @@ public struct MapFlowFeature {
                 zoomLevel: state.map.camera.zoomLevel
             )
             return .none
-        case let .presentSearchPlaceDetail(place):
+        case let .presentSearchPlaceDetail(place, query):
             // 검색 장소 상세. 닫으면 탐색 탭으로 되돌리도록 표시해 둔다
             state.returnsAfterDetailClose = true
             // 저장 핀·검색 UI 를 감추고 이 장소만 지도에 얹는다
             state.map.mode = .content(places: [place])
-            presentDetail(state: &state, place: place)
+            presentDetail(state: &state, place: place, query: query)
             state.map.camera = .focusing(place.coordinate, zoomLevel: state.map.camera.zoomLevel)
             return .none
         case .showAllSaved:
@@ -243,13 +243,15 @@ private extension MapFlowFeature {
                 .send(.map(.searchClearTapped))
             )
         case let .searchConfirmed(query, places):
+            // 새 결과 목록을 열면 보고 있던 장소 상세는 내린다. 안 내리면 결과 시트를 덮는다
+            dismissDetail(state: &state)
             return .merge(
                 .send(.pathChanged([])),
                 .send(.map(.searchResultsApplied(query: query, places: places)))
             )
-        case let .placeSelected(place):
+        case let .placeSelected(place, query):
             // 고른 장소 하나를 지도에 올리고 시트만 상세로 바꾼다. 상세는 밀린 화면이 아니다
-            presentDetail(state: &state, place: place)
+            presentDetail(state: &state, place: place, query: query)
             return .concatenate(
                 .send(.pathChanged([])),
                 .send(.map(.searchResultsApplied(query: place.name, places: [place])))
@@ -261,13 +263,17 @@ private extension MapFlowFeature {
 
     func handleChild(state: inout State, action: Action) -> Effect<Action> {
         switch action {
-        case let .alias(.presented(.delegate(.saved(id, alias)))):
+        case let .alias(.presented(.delegate(.saved(savedPlace)))):
             state.alias = nil
-            return .send(.map(.aliasSaved(id: id, alias: alias)))
+            return .send(.map(.aliasSaved(savedPlace)))
 
         case .alias(.presented(.delegate(.cancelled))), .alias(.dismiss):
             state.alias = nil
             return .none
+
+        case .alias(.presented(.delegate(.sessionExpired))):
+            state.alias = nil
+            return .send(.delegate(.sessionExpired))
 
         case .detail:
             return handleDetail(state: &state, action: action)
@@ -353,10 +359,9 @@ private extension MapFlowFeature {
             }
         case .searchResult:
             if let place = state.map.searchResults.first(where: { $0.id == id }) {
-                presentDetail(state: &state, place: place)
+                presentDetail(state: &state, place: place, query: state.map.searchQuery ?? "")
             }
         case .content:
-            // 게시글 핀을 누르면 그 장소 상세를 게시글 상세 위에 얹는다
             if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
                 presentContentPlaceDetail(state: &state, place: place)
             }
@@ -372,7 +377,7 @@ private extension MapFlowFeature {
 
     /// 게시글 핀을 눌러 장소 상세를 연다. 게시글 상세는 남겨 둬 상세를 닫으면 그 자리로 돌아간다
     func presentContentPlaceDetail(state: inout State, place: Place) {
-        var detail = PlaceDetailFeature.State(place: place)
+        var detail = PlaceDetailFeature.State(contentPlace: place)
         // 저장 상태는 게시글 상세 목록을 기준으로 물려받는다. 없으면 지도 저장 목록을 본다
         detail.isBookmarked = state.postDetail?.savedPlaceIDs.contains(place.id)
             ?? state.map.bookmarkedPlaceIDs.contains(place.id)
@@ -396,8 +401,8 @@ private extension MapFlowFeature {
         state.postDetail = nil
     }
 
-    func presentDetail(state: inout State, place: Place) {
-        var detail = PlaceDetailFeature.State(place: place)
+    func presentDetail(state: inout State, place: Place, query: String) {
+        var detail = PlaceDetailFeature.State(place: place, query: query)
         detail.isBookmarked = state.map.bookmarkedPlaceIDs.contains(place.id)
         state.detail = detail
         state.map.selectedPlace = MapFeature.State.SelectedPlace(

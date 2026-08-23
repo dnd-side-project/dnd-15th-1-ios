@@ -57,7 +57,7 @@ public struct ExploreFeature {
             /// 카드 탭. MainTab 이 지도 탭으로 옮겨 상세를 연다
             case showContentDetail(String)
             /// 장소 결과 탭. MainTab 이 지도 탭으로 옮겨 장소 상세를 연다
-            case showPlaceDetail(Place)
+            case showPlaceDetail(Place, query: String)
         }
     }
 
@@ -134,9 +134,9 @@ public struct ExploreFeature {
             // 검색 결과 카드도 같은 길을 탄다
             return .send(.delegate(.showContentDetail(id)))
 
-        case let .search(.delegate(.showPlaceDetail(place))):
+        case let .search(.delegate(.showPlaceDetail(place, query))):
             // 검색 장소 결과는 지도 탭에서 장소 상세를 연다
-            return .send(.delegate(.showPlaceDetail(place)))
+            return .send(.delegate(.showPlaceDetail(place, query: query)))
 
         default:
             return .none

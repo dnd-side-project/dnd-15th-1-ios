@@ -4,13 +4,16 @@ import ThirdParty
 public extension PlaceClient {
     static let mock = PlaceClient(
         savedPlaces: { SavedPlace.mocks },
-        searchPlaces: { query in
+        searchPlaces: { query, _ in
             let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
             // 빈 검색어는 빈 결과다. 화면이 이미 빈 질의를 막고 있고,
             // 여기서 전체를 돌려주면 "검색 안 해도 결과가 뜬다" 는 착각을 만든다
-            guard !keyword.isEmpty else { return [] }
+            guard !keyword.isEmpty else { return PlacePage(items: [], hasNext: false) }
 
-            return Place.mocks.filter { $0.name.localizedCaseInsensitiveContains(keyword) }
+            return PlacePage(
+                items: Place.mocks.filter { $0.name.localizedCaseInsensitiveContains(keyword) },
+                hasNext: false
+            )
         },
         savePlace: { kakaoPlaceID, _, alias, memo in
             // 못 찾으면 폴백하지 않는다. 엉뚱한 장소를 저장 성공으로 돌려주면
@@ -27,7 +30,41 @@ public extension PlaceClient {
                 savedAt: Date(timeIntervalSince1970: 1_786_000_000)
             )
         },
-        removePlace: { _ in }
+        removePlace: { _ in },
+        placeDetail: { placeID in
+            guard let place = Place.mocks.first(where: { $0.id == String(placeID) }) else {
+                throw PlaceError.notFound
+            }
+            return PlaceDetail(
+                place: place,
+                savedByMe: true,
+                savedMemberCount: place.bookmarkCount,
+                ownership: .mine
+            )
+        },
+        kakaoPlaceDetail: { kakaoPlaceID, _ in
+            guard let place = Place.mocks.first(where: { $0.kakaoPlaceID == kakaoPlaceID }) else {
+                throw PlaceError.notFound
+            }
+            return PlaceDetail(
+                place: place,
+                savedByMe: false,
+                savedMemberCount: place.bookmarkCount,
+                ownership: nil
+            )
+        },
+        updateAlias: { placeID, alias in
+            guard let saved = SavedPlace.mocks.first(where: { $0.id == String(placeID) }) else {
+                throw PlaceError.notFound
+            }
+            return SavedPlace(
+                place: saved.place,
+                ownership: saved.ownership,
+                alias: alias,
+                memo: saved.memo,
+                savedAt: saved.savedAt
+            )
+        }
     )
 }
 

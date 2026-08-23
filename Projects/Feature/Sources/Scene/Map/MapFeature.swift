@@ -106,7 +106,7 @@ public struct MapFeature {
         case searchBackTapped
         case bookmarkTapped(String)
         /// 별칭 시트가 저장한 뒤 목록을 갈아 끼운다
-        case aliasSaved(id: String, alias: String)
+        case aliasSaved(SavedPlace)
         case delegate(Delegate)
 
         @CasePathable
@@ -439,17 +439,9 @@ private extension MapFeature {
 
     func applyAlias(state: inout State, action: Action) -> Effect<Action> {
         switch action {
-        case let .aliasSaved(id, alias):
-            // 서버에 별칭 수정 계약이 없다. 목록을 화면 안에서 갈아 끼운다
-            if let index = state.places.firstIndex(where: { $0.id == id }) {
-                let old = state.places[index]
-                state.places[index] = SavedPlace(
-                    place: old.place,
-                    ownership: old.ownership,
-                    alias: alias,
-                    memo: old.memo,
-                    savedAt: old.savedAt
-                )
+        case let .aliasSaved(savedPlace):
+            if let index = state.places.firstIndex(where: { $0.id == savedPlace.id }) {
+                state.places[index] = savedPlace
             }
             state.toast = ToastState(message: "별칭을 저장했어요")
             return .none

@@ -28,6 +28,10 @@ public struct PlaceAliasFeature {
         public let address: String
 
         public var alias: String
+        /// 저장 요청이 도는 동안 참이다. 버튼을 잠그고 두 번 눌리는 것을 막는다
+        public var isSaving = false
+        /// 실패 문구. 입력칸 아래에 뜬다
+        public var errorMessage: String?
 
         public var trimmedAlias: String {
             alias.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -47,15 +51,20 @@ public struct PlaceAliasFeature {
         case binding(BindingAction<State>)
         case saveTapped
         case dismissed
+        case aliasSaved(SavedPlace)
+        case aliasSaveFailed(PlaceError)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
-            /// 장소 id 와 다듬은 별칭. 받는 쪽이 목록을 갈아 끼운다
-            case saved(String, String)
+            /// 서버가 준 갱신된 저장 장소. 받는 쪽이 목록 원소를 통째로 갈아 끼운다
+            case saved(SavedPlace)
             case cancelled
+            case sessionExpired
         }
     }
+
+    @Dependency(\.placeClient) var placeClient
 
     public init() {}
 
@@ -68,16 +77,79 @@ public struct PlaceAliasFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .binding:
+            return updateInput(state: &state, action: action)
+        case .saveTapped, .aliasSaved, .aliasSaveFailed:
+            return saveAlias(state: &state, action: action)
+        case .dismissed, .delegate:
+            return raise(state: &state, action: action)
+        }
+    }
+
+    private func updateInput(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .binding:
+            state.errorMessage = nil
+            return .none
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    private func saveAlias(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .saveTapped:
+            guard state.isSaveEnabled, !state.isSaving else { return .none }
+            guard let placeID = Int(state.placeID) else {
+                state.errorMessage = "저장한 장소가 아니에요"
+                return .none
+            }
+            let alias = state.trimmedAlias
+            state.isSaving = true
+            state.errorMessage = nil
+            return .run { [placeClient] send in
+                do {
+                    let saved = try await placeClient.updateAlias(placeID, alias)
+                    await send(.aliasSaved(saved))
+                } catch let error as PlaceError {
+                    await send(.aliasSaveFailed(error))
+                } catch {
+                    await send(.aliasSaveFailed(.unknown))
+                }
+            }
+
+        case let .aliasSaved(savedPlace):
+            state.isSaving = false
+            return .send(.delegate(.saved(savedPlace)))
+
+        case let .aliasSaveFailed(error):
+            state.isSaving = false
+            switch error {
+            case .unauthorized:
+                // 전역 에러다. 문구를 띄우지 않고 상위가 처리한다
+                state.errorMessage = nil
+                return .send(.delegate(.sessionExpired))
+            case .notFound:
+                state.errorMessage = "저장한 장소가 아니에요"
+            case .network, .alreadySaved, .unknown:
+                state.errorMessage = "잠시 뒤 다시 시도해주세요"
+            }
             return .none
 
-        case .saveTapped:
-            guard state.isSaveEnabled else { return .none }
-            return .send(.delegate(.saved(state.placeID, state.trimmedAlias)))
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
 
+    private func raise(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .dismissed:
             return .send(.delegate(.cancelled))
-
         case .delegate:
+            return .none
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
     }
