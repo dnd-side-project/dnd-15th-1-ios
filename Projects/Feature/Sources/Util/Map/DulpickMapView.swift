@@ -64,6 +64,8 @@ extension DulpickMapView {
 
         private var controller: KMController?
         private weak var container: KMViewContainer?
+        /// 링크를 놓으면 요청도 사라진다. 지도가 살아 있는 동안 붙잡는다
+        private var frameRateLink: UIUpdateLink?
         private var isMapReady = false
 
         /// SDK 가 마지막으로 통보한 컨테이너 크기. 지도 뷰 생성 전에도 올 수 있어 들고 있는다
@@ -99,6 +101,13 @@ extension DulpickMapView {
             controller.delegate = self
             // 120Hz 기기에서 지도가 60Hz 로 묶이는 것을 푼다. SDK 기본값이 false 다
             controller.proMotionSupport = true
+            // 가변 주사율이 낮은 값으로 내려앉으면 프레임 간격이 고르지 않다.
+            // 실기기에서 이 링크를 빼면 평균 73.8Hz 가 58.5Hz 로, 프레임 떨굼이 35% 에서 54% 로 나빠졌다.
+            // minimum 이 이 링크가 맡는 일이다. 범위는 요청이라 시스템이 다른 요청과 함께 고른다
+            let frameRateLink = UIUpdateLink(view: container)
+            frameRateLink.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+            frameRateLink.isEnabled = true
+            self.frameRateLink = frameRateLink
             self.controller = controller
             controller.prepareEngine()
             controller.activateEngine()
@@ -107,6 +116,8 @@ extension DulpickMapView {
 
         func teardown() {
             stopObservingAppLifecycle()
+            frameRateLink?.isEnabled = false
+            frameRateLink = nil
             controller?.pauseEngine()
             controller?.resetEngine()
             controller = nil
@@ -217,26 +228,6 @@ extension DulpickMapView {
                 )
             )
             _ = routeManager.addRouteLayer(layerID: Layout.routeLayerID, zOrder: 1_000)
-        }
-
-        /// 개수가 수십 개 수준이라 레이어를 통째로 다시 그린다
-        private func drawMarkers(_ map: KakaoMap) {
-            let manager = map.getLabelManager()
-            guard let layer = manager.getLabelLayer(layerID: Layout.markerLayerID) else { return }
-
-            layer.clearAllItems()
-
-            for marker in desiredMarkers {
-                let styleID = MapMarkerSymbol.styleID(for: marker.kind)
-                registerMarkerStyleIfNeeded(styleID: styleID, kind: marker.kind, manager: manager)
-
-                let options = PoiOptions(styleID: styleID, poiID: marker.id)
-                options.clickable = true
-                options.rank = MapMarkerSymbol.rank(for: marker.kind)
-                layer.addPoi(option: options, at: marker.coordinate.mapPoint)?.show()
-            }
-
-            layer.setClickable(true)
         }
 
         private func drawRoutes(_ map: KakaoMap) {
@@ -406,6 +397,64 @@ private extension DulpickMapView.Coordinator {
     }
 }
 
+// MARK: - 마커
+
+private extension DulpickMapView.Coordinator {
+    /// 엔진이 막 준비됐을 때만 레이어를 비운다.
+    /// 그 다음부터는 바뀐 핀만 더하거나 지운다. 고를 때마다 전부 지워 다시 찍으면
+    /// 카메라가 움직이는 동안 핀이 사라진다
+    func drawMarkers(_ map: KakaoMap) {
+        let manager = map.getLabelManager()
+        guard let layer = manager.getLabelLayer(layerID: DulpickMapView.Layout.markerLayerID) else { return }
+
+        if appliedMarkers == nil {
+            layer.clearAllItems()
+            for marker in desiredMarkers {
+                addMarker(marker, on: layer, manager: manager)
+            }
+            layer.setClickable(true)
+            return
+        }
+
+        let change = MapMarkerDiff.change(from: appliedMarkers ?? [], to: desiredMarkers)
+        for id in change.removedIDs {
+            layer.removePoi(poiID: id)
+        }
+        for marker in change.added {
+            addMarker(marker, on: layer, manager: manager)
+        }
+        for marker in change.moved {
+            layer.getPoi(poiID: marker.id)?
+                .moveAt(marker.coordinate.mapPoint, duration: 0)
+        }
+        for marker in change.restyled {
+            let styleID = MapMarkerSymbol.styleID(for: marker.kind)
+            registerMarkerStyleIfNeeded(
+                styleID: styleID,
+                kind: marker.kind,
+                manager: manager
+            )
+            guard let poi = layer.getPoi(poiID: marker.id) else { continue }
+            poi.changeStyle(styleID: styleID, enableTransition: false)
+            poi.rank = MapMarkerSymbol.rank(for: marker.kind)
+        }
+        layer.setClickable(true)
+    }
+
+    func addMarker(
+        _ marker: MapMarker,
+        on layer: LabelLayer,
+        manager: LabelManager
+    ) {
+        let styleID = MapMarkerSymbol.styleID(for: marker.kind)
+        registerMarkerStyleIfNeeded(styleID: styleID, kind: marker.kind, manager: manager)
+        let options = PoiOptions(styleID: styleID, poiID: marker.id)
+        options.clickable = true
+        options.rank = MapMarkerSymbol.rank(for: marker.kind)
+        layer.addPoi(option: options, at: marker.coordinate.mapPoint)?.show()
+    }
+}
+
 // MARK: - 카메라
 
 private extension DulpickMapView.Coordinator {
@@ -418,10 +467,9 @@ private extension DulpickMapView.Coordinator {
         map.animateCamera(
             cameraUpdate: update,
             options: CameraAnimationOptions(
-                // 멀리 옮길 때 카메라를 들어 올렸다 내린다. 화면이 당겨진 채 미끄러지면 어지럽다
-                autoElevation: true,
+                autoElevation: ObjCBool(MapCameraMove.autoElevation),
                 consecutive: false,
-                durationInMillis: 150
+                durationInMillis: MapCameraMove.durationInMillis
             )
         )
     }
