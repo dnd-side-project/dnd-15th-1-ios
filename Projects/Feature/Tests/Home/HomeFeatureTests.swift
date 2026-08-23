@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Domain
 import Feature
 import Foundation
+import SharedDesignSystem
 import XCTest
 
 private struct BoomError: Error {}
@@ -51,5 +52,123 @@ final class HomeFeatureTests: XCTestCase {
 
         XCTAssertEqual(store.state.savedPlaces.map(\.id), ["keep"])
         XCTAssertEqual(store.state.recommendations.map(\.id), ["keep"])
+    }
+
+    func test_당겨서새로고침_홈요약_저장장소_추천을_다시읽고_isRefreshing이_참이된다() async {
+        let store = TestStore(initialState: HomeFeature.State()) {
+            HomeFeature()
+        } withDependencies: {
+            $0.homeClient.home = {
+                HomeSummary(
+                    connected: false,
+                    myNickname: "둘픽",
+                    partnerNickname: nil,
+                    currentDateCourse: nil
+                )
+            }
+            $0.homeClient.recentSavedPlaces = { _ in [.fixture(id: "1")] }
+            $0.profileClient.member = { UserProfile(nickname: "둘픽", iconID: 0, datePreference: nil) }
+            $0.exploreClient.contents = { _, _, _ in
+                ContentPage(
+                    items: [Content(id: "c1", title: "코스", thumbnailURLs: [], placeCount: 1)],
+                    hasNext: false,
+                    popularTags: []
+                )
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.refreshRequested)
+        await store.skipReceivedActions()
+
+        XCTAssertTrue(store.state.isRefreshing)
+        XCTAssertEqual(store.state.nickname, "둘픽")
+        XCTAssertEqual(store.state.savedPlaces.map(\.id), ["1"])
+        XCTAssertEqual(store.state.recommendations.map(\.id), ["c1"])
+    }
+
+    func test_당겨서새로고침_저장장소실패시_토스트가_선다() async {
+        let store = TestStore(initialState: HomeFeature.State()) {
+            HomeFeature()
+        } withDependencies: {
+            $0.homeClient.home = {
+                HomeSummary(
+                    connected: false,
+                    myNickname: "둘픽",
+                    partnerNickname: nil,
+                    currentDateCourse: nil
+                )
+            }
+            $0.homeClient.recentSavedPlaces = { _ in throw BoomError() }
+            $0.profileClient.member = { UserProfile(nickname: "둘픽", iconID: 0, datePreference: nil) }
+            $0.exploreClient.contents = { _, _, _ in
+                ContentPage(
+                    items: [Content(id: "c1", title: "코스", thumbnailURLs: [], placeCount: 1)],
+                    hasNext: false,
+                    popularTags: []
+                )
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.refreshRequested)
+        await store.receive(\.refreshFailed)
+
+        XCTAssertEqual(store.state.toast, ToastState(message: "잠시 뒤 다시 시도해주세요"))
+    }
+
+    func test_자동진입_저장장소실패시_토스트가_안선다() async {
+        let store = TestStore(initialState: HomeFeature.State()) {
+            HomeFeature()
+        } withDependencies: {
+            $0.homeClient.home = {
+                HomeSummary(
+                    connected: false,
+                    myNickname: "둘픽",
+                    partnerNickname: nil,
+                    currentDateCourse: nil
+                )
+            }
+            $0.homeClient.recentSavedPlaces = { _ in throw BoomError() }
+            $0.profileClient.member = { UserProfile(nickname: "둘픽", iconID: 0, datePreference: nil) }
+            $0.exploreClient.contents = { _, _, _ in
+                ContentPage(
+                    items: [Content(id: "c1", title: "코스", thumbnailURLs: [], placeCount: 1)],
+                    hasNext: false,
+                    popularTags: []
+                )
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.onAppear)
+        await store.skipReceivedActions()
+
+        XCTAssertNil(store.state.toast)
+        XCTAssertFalse(store.state.isRefreshing)
+    }
+
+    func test_당겨서새로고침_세션만료는_토스트없이_sessionExpired만_올린다() async {
+        let store = TestStore(initialState: HomeFeature.State()) {
+            HomeFeature()
+        } withDependencies: {
+            $0.homeClient.home = { throw HomeError.unauthorized }
+            $0.homeClient.recentSavedPlaces = { _ in [.fixture(id: "1")] }
+            $0.profileClient.member = { UserProfile(nickname: "둘픽", iconID: 0, datePreference: nil) }
+            $0.exploreClient.contents = { _, _, _ in
+                ContentPage(
+                    items: [Content(id: "c1", title: "코스", thumbnailURLs: [], placeCount: 1)],
+                    hasNext: false,
+                    popularTags: []
+                )
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.refreshRequested)
+        await store.receive(\.homeLoadFailed)
+        await store.receive(\.delegate.sessionExpired)
+
+        XCTAssertNil(store.state.toast)
     }
 }

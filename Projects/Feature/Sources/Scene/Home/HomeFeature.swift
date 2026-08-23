@@ -1,5 +1,6 @@
 import Domain
 import Foundation
+import SharedDesignSystem
 import ThirdParty
 
 @Reducer
@@ -21,6 +22,9 @@ public struct HomeFeature {
         public var recommendations: [Content]
         public var pastSchedules: [DateSchedule]
         public var savedPlaces: [SavedPlace]
+        /// 당겨서 새로고침 중인지. 실패 알림을 이때만 낸다
+        public var isRefreshing = false
+        public var toast: ToastState?
         // 요약(GET /home) 로드 완료. 헤더·배너를 이 이후 실제로 그린다
         public var didLoadSummary = false
         // 최근 저장 장소 로드 완료(성공·실패 모두). 로딩과 빈 상태를 구분한다
@@ -63,6 +67,11 @@ public struct HomeFeature {
 
     public enum Action: Equatable {
         case onAppear
+        /// 사용자가 화면을 당겼다. onAppear 와 같은 것을 읽는다
+        case refreshRequested
+        case refreshFinished
+        case refreshFailed
+        case toastDismissed
         /// 커플 연결이 끝난 뒤 배너·헤더만 다시 받는다
         case reloadRequested
         case homeLoaded(HomeSummary)
@@ -114,6 +123,9 @@ public struct HomeFeature {
         case .onAppear:
             return .merge(loadHome(), loadSavedPlaces(), loadRecommendations())
 
+        case .refreshRequested, .refreshFinished, .refreshFailed, .toastDismissed:
+            return homeRefreshCore(state: &state, action: action)
+
         case .homeLoaded, .homeLoadFailed, .savedPlacesLoaded, .savedPlacesLoadFinished,
              .recommendationsLoaded, .recommendationsLoadFinished, .pastDatesLoaded:
             return handleLoadResponse(state: &state, action: action)
@@ -146,7 +158,7 @@ public struct HomeFeature {
             state.partnerName = summary.connected ? summary.partnerNickname : nil
             state.upcomingSchedule = summary.currentDateCourse
             // 지난 데이트는 연결됐을 때만 있다
-            return summary.connected ? loadPastDates() : .none
+            return summary.connected ? loadPastDates(notifiesFailure: state.isRefreshing) : .none
 
         case let .homeLoadFailed(error):
             // 실패해도 스켈레톤은 걷는다. 인증 만료만 상위로 올려 로그인으로 보낸다
@@ -154,7 +166,7 @@ public struct HomeFeature {
             if error == .unauthorized {
                 return .send(.delegate(.sessionExpired))
             }
-            return .none
+            return state.isRefreshing ? .send(.refreshFailed) : .none
 
         case let .savedPlacesLoaded(places):
             state.didLoadSaved = true
@@ -177,6 +189,36 @@ public struct HomeFeature {
 
         case let .pastDatesLoaded(schedules):
             state.pastSchedules = schedules
+            return .none
+
+        default:
+            return .none
+        }
+    }
+
+    private func homeRefreshCore(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .refreshRequested:
+            state.isRefreshing = true
+            return .merge(
+                loadHome(),
+                loadSavedPlaces(notifiesFailure: true),
+                loadRecommendations(notifiesFailure: true)
+            )
+
+        case .refreshFinished:
+            state.isRefreshing = false
+            return .none
+
+        case .refreshFailed:
+            // 셋이 다 실패해도 토스트는 하나다
+            if state.toast == nil {
+                state.toast = ToastState(message: "잠시 뒤 다시 시도해주세요")
+            }
+            return .none
+
+        case .toastDismissed:
+            state.toast = nil
             return .none
 
         default:
@@ -228,25 +270,29 @@ private extension HomeFeature {
         }
     }
 
-    private func loadSavedPlaces() -> Effect<Action> {
+    private func loadSavedPlaces(notifiesFailure: Bool = false) -> Effect<Action> {
         .run { [homeClient] send in
             // 실패 시 기존 섹션을 지우지 않도록 데이터는 그대로 두고, 완료만 알려 스켈레톤을 걷는다
             guard let places = try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount) else {
                 await send(.savedPlacesLoadFinished)
+                if notifiesFailure { await send(.refreshFailed) }
                 return
             }
             await send(.savedPlacesLoaded(places))
         }
     }
 
-    private func loadPastDates() -> Effect<Action> {
+    private func loadPastDates(notifiesFailure: Bool = false) -> Effect<Action> {
         .run { [homeClient] send in
-            guard let dates = try? await homeClient.pastDates(Self.pastDateCount) else { return }
+            guard let dates = try? await homeClient.pastDates(Self.pastDateCount) else {
+                if notifiesFailure { await send(.refreshFailed) }
+                return
+            }
             await send(.pastDatesLoaded(dates))
         }
     }
 
-    private func loadRecommendations() -> Effect<Action> {
+    private func loadRecommendations(notifiesFailure: Bool = false) -> Effect<Action> {
         .run { [profileClient, exploreClient] send in
             // datePreference 를 등록한 사용자만 취향(PREFERENCE) 정렬을 쓰고, 아니면 POPULAR
             let hasPreference = (try? await profileClient.member())?.datePreference != nil
@@ -254,6 +300,7 @@ private extension HomeFeature {
             // 실패 시 기존 추천은 그대로 두고, 완료만 알려 스켈레톤을 걷는다
             guard let page = try? await exploreClient.contents(sort, 0, Self.recommendationCount) else {
                 await send(.recommendationsLoadFinished)
+                if notifiesFailure { await send(.refreshFailed) }
                 return
             }
             await send(.recommendationsLoaded(page.items))

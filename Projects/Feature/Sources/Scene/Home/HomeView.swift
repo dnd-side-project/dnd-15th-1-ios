@@ -29,7 +29,24 @@ public struct HomeView: View {
             .ignoresSafeArea()
         }
         .toolbar(.hidden, for: .navigationBar)
+        .refreshable {
+            await store.send(.refreshRequested).finish()
+            store.send(.refreshFinished)
+        }
+        .tint(Color.commonWhite)
+        .toast(item: toastBinding)
         .task { store.send(.onAppear) }
+    }
+
+    private var toastBinding: Binding<ToastState?> {
+        Binding(
+            get: { store.toast },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.toastDismissed)
+                }
+            }
+        )
     }
 
     private var topSection: some View {
