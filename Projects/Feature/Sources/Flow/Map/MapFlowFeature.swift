@@ -145,11 +145,15 @@ public struct MapFlowFeature {
             return handle(courseDelegate: delegate, state: &state)
         case let .courseResult(.delegate(delegate)):
             return handle(courseResultDelegate: delegate, state: &state)
+        case let .courseEdit(.delegate(delegate)):
+            return handle(courseEditDelegate: delegate, state: &state)
+        case let .coursePlaceAdd(.delegate(delegate)):
+            return handle(coursePlaceAddDelegate: delegate, state: &state)
         case let .placeSearch(.delegate(delegate)):
             return handle(searchDelegate: delegate, state: &state)
         case .detail, .alias, .postDetail:
             return handleChild(state: &state, action: action)
-        case .map, .course, .courseResult, .placeSearch, .delegate:
+        case .map, .course, .courseResult, .courseEdit, .coursePlaceAdd, .placeSearch, .delegate:
             return .none
         }
     }
@@ -168,6 +172,8 @@ private extension MapFlowFeature {
                 .send(.map(.searchClearTapped)),
                 .send(.map(.filtersReset))
             )
+        case .finishReturnToPreviousTab:
+            return finishReturnToPreviousTab(state: &state)
         case let .map(.delegate(delegate)):
             return handle(mapDelegate: delegate, state: &state)
         case let .course(.delegate(delegate)):

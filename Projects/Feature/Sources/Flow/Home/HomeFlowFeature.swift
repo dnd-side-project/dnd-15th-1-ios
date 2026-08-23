@@ -251,6 +251,9 @@ private extension HomeFlowFeature {
         switch courseDelegate {
         case .placePickRequested:
             return applyPath(state.path + [.coursePlacePick], state: &state)
+        case .placesPicked:
+            // 홈 만들기는 고르기 모드를 안 쓴다. 고르기는 지도 수정 흐름이 받는다
+            return .none
         case .dismissed:
             var next = state.path
             // 코스 화면이 스스로 닫는 신호라, 맨 위가 코스 경로일 때만 뺀다
