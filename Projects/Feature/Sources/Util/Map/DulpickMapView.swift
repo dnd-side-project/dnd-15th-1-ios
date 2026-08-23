@@ -599,10 +599,9 @@ private extension DulpickMapView {
         static let routeWidth: UInt = 4
         /// 시안 c01. 흰 외곽은 칠의 한 쪽 약 1
         static let routeStrokeWidth: UInt = 1
-        static let routeArrowWidth: CGFloat = 2.7
         /// 선 두께(4)보다 작아 선 안에 들어간다
-        static let routeArrowHeight: CGFloat = 2.2
-        static let routeArrowSpacing: CGFloat = 35
+        static let routeDotDiameter: CGFloat = 2.2
+        static let routeDotSpacing: CGFloat = 35
     }
 
     static func makeRouteStyleSet() -> RouteStyleSet {
@@ -624,11 +623,8 @@ private extension DulpickMapView {
         // 시작·끝을 고정하면 번호 핀과 겹친다. 짧은 구간은 SDK 가 가운데에 하나 두는지 실기기에서 본다
         styleSet.addPattern(
             RoutePattern(
-                pattern: MapMarkerSymbol.routeDirectionImage(
-                    width: Layout.routeArrowWidth,
-                    height: Layout.routeArrowHeight
-                ),
-                distance: KakaoMapMetrics.pixels(Layout.routeArrowSpacing),
+                pattern: MapMarkerSymbol.routeDotImage(diameter: Layout.routeDotDiameter),
+                distance: KakaoMapMetrics.pixels(Layout.routeDotSpacing),
                 symbol: nil,
                 pinStart: false,
                 pinEnd: false
@@ -733,22 +729,15 @@ enum MapMarkerSymbol {
         circle(diameter: 18, fill: userLocationColor, text: nil)
     }
 
-    // 경로 진행 방향. +x 가 진행 쪽이라고 보고 오른쪽을 가리킨다
-    static func routeDirectionImage(width: CGFloat, height: CGFloat) -> UIImage {
-        let size = CGSize(width: width, height: height)
+    // 경로선 위에 일정 간격으로 찍히는 점. SDK 가 선을 따라 반복해 그린다
+    static func routeDotImage(diameter: CGFloat) -> UIImage {
+        let size = CGSize(width: diameter, height: diameter)
         let format = UIGraphicsImageRendererFormat()
         format.scale = KakaoMapMetrics.imageScale
 
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
-            let path = CGMutablePath()
-            path.move(to: CGPoint(x: width, y: height / 2))
-            path.addLine(to: CGPoint(x: 0, y: 0))
-            path.addLine(to: CGPoint(x: 0, y: height))
-            path.closeSubpath()
-
-            context.cgContext.addPath(path)
             UIColor.white.setFill()
-            context.cgContext.fillPath()
+            context.cgContext.fillEllipse(in: CGRect(origin: .zero, size: size))
         }
     }
 
