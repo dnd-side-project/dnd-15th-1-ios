@@ -1,4 +1,5 @@
 import Domain
+import SharedDesignSystem
 import SharedLogger
 import SwiftUI
 import ThirdPartyUI
@@ -211,22 +212,7 @@ extension DulpickMapView {
             )
 
             let routeManager = map.getRouteManager()
-            routeManager.addRouteStyleSet(
-                RouteStyleSet(
-                    styleID: Layout.routeStyleID,
-                    styles: [
-                        RouteStyle(styles: [
-                            PerLevelRouteStyle(
-                                width: 14,
-                                color: MapMarkerSymbol.routeColor,
-                                strokeWidth: 3,
-                                strokeColor: .white,
-                                level: 0
-                            ),
-                        ]),
-                    ]
-                )
-            )
+            routeManager.addRouteStyleSet(DulpickMapView.makeRouteStyleSet())
             _ = routeManager.addRouteLayer(layerID: Layout.routeLayerID, zOrder: 1_000)
         }
 
@@ -587,6 +573,20 @@ extension DulpickMapView.Coordinator: @preconcurrency KakaoMapEventDelegate {
 
 // MARK: - 내부 상수
 
+/// 카카오 지도 SDK 는 입력 px 에 `UIScreen.main.scale / 2` 를 곱한다.
+/// 2x 기준으로 넘기면 기기와 관계없이 의도한 pt 가 된다
+private enum KakaoMapMetrics {
+    static let imageScale: CGFloat = 2
+
+    static func pixels(_ points: UInt) -> UInt {
+        UInt(CGFloat(points) * imageScale)
+    }
+
+    static func pixels(_ points: CGFloat) -> Float {
+        Float(points * imageScale)
+    }
+}
+
 private extension DulpickMapView {
     enum Layout {
         static let viewName = "dulpick.map"
@@ -595,20 +595,55 @@ private extension DulpickMapView {
         static let userLocationStyleID = "dulpick.map.style.userLocation"
         static let routeLayerID = "dulpick.map.route"
         static let routeStyleID = "dulpick.map.style.route"
+        /// 시안 c01. 물방울 폭 26 을 자로 재면 칠이 약 4
+        static let routeWidth: UInt = 4
+        /// 시안 c01. 흰 외곽은 칠의 한 쪽 약 1
+        static let routeStrokeWidth: UInt = 1
+        /// 선 두께(4)보다 작아 선 안에 들어간다
+        static let routeDotDiameter: CGFloat = 2.2
+        static let routeDotSpacing: CGFloat = 35
+    }
+
+    static func makeRouteStyleSet() -> RouteStyleSet {
+        let styleSet = RouteStyleSet(
+            styleID: Layout.routeStyleID,
+            styles: [
+                RouteStyle(styles: [
+                    PerLevelRouteStyle(
+                        width: KakaoMapMetrics.pixels(Layout.routeWidth),
+                        color: MapMarkerSymbol.routeColor,
+                        strokeWidth: KakaoMapMetrics.pixels(Layout.routeStrokeWidth),
+                        strokeColor: .white,
+                        level: 0,
+                        patternIndex: 0
+                    ),
+                ]),
+            ]
+        )
+        // 시작·끝을 고정하면 번호 핀과 겹친다. 짧은 구간은 SDK 가 가운데에 하나 두는지 실기기에서 본다
+        styleSet.addPattern(
+            RoutePattern(
+                pattern: MapMarkerSymbol.routeDotImage(diameter: Layout.routeDotDiameter),
+                distance: KakaoMapMetrics.pixels(Layout.routeDotSpacing),
+                symbol: nil,
+                pinStart: false,
+                pinEnd: false
+            )
+        )
+        return styleSet
     }
 }
 
 // MARK: - 기본 마커 심볼
 
-/// `place` `numbered` 는 여기서 그린 최소 심볼을 쓴다.
-/// 고른 장소(`selected`)와 코스 후보(`candidate`)는 `MapPlacePin` 을 얹는다.
+/// `place` 는 여기서 그린 최소 심볼을 쓴다.
+/// 고른 장소(`selected`)·코스 후보(`candidate`)·코스 번호(`numbered`)는 `MapPlacePin` 을 얹는다.
 /// 저장한 장소 핀(`category`)은 시안 에셋을 20 으로 줄여 쓴다.
 @MainActor
-private enum MapMarkerSymbol {
-    static let routeColor = UIColor(red: 0.98, green: 0.31, blue: 0.44, alpha: 1.0)
+enum MapMarkerSymbol {
+    static let routeColor = SharedDesignSystemAsset.brandPrimary.color
 
     private static let placeColor = UIColor(red: 0.98, green: 0.31, blue: 0.44, alpha: 1.0)
-    private static let selectedColor = UIColor(red: 0.14, green: 0.14, blue: 0.16, alpha: 1.0)
     private static let userLocationColor = UIColor(red: 0.16, green: 0.47, blue: 0.96, alpha: 1.0)
 
     /// 그림자 radius 2 + offsetY 1 을 담는 여백
@@ -634,7 +669,7 @@ private enum MapMarkerSymbol {
         case .selected:
             rendered(MapPlacePin(content: .selected))
         case let .numbered(number):
-            circle(diameter: 28, fill: selectedColor, text: "\(number)")
+            rendered(MapPlacePin(content: .number(number)))
         case let .category(category):
             resized(category.pin, to: categoryPinSide)
         case .candidate:
@@ -642,13 +677,16 @@ private enum MapMarkerSymbol {
         }
     }
 
-    /// 저장한 장소 핀. 에셋은 24 로 그려져 있고 시안 대조에서 20 으로 정했다.
-    /// 에셋을 고치면 일곱 카테고리와 다른 화면까지 같이 바뀌어 여기서 줄인다
-    private static let categoryPinSide: CGFloat = 20
+    /// 저장한 장소 핀. 에셋 상자 24 안에 흰 원 20 · 컬러 원 16 이 들어 있고
+    /// 남는 자리는 SVG 에 구워진 그림자 몫이다. 상자를 줄이면 안쪽 원도 같이 줄어
+    /// 시안(컬러 원 16)과 어긋난다. 그래서 원본 크기 그대로 쓴다
+    private static let categoryPinSide: CGFloat = 24
 
     private static func resized(_ image: UIImage, to side: CGFloat) -> UIImage {
         let size = CGSize(width: side, height: side)
-        return UIGraphicsImageRenderer(size: size).image { _ in
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = KakaoMapMetrics.imageScale
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
             image.draw(in: CGRect(origin: .zero, size: size))
         }
     }
@@ -668,11 +706,11 @@ private enum MapMarkerSymbol {
     /// 원형 마커는 중심이 좌표다. 물방울은 뾰족한 아래 끝이 좌표다.
     static func anchorPoint(for kind: MapMarker.Kind) -> CGPoint {
         switch kind {
-        case .selected, .candidate:
+        case .selected, .candidate, .numbered:
             // 그림자 여백만큼 이미지가 커졌다. 1.0 을 주면 끝이 좌표보다 그만큼 위에 앉는다
             CGPoint(x: 0.5, y: (pinShadowInset + pinHeight) / (pinShadowInset * 2 + pinHeight))
         // default 를 쓰지 않는다. 물방울 심볼이 늘면 여기서 컴파일이 막혀야 한다
-        case .place, .numbered, .category:
+        case .place, .category:
             CGPoint(x: 0.5, y: 0.5)
         }
     }
@@ -683,7 +721,7 @@ private enum MapMarkerSymbol {
     /// `ImageRenderer` 는 프레임까지만 그리므로 여백을 둘러 잘리지 않게 한다.
     private static func rendered(_ view: some View) -> UIImage {
         let renderer = ImageRenderer(content: view.padding(pinShadowInset))
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = KakaoMapMetrics.imageScale
         return renderer.uiImage ?? UIImage()
     }
 
@@ -691,11 +729,25 @@ private enum MapMarkerSymbol {
         circle(diameter: 18, fill: userLocationColor, text: nil)
     }
 
+    // 경로선 위에 일정 간격으로 찍히는 점. SDK 가 선을 따라 반복해 그린다
+    static func routeDotImage(diameter: CGFloat) -> UIImage {
+        let size = CGSize(width: diameter, height: diameter)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = KakaoMapMetrics.imageScale
+
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.white.setFill()
+            context.cgContext.fillEllipse(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
     private static func circle(diameter: CGFloat, fill: UIColor, text: String?) -> UIImage {
         let ringWidth: CGFloat = 3
         let size = CGSize(width: diameter + ringWidth * 2, height: diameter + ringWidth * 2)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = KakaoMapMetrics.imageScale
 
-        return UIGraphicsImageRenderer(size: size).image { context in
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
             let outer = CGRect(origin: .zero, size: size)
             UIColor.white.setFill()
             context.cgContext.fillEllipse(in: outer)

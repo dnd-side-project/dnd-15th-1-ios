@@ -7,16 +7,40 @@
 
 import Foundation
 
-/// `walkToNext` 와 `places` 는 담지 않는다. `POST /api/v1/date-courses` 는
-/// 장소 없는 DRAFT 를 만들어서 늘 빈 배열이고, 담을 곳인 `CourseLeg` 가
-/// 명세와 단위·위치가 어긋난다. DND-52 가 실제 응답을 보며 고친다
 struct DateCourseResponseDTO: Decodable, Sendable {
     let dateCourseId: Int
     let title: String
     let date: String
-    let time: String
+    let time: String?
     let status: String
     let version: Int
+    let totalPlaceCount: Int?
+    let places: [DateCoursePlaceResponseDTO]?
+}
+
+struct DateCoursePlaceResponseDTO: Decodable, Sendable {
+    let order: Int
+    let placeId: Int64
+    let name: String
+    let address: String?
+    let roadAddress: String?
+    let latitude: Double
+    let longitude: Double
+    let category: String?
+    let categoryName: String?
+    let thumbnailUrl: String?
+    let imageUrls: [String]?
+    let walkToNext: WalkToNextResponseDTO?
+}
+
+struct WalkToNextResponseDTO: Decodable, Sendable {
+    let distanceMeters: Int
+    let durationSeconds: Int
+}
+
+struct DateCoursePartnerNotifyResponseDTO: Decodable, Sendable {
+    let notified: Bool
+    let partnerMemberId: Int64
 }
 
 struct DateCoursePlacePoolResponseDTO: Decodable, Sendable {

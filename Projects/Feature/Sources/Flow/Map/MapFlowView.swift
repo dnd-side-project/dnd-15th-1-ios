@@ -27,12 +27,11 @@ public struct MapFlowView: View {
         }
     }
 
-    // 목적지 화면은 각 Cycle 이 자기 PR 에서 채운다. 그때까지 어느 경로가 밀렸는지만 보인다
     @ViewBuilder
     private func destination(_ route: MapFlowFeature.Route) -> some View {
         switch route {
         case .postDetail:
-            Text("게시글 상세 화면 준비 중 — Cycle 7")
+            Text("게시글 상세 화면 준비 중")
         case .search:
             if let searchStore = store.scope(state: \.placeSearch, action: \.placeSearch) {
                 PlaceSearchView(store: searchStore)
@@ -41,6 +40,8 @@ public struct MapFlowView: View {
             if let courseStore { CourseDateView(store: courseStore) }
         case .coursePlacePick:
             if let courseStore { CoursePlacePickView(store: courseStore) }
+        case .courseResult:
+            if let courseResultStore { CourseResultView(store: courseResultStore) }
         }
     }
 
@@ -50,6 +51,10 @@ public struct MapFlowView: View {
 
     private var courseStore: StoreOf<CourseFeature>? {
         store.scope(state: \.course, action: \.course)
+    }
+
+    private var courseResultStore: StoreOf<CourseResultFeature>? {
+        store.scope(state: \.courseResult, action: \.courseResult)
     }
 
     // 지도 목적지 스택은 MapFlowFeature 가 소유하고, NavigationStack 이 그 path 를 그대로 민다

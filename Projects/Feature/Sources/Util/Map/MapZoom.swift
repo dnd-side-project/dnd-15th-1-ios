@@ -4,19 +4,22 @@ import Foundation
 
 /// 코스 결과 화면이 쓰는 줌 계산.
 ///
-/// 지도 SDK 없이 도는 순수 계산이다. `Cycle 5` 가 코스 결과 화면에서 `DulpickMapView` 를 통해 부른다. 이 Cycle 에는 부르는 곳이 없다.
+/// 지도 SDK 없이 도는 순수 계산이다.
 /// KakaoMapsSDK 의 zoomLevel 은 웹 메르카토르 z 와 같은 뜻이다 — 한 단계 오르면 축척이 두 배다.
 enum MapZoom {
 
     /// 더 줌아웃하지 않는 바닥. 여기 닿으면 일부 장소가 화면 밖에 남는다
     static let lowerBound = 6
 
+    /// `DulpickMapView` 가 시트 윗면에 초점을 두는 비율. 그 값은 private 이라 여기서 쓴다
+    static let mapFocusRatio: CGFloat = 0.65
+
     /// 지도 타일 한 장의 픽셀 크기
     private static let tileSize: Double = 256
 
-    /// anchor 를 화면 한가운데에 둔 채, 모든 좌표가 보이는 영역에 들어오는 가장 큰 줌.
+    /// anchor 를 `focusRatio` 자리에 둔 채, 모든 좌표가 보이는 영역에 들어오는 가장 큰 줌.
     ///
-    /// anchor 가 중심이므로 반지름은 anchor 에서 가장 먼 점까지다.
+    /// 기본 `focusRatio` 0.5 는 한가운데다. 남북은 초점 위·아래 여유를 따로 잰다.
     /// 코스 한가운데를 중심으로 잡는 것보다 더 많이 줌아웃한다. 그 대가는 스펙 2절이 적었다.
     ///
     /// - Parameters:
@@ -24,33 +27,39 @@ enum MapZoom {
     ///   - visibleHeight: 시트 위에 보이는 세로 픽셀. 화면 전체가 아니다
     ///   - maximum: 이보다 더 당기지 않는다
     ///   - minimum: 이보다 더 밀지 않는다
+    ///   - focusRatio: 보이는 띠 맨 위가 0, 맨 아래가 1. 기본은 한가운데
     static func fit(
         coordinates: [Coordinate],
         anchor: Coordinate,
         viewWidth: CGFloat,
         visibleHeight: CGFloat,
         maximum: Int,
-        minimum: Int = lowerBound
+        minimum: Int = lowerBound,
+        focusRatio: CGFloat = 0.5
     ) -> Int {
         guard maximum >= minimum else { return maximum }
         guard viewWidth > 0, visibleHeight > 0 else { return maximum }
+        guard focusRatio > 0, focusRatio < 1 else { return maximum }
 
-        // anchor 가 한가운데라 담아야 할 폭은 가장 먼 점까지의 두 배다
-        var halfSpanX: Double = 0
-        var halfSpanY: Double = 0
+        var west: Double = 0
+        var east: Double = 0
+        var north: Double = 0
+        var south: Double = 0
         let anchorPoint = normalized(anchor)
 
         for coordinate in coordinates {
             let point = normalized(coordinate)
-            halfSpanX = max(halfSpanX, abs(point.x - anchorPoint.x))
-            halfSpanY = max(halfSpanY, abs(point.y - anchorPoint.y))
+            let dx = point.x - anchorPoint.x
+            let dy = point.y - anchorPoint.y
+            if dx >= 0 { east = max(east, dx) } else { west = max(west, -dx) }
+            if dy >= 0 { south = max(south, dy) } else { north = max(north, -dy) }
         }
 
-        guard halfSpanX > 0 || halfSpanY > 0 else { return maximum }
+        guard west > 0 || east > 0 || north > 0 || south > 0 else { return maximum }
 
         // 정규 좌표 1.0 이 곧 세계 한 바퀴다. 줌 z 에서 세계는 tileSize * 2^z 픽셀이다
-        let spanX = halfSpanX * 2
-        let spanY = halfSpanY * 2
+        let spanX = max(west, east) * 2
+        let spanY = max(north / Double(focusRatio), south / Double(1 - focusRatio))
 
         var best = minimum
         for level in stride(from: maximum, through: minimum, by: -1) {

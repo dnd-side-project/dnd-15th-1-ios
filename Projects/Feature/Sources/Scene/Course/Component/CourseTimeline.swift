@@ -32,7 +32,7 @@ private enum CourseTimelineMetric {
     /// 장소명 타이포. 배지 세로 위치를 이 줄 높이에 맞추므로 한곳에서 읽는다
     static let stopNameTypography: Typography = .headline
     static let warningIconSize: CGFloat = 13
-    static let warningCornerRadius: CGFloat = 6
+    static let warningCornerRadius: CGFloat = 4
     static let dividerHeight: CGFloat = 1
 }
 
@@ -41,7 +41,7 @@ private enum CourseTimelineMetric {
 /// 코스 순서를 위에서 아래로 잇는 타임라인.
 ///
 /// 번호 배지 사이를 빨강 점선으로 잇고, 사이마다 이동 구간을 한 줄 끼운다.
-/// `legs` 는 `stops` 보다 하나 적다. 모자라면 그 구간은 그려지지 않는다.
+/// `legs` 는 `stops` 보다 하나 적다. 값이 없어도 구간 행은 그려서 점선이 끊기지 않게 한다.
 /// 좌우 여백은 호출부가 넣는다.
 ///
 /// ```swift
@@ -60,10 +60,10 @@ struct CourseTimeline: View {
     var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
-                stopRow(stop, number: index + 1, isLast: isLast(index))
+                stopRow(stop, number: index + 1, isFirst: index == 0, isLast: isLast(index))
 
-                if let leg = leg(after: index) {
-                    legRow(leg)
+                if !isLast(index) {
+                    legRow(leg(after: index) ?? CourseLeg(duration: "", distance: "", isLong: false))
                 }
             }
         }
@@ -89,11 +89,15 @@ private extension CourseTimeline {
 
 private extension CourseTimeline {
 
-    func stopRow(_ stop: CourseStop, number: Int, isLast: Bool) -> some View {
+    func stopRow(_ stop: CourseStop, number: Int, isFirst: Bool, isLast: Bool) -> some View {
         row {
-            VStack(spacing: Spacing.s4) {
+            VStack(spacing: 0) {
+                if !isFirst {
+                    connector
+                        .frame(height: Spacing.s24)
+                        .padding(.top, -Spacing.s24)
+                }
                 numberBadge(number)
-
                 if !isLast {
                     connector
                 }
@@ -132,14 +136,19 @@ private extension CourseTimeline {
                 connector
             }
         } content: {
+            // 시안은 셋이 한 줄이다. 폭이 모자라도 접지 않고 자연 폭을 지킨다
             HStack(spacing: Spacing.s8) {
                 Text(leg.duration)
                     .typography(.body2M)
                     .foregroundStyle(Color.textSecondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
 
                 Text(leg.distance)
                     .typography(.caption1R)
                     .foregroundStyle(Color.textTertiary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
 
                 if leg.isLong {
                     longLegBadge
@@ -225,6 +234,8 @@ private extension CourseTimeline {
 
             Text("이동이 긴 구간입니다")
                 .typography(.caption2M)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .foregroundStyle(Color.statusError)
         .padding(.horizontal, Spacing.s8)
@@ -286,6 +297,15 @@ private struct CourseTimelinePreviewHost: View {
     CourseTimelinePreviewHost(
         stops: [.preview(0)],
         legs: []
+    )
+}
+
+// 시간·거리가 가장 길 때. 셋이 `fixedSize` 라 폭이 모자라면 접히지 않고 오른쪽으로 넘친다.
+// 넘치는지 눈으로 보려고 둔다
+#Preview("구간 폭 한계") {
+    CourseTimelinePreviewHost(
+        stops: [.preview(0), .preview(1)],
+        legs: [CourseLeg(duration: "도보 10시간 20분", distance: "123.4 km", isLong: true)]
     )
 }
 #endif

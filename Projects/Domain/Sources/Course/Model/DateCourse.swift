@@ -10,8 +10,8 @@ public struct DateCourse: Equatable, Identifiable, Sendable {
     public let version: Int
     /// 방문 순서대로. 번호 배지가 이 순서를 따른다
     public let stops: [CourseStop]
-    /// 서버가 계산해 보낸 구간 값. 항상 `stops.count - 1` 개
-    public let legs: [CourseLeg]
+    /// 서버가 계산해 보낸 구간 값. 항상 `stops.count - 1` 개. 못 받은 구간은 nil
+    public let legs: [CourseLeg?]
 
     public init(
         id: String,
@@ -20,7 +20,7 @@ public struct DateCourse: Equatable, Identifiable, Sendable {
         status: CourseStatus,
         version: Int,
         stops: [CourseStop],
-        legs: [CourseLeg]
+        legs: [CourseLeg?]
     ) {
         self.id = id
         self.title = title
@@ -33,6 +33,10 @@ public struct DateCourse: Equatable, Identifiable, Sendable {
 }
 
 public extension DateCourse {
-    var totalWalkingMinutes: Int { legs.reduce(0) { $0 + $1.walkingMinutes } }
-    var totalDistanceMeters: Int { legs.reduce(0) { $0 + $1.distanceMeters } }
+    var totalWalkingMinutes: Int {
+        legs.compactMap(\.self).reduce(0) { $0 + $1.walkingMinutes }
+    }
+    var totalDistanceMeters: Int {
+        legs.compactMap(\.self).reduce(0) { $0 + $1.distanceMeters }
+    }
 }

@@ -22,4 +22,16 @@ public struct CourseRemoteDataSource: Sendable {
     func placePool() async throws -> DateCoursePlacePoolResponseDTO {
         try await networkClient.request(CourseEndpoint.placePool)
     }
+
+    func detail(id: String) async throws -> DateCourseResponseDTO {
+        try await networkClient.request(CourseEndpoint.detail(id))
+    }
+
+    func save(id: String, body: SaveDateCourseRequestDTO) async throws -> DateCourseResponseDTO {
+        try await networkClient.request(CourseEndpoint.save(id, body))
+    }
+
+    func notifyPartner(id: String) async throws -> DateCoursePartnerNotifyResponseDTO {
+        try await networkClient.request(CourseEndpoint.notifyPartner(id))
+    }
 }

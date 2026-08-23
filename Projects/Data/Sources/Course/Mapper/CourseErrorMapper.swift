@@ -30,7 +30,9 @@ enum CourseErrorMapper {
             return .unauthorized
         case .notFound:
             return .notFound
-        case .badRequest, .forbidden, .conflict, .clientError, .serverError,
+        case .conflict:
+            return .conflict
+        case .badRequest, .forbidden, .clientError, .serverError,
              .decodingFailed, .invalidResponse, .invalidURL:
             return .unknown
         }

@@ -50,6 +50,16 @@ public struct CoursePlacePickView: View {
         // 네비바가 있으면 안전영역이 늘어 시트가 그만큼 내려앉는다
         .toolbar(.hidden, for: .navigationBar)
         .task { store.send(.onAppear) }
+        .alert(
+            store.conflictAlertMessage ?? "",
+            isPresented: Binding(
+                get: { store.conflictAlertMessage != nil },
+                set: { if !$0 { store.send(.conflictAlertDismissed) } }
+            )
+        ) {
+            Button("확인", role: .cancel) { store.send(.conflictAlertDismissed) }
+        }
+        .toast(item: toastBinding)
     }
 }
 
@@ -288,6 +298,17 @@ private extension CoursePlacePickView {
                 // 리듀서가 같은 값 재탭을 해제로 읽는다. 드롭다운은 늘 그 값으로 놓아야 한다
                 if store.selectedCategory != category {
                     store.send(.categoryTapped(category))
+                }
+            }
+        )
+    }
+
+    var toastBinding: Binding<ToastState?> {
+        Binding(
+            get: { store.toast },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.toastDismissed)
                 }
             }
         )

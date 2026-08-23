@@ -24,6 +24,14 @@ enum CourseDateFormat {
         String(format: "%02d:%02d:00", time.hour ?? 0, time.minute ?? 0)
     }
 
+    static func dateText(_ date: Date) -> String {
+        dateText(seoulComponents([.year, .month, .day], from: date))
+    }
+
+    static func timeText(_ date: Date) -> String {
+        timeText(seoulComponents([.hour, .minute], from: date))
+    }
+
     /// "yyyy-MM-dd" + "HH:mm:ss" -> Date. 못 읽으면 nil.
     /// 서버가 초 0 이면 초를 생략해 보내서 두 형식을 다 받는다
     static func date(from date: String, time: String) -> Date? {
@@ -44,5 +52,15 @@ enum CourseDateFormat {
         }
 
         return nil
+    }
+
+    private static func seoulComponents(
+        _ components: Set<Calendar.Component>,
+        from date: Date
+    ) -> DateComponents {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        calendar.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .gmt
+        return calendar.dateComponents(components, from: date)
     }
 }

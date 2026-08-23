@@ -40,7 +40,10 @@ public struct CourseFeature {
         /// 낙관적 락 번호. 서버 응답 값을 그대로 들고 다닌다
         public var version: Int?
         public var isCreatingCourse = false
+        public var isSavingCourse = false
         public var toast: ToastState?
+        /// 409 를 받은 뒤 최신 코스를 다시 읽었을 때 띄우는 짧은 알림
+        public var conflictAlertMessage: String?
 
         // 장소 화면
         public var places: [CoursePlaceCandidate] = []
@@ -66,7 +69,10 @@ public struct CourseFeature {
         case coursePlacesResponse(Result<[CoursePlaceCandidate], CourseError>)
         case coupleResponse(CoupleStatus?)
         case courseCreated(Result<DateCourse, CourseError>)
+        case courseSaved(Result<DateCourse, CourseError>)
+        case conflictReloaded(Result<DateCourse, CourseError>)
         case toastDismissed
+        case conflictAlertDismissed
 
         // 날짜 화면
         case dateFieldTapped
@@ -90,15 +96,8 @@ public struct CourseFeature {
 
         @CasePathable
         public enum Delegate: Equatable {
-            /// 날짜와 시간을 합치지 않고 그대로 올린다.
-            /// 서버 명세가 없어 `Date` 로 만드는 자리를 Cycle 5 로 미룬다
-            case buildRequested(
-                dateCourseID: String,
-                version: Int,
-                date: DateComponents,
-                time: DateComponents?,
-                placeIDs: [String]
-            )
+            /// 확정 저장된 코스. 결과 화면이 받아 그린다
+            case buildRequested(DateCourse)
             case placePickRequested(dateCourseID: String)
             case dismissed
             case sessionExpired
@@ -109,6 +108,8 @@ public struct CourseFeature {
         case load
         case couple
         case createCourse
+        case saveCourse
+        case reloadCourse
     }
 
     @Dependency(\.courseClient) var courseClient
@@ -130,8 +131,10 @@ public struct CourseFeature {
             return updateDate(state: &state, action: action)
         case .ownershipSelected, .categoryTapped, .rowTapped, .markerTapped, .cameraChanged:
             return updatePlace(state: &state, action: action)
-        case .backTapped, .buildTapped:
+        case .backTapped:
             return raise(state: &state, action: action)
+        case .buildTapped, .courseSaved, .conflictReloaded, .conflictAlertDismissed:
+            return save(state: &state, action: action)
         case .delegate:
             return .none
         }
@@ -280,31 +283,130 @@ private extension CourseFeature {
     func raise(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .backTapped:
-            return .send(.delegate(.dismissed))
-
-        case .buildTapped:
-            guard let dateCourseID = state.dateCourseID,
-                  let version = state.version,
-                  let date = state.date,
-                  !state.selectedPlaceIDs.isEmpty else {
-                return .none
-            }
-            return .send(
-                .delegate(
-                    .buildRequested(
-                        dateCourseID: dateCourseID,
-                        version: version,
-                        date: date,
-                        time: state.time,
-                        placeIDs: state.selectedPlaceIDs
-                    )
-                )
+            // 장소 선택을 벗어나도 저장 응답이 결과를 열지 않게 끊는다
+            state.isSavingCourse = false
+            state.conflictAlertMessage = nil
+            return .merge(
+                .cancel(id: CancelID.saveCourse),
+                .cancel(id: CancelID.reloadCourse),
+                .send(.delegate(.dismissed))
             )
 
         default:
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
+    }
+
+    func save(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .buildTapped:
+            return startSaveCourse(state: &state)
+
+        case let .courseSaved(.success(course)):
+            state.isSavingCourse = false
+            // 낡은 값으로 다시 저장하지 않게 한다
+            state.version = course.version
+            return .send(.delegate(.buildRequested(course)))
+
+        case let .courseSaved(.failure(error)):
+            if error == .unauthorized {
+                state.isSavingCourse = false
+                return .send(.delegate(.sessionExpired))
+            }
+            if error == .conflict {
+                guard let id = state.dateCourseID else {
+                    state.isSavingCourse = false
+                    state.toast = ToastState(message: "잠시 뒤 다시 시도해주세요")
+                    return .none
+                }
+                // 그냥 재시도하지 않는다. 최신 코스를 읽고 사용자에게 알린다
+                return reloadCourse(id: id)
+            }
+            state.isSavingCourse = false
+            state.toast = ToastState(message: "잠시 뒤 다시 시도해주세요")
+            return .none
+
+        case let .conflictReloaded(.success(course)):
+            state.isSavingCourse = false
+            state.version = course.version
+            state.conflictAlertMessage = "상대방이 코스를 먼저 바꿨어요. 다시 확인해주세요"
+            return .none
+
+        case let .conflictReloaded(.failure(error)):
+            state.isSavingCourse = false
+            guard error != .unauthorized else {
+                return .send(.delegate(.sessionExpired))
+            }
+            state.toast = ToastState(message: "잠시 뒤 다시 시도해주세요")
+            return .none
+
+        case .conflictAlertDismissed:
+            state.conflictAlertMessage = nil
+            return .none
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    func startSaveCourse(state: inout State) -> Effect<Action> {
+        guard let dateCourseID = state.dateCourseID,
+              let version = state.version,
+              let date = state.date,
+              !state.selectedPlaceIDs.isEmpty,
+              !state.isSavingCourse else {
+            return .none
+        }
+        state.isSavingCourse = true
+
+        let time = state.time ?? State.defaultTime
+        let title = DateCourseTitle.make(date: date)
+        let scheduledAt = Self.scheduledAt(date: date, time: time)
+        let placeIDs = state.selectedPlaceIDs
+
+        return .run { [courseClient] send in
+            do {
+                let course = try await courseClient.updateCourse(
+                    dateCourseID,
+                    title,
+                    scheduledAt,
+                    placeIDs,
+                    version
+                )
+                await send(.courseSaved(.success(course)))
+            } catch let error as CourseError {
+                await send(.courseSaved(.failure(error)))
+            } catch {
+                await send(.courseSaved(.failure(.unknown)))
+            }
+        }
+        .cancellable(id: CancelID.saveCourse, cancelInFlight: true)
+    }
+
+    func reloadCourse(id: String) -> Effect<Action> {
+        .run { [courseClient] send in
+            do {
+                let course = try await courseClient.course(id)
+                await send(.conflictReloaded(.success(course)))
+            } catch let error as CourseError {
+                await send(.conflictReloaded(.failure(error)))
+            } catch {
+                await send(.conflictReloaded(.failure(.unknown)))
+            }
+        }
+        .cancellable(id: CancelID.reloadCourse, cancelInFlight: true)
+    }
+
+    /// `createCourse` 는 날짜·시간을 나눠 보내고, 저장은 `Date` 하나로 보낸다
+    static func scheduledAt(date: DateComponents, time: DateComponents) -> Date {
+        var merged = date
+        merged.hour = time.hour
+        merged.minute = time.minute
+        merged.second = 0
+        merged.timeZone = TimeZone(identifier: "Asia/Seoul")
+        return Calendar(identifier: .gregorian).date(from: merged) ?? Date.distantPast
     }
 
     func loadPlaces() -> Effect<Action> {
@@ -418,7 +520,7 @@ public extension CourseFeature.State {
         selectedCount == 0 ? "장소를 선택해주세요" : "\(selectedCount)곳으로 코스짜기"
     }
 
-    var isCTAEnabled: Bool { selectedCount >= 1 }
+    var isCTAEnabled: Bool { selectedCount >= 1 && !isSavingCourse }
 
     var isEmpty: Bool { loadState == .loaded && filteredPlaces.isEmpty }
 

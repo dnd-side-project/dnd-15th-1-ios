@@ -22,11 +22,15 @@ final class CourseErrorMapperTests: XCTestCase {
         XCTAssertEqual(mapped, .notFound)
     }
 
+    func test_409는_conflict로_바뀐다() {
+        let error = NetworkError.conflict(message: nil)
+        XCTAssertEqual(CourseErrorMapper.map(error), .conflict)
+    }
+
     func test_나머지_상태는_unknown으로_묶는다() {
         let errors: [NetworkError] = [
             .badRequest(message: nil),
             .forbidden(message: nil),
-            .conflict(message: nil),
             .clientError(statusCode: 418, message: nil),
             .serverError(statusCode: 500, message: nil),
             .decodingFailed,

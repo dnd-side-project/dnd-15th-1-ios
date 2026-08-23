@@ -11,6 +11,9 @@ import Foundation
 enum CourseEndpoint: APIEndpoint {
     case create(CreateDateCourseRequestDTO)
     case placePool
+    case detail(String)
+    case save(String, SaveDateCourseRequestDTO)
+    case notifyPartner(String)
 
     var path: String {
         switch self {
@@ -18,15 +21,23 @@ enum CourseEndpoint: APIEndpoint {
             return "/api/v1/date-courses"
         case .placePool:
             return "/api/v1/date-courses/places"
+        case let .detail(id):
+            return "/api/v1/date-courses/\(id)"
+        case let .save(id, _):
+            return "/api/v1/date-courses/\(id)"
+        case let .notifyPartner(id):
+            return "/api/v1/date-courses/\(id)/notify-partner"
         }
     }
 
     var method: HTTPMethod {
         switch self {
-        case .create:
+        case .create, .notifyPartner:
             return .post
-        case .placePool:
+        case .placePool, .detail:
             return .get
+        case .save:
+            return .put
         }
     }
 
@@ -36,7 +47,9 @@ enum CourseEndpoint: APIEndpoint {
         switch self {
         case let .create(request):
             return try? NetworkJSONCoding.makeEncoder().encode(request)
-        case .placePool:
+        case let .save(_, request):
+            return try? NetworkJSONCoding.makeEncoder().encode(request)
+        case .placePool, .detail, .notifyPartner:
             return nil
         }
     }

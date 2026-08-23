@@ -15,20 +15,19 @@ public struct CourseClient: Sendable {
     public var coursePlaces: @Sendable () async throws -> [CoursePlaceCandidate]
 
     /// GET /api/v1/date-courses/{dateCourseId}
-    /// 부르는 화면이 아직 없다. DND-52 데이트 코스 결과 화면이 붙인다
     public var course: @Sendable (_ id: String) async throws -> DateCourse
 
     /// PUT /api/v1/date-courses/{dateCourseId}
-    /// 부르는 화면이 아직 없다. DND-52 에서 `saveType`(`TEMPORARY`/`CONFIRM`) 과
-    /// `version` 을 더한다. 소비자 없이 미리 만들면 또 틀린다
+    /// 확정 저장이다
     public var updateCourse: @Sendable (
         _ id: String,
         _ title: String,
         _ scheduledAt: Date,
-        _ placeIDs: [String]
+        _ placeIDs: [String],
+        _ version: Int
     ) async throws -> DateCourse
 
-    /// 시안 `{상대닉네임}에게 코스 알리기`. 명세에 해당 엔드포인트가 없다
+    /// POST /api/v1/date-courses/{dateCourseId}/notify-partner
     public var notifyPartner: @Sendable (_ id: String) async throws -> Void
 }
 
