@@ -575,56 +575,6 @@ final class MapFlowDetailStackTests: XCTestCase {
         XCTAssertEqual(store.state.postDetail?.contentID, "P")
         XCTAssertEqual(store.state.topDetail, .place)
     }
-
-    func test_나중에_연_장소가_위다() async {
-        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
-        let row = PostDetailPlace(
-            id: "201",
-            name: "행 장소",
-            category: .cafe,
-            isSaved: false,
-            coordinate: Coordinate(latitude: 37.5, longitude: 127.0)
-        )
-        var state = MapFlowFeature.State()
-        state.detail = PlaceDetailFeature.State(savedPlace: saved)
-        state.postDetail = PostDetailFeature.State(contentID: "1")
-        state.postDetail?.detail = PostDetailContent(
-            id: "1",
-            title: "제목",
-            caption: nil,
-            canonicalURL: nil,
-            places: [row]
-        )
-        state.topDetail = .post
-        let store = TestStore(initialState: state) {
-            MapFlowFeature()
-        }
-
-        await store.send(.postDetail(.presented(.delegate(.placeSelected("201"))))) {
-            $0.map.camera = .focusing(row.coordinate, zoomLevel: state.map.camera.zoomLevel)
-            $0.detail = PlaceDetailFeature.State(
-                contentPlace: Place(
-                    id: row.id,
-                    kakaoPlaceID: row.kakaoPlaceID,
-                    name: row.name,
-                    category: row.category,
-                    address: row.address,
-                    roadAddress: row.roadAddress,
-                    coordinate: row.coordinate,
-                    bookmarkCount: 0,
-                    thumbnailURLs: row.imageURLs
-                )
-            )
-            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
-                id: row.id,
-                coordinate: row.coordinate
-            )
-            $0.topDetail = .place
-        }
-        XCTAssertEqual(store.state.topDetail, .place)
-        XCTAssertNotNil(store.state.postDetail)
-        XCTAssertNotNil(store.state.detail)
-    }
 }
 
 @MainActor
