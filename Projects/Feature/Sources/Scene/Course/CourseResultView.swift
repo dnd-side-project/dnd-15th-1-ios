@@ -26,6 +26,7 @@ public struct CourseResultView: View {
     @State private var sheetDetent: SheetDetent = .collapsed
 
     @State private var collapsedSheetTop: CGFloat = 0
+    @State private var grabFrames: [CGRect] = []
 
     public init(store: StoreOf<CourseResultFeature>) {
         self.store = store
@@ -92,6 +93,7 @@ private extension CourseResultView {
         MapBottomSheet(
             selection: $sheetDetent,
             expandLimit: .belowSearchBar,
+            grabFrames: grabFrames,
             gestureKind: .grabberOnly,
             onCollapsedTopChange: { collapsedSheetTop = $0 }
         ) {
@@ -119,25 +121,28 @@ private extension CourseResultView {
     }
 
     var sheetHeader: some View {
-        HStack(alignment: .top, spacing: Spacing.s8) {
-            VStack(alignment: .leading, spacing: Spacing.s8) {
+        VStack(alignment: .leading, spacing: Spacing.s8) {
+            HStack(alignment: .top, spacing: Spacing.s8) {
                 Text(store.course?.title ?? "")
                     .typography(.title3SB)
                     .foregroundStyle(Color.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                if let summaryText = store.summaryText {
-                    Text(summaryText)
-                        .typography(.body2M)
-                        .foregroundStyle(Color.textTertiary)
+                // 지난 데이트로 들어오면 수정을 안 낸다. 제목이 그 폭을 가져간다
+                if store.showsEditButton {
+                    AppButton("수정", style: .outlined, size: .sm) {
+                        store.send(.editTapped)
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                if grabFrames != [$0] { grabFrames = [$0] }
+            }
 
-            // 지난 데이트로 들어오면 수정을 안 낸다. 제목이 그 폭을 가져간다
-            if store.showsEditButton {
-                AppButton("수정", style: .outlined, size: .sm) {
-                    store.send(.editTapped)
-                }
+            if let summaryText = store.summaryText {
+                Text(summaryText)
+                    .typography(.body2M)
+                    .foregroundStyle(Color.textTertiary)
             }
         }
         .padding(.horizontal, Spacing.s20)

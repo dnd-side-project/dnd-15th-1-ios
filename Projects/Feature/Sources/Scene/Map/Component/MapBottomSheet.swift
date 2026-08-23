@@ -64,6 +64,9 @@ struct MapBottomSheet<Above: View, Header: View, Content: View>: View {
     /// 열린 메뉴의 화면 좌표. 시작점이 이 안이면 시트 손짓을 시작하지 않는다
     private let openMenuFrames: [CGRect]
 
+    /// 손잡이 외에 시트를 잡을 화면 좌표. 제목 줄이 여기 들어간다
+    private let grabFrames: [CGRect]
+
     /// 이 시트가 손짓을 받는 방식. 분해 문서 `:194-200` 표를 따른다
     private let gestureKind: SheetGestureKind
 
@@ -137,6 +140,7 @@ extension MapBottomSheet {
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
+        grabFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
         gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
@@ -147,6 +151,7 @@ extension MapBottomSheet {
         self._selection = selection
         self.expandLimit = expandLimit
         self.openMenuFrames = openMenuFrames
+        self.grabFrames = grabFrames
         self.onDragBegan = onDragBegan
         self.gestureKind = gestureKind
         self.onCollapsedTopChange = onCollapsedTopChange
@@ -162,6 +167,7 @@ extension MapBottomSheet where Above == EmptyView {
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
+        grabFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
         gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
@@ -172,6 +178,7 @@ extension MapBottomSheet where Above == EmptyView {
             selection: selection,
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
+            grabFrames: grabFrames,
             onDragBegan: onDragBegan,
             gestureKind: gestureKind,
             onCollapsedTopChange: onCollapsedTopChange,
@@ -188,6 +195,7 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
+        grabFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
         gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
@@ -197,6 +205,7 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
             selection: selection,
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
+            grabFrames: grabFrames,
             onDragBegan: onDragBegan,
             gestureKind: gestureKind,
             onCollapsedTopChange: onCollapsedTopChange,
@@ -213,6 +222,7 @@ extension MapBottomSheet where Header == EmptyView {
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
         openMenuFrames: [CGRect] = [],
+        grabFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
         gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
@@ -223,6 +233,7 @@ extension MapBottomSheet where Header == EmptyView {
             selection: selection,
             expandLimit: expandLimit,
             openMenuFrames: openMenuFrames,
+            grabFrames: grabFrames,
             onDragBegan: onDragBegan,
             gestureKind: gestureKind,
             onCollapsedTopChange: onCollapsedTopChange,
@@ -488,7 +499,11 @@ private extension MapBottomSheet {
             isContentAtTop: isContentAtTop,
             translation: value.translation,
             startedInOpenMenu: openMenuFrames.contains { $0.contains(value.startLocation) },
-            startedInGrabber: grabberFrame.contains(value.startLocation)
+            startedInGrabber: SheetLayout.isGrabStart(
+                location: value.startLocation,
+                grabberFrame: grabberFrame,
+                extraFrames: grabFrames
+            )
         )
     }
 }

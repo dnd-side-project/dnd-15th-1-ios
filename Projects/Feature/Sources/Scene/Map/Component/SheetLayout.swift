@@ -203,7 +203,7 @@ struct SheetLayout: Equatable {
     /// - Parameters:
     ///   - translation: 손짓의 누적 이동량. 아래로 끌면 `height` 가 양수다
     ///   - startedInOpenMenu: 손짓 시작점이 열린 드롭다운 안이었는지
-    ///   - startedInGrabber: 손짓 시작점이 손잡이 안이었는지. `grabberOnly` 가 시트를 움직이는 유일한 길이다
+    ///   - startedInGrabber: 손짓 시작점이 손잡이 또는 잡는 칸 안이었는지. `grabberOnly` 가 시트를 움직이는 유일한 길이다
     static func dragOwner( // swiftlint:disable:this function_parameter_count
         kind: SheetGestureKind,
         detent: SheetDetent,
@@ -239,5 +239,14 @@ struct SheetLayout: Equatable {
             isContentAtTop: isContentAtTop,
             translationY: translation.height
         ) ? .sheet : .content
+    }
+
+    /// 손잡이 줄이거나, 시트가 넘긴 제목 줄이면 접힘에서도 시트가 움직인다
+    static func isGrabStart(
+        location: CGPoint,
+        grabberFrame: CGRect,
+        extraFrames: [CGRect]
+    ) -> Bool {
+        grabberFrame.contains(location) || extraFrames.contains { $0.contains(location) }
     }
 }
