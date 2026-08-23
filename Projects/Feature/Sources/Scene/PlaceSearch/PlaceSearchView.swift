@@ -236,7 +236,7 @@ public struct PlaceSearchView: View {
     private var resultList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(store.results) { place in
+                ForEach(Array(store.results.enumerated()), id: \.element.id) { index, place in
                     PlaceListRow(
                         icon: place.category.icon,
                         name: place.name,
@@ -245,6 +245,11 @@ public struct PlaceSearchView: View {
                     )
                     .contentShape(Rectangle())
                     .onTapGesture { store.send(.rowTapped(place.id)) }
+                    .onAppear {
+                        if index == max(0, store.results.count - 3) {
+                            store.send(.reachedEnd)
+                        }
+                    }
                 }
             }
         }
