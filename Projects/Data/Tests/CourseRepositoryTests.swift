@@ -69,7 +69,7 @@ final class CourseRepositoryTests: XCTestCase {
         XCTAssertEqual(course.version, 1)
     }
 
-    func test_저장은_put으로_확정_저장한다() async throws {
+    func test_저장은_PUT으로_확정_저장한다() async throws {
         let network = StubNetworkClient()
         network.responses["PUT \(detailPath)"] = DateCourseResponseDTO(
             dateCourseId: 42,
