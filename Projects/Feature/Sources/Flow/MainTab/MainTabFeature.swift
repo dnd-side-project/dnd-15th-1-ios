@@ -14,8 +14,8 @@ public struct MainTabFeature {
     @ObservableState
     public struct State: Equatable {
         public var selectedTab: Tab
-        public var home: HomeFeature.State
-        public var explore: ExploreFeature.State
+        public var home: HomeFlowFeature.State
+        public var explore: ExploreFlowFeature.State
         public var map: MapFlowFeature.State
         public var myPage: MyPageFeature.State
 
@@ -24,8 +24,8 @@ public struct MainTabFeature {
 
         public init(
             selectedTab: Tab = .home,
-            home: HomeFeature.State = HomeFeature.State(),
-            explore: ExploreFeature.State = ExploreFeature.State(),
+            home: HomeFlowFeature.State = HomeFlowFeature.State(),
+            explore: ExploreFlowFeature.State = ExploreFlowFeature.State(),
             map: MapFlowFeature.State = MapFlowFeature.State(),
             myPage: MyPageFeature.State = MyPageFeature.State(),
             contentReturnTab: Tab? = nil
@@ -41,8 +41,8 @@ public struct MainTabFeature {
 
     public enum Action: Equatable {
         case tabSelected(Tab)
-        case home(HomeFeature.Action)
-        case explore(ExploreFeature.Action)
+        case home(HomeFlowFeature.Action)
+        case explore(ExploreFlowFeature.Action)
         case map(MapFlowFeature.Action)
         case myPage(MyPageFeature.Action)
         case delegate(Delegate)
@@ -59,10 +59,10 @@ public struct MainTabFeature {
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.home, action: \.home) {
-            HomeFeature()
+            HomeFlowFeature()
         }
         Scope(state: \.explore, action: \.explore) {
-            ExploreFeature()
+            ExploreFlowFeature()
         }
         Scope(state: \.map, action: \.map) {
             MapFlowFeature()
@@ -105,7 +105,7 @@ public struct MainTabFeature {
 
     private func handleHome(
         state: inout State,
-        delegate: HomeFeature.Action.Delegate
+        delegate: HomeFlowFeature.Action.Delegate
     ) -> Effect<Action> {
         switch delegate {
         case .sessionExpired:
@@ -142,7 +142,7 @@ public struct MainTabFeature {
 
     private func handleExplore(
         state: inout State,
-        delegate: ExploreFeature.Action.Delegate
+        delegate: ExploreFlowFeature.Action.Delegate
     ) -> Effect<Action> {
         switch delegate {
         case .sessionExpired:

@@ -382,8 +382,8 @@ private extension RootFlowFeature {
     func makeMainState(userID: String) -> MainTabFeature.State {
         MainTabFeature.State(
             selectedTab: .home,
-            home: HomeFeature.State(),
-            explore: ExploreFeature.State(),
+            home: HomeFlowFeature.State(),
+            explore: ExploreFlowFeature.State(),
             map: MapFlowFeature.State(map: MapFeature.State()),
             myPage: MyPageFeature.State()
         )

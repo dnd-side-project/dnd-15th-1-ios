@@ -34,9 +34,6 @@ public struct ExploreView: View {
             .padding(.horizontal, Spacing.s20)
             .padding(.top, 6)
         }
-        .navigationDestination(for: ExploreFeature.Route.self) { route in
-            searchDestination(route)
-        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -64,16 +61,6 @@ public struct ExploreView: View {
     private func prefetchIfNeeded(_ content: Content) {
         if content.id == store.contents.suffix(3).first?.id {
             store.send(.reachedEnd)
-        }
-    }
-
-    @ViewBuilder
-    private func searchDestination(_ route: ExploreFeature.Route) -> some View {
-        if let searchStore = store.scope(state: \.search, action: \.search) {
-            switch route {
-            case .search:
-                SearchView(store: searchStore)
-            }
         }
     }
 
