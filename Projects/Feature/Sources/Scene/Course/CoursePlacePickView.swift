@@ -33,6 +33,7 @@ public struct CoursePlacePickView: View {
     @State private var openFilterMenu: FilterMenu?
     @State private var ownershipMenuFrame: CGRect?
     @State private var categoryMenuFrame: CGRect?
+    @State private var grabFrames: [CGRect] = []
 
     public init(store: StoreOf<CourseFeature>) {
         self.store = store
@@ -104,6 +105,7 @@ private extension CoursePlacePickView {
             // 이 화면엔 서치바가 없다. 뒤로가기 버튼이 같은 높이에 있어 그 아래 8 에서 멈춘다
             expandLimit: .belowSearchBar,
             openMenuFrames: [ownershipMenuFrame, categoryMenuFrame].compactMap { $0 },
+            grabFrames: grabFrames,
             // 끌기 시작하면 열린 메뉴를 닫는다. 열어둔 채 끌면 메뉴가 시트를 따라다녀 어색하다
             onDragBegan: { openFilterMenu = nil },
             gestureKind: .grabberOnly,
@@ -132,6 +134,10 @@ private extension CoursePlacePickView {
             Text("저장한 장소")
                 .typography(.title3SB)
                 .foregroundStyle(Color.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    if grabFrames != [$0] { grabFrames = [$0] }
+                }
 
             HStack(spacing: Spacing.s8) {
                 if store.isCoupleConnected {

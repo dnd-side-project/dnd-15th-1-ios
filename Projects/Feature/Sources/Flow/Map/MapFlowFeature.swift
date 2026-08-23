@@ -45,6 +45,14 @@ public struct MapFlowFeature {
         /// 장소 상세에서 뜬 게시글 상세. 시트 표시는 `MapFlowView` 가 한다
         @Presents public var postDetail: PostDetailFeature.State?
 
+        /// 두 상세가 같이 있을 때 위에 있는 쪽. 나중에 연 쪽이다
+        public var topDetail: TopDetail?
+
+        public enum TopDetail: Equatable {
+            case place
+            case post
+        }
+
         public init(
             map: MapFeature.State = MapFeature.State(),
             course: CourseFeature.State? = nil,
@@ -194,6 +202,9 @@ private extension MapFlowFeature {
         case let .presentContentDetail(id):
             // 상세는 시트가 스스로 불러온다. 로드되면 그 places 로 핀을 세운다
             state.showsContentPins = true
+            state.detail = nil
+            state.map.selectedPlace = nil
+            state.topDetail = .post
             state.postDetail = PostDetailFeature.State(contentID: id)
             // 상세가 뜨는 즉시 저장 시트·코스 버튼을 감추도록 핀 모드로 들어간다. 핀은 로드 후 채운다
             state.map.mode = .content(places: [])
@@ -201,6 +212,8 @@ private extension MapFlowFeature {
         case let .presentPlaceDetail(savedPlace):
             // 홈에서 연 저장 장소. 닫으면 원래 탭으로 되돌린다
             state.returnsAfterDetailClose = true
+            state.postDetail = nil
+            state.topDetail = .place
             state.detail = PlaceDetailFeature.State(savedPlace: savedPlace)
             state.map.selectedPlace = MapFeature.State.SelectedPlace(
                 id: savedPlace.id,
@@ -487,12 +500,7 @@ private extension MapFlowFeature {
             return .send(.map(.contentPlacesApplied(places: detail.places.map(place))))
 
         case .postDetail(.presented(.delegate(.closeRequested))), .postDetail(.dismiss):
-            guard state.showsContentPins else {
-                state.postDetail = nil
-                return .none
-            }
-            // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
-            return .send(.delegate(.contentDetailClosed))
+            return closePostDetail(state: &state)
 
         case .postDetail(.presented(.delegate(.sessionExpired))):
             return .send(.delegate(.sessionExpired))
@@ -517,16 +525,12 @@ private extension MapFlowFeature {
         case let .detail(.presented(.delegate(.contentSelected(id)))):
             // 장소 상세를 닫지 않는다. 게시글을 닫으면 그 자리로 돌아가야 한다
             state.postDetail = PostDetailFeature.State(contentID: id)
+            state.topDetail = .post
             // 화면 등장에 안 기댄다. 내려가던 시트를 도로 올리면 등장이 안 온다
             return .send(.postDetail(.presented(.onAppear)))
 
         case .detail(.presented(.delegate(.closed))), .detail(.dismiss):
-            guard state.returnsAfterDetailClose else {
-                dismissDetail(state: &state)
-                return .none
-            }
-            // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
-            return .send(.delegate(.contentDetailClosed))
+            return closePlaceDetail(state: &state)
 
         case let .detail(.presented(.delegate(.bookmarkToggled(id, isSaved)))):
             // 장소 상세에서 바뀐 저장 상태를 게시글 상세 목록·지도 핀에 맞춘다
@@ -536,6 +540,28 @@ private extension MapFlowFeature {
         default:
             return .none
         }
+    }
+
+    func closePlaceDetail(state: inout State) -> Effect<Action> {
+        let other = state.postDetail
+        if other == nil, state.showsContentPins || state.returnsAfterDetailClose {
+            // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
+            return .send(.delegate(.contentDetailClosed))
+        }
+        dismissDetail(state: &state)
+        state.topDetail = other != nil ? .post : nil
+        return .none
+    }
+
+    func closePostDetail(state: inout State) -> Effect<Action> {
+        let other = state.detail
+        if other == nil, state.showsContentPins || state.returnsAfterDetailClose {
+            // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
+            return .send(.delegate(.contentDetailClosed))
+        }
+        state.postDetail = nil
+        state.topDetail = other != nil ? .place : nil
+        return .none
     }
 
     /// 게시글 상세 목록·지도 핀의 저장 상태를 한곳에서 맞춘다
@@ -562,24 +588,50 @@ private extension MapFlowFeature {
             }
         case .content:
             if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
-                presentContentPlaceDetail(state: &state, place: place)
+                presentOutsideContentPlace(state: &state, place: place)
             }
         }
     }
 
-    /// 리스트에서 고른 장소로 카메라를 옮기고 상세를 연다. 지도에 없는 id 면 무시한다
+    /// 리스트에서 고른 장소로 카메라를 옮기고 상세를 연다. 없으면 무시한다
     func focusContentPlaceDetail(state: inout State, id: String) {
-        guard let place = state.map.contentPlaces.first(where: { $0.id == id }) else { return }
+        guard let place = contentPlace(id: id, state: state) else { return }
         state.map.camera = .focusing(place.coordinate, zoomLevel: state.map.camera.zoomLevel)
         presentContentPlaceDetail(state: &state, place: place)
     }
 
-    /// 게시글 핀을 눌러 장소 상세를 연다. 게시글 상세는 남겨 둬 상세를 닫으면 그 자리로 돌아간다
+    func contentPlace(id: String, state: State) -> Place? {
+        if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
+            return place
+        }
+        if let detailPlace = state.postDetail?.detail?.places.first(where: { $0.id == id }) {
+            return place(detailPlace)
+        }
+        return nil
+    }
+
+    /// 게시글 상세는 남겨 둬 장소 상세를 닫으면 그 자리로 돌아간다
     func presentContentPlaceDetail(state: inout State, place: Place) {
         var detail = PlaceDetailFeature.State(contentPlace: place)
         // 저장 상태는 게시글 상세 목록을 기준으로 물려받는다. 없으면 지도 저장 목록을 본다
         detail.isBookmarked = state.postDetail?.savedPlaceIDs.contains(place.id)
             ?? state.map.bookmarkedPlaceIDs.contains(place.id)
+        state.detail = detail
+        state.topDetail = .place
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: place.id,
+            coordinate: place.coordinate
+        )
+    }
+
+    /// 핀 모드 지도 핀은 밖이라 게시글 시트를 지운다. 북마크는 지우기 전 목록에서 읽는다
+    func presentOutsideContentPlace(state: inout State, place: Place) {
+        let isBookmarked = state.postDetail?.savedPlaceIDs.contains(place.id)
+            ?? state.map.bookmarkedPlaceIDs.contains(place.id)
+        state.postDetail = nil
+        state.topDetail = .place
+        var detail = PlaceDetailFeature.State(contentPlace: place)
+        detail.isBookmarked = isBookmarked
         state.detail = detail
         state.map.selectedPlace = MapFeature.State.SelectedPlace(
             id: place.id,
@@ -598,6 +650,7 @@ private extension MapFlowFeature {
         )
         // 게시글 상세가 떠 있으면 지운다. 두 상세가 동시에 살아 있으면 안 된다
         state.postDetail = nil
+        state.topDetail = .place
     }
 
     func presentDetail(state: inout State, place: Place, query: String) {
@@ -610,11 +663,13 @@ private extension MapFlowFeature {
         )
         // 게시글 상세가 떠 있으면 지운다. 두 상세가 동시에 살아 있으면 안 된다
         state.postDetail = nil
+        state.topDetail = .place
     }
 
     func dismissDetail(state: inout State) {
         state.detail = nil
         state.map.selectedPlace = nil
+        state.topDetail = state.postDetail != nil ? .post : nil
     }
 
     func finishReturnToPreviousTab(state: inout State) -> Effect<Action> {
@@ -623,6 +678,7 @@ private extension MapFlowFeature {
         state.returnsAfterDetailClose = false
         state.postDetail = nil
         dismissDetail(state: &state)
+        state.topDetail = nil
         return .send(.map(.searchClearTapped))
     }
 

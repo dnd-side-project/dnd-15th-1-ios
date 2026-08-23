@@ -11,7 +11,7 @@ public struct MapFlowView: View {
     /// 상세 시트 층의 높이. 게시글이 뜰 때 장소 상세를 이만큼 아래로 치운다
     @State private var layerHeight: CGFloat = 0
 
-    /// 게시글 상세 층의 높이. 핀 탭으로 장소 상세가 올라올 때 게시글을 이만큼 아래로 치운다
+    /// 게시글 상세 층의 높이. 나중에 연 장소가 올라올 때 게시글을 이만큼 아래로 치운다
     @State private var postLayerHeight: CGFloat = 0
 
     public init(store: StoreOf<MapFlowFeature>) {
@@ -134,9 +134,9 @@ private extension MapFlowView {
                     .id(detailStore.id)
                     .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
                     .ignoresSafeArea(edges: .bottom)
-                    // 게시글이 위에 뜨면(장소 상세 → 게시글 순서) 장소 상세를 트리에서 빼지 않고 아래로 치운다.
+                    // 나중에 연 게시글이 위면 장소 상세를 트리에서 빼지 않고 아래로 치운다.
                     // 빼면 시트 단계와 스크롤이 날아간다. 게시글을 닫으면 보던 자리 그대로 다시 올라온다.
-                    // 게시글 핀 모드에선 장소 상세가 위라 치우지 않는다
+                    // 나중에 연 장소가 위면(topDetail == .place) 치우지 않는다
                     .offset(y: isPlaceDetailCovered ? layerHeight : 0)
                     // 치울 때는 즉시, 올릴 때만 스프링. 사라지는 시트는 안 움직인다는 규칙에 맞춘다
                     .animation(
@@ -162,7 +162,7 @@ private extension MapFlowView {
                 PostDetailView(store: postDetailStore, bottomInset: bottomInset)
                     .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .identity))
                     .ignoresSafeArea(edges: .bottom)
-                    // 게시글 핀을 눌러 장소 상세가 위로 올라오면 게시글 상세를 아래로 치운다.
+                    // 나중에 연 장소가 위면 게시글 상세를 아래로 치운다.
                     // 트리에 남겨 둬 장소 상세를 닫으면 보던 자리 그대로 다시 올라온다
                     .offset(y: isPostDetailCovered ? postLayerHeight : 0)
                     .allowsHitTesting(!isPostDetailCovered)
@@ -180,14 +180,14 @@ private extension MapFlowView {
         )
     }
 
-    /// 원래 흐름(장소 상세 → 게시글)에서 게시글이 위에 떠 장소 상세가 아래로 치워지는 상태
+    /// 나중에 연 게시글이 위에 있어 장소 상세를 아래로 치운 상태
     var isPlaceDetailCovered: Bool {
-        store.postDetail != nil && !store.showsContentPins
+        store.topDetail == .post && store.detail != nil
     }
 
-    /// 게시글 핀 모드에서 장소 상세가 위로 올라와 게시글 상세가 아래로 치워지는 상태
+    /// 나중에 연 장소가 위에 있어 게시글 상세를 아래로 치운 상태
     var isPostDetailCovered: Bool {
-        store.detail != nil && store.showsContentPins
+        store.topDetail == .place && store.postDetail != nil
     }
 
     /// 아래 안전영역(탭바 + 홈 인디케이터)을 재는 층.
