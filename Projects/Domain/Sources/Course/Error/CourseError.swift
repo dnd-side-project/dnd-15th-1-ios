@@ -10,6 +10,9 @@ public enum CourseError: Error, Equatable, Sendable {
     /// 대상 코스를 서버가 찾지 못함
     case notFound
 
+    /// 상대가 먼저 고쳐서 version 이 어긋남. HTTP 409
+    case conflict
+
     /// 코스를 만들기에 장소 수가 부족함.
     /// 최소 몇 곳인지는 서버 명세가 없어 미확정이다
     case tooFewPlaces

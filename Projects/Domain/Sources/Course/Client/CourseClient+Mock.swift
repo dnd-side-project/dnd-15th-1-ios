@@ -1,7 +1,6 @@
 import Foundation
 import ThirdParty
 
-/// 아직 서버를 안 붙인 포트가 쓰는 mock. `course` · `updateCourse` · `notifyPartner` 셋이다
 public extension CourseClient {
     static let mock = CourseClient(
         createCourse: { title, date, time in
@@ -36,7 +35,7 @@ public extension CourseClient {
                 placeIDs: ["3", "4", "5"]
             )
         },
-        updateCourse: { id, title, scheduledAt, placeIDs in
+        updateCourse: { id, title, scheduledAt, placeIDs, _ in
             mockCourse(
                 id: id,
                 title: title,
@@ -83,7 +82,7 @@ private func mockCourse(
         .compactMap { placeID in Place.mocks.first { $0.id == placeID } }
         .map(CourseStop.init(place:))
 
-    let legs = (0..<max(0, stops.count - 1)).map { index in
+    let legs = (0..<max(0, stops.count - 1)).map { index -> CourseLeg? in
         let values = mockLegValues[index % mockLegValues.count]
         return CourseLeg(
             walkingMinutes: values.walkingMinutes,
