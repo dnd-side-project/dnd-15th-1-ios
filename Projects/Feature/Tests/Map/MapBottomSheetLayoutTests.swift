@@ -310,3 +310,35 @@ final class SheetLayoutTests: XCTestCase {
         )
     }
 }
+
+@MainActor
+final class SheetGrabStartTests: XCTestCase {
+    func test_잡는칸은_손잡이_안이면_참이다() {
+        let grabber = CGRect(x: 0, y: 0, width: 390, height: 33)
+        XCTAssertTrue(SheetLayout.isGrabStart(
+            location: CGPoint(x: 195, y: 16),
+            grabberFrame: grabber,
+            extraFrames: []
+        ))
+    }
+
+    func test_잡는칸은_제목_줄_안이면_참이다() {
+        let grabber = CGRect(x: 0, y: 0, width: 390, height: 33)
+        let title = CGRect(x: 20, y: 33, width: 350, height: 24)
+        XCTAssertTrue(SheetLayout.isGrabStart(
+            location: CGPoint(x: 40, y: 40),
+            grabberFrame: grabber,
+            extraFrames: [title]
+        ))
+    }
+
+    func test_잡는칸은_필터와_요약만_있으면_거짓이다() {
+        let grabber = CGRect(x: 0, y: 0, width: 390, height: 33)
+        let title = CGRect(x: 20, y: 33, width: 350, height: 24)
+        XCTAssertFalse(SheetLayout.isGrabStart(
+            location: CGPoint(x: 40, y: 70),
+            grabberFrame: grabber,
+            extraFrames: [title]
+        ))
+    }
+}
