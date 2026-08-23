@@ -2,39 +2,116 @@ import SwiftUI
 
 // MARK: - Presentation
 
-// 사용법: .bottomSheet(isPresented: $store.isPresented, isDismissable: false, showsHandle: false) { ... }
-// 핸들은 기본으로 컨테이너가 그리고 그 아래를 content 가 채운다. 하단 safe area 는 배경이 따로 덮는다
 public extension View {
     func bottomSheet<Content: View>(
         isPresented: Binding<Bool>,
         isDismissable: Bool = true,
         showsHandle: Bool = true,
+        onDismissed: @escaping () -> Void = {},
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        // 아래에서 올라오는 오버레이. dim 은 페이드, 시트는 이동만 한다.
-        // 시트에 페이드를 걸면 안에 든 스크롤 목록까지 매 프레임 한 장으로 합쳐야 해 끊긴다
-        // zIndex 를 적지 않으면 닫히는 동안 시트가 dim 밑으로 내려가 한 프레임에 어두워진다
         overlay {
-            ZStack(alignment: .bottom) {
-                if isPresented.wrappedValue {
-                    Color.dimBackground
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            guard isDismissable else { return }
-                            isPresented.wrappedValue = false
-                        }
-                        .transition(.opacity)
-                        .zIndex(0)
+            BottomSheetHost(
+                isPresented: isPresented,
+                isDismissable: isDismissable,
+                showsHandle: showsHandle,
+                onDismissed: onDismissed,
+                content: content
+            )
+        }
+    }
+}
 
-                    BottomSheetContainer(showsHandle: showsHandle, content: content)
-                        .transition(.move(edge: .bottom))
-                        .zIndex(1)
+// MARK: - Dismiss gate
+
+/// 부모 화면이 트리에서 빠지면 닫힘 완료가 `onDismissed` 를 부르지 않게 한다
+struct BottomSheetDismissGate: Equatable, Sendable {
+    private(set) var generation = 0
+
+    @discardableResult
+    mutating func bump() -> Int {
+        generation += 1
+        return generation
+    }
+
+    func shouldDeliver(started: Int) -> Bool {
+        started == generation
+    }
+}
+
+// MARK: - Host
+
+private struct BottomSheetHost<Content: View>: View {
+    @Binding var isPresented: Bool
+    let isDismissable: Bool
+    let showsHandle: Bool
+    let onDismissed: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    @State private var isMounted = false
+    @State private var isOpen = false
+    @State private var dismissGate = BottomSheetDismissGate()
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            if isMounted {
+                Color.dimBackground
+                    .opacity(isOpen ? 1 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(isOpen)
+                    .onTapGesture {
+                        guard isDismissable else { return }
+                        isPresented = false
+                    }
+                    .zIndex(0)
+
+                BottomSheetContainer(showsHandle: showsHandle, content: content)
+                    .offset(y: isOpen ? 0 : UIScreen.main.bounds.height)
+                    .zIndex(1)
+            }
+        }
+        .accessibilityAddTraits(isOpen ? .isModal : [])
+        .onChange(of: isPresented, initial: true) { _, presented in
+            syncPresentation(presented)
+        }
+        .onDisappear {
+            dismissGate.bump()
+        }
+    }
+
+    private func syncPresentation(_ presented: Bool) {
+        if presented {
+            let generation = dismissGate.bump()
+            if !isMounted {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    isMounted = true
+                    isOpen = false
+                }
+                // 같은 프레임에 열면 시작 오프셋 없이 끝 자리에 붙는다
+                DispatchQueue.main.async {
+                    guard dismissGate.shouldDeliver(started: generation) else { return }
+                    withAnimation(Motion.sheetSpring) {
+                        isOpen = true
+                    }
+                }
+            } else {
+                withAnimation(Motion.sheetSpring) {
+                    isOpen = true
                 }
             }
-            .accessibilityAddTraits(isPresented.wrappedValue ? .isModal : [])
+            return
         }
-        // 바깥에 둬야 같은 값에 묶인 화면 쪽 변화도 시트와 같은 곡선으로 따라온다
-        .animation(.easeOut(duration: Motion.sheetDuration), value: isPresented.wrappedValue)
+        guard isMounted else { return }
+        let generation = dismissGate.bump()
+        withAnimation(Motion.sheetSpring, completionCriteria: .removed) {
+            isOpen = false
+        } completion: {
+            guard dismissGate.shouldDeliver(started: generation) else { return }
+            isMounted = false
+            onDismissed()
+        }
     }
 }
 
@@ -52,7 +129,6 @@ private struct BottomSheetContainer<Content: View>: View {
         }
         .frame(maxWidth: .infinity)
         .background {
-            // 배경만 하단 safe area 까지 늘린다. 내용은 늘어난 영역 밖에 있어 가려지지 않는다
             Color.commonWhite
                 .clipShape(
                     UnevenRoundedRectangle(
@@ -65,7 +141,6 @@ private struct BottomSheetContainer<Content: View>: View {
     }
 
     private var handle: some View {
-        // 시안 대조에서 정한 잡이 자리. 위 14 · 막대 6 · 아래 13 = 33
         Capsule()
             .fill(Color.gray100)
             .frame(width: 50, height: 6)
