@@ -32,4 +32,20 @@ public struct PlaceRemoteDataSource: Sendable {
     func remove(placeID: String) async throws {
         try await networkClient.request(PlaceEndpoint.remove(placeID: placeID))
     }
+
+    func detail(placeID: Int) async throws -> PlaceDetailResponseDTO {
+        try await networkClient.request(PlaceEndpoint.detail(placeID: placeID))
+    }
+
+    func kakaoDetail(kakaoPlaceID: String, query: String) async throws -> PlaceDetailResponseDTO {
+        try await networkClient.request(
+            PlaceEndpoint.kakaoDetail(kakaoPlaceID: kakaoPlaceID, query: query)
+        )
+    }
+
+    func updateAlias(placeID: Int, alias: String?) async throws -> SavedPlaceResponseDTO {
+        try await networkClient.request(
+            PlaceEndpoint.updateAlias(placeID: placeID, alias: alias)
+        )
+    }
 }

@@ -19,10 +19,25 @@ enum PlaceDTOMapper {
         )
     }
 
-    static func toSearchPage(_ dto: PlaceSearchResponseDTO) -> PlacePage {
+    private static let maxPage = 44
+
+    static func toSearchPage(_ dto: PlaceSearchResponseDTO, page: Int) -> PlacePage {
         PlacePage(
             items: dto.places.map(toPlace),
-            hasNext: dto.hasNext
+            // 명세의 page 최대값이 44 다. 45 를 요청하면 서버가 400 을 준다.
+            // 여기서 끊어 화면이 서버 제약을 몰라도 되게 한다
+            hasNext: dto.hasNext && page < maxPage
+        )
+    }
+
+    static func toDomain(_ dto: PlaceDetailResponseDTO) -> PlaceDetail {
+        PlaceDetail(
+            place: toPlace(dto),
+            savedByMe: dto.savedByMe,
+            savedMemberCount: dto.savedMemberCount,
+            ownership: dto.ownershipStatus.flatMap { PlaceOwnership(rawValue: $0.lowercased()) },
+            phone: dto.phone,
+            kakaoPlaceURL: dto.kakaoPlaceUrl.flatMap(URL.init(string:))
         )
     }
 
@@ -33,11 +48,30 @@ enum PlaceDTOMapper {
             id: dto.placeId.map(String.init) ?? dto.kakaoPlaceId ?? "\(dto.name)|\(dto.latitude)|\(dto.longitude)",
             kakaoPlaceID: dto.kakaoPlaceId,
             name: dto.name,
-            category: category(dto.categoryName),
+            category: category(code: dto.categoryCode, name: dto.categoryName),
             address: dto.address,
             roadAddress: dto.roadAddress ?? "",
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
             bookmarkCount: 0,
+            thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
+        )
+    }
+
+    // 상세 응답은 kakaoPlaceId 가 항상 있어 합성 폴백이 필요 없다
+    private static func toPlace(_ dto: PlaceDetailResponseDTO) -> Place {
+        Place(
+            id: dto.placeId.map(String.init) ?? dto.kakaoPlaceId,
+            kakaoPlaceID: dto.kakaoPlaceId,
+            name: dto.name,
+            category: category(code: dto.categoryCode, name: dto.categoryName),
+            address: dto.address,
+            roadAddress: dto.roadAddress ?? "",
+            // 명세는 nullable 이지만 실측 120/120 값이 있었다. 없는 응답은 0,0 으로 둔다
+            coordinate: Coordinate(
+                latitude: dto.latitude ?? 0,
+                longitude: dto.longitude ?? 0
+            ),
+            bookmarkCount: dto.savedMemberCount,
             thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
         )
     }
@@ -70,6 +104,21 @@ enum PlaceDTOMapper {
         case "숙박": return .accommodation
         case "편의", "생활 편의": return .convenience
         default: return .food
+        }
+    }
+
+    // 상세·검색 응답에는 ASCII categoryCode 가 실려 온다. 그것이 있으면 먼저 본다.
+    // 저장 목록·저장 응답에는 없어 한글 categoryName 으로 계속 매핑한다
+    private static func category(code: String?, name: String) -> PlaceCategory {
+        switch code {
+        case "RESTAURANT": return .food
+        case "CAFE": return .cafe
+        case "ENTERTAINMENT": return .activity
+        case "SHOPPING": return .shopping
+        case "CONVENIENCE": return .convenience
+        case "TOURISM": return .tourism
+        case "ACCOMMODATION": return .accommodation
+        default: return category(name)
         }
     }
 
