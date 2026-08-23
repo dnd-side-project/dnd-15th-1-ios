@@ -166,48 +166,74 @@ public struct MyPageView: View {
         )
     }
 
+    @ViewBuilder
     private var profileSection: some View {
-        VStack(spacing: 8) {
-            profileImage
-                .resizable()
-                .scaledToFill()
-                .frame(width: 100, height: 100)
-                .clipShape(Circle())
+        if store.isSkeleton {
+            skeletonProfileSection
+        } else {
+            VStack(spacing: 8) {
+                profileImage
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 100, height: 100)
+                    .clipShape(Circle())
 
-            Text(store.nickname)
-                .typography(.headline)
-                .foregroundStyle(.textPrimary)
+                Text(store.nickname)
+                    .typography(.headline)
+                    .foregroundStyle(.textPrimary)
 
-            AppButton("프로필 수정", style: .outlined, size: .sm) {
-                store.send(.profileEditTapped)
+                AppButton("프로필 수정", style: .outlined, size: .sm) {
+                    store.send(.profileEditTapped)
+                }
             }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var securityCard: some View {
         card("개인/보안") {
-            navRow("나의 데이트 유형", edge: .first) { store.send(.dateTypeTapped) }
-            divider
-            navRow("연결 관리") { store.send(.connectionTapped) }
-            divider
-            navRow("로그아웃", edge: .last) { store.send(.logoutButtonTapped) }
+            if store.isSkeleton {
+                skeletonNavRow(edge: .first)
+                divider
+                skeletonNavRow()
+                divider
+                skeletonNavRow(edge: .last)
+            } else {
+                navRow("나의 데이트 유형", edge: .first) { store.send(.dateTypeTapped) }
+                divider
+                navRow("연결 관리") { store.send(.connectionTapped) }
+                divider
+                navRow("로그아웃", edge: .last) { store.send(.logoutButtonTapped) }
+            }
         }
     }
 
+    @ViewBuilder
     private var notificationCard: some View {
         card("알림 설정") {
-            toggleRow("콘텐츠 저장 알림", isOn: $store.savedContentAlarmOn)
-            divider
-            toggleRow("데이트 일정 알림", isOn: $store.dateScheduleAlarmOn)
-            divider
-            toggleRow("마케팅 정보 알림", isOn: $store.marketingAlarmOn)
+            if store.isSkeleton {
+                skeletonToggleRow
+                divider
+                skeletonToggleRow
+                divider
+                skeletonToggleRow
+            } else {
+                toggleRow("콘텐츠 저장 알림", isOn: $store.savedContentAlarmOn)
+                divider
+                toggleRow("데이트 일정 알림", isOn: $store.dateScheduleAlarmOn)
+                divider
+                toggleRow("마케팅 정보 알림", isOn: $store.marketingAlarmOn)
+            }
         }
     }
 
     private var inquiryCard: some View {
         card("문의하기") {
-            navRow("서비스 피드백하기", edge: .only) { sendFeedbackMail() }
+            if store.isSkeleton {
+                skeletonNavRow(edge: .only)
+            } else {
+                navRow("서비스 피드백하기", edge: .only) { sendFeedbackMail() }
+            }
         }
     }
 
@@ -302,6 +328,47 @@ private extension MyPageView {
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .tint(.textPrimary)
+        }
+        .padding(.vertical, 14)
+    }
+
+    // 프로필 사진·닉네임·수정 버튼 자리를 시머로 채운다
+    var skeletonProfileSection: some View {
+        VStack(spacing: 8) {
+            ShimmerBlock(baseColor: .gray300)
+                .frame(width: 100, height: 100)
+                .clipShape(Circle())
+
+            ShimmerBlock(cornerRadius: 4, baseColor: .gray300)
+                .frame(width: 100, height: 18)
+
+            ShimmerBlock(cornerRadius: 8, baseColor: .gray300)
+                .frame(width: 90, height: 34)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // navRow 와 같은 edge 패딩. 제목만 시머로, 화살표는 정적이라 자리만 비운다
+    func skeletonNavRow(edge: RowEdge = .middle) -> some View {
+        HStack {
+            ShimmerBlock(cornerRadius: 4, baseColor: .gray300)
+                .frame(width: 100, height: 16)
+            Spacer()
+        }
+        // 실제 행의 화살표 높이(24)만큼 확보해 로드 전후 높이를 유지한다
+        .frame(height: 24)
+        .padding(.top, edge.top)
+        .padding(.bottom, edge.bottom)
+    }
+
+    // toggleRow 와 같은 높이·패딩. 제목·토글 자리를 시머로 채운다
+    var skeletonToggleRow: some View {
+        HStack {
+            ShimmerBlock(cornerRadius: 4, baseColor: .gray300)
+                .frame(width: 100, height: 16)
+            Spacer()
+            ShimmerBlock(cornerRadius: 15, baseColor: .gray300)
+                .frame(width: 51, height: 31)
         }
         .padding(.vertical, 14)
     }
