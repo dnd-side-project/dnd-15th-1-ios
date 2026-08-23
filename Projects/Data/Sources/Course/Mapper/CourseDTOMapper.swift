@@ -10,14 +10,23 @@ import Foundation
 
 enum CourseDTOMapper {
     static func toDomain(_ dto: DateCourseResponseDTO) throws -> DateCourse {
-        DateCourse(
+        let sorted = (dto.places ?? []).sorted { $0.order < $1.order }
+        let stops = sorted.map { CourseStop(place: mapPlace($0)) }
+        let legs = sorted.dropLast().map { place -> CourseLeg? in
+            guard let walk = place.walkToNext else { return nil }
+            return CourseLeg(
+                walkingMinutes: Int((Double(walk.durationSeconds) / 60).rounded()),
+                distanceMeters: walk.distanceMeters
+            )
+        }
+        return DateCourse(
             id: String(dto.dateCourseId),
             title: dto.title,
             scheduledAt: try scheduledAt(date: dto.date, time: dto.time),
             status: status(dto.status),
             version: dto.version,
-            stops: [],
-            legs: []
+            stops: stops,
+            legs: legs
         )
     }
 
@@ -31,6 +40,27 @@ enum CourseDTOMapper {
             ownership: ownership(dto.ownershipStatus),
             alias: dto.alias,
             thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
+        )
+    }
+
+    private static func mapPlace(_ dto: DateCoursePlaceResponseDTO) -> Place {
+        let imageURLs = (dto.imageUrls ?? []).compactMap(URL.init(string:))
+        let thumbnailURLs: [URL]
+        if imageURLs.isEmpty, let thumb = dto.thumbnailUrl.flatMap(URL.init(string:)) {
+            thumbnailURLs = [thumb]
+        } else {
+            thumbnailURLs = imageURLs
+        }
+        return Place(
+            id: String(dto.placeId),
+            kakaoPlaceID: nil,
+            name: dto.name,
+            category: category(dto.categoryName ?? ""),
+            address: dto.address ?? "",
+            roadAddress: dto.roadAddress ?? "",
+            coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
+            bookmarkCount: 0,
+            thumbnailURLs: thumbnailURLs
         )
     }
 
@@ -57,9 +87,10 @@ enum CourseDTOMapper {
     }
 
     // 서버가 `2026-08-05` 와 `13:00:00` 을 따로 준다. 타임존 표기가 없고 Asia/Seoul 기준이다
+    // time 이 null 이면 날짜만 있는 응답이라 자정으로 읽는다
     // 틀린 시각을 만들어 아래로 흘리느니 실패로 끝낸다
-    private static func scheduledAt(date: String, time: String) throws -> Date {
-        guard let scheduledAt = CourseDateFormat.date(from: date, time: time) else {
+    private static func scheduledAt(date: String, time: String?) throws -> Date {
+        guard let scheduledAt = CourseDateFormat.date(from: date, time: time ?? "00:00:00") else {
             throw CourseError.unknown
         }
         return scheduledAt

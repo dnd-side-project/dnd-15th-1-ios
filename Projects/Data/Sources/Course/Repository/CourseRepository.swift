@@ -39,4 +39,48 @@ public struct CourseRepository: Sendable {
             throw CourseErrorMapper.map(error)
         }
     }
+
+    public func course(id: String) async throws -> DateCourse {
+        do {
+            return try CourseDTOMapper.toDomain(try await remote.detail(id: id))
+        } catch {
+            throw CourseErrorMapper.map(error)
+        }
+    }
+
+    public func updateCourse(
+        id: String,
+        title: String,
+        scheduledAt: Date,
+        placeIDs: [String],
+        version: Int
+    ) async throws -> DateCourse {
+        do {
+            let request = SaveDateCourseRequestDTO(
+                title: title,
+                date: CourseDateFormat.dateText(scheduledAt),
+                time: CourseDateFormat.timeText(scheduledAt),
+                placeIds: try placeIDs.map { try Self.placeID(from: $0) },
+                version: version
+            )
+            return try CourseDTOMapper.toDomain(try await remote.save(id: id, body: request))
+        } catch {
+            throw CourseErrorMapper.map(error)
+        }
+    }
+
+    public func notifyPartner(id: String) async throws {
+        do {
+            _ = try await remote.notifyPartner(id: id)
+        } catch {
+            throw CourseErrorMapper.map(error)
+        }
+    }
+
+    private static func placeID(from raw: String) throws -> Int64 {
+        guard let placeID = Int64(raw) else {
+            throw CourseError.unknown
+        }
+        return placeID
+    }
 }

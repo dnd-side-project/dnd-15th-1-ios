@@ -13,8 +13,6 @@ public enum CourseClientFactory {
         let repository = CourseRepository(
             remote: CourseRemoteDataSource(networkClient: session.authedClient)
         )
-        // course / updateCourse / notifyPartner 는 부르는 화면이 없어 mock 유지.
-        // DND-52 데이트 코스 결과 화면이 붙인다
         return CourseClient(
             createCourse: { title, date, time in
                 try await repository.createCourse(title: title, date: date, time: time)
@@ -22,9 +20,17 @@ public enum CourseClientFactory {
             coursePlaces: {
                 try await repository.coursePlaces()
             },
-            course: CourseClient.mock.course,
-            updateCourse: CourseClient.mock.updateCourse,
-            notifyPartner: CourseClient.mock.notifyPartner
+            course: { try await repository.course(id: $0) },
+            updateCourse: {
+                try await repository.updateCourse(
+                    id: $0,
+                    title: $1,
+                    scheduledAt: $2,
+                    placeIDs: $3,
+                    version: $4
+                )
+            },
+            notifyPartner: { try await repository.notifyPartner(id: $0) }
         )
     }
 }
