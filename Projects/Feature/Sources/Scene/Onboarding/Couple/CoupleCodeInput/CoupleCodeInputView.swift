@@ -5,20 +5,23 @@ import ThirdParty
 struct CoupleCodeInputView: View {
     let store: StoreOf<CoupleConnectFeature>
 
-    @State private var isCodeFocused = false
+    @State private var isCodeFocused = true
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
-                .frame(height: TitleMetric.topSpacing)
+            // 시안 여백. 키보드가 올라와 세로가 모자라면 이 값 아래로 줄어든다
+            Spacer(minLength: 0)
+                .frame(maxHeight: TitleMetric.topSpacing)
 
             Text("코드를 입력해주세요")
                 .typography(.title1B)
                 .foregroundStyle(Color.gray900)
                 .multilineTextAlignment(.center)
+                // 없으면 VStack 이 여백보다 제목 줄을 먼저 지운다
+                .fixedSize(horizontal: false, vertical: true)
 
-            Spacer()
-                .frame(height: CodeFieldMetric.topSpacing)
+            Spacer(minLength: 0)
+                .frame(maxHeight: CodeFieldMetric.topSpacing)
 
             CodeInputField(
                 code: codeBinding,
@@ -32,6 +35,9 @@ struct CoupleCodeInputView: View {
 
             CTAContainer {
                 AppButton("연결하기", style: .dark, size: .xl, fullWidth: true) {
+                    // 화면이 밀려나기 전에 내려야 한다. 전환이 시작된 뒤에 내리면 iOS 가 되돌린다
+                    isCodeFocused = false
+                    dismissKeyboard()
                     store.send(.connectButtonTapped)
                 }
                 .disabled(!store.isConnectEnabled)
@@ -50,14 +56,12 @@ struct CoupleCodeInputView: View {
                     .foregroundStyle(Color.gray900)
             }
         }
-        // push 애니메이션 중에 준 포커스는 버려진다. 전환이 끝난 뒤에 준다
-        .task {
-            try? await Task.sleep(for: .milliseconds(400))
-            isCodeFocused = true
-        }
-        // 연결 중에는 입력칸이 disabled 라 포커스가 풀린다. 끝나면 되돌린다
+        // 연결 중에는 입력칸이 disabled 라 포커스가 풀린다.
+        // 실패로 끝나면 되돌리고, 성공은 완료 화면이 푸시되므로 켜지 않는다
         .onChange(of: store.isConnecting) { _, isConnecting in
-            isCodeFocused = !isConnecting
+            if !isConnecting, store.connectedCouple == nil {
+                isCodeFocused = true
+            }
         }
     }
 
