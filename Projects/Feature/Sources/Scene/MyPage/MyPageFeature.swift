@@ -15,6 +15,8 @@ public struct MyPageFeature {
         // 마케팅 약관 버전. 마케팅을 켤 때 함께 보낸다
         public var marketingConsentVersion: String?
         public var availableMarketingConsentVersion: String?
+        // 시트로 여는 약관 웹뷰 대상
+        public var presentedTerms: TermsType?
         public var isLoading: Bool
         public var errorMessage: String?
 
@@ -26,6 +28,7 @@ public struct MyPageFeature {
             marketingAlarmOn: Bool = false,
             marketingConsentVersion: String? = nil,
             availableMarketingConsentVersion: String? = nil,
+            presentedTerms: TermsType? = nil,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
@@ -36,6 +39,7 @@ public struct MyPageFeature {
             self.marketingAlarmOn = marketingAlarmOn
             self.marketingConsentVersion = marketingConsentVersion
             self.availableMarketingConsentVersion = availableMarketingConsentVersion
+            self.presentedTerms = presentedTerms
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
@@ -52,6 +56,7 @@ public struct MyPageFeature {
         case connectionTapped
         case feedbackTapped
         case termsLinkTapped(TermsType)
+        case dismissTerms
         case withdrawTapped
         case logoutButtonTapped
         case logoutResponse(Result<EquatableVoid, AuthError>)
@@ -107,6 +112,28 @@ public struct MyPageFeature {
              .binding(\.marketingAlarmOn):
             return updateNotificationSettings(state: state)
 
+        case .logoutButtonTapped, .logoutResponse:
+            return handleLogout(state: &state, action: action)
+
+        case let .termsLinkTapped(terms):
+            // 약관 웹뷰를 시트로 연다. 지원 URL 이 아니면 무시(로그인과 동일)
+            guard let url = terms.url, SupportedWebURL.isSupported(url) else { return .none }
+            state.presentedTerms = terms
+            return .none
+
+        case .dismissTerms:
+            state.presentedTerms = nil
+            return .none
+
+        case .binding, .profileEditTapped, .dateTypeTapped, .connectionTapped,
+             .feedbackTapped, .withdrawTapped, .delegate:
+            // 이동할 화면들은 아직 없음. 붙는 대로 연결
+            return .none
+        }
+    }
+
+    private func handleLogout(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .logoutButtonTapped:
             guard !state.isLoading else { return .none }
             state.isLoading = true
@@ -125,9 +152,7 @@ public struct MyPageFeature {
             }
             return .none
 
-        case .binding, .profileEditTapped, .dateTypeTapped, .connectionTapped,
-             .feedbackTapped, .termsLinkTapped, .withdrawTapped, .delegate:
-            // 이동할 화면들은 아직 없음. 붙는 대로 연결
+        default:
             return .none
         }
     }

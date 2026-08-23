@@ -34,9 +34,26 @@ public struct MyPageView: View {
             }
         }
         .toolbarRole(.editor)
+        .sheet(item: presentedTermsBinding) { terms in
+            if let url = terms.url {
+                SafariView(url: url)
+                    .ignoresSafeArea()
+            }
+        }
         .task {
             store.send(.onAppear)
         }
+    }
+
+    private var presentedTermsBinding: Binding<TermsType?> {
+        Binding(
+            get: { store.presentedTerms },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.dismissTerms)
+                }
+            }
+        )
     }
 
     private var profileSection: some View {
