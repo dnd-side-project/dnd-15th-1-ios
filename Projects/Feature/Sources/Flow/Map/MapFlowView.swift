@@ -103,7 +103,10 @@ private extension MapFlowView {
         // (분해 문서 `2026-08-13-map-course-ui-split.md:194-200` 표가 SSOT)
         .toolbar(isTabBarShown ? .automatic : .hidden, for: .tabBar)
         // 키보드 영역까지 지운 지도 층 밖에 건다. 안에 걸면 저장 버튼이 키보드에 가린다
-        .bottomSheet(isPresented: aliasSheetBinding) {
+        .bottomSheet(
+            isPresented: aliasSheetBinding,
+            onDismissed: { store.send(.alias(.dismiss)) }
+        ) {
             if let aliasStore = store.scope(state: \.alias, action: \.alias.presented) {
                 PlaceAliasView(store: aliasStore)
             }
@@ -199,11 +202,10 @@ private extension MapFlowView {
 
     var aliasSheetBinding: Binding<Bool> {
         Binding(
-            get: { store.alias != nil },
+            get: { store.isAliasPresented },
             set: { isPresented in
-                // 딤 탭도 화면이 스스로 닫는 길을 타야 `cancelled` 가 상위까지 간다
                 if !isPresented {
-                    store.send(.alias(.presented(.dismissed)))
+                    store.send(.aliasCloseRequested)
                 }
             }
         )

@@ -35,8 +35,9 @@ public struct MyPageFeature {
         public var isSkeleton: Bool
         // 시트로 여는 약관 웹뷰 대상
         public var presentedTerms: TermsType?
-        // 프로필 수정 바텀시트
+        // 프로필 수정 바텀시트. 플래그가 먼저 내려가고, 퇴장이 끝난 뒤 profileEdit 을 비운다
         @Presents public var profileEdit: ProfileEditFeature.State?
+        public var isProfileEditPresented: Bool
         // push 스택. 나의 데이트 유형 / 연결 관리
         public var path: [Route]
         public var dateType: DateTypeFeature.State?
@@ -61,6 +62,7 @@ public struct MyPageFeature {
             isSkeleton: Bool = true,
             presentedTerms: TermsType? = nil,
             profileEdit: ProfileEditFeature.State? = nil,
+            isProfileEditPresented: Bool = false,
             path: [Route] = [],
             dateType: DateTypeFeature.State? = nil,
             connection: ConnectionManageFeature.State? = nil,
@@ -82,6 +84,7 @@ public struct MyPageFeature {
             self.isSkeleton = isSkeleton
             self.presentedTerms = presentedTerms
             self.profileEdit = profileEdit
+            self.isProfileEditPresented = isProfileEditPresented
             self.path = path
             self.dateType = dateType
             self.connection = connection
@@ -102,6 +105,7 @@ public struct MyPageFeature {
         case notificationSettingsLoadFailed
         case notificationSettingsUpdateFailed
         case profileEditTapped
+        case profileEditCloseRequested
         case dateTypeTapped
         case connectionTapped
         case termsLinkTapped(TermsType)
@@ -194,7 +198,7 @@ public struct MyPageFeature {
         case .termsLinkTapped, .dismissTerms:
             return handleTerms(state: &state, action: action)
 
-        case .profileEditTapped, .profileEdit:
+        case .profileEditTapped, .profileEditCloseRequested, .profileEdit:
             return handleProfileEdit(state: &state, action: action)
 
         case .dateTypeTapped, .pathChanged, .dateType:
@@ -220,23 +224,32 @@ public struct MyPageFeature {
                 nickname: state.nickname,
                 selectedIconID: state.iconID
             )
+            state.isProfileEditPresented = true
+            return .none
+
+        case .profileEditCloseRequested:
+            state.isProfileEditPresented = false
             return .none
 
         case let .profileEdit(.presented(.delegate(.saved(nickname, iconID)))):
-            // API 는 이후. 지금은 화면 값만 갱신하고 닫는다
             state.nickname = nickname
             state.iconID = iconID
-            state.profileEdit = nil
+            state.isProfileEditPresented = false
             return .none
 
         case .profileEdit(.presented(.delegate(.dismiss))):
-            state.profileEdit = nil
+            state.isProfileEditPresented = false
             return .none
 
         case .profileEdit(.presented(.delegate(.sessionExpired))):
-            // 시트를 닫고 세션 만료를 위로 올려 로그인으로 보낸다
+            // 화면을 떠나므로 퇴장 애니메이션을 기다리지 않는다
+            state.isProfileEditPresented = false
             state.profileEdit = nil
             return .send(.delegate(.sessionExpired))
+
+        case .profileEdit(.dismiss):
+            state.isProfileEditPresented = false
+            return .none
 
         case .profileEdit:
             return .none

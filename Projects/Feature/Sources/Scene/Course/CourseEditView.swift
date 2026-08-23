@@ -62,7 +62,11 @@ public struct CourseEditView: View {
                     onClose: { store.send(.backModalClosed) }
                 )
             }
-            .bottomSheet(isPresented: isWheelPresented, showsHandle: false) {
+            .bottomSheet(
+                isPresented: isWheelPresented,
+                showsHandle: false,
+                onDismissed: { store.send(.wheelDismissFinished) }
+            ) {
                 wheelSheet
             }
             .onAppear { store.send(.onAppear) }
@@ -288,7 +292,7 @@ private extension CourseEditView {
 
     var isWheelPresented: Binding<Bool> {
         Binding(
-            get: { store.activeWheel != nil },
+            get: { store.isWheelPresented },
             set: { isPresented in
                 guard !isPresented else { return }
                 store.send(.wheelDismissed)

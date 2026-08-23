@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Domain
 @testable import Feature
 import Foundation
-import SharedDesignSystem
+@testable import SharedDesignSystem
 import XCTest
 
 @MainActor
@@ -217,24 +217,6 @@ final class CourseEditFeatureTests: XCTestCase {
         XCTAssertNotEqual(state.tomorrow, today)
     }
 
-    func test_이미_고른_시간이_있으면_휠을_열어도_그_값이다() async {
-        let calendar = Calendar.current
-        let now = calendar.date(
-            from: DateComponents(year: 2026, month: 8, day: 23, hour: 22, minute: 3)
-        ) ?? Date.distantPast
-        var initial = CourseEditFeature.State(dateCourseID: "1", now: now)
-        initial.scheduledTime = DateComponents(hour: 15, minute: 30)
-        let store = TestStore(initialState: initial) {
-            CourseEditFeature()
-        }
-        store.exhaustivity = .off(showSkippedAssertions: false)
-
-        await store.send(.timeFieldTapped) {
-            $0.activeWheel = .time
-            $0.draftTime = DateComponents(hour: 15, minute: 30)
-        }
-    }
-
     func test_로드된_오늘_날짜는_날짜_휠을_안_열면_유지된다() async {
         let calendar = Calendar.current
         let now = calendar.date(
@@ -285,6 +267,69 @@ final class CourseEditFeatureTests: XCTestCase {
         await store.send(.backModalSaveTapped)
         await store.receive(\.saveResponse)
         await store.receive(.delegate(.saved(threeStopCourse)))
+    }
+}
+
+@MainActor
+final class CourseEditWheelTests: XCTestCase {
+    func test_이미_고른_시간이_있으면_휠을_열어도_그_값이다() async {
+        let calendar = Calendar.current
+        let now = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 23, hour: 22, minute: 3)
+        ) ?? Date.distantPast
+        var initial = CourseEditFeature.State(dateCourseID: "1", now: now)
+        initial.scheduledTime = DateComponents(hour: 15, minute: 30)
+        let store = TestStore(initialState: initial) {
+            CourseEditFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.timeFieldTapped) {
+            $0.activeWheel = .time
+            $0.isWheelPresented = true
+            $0.draftTime = DateComponents(hour: 15, minute: 30)
+        }
+    }
+
+    func test_휠을_닫아도_시트가_내리기_전에는_본문이_남는다() async {
+        let calendar = Calendar.current
+        let now = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 23, hour: 22, minute: 3)
+        ) ?? Date.distantPast
+        let store = TestStore(
+            initialState: CourseEditFeature.State(dateCourseID: "1", now: now)
+        ) {
+            CourseEditFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.timeFieldTapped) {
+            $0.activeWheel = .time
+            $0.isWheelPresented = true
+        }
+        await store.send(.wheelDismissed) {
+            $0.isWheelPresented = false
+        }
+        XCTAssertEqual(store.state.activeWheel, .time)
+        await store.send(.wheelDismissFinished) {
+            $0.activeWheel = nil
+        }
+    }
+}
+
+@MainActor
+final class BottomSheetDismissGateTests: XCTestCase {
+    func test_화면이_남으면_닫힘_완료가_onDismissed를_부른다() {
+        var gate = BottomSheetDismissGate()
+        let started = gate.bump()
+        XCTAssertTrue(gate.shouldDeliver(started: started))
+    }
+
+    func test_화면이_빠지면_닫힘_완료가_onDismissed를_안_부른다() {
+        var gate = BottomSheetDismissGate()
+        let started = gate.bump()
+        gate.bump()
+        XCTAssertFalse(gate.shouldDeliver(started: started))
     }
 }
 

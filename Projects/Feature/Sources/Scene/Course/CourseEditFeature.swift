@@ -73,6 +73,8 @@ public struct CourseEditFeature {
         public var entry: Snapshot?
         public var pendingUndo: DeletedPlace?
         public var activeWheel: Wheel?
+        // 플래그가 먼저 내려가고, 퇴장이 끝난 뒤 activeWheel 을 비운다
+        public var isWheelPresented = false
         public var draftDate: DateComponents
         public var draftTime: DateComponents
         public var isBackModalPresented: Bool
@@ -96,6 +98,7 @@ public struct CourseEditFeature {
             self.entry = nil
             self.pendingUndo = nil
             self.activeWheel = nil
+            self.isWheelPresented = false
             self.draftDate = tomorrow
             self.draftTime = nowTime
             self.isBackModalPresented = false
@@ -117,6 +120,7 @@ public struct CourseEditFeature {
         case wheelDraftChanged(Wheel, DateComponents)
         case wheelConfirmed
         case wheelDismissed
+        case wheelDismissFinished
 
         case placeMoved(from: Int, to: Int)
         case placeDeleteTapped(id: String)
@@ -163,7 +167,7 @@ public struct CourseEditFeature {
         case .onAppear, .retryTapped, .courseResponse:
             return load(state: &state, action: action)
         case .titleChanged, .dateFieldTapped, .timeFieldTapped,
-             .wheelDraftChanged, .wheelConfirmed, .wheelDismissed:
+             .wheelDraftChanged, .wheelConfirmed, .wheelDismissed, .wheelDismissFinished:
             return updateForm(state: &state, action: action)
         case .placeMoved, .placeDeleteTapped, .undoTapped, .toastDismissed,
              .addPlaceTapped, .placesAdded:
@@ -239,12 +243,14 @@ private extension CourseEditFeature {
         case .dateFieldTapped:
             state.draftDate = Self.dateComponents(from: state.scheduledDate)
             state.activeWheel = .date
+            state.isWheelPresented = true
             return .none
 
         case .timeFieldTapped:
             // 기본값을 scheduledTime 에 넣지 않는다. 시간 없는 코스는 칸이 빈 채로 남는다
             state.draftTime = state.scheduledTime ?? state.draftTime
             state.activeWheel = .time
+            state.isWheelPresented = true
             return .none
 
         case let .wheelDraftChanged(wheel, components):
@@ -256,6 +262,10 @@ private extension CourseEditFeature {
             return .none
 
         case .wheelDismissed:
+            state.isWheelPresented = false
+            return .none
+
+        case .wheelDismissFinished:
             state.activeWheel = nil
             return .none
 
@@ -369,7 +379,7 @@ private extension CourseEditFeature {
         case .none:
             break
         }
-        state.activeWheel = nil
+        state.isWheelPresented = false
     }
 
     func updateCourse(state: State) -> Effect<Action> {

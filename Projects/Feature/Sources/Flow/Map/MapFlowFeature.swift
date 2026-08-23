@@ -39,6 +39,8 @@ public struct MapFlowFeature {
 
         /// 행 메뉴 `수정` 으로 뜬 별칭 지정 시트
         @Presents public var alias: PlaceAliasFeature.State?
+        // 플래그가 먼저 내려가고, 퇴장이 끝난 뒤 alias 를 비운다
+        public var isAliasPresented: Bool = false
 
         /// 장소 상세에서 뜬 게시글 상세. 시트 표시는 `MapFlowView` 가 한다
         @Presents public var postDetail: PostDetailFeature.State?
@@ -53,6 +55,7 @@ public struct MapFlowFeature {
             placeSearch: PlaceSearchFeature.State? = nil,
             detail: PlaceDetailFeature.State? = nil,
             alias: PlaceAliasFeature.State? = nil,
+            isAliasPresented: Bool = false,
             postDetail: PostDetailFeature.State? = nil
         ) {
             self.map = map
@@ -64,6 +67,7 @@ public struct MapFlowFeature {
             self.placeSearch = placeSearch
             self.detail = detail
             self.alias = alias
+            self.isAliasPresented = isAliasPresented
             self.postDetail = postDetail
         }
     }
@@ -87,6 +91,7 @@ public struct MapFlowFeature {
         case coursePlaceAdd(CourseFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
         case detail(PresentationAction<PlaceDetailFeature.Action>)
+        case aliasCloseRequested
         case alias(PresentationAction<PlaceAliasFeature.Action>)
         case postDetail(PresentationAction<PostDetailFeature.Action>)
         case delegate(Delegate)
@@ -151,7 +156,9 @@ public struct MapFlowFeature {
             return handle(coursePlaceAddDelegate: delegate, state: &state)
         case let .placeSearch(.delegate(delegate)):
             return handle(searchDelegate: delegate, state: &state)
-        case .detail, .alias, .postDetail:
+        case .aliasCloseRequested, .alias:
+            return handleAlias(state: &state, action: action)
+        case .detail, .postDetail:
             return handleChild(state: &state, action: action)
         case .map, .course, .courseResult, .courseEdit, .coursePlaceAdd, .placeSearch, .delegate:
             return .none
@@ -279,6 +286,7 @@ private extension MapFlowFeature {
         case let .aliasRequested(id):
             if let saved = state.map.places.first(where: { $0.id == id }) {
                 state.alias = PlaceAliasFeature.State(savedPlace: saved)
+                state.isAliasPresented = true
             }
             return .none
         case .deleteRequested:
@@ -436,20 +444,40 @@ private extension MapFlowFeature {
         }
     }
 
-    func handleChild(state: inout State, action: Action) -> Effect<Action> {
+    func handleAlias(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case .aliasCloseRequested:
+            state.isAliasPresented = false
+            return .none
+
         case let .alias(.presented(.delegate(.saved(savedPlace)))):
-            state.alias = nil
+            state.isAliasPresented = false
             return .send(.map(.aliasSaved(savedPlace)))
 
-        case .alias(.presented(.delegate(.cancelled))), .alias(.dismiss):
-            state.alias = nil
+        case .alias(.presented(.delegate(.cancelled))):
+            state.isAliasPresented = false
+            return .none
+
+        case .alias(.dismiss):
+            state.isAliasPresented = false
             return .none
 
         case .alias(.presented(.delegate(.sessionExpired))):
+            // 화면을 떠나므로 퇴장 애니메이션을 기다리지 않는다
+            state.isAliasPresented = false
             state.alias = nil
             return .send(.delegate(.sessionExpired))
 
+        case .alias:
+            return .none
+
+        default:
+            return .none
+        }
+    }
+
+    func handleChild(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .detail:
             return handleDetail(state: &state, action: action)
 
@@ -474,7 +502,7 @@ private extension MapFlowFeature {
             focusContentPlaceDetail(state: &state, id: id)
             return .none
 
-        case .alias, .postDetail:
+        case .postDetail:
             return .none
 
         default:

@@ -27,7 +27,11 @@ public struct CourseDateView: View {
 
     public var body: some View {
         content
-            .bottomSheet(isPresented: isWheelPresented, showsHandle: false) {
+            .bottomSheet(
+                isPresented: isWheelPresented,
+                showsHandle: false,
+                onDismissed: { store.send(.wheelDismissFinished) }
+            ) {
                 wheelSheet
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -132,7 +136,7 @@ private extension CourseDateView {
 
     var isWheelPresented: Binding<Bool> {
         Binding(
-            get: { store.activeWheel != nil },
+            get: { store.isWheelPresented },
             set: { isPresented in
                 guard !isPresented else { return }
                 store.send(.wheelDismissed)

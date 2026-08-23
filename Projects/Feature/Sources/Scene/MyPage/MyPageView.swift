@@ -47,7 +47,10 @@ public struct MyPageView: View {
                     .ignoresSafeArea()
             }
         }
-        .bottomSheet(isPresented: profileEditBinding) {
+        .bottomSheet(
+            isPresented: profileEditBinding,
+            onDismissed: { store.send(.profileEdit(.dismiss)) }
+        ) {
             if let editStore = store.scope(state: \.profileEdit, action: \.profileEdit.presented) {
                 ProfileEditView(store: editStore)
             }
@@ -135,10 +138,10 @@ public struct MyPageView: View {
 
     private var profileEditBinding: Binding<Bool> {
         Binding(
-            get: { store.profileEdit != nil },
+            get: { store.isProfileEditPresented },
             set: { isPresented in
                 if !isPresented {
-                    store.send(.profileEdit(.dismiss))
+                    store.send(.profileEditCloseRequested)
                 }
             }
         )
