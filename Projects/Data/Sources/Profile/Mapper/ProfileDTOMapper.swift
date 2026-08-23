@@ -55,7 +55,18 @@ enum ProfileDTOMapper {
         NotificationSettings(
             contentSavedEnabled: dto.contentSavedEnabled,
             dateScheduleEnabled: dto.dateScheduleEnabled,
-            marketingEnabled: dto.marketingEnabled
+            marketingEnabled: dto.marketingEnabled,
+            marketingConsentVersion: dto.marketingConsentVersion,
+            availableMarketingConsentVersion: dto.availableMarketingConsentVersion
+        )
+    }
+
+    static func toRequest(_ settings: NotificationSettings) -> NotificationSettingsRequestDTO {
+        NotificationSettingsRequestDTO(
+            contentSavedEnabled: settings.contentSavedEnabled,
+            dateScheduleEnabled: settings.dateScheduleEnabled,
+            marketingEnabled: settings.marketingEnabled,
+            marketingConsentVersion: settings.marketingConsentVersion
         )
     }
 

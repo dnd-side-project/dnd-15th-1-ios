@@ -29,6 +29,19 @@ public struct ProfileRepository: Sendable {
         }
     }
 
+    public func updateNotificationSettings(
+        _ settings: NotificationSettings
+    ) async throws -> NotificationSettings {
+        do {
+            let dto = try await profileRemote.updateNotificationSettings(
+                ProfileDTOMapper.toRequest(settings)
+            )
+            return ProfileDTOMapper.toDomain(dto)
+        } catch {
+            throw ProfileErrorMapper.map(error)
+        }
+    }
+
     public func updateNickname(nickname: String, iconID: Int) async throws -> UserProfile {
         do {
             let member = try await profileRemote.member()

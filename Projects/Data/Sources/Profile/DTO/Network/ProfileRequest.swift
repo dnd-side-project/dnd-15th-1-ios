@@ -16,6 +16,16 @@ struct UpdateMemberProfileRequestDTO: Encodable, Sendable {
     let profileIcon: Int
 }
 
+// MARK: - Notification Settings
+
+struct NotificationSettingsRequestDTO: Encodable, Sendable {
+    let contentSavedEnabled: Bool
+    let dateScheduleEnabled: Bool
+    let marketingEnabled: Bool
+    /// 마케팅을 켤 때 동의한 약관 버전. nil 이면 키가 실리지 않는다
+    let marketingConsentVersion: String?
+}
+
 // MARK: - Date Preferences
 
 struct DatePreferencesRequestDTO: Encodable, Sendable {

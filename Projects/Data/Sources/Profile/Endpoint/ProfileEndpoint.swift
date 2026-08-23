@@ -4,6 +4,7 @@ import Foundation
 enum ProfileEndpoint: APIEndpoint {
     case member
     case notificationSettings
+    case updateNotificationSettings(NotificationSettingsRequestDTO)
     case initializeProfile(
         nickname: String,
         profileIcon: Int,
@@ -16,7 +17,7 @@ enum ProfileEndpoint: APIEndpoint {
         switch self {
         case .member:
             return "/api/v1/members/me"
-        case .notificationSettings:
+        case .notificationSettings, .updateNotificationSettings:
             return "/api/v1/members/me/notification-settings"
         case .initializeProfile, .updateProfile:
             return "/api/v1/members/me/profile"
@@ -33,7 +34,7 @@ enum ProfileEndpoint: APIEndpoint {
             return .post
         case .updateProfile:
             return .patch
-        case .updateDatePreferences:
+        case .updateDatePreferences, .updateNotificationSettings:
             return .put
         }
     }
@@ -64,6 +65,8 @@ enum ProfileEndpoint: APIEndpoint {
             )
         case let .updateDatePreferences(preferences):
             return try? encoder.encode(preferences)
+        case let .updateNotificationSettings(settings):
+            return try? encoder.encode(settings)
         }
     }
 }

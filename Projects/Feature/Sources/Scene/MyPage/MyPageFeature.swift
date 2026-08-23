@@ -8,19 +8,24 @@ public struct MyPageFeature {
     public struct State: Equatable {
         public var nickname: String
         public var iconID: Int
-        // 알림 토글. 서버 연동 전까지 화면 상태만 유지
+        // 알림 토글. 진입 시 서버 값으로 로드되고, 바꾸면 즉시 서버에 반영
         public var savedContentAlarmOn: Bool
         public var dateScheduleAlarmOn: Bool
         public var marketingAlarmOn: Bool
+        // 마케팅 약관 버전. 마케팅을 켤 때 함께 보낸다
+        public var marketingConsentVersion: String?
+        public var availableMarketingConsentVersion: String?
         public var isLoading: Bool
         public var errorMessage: String?
 
         public init(
             nickname: String = "",
             iconID: Int = 1,
-            savedContentAlarmOn: Bool = true,
-            dateScheduleAlarmOn: Bool = true,
+            savedContentAlarmOn: Bool = false,
+            dateScheduleAlarmOn: Bool = false,
             marketingAlarmOn: Bool = false,
+            marketingConsentVersion: String? = nil,
+            availableMarketingConsentVersion: String? = nil,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
@@ -29,6 +34,8 @@ public struct MyPageFeature {
             self.savedContentAlarmOn = savedContentAlarmOn
             self.dateScheduleAlarmOn = dateScheduleAlarmOn
             self.marketingAlarmOn = marketingAlarmOn
+            self.marketingConsentVersion = marketingConsentVersion
+            self.availableMarketingConsentVersion = availableMarketingConsentVersion
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
@@ -39,6 +46,7 @@ public struct MyPageFeature {
         case onAppear
         case profileLoaded(UserProfile)
         case notificationSettingsLoaded(NotificationSettings)
+        case notificationSettingsUpdateFailed
         case profileEditTapped
         case dateTypeTapped
         case connectionTapped
@@ -63,6 +71,8 @@ public struct MyPageFeature {
     @Dependency(\.authClient) var authClient
     @Dependency(\.profileClient) var profileClient
 
+    private enum CancelID { case updateNotification }
+
     public init() {}
 
     public var body: some ReducerOf<Self> {
@@ -85,7 +95,17 @@ public struct MyPageFeature {
             state.savedContentAlarmOn = settings.contentSavedEnabled
             state.dateScheduleAlarmOn = settings.dateScheduleEnabled
             state.marketingAlarmOn = settings.marketingEnabled
+            state.marketingConsentVersion = settings.marketingConsentVersion
+            state.availableMarketingConsentVersion = settings.availableMarketingConsentVersion
             return .none
+
+        case .notificationSettingsUpdateFailed:
+            // 저장 실패면 서버 값으로 되돌려 화면과 서버를 다시 맞춘다
+            return loadNotificationSettings()
+
+        case .binding(\.savedContentAlarmOn), .binding(\.dateScheduleAlarmOn),
+             .binding(\.marketingAlarmOn):
+            return updateNotificationSettings(state: state)
 
         case .logoutButtonTapped:
             guard !state.isLoading else { return .none }
@@ -124,6 +144,29 @@ public struct MyPageFeature {
             guard let settings = try? await profileClient.notificationSettings() else { return }
             await send(.notificationSettingsLoaded(settings))
         }
+    }
+
+    // 현재 토글 상태를 통째로 PUT. 마케팅 동의 버전은 저장값이 없으면 최신 가능 버전으로 보낸다
+    private func updateNotificationSettings(state: State) -> Effect<Action> {
+        let outgoing = NotificationSettings(
+            contentSavedEnabled: state.savedContentAlarmOn,
+            dateScheduleEnabled: state.dateScheduleAlarmOn,
+            marketingEnabled: state.marketingAlarmOn,
+            marketingConsentVersion: state.marketingConsentVersion
+                ?? state.availableMarketingConsentVersion,
+            availableMarketingConsentVersion: state.availableMarketingConsentVersion
+        )
+        return .run { [profileClient] send in
+            do {
+                let updated = try await profileClient.updateNotificationSettings(outgoing)
+                await send(.notificationSettingsLoaded(updated))
+            } catch {
+                // 다음 토글이 이 PUT 을 취소한 경우는 실패가 아니다
+                if error is CancellationError { return }
+                await send(.notificationSettingsUpdateFailed)
+            }
+        }
+        .cancellable(id: CancelID.updateNotification, cancelInFlight: true)
     }
 
     private func logout() -> Effect<Action> {
