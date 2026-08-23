@@ -32,7 +32,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
             bookmarkCount: 12,
             thumbnailURLs: []
         )
-        let state = PlaceDetailFeature.State(place: place)
+        let state = PlaceDetailFeature.State(place: place, query: "검색 장소")
 
         XCTAssertFalse(state.isBookmarked)
         XCTAssertNil(state.alias)
@@ -54,6 +54,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
         }
 
         await store.send(.bookmarkTapped) {
+            $0.didToggleBookmark = true
             $0.isBookmarked = false
             $0.bookmarkCount = 123
         }
@@ -80,6 +81,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
         }
 
         await store.send(.bookmarkTapped) {
+            $0.didToggleBookmark = true
             $0.isBookmarked = false
             $0.bookmarkCount = 0
         }
@@ -144,5 +146,121 @@ final class PlaceDetailFeatureTests: XCTestCase {
 
         XCTAssertTrue(state.visibleContents.isEmpty)
         XCTAssertFalse(state.canLoadMore)
+    }
+
+    func test_저장_장소로_열면_서버_상세를_부르고_세_값을_갱신한다() async {
+        let saved = SavedPlace.mocks[0]
+        let updated = PlaceDetail(
+            place: saved.place,
+            savedByMe: true,
+            savedMemberCount: 77,
+            ownership: .mine
+        )
+        let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: saved)) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.placeDetail = { _ in updated }
+        }
+
+        await store.send(.onAppear)
+        await store.receive(.detailLoaded(updated)) {
+            $0.place = Place(
+                id: $0.id,
+                kakaoPlaceID: updated.place.kakaoPlaceID,
+                name: updated.place.name,
+                category: updated.place.category,
+                address: updated.place.address,
+                roadAddress: updated.place.roadAddress,
+                coordinate: updated.place.coordinate,
+                bookmarkCount: 77,
+                thumbnailURLs: updated.place.thumbnailURLs
+            )
+            $0.bookmarkCount = 77
+            $0.isBookmarked = true
+        }
+    }
+
+    func test_검색_장소로_열면_카카오_상세를_검색어와_함께_부른다() async {
+        let place = Place.mocks[0]
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(place: place, query: "성수 카페")
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.kakaoPlaceDetail = { kakaoID, query in
+                XCTAssertEqual(kakaoID, place.kakaoPlaceID ?? "")
+                XCTAssertEqual(query, "성수 카페")
+                return PlaceDetail(
+                    place: place, savedByMe: false, savedMemberCount: 3, ownership: nil
+                )
+            }
+        }
+
+        await store.send(.onAppear)
+        await store.receive(\.detailLoaded) {
+            $0.place = Place(
+                id: $0.id,
+                kakaoPlaceID: place.kakaoPlaceID,
+                name: place.name,
+                category: place.category,
+                address: place.address,
+                roadAddress: place.roadAddress,
+                coordinate: place.coordinate,
+                bookmarkCount: 3,
+                thumbnailURLs: place.thumbnailURLs
+            )
+            $0.bookmarkCount = 3
+        }
+    }
+
+    func test_조회가_실패해도_넘겨받은_값이_남는다() async {
+        let saved = SavedPlace.mocks[0]
+        let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: saved)) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+        }
+
+        await store.send(.onAppear)
+        // 상태가 하나도 안 바뀐다
+    }
+
+    func test_조회_결과가_화면_식별자를_바꾸지_않는다() async {
+        let place = Place.mocks[0]
+        let state = PlaceDetailFeature.State(place: place, query: "성수")
+        let originalID = state.id
+        let other = Place(
+            id: "999999",
+            kakaoPlaceID: place.kakaoPlaceID,
+            name: place.name,
+            category: place.category,
+            address: place.address,
+            roadAddress: place.roadAddress,
+            coordinate: place.coordinate,
+            bookmarkCount: 5,
+            thumbnailURLs: place.thumbnailURLs
+        )
+        let store = TestStore(initialState: state) { PlaceDetailFeature() } withDependencies: {
+            $0.placeClient.kakaoPlaceDetail = { _, _ in
+                PlaceDetail(place: other, savedByMe: false, savedMemberCount: 5, ownership: nil)
+            }
+        }
+
+        await store.send(.onAppear)
+        await store.receive(\.detailLoaded) {
+            $0.place = Place(
+                id: $0.id,
+                kakaoPlaceID: other.kakaoPlaceID,
+                name: other.name,
+                category: other.category,
+                address: other.address,
+                roadAddress: other.roadAddress,
+                coordinate: other.coordinate,
+                bookmarkCount: 5,
+                thumbnailURLs: other.thumbnailURLs
+            )
+            $0.bookmarkCount = 5
+        }
+        XCTAssertEqual(store.state.id, originalID)
     }
 }

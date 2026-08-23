@@ -13,7 +13,7 @@ final class PlaceSearchFeatureTests: XCTestCase {
             PlaceSearchFeature()
         } withDependencies: {
             $0.continuousClock = clock
-            $0.placeClient.searchPlaces = { _ in places }
+            $0.placeClient.searchPlaces = { _, _ in PlacePage(items: places, hasNext: false) }
             $0.mapRecentSearchClient.load = { [] }
         }
 
@@ -41,9 +41,9 @@ final class PlaceSearchFeatureTests: XCTestCase {
             PlaceSearchFeature()
         } withDependencies: {
             $0.continuousClock = clock
-            $0.placeClient.searchPlaces = { _ in
+            $0.placeClient.searchPlaces = { _, _ in
                 XCTFail("빈 검색어로 서버를 부르면 안 된다")
-                return []
+                return PlacePage(items: [], hasNext: false)
             }
         }
 
@@ -61,7 +61,7 @@ final class PlaceSearchFeatureTests: XCTestCase {
             PlaceSearchFeature()
         } withDependencies: {
             $0.continuousClock = clock
-            $0.placeClient.searchPlaces = { _ in [] }
+            $0.placeClient.searchPlaces = { _, _ in PlacePage(items: [], hasNext: false) }
             $0.mapRecentSearchClient.load = { [] }
         }
 
@@ -144,7 +144,7 @@ final class PlaceSearchFeatureTests: XCTestCase {
             PlaceSearchFeature()
         } withDependencies: {
             $0.continuousClock = clock
-            $0.placeClient.searchPlaces = { _ in throw PlaceError.network }
+            $0.placeClient.searchPlaces = { _, _ in throw PlaceError.network }
             $0.mapRecentSearchClient.load = { [] }
         }
 
@@ -166,7 +166,7 @@ final class PlaceSearchFeatureTests: XCTestCase {
             PlaceSearchFeature()
         } withDependencies: {
             $0.continuousClock = clock
-            $0.placeClient.searchPlaces = { _ in throw PlaceError.unauthorized }
+            $0.placeClient.searchPlaces = { _, _ in throw PlaceError.unauthorized }
             $0.mapRecentSearchClient.load = { [] }
         }
 
@@ -193,7 +193,7 @@ final class PlaceSearchFeatureTests: XCTestCase {
             PlaceSearchFeature()
         } withDependencies: {
             $0.continuousClock = clock
-            $0.placeClient.searchPlaces = { _ in places }
+            $0.placeClient.searchPlaces = { _, _ in PlacePage(items: places, hasNext: false) }
         }
 
         await store.send(.recentSearchTapped("음식점")) {
@@ -219,13 +219,13 @@ final class PlaceSearchFeatureTests: XCTestCase {
             PlaceSearchFeature()
         } withDependencies: {
             $0.continuousClock = clock
-            $0.placeClient.searchPlaces = { query in
+            $0.placeClient.searchPlaces = { query, _ in
                 if query == "음식점" {
                     firstSearchStarted.setValue(true)
                     try await clock.sleep(for: .milliseconds(100))
-                    return firstPlaces
+                    return PlacePage(items: firstPlaces, hasNext: false)
                 }
-                return secondPlaces
+                return PlacePage(items: secondPlaces, hasNext: false)
             }
             $0.mapRecentSearchClient.load = { [] }
         }
@@ -252,6 +252,85 @@ final class PlaceSearchFeatureTests: XCTestCase {
         await store.receive(\.queryChangeDebounced)
         await store.receive(\.searchResponse.success) {
             $0.results = secondPlaces
+            $0.loadState = .loaded
+        }
+    }
+}
+
+@MainActor
+final class PlaceSearchFeaturePaginationTests: XCTestCase {
+    func test_끝에_닿으면_다음_페이지를_붙인다() async {
+        let first = Array(Place.mocks.prefix(3))
+        let second = Array(Place.mocks.suffix(2))
+        let store = TestStore(initialState: PlaceSearchFeature.State(query: "성수")) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.placeClient.searchPlaces = { _, page in
+                page == 0
+                    ? PlacePage(items: first, hasNext: true)
+                    : PlacePage(items: second, hasNext: false)
+            }
+            $0.mapRecentSearchClient.load = { [] }
+        }
+
+        await store.send(.onAppear) {
+            $0.loadState = .loading
+        }
+        await store.receive(\.recentSearchesUpdated)
+        await store.receive(\.searchResponse.success) {
+            $0.results = first
+            $0.hasNext = true
+            $0.loadState = .loaded
+        }
+
+        await store.send(.reachedEnd) {
+            $0.isLoadingMore = true
+        }
+        await store.receive(\.moreResponse.success) {
+            $0.results = first + second
+            $0.page = 1
+            $0.hasNext = false
+            $0.isLoadingMore = false
+        }
+    }
+
+    func test_다음이_없으면_더_부르지_않는다() async {
+        var state = PlaceSearchFeature.State(query: "성수")
+        state.hasNext = false
+        state.loadState = .loaded
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        }
+
+        await store.send(.reachedEnd)
+    }
+
+    func test_새_검색은_페이지를_0으로_되돌린다() async {
+        let clock = TestClock()
+        var state = PlaceSearchFeature.State()
+        state.page = 3
+        state.hasNext = true
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.placeClient.searchPlaces = { _, page in
+                XCTAssertEqual(page, 0)
+                return PlacePage(items: Place.mocks, hasNext: false)
+            }
+        }
+
+        await store.send(.binding(.set(\.query, "성수"))) {
+            $0.query = "성수"
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.queryChangeDebounced) {
+            $0.page = 0
+            $0.hasNext = false
+            $0.loadState = .loading
+        }
+        await store.receive(\.searchResponse.success) {
+            $0.results = Place.mocks
             $0.loadState = .loaded
         }
     }

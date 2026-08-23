@@ -52,17 +52,36 @@ final class PlaceAliasFeatureTests: XCTestCase {
     }
 
     func test_저장을_누르면_다듬은_별칭을_올린다() async {
+        let saved = SavedPlace.fixture(id: "7", alias: nil)
+        let updated = SavedPlace(
+            place: saved.place,
+            ownership: saved.ownership,
+            alias: "우리 첫 카페",
+            memo: saved.memo,
+            savedAt: saved.savedAt
+        )
         let store = TestStore(
-            initialState: PlaceAliasFeature.State(savedPlace: .fixture(id: "7", alias: nil))
+            initialState: PlaceAliasFeature.State(savedPlace: saved)
         ) {
             PlaceAliasFeature()
+        } withDependencies: {
+            $0.placeClient.updateAlias = { placeID, alias in
+                XCTAssertEqual(placeID, 7)
+                XCTAssertEqual(alias, "우리 첫 카페")
+                return updated
+            }
         }
 
         await store.send(\.binding.alias, "  우리 첫 카페  ") {
             $0.alias = "  우리 첫 카페  "
         }
-        await store.send(.saveTapped)
-        await store.receive(.delegate(.saved("7", "우리 첫 카페")))
+        await store.send(.saveTapped) {
+            $0.isSaving = true
+        }
+        await store.receive(.aliasSaved(updated)) {
+            $0.isSaving = false
+        }
+        await store.receive(.delegate(.saved(updated)))
     }
 
     func test_닫으면_취소를_올린다() async {
@@ -86,6 +105,106 @@ final class PlaceAliasFeatureTests: XCTestCase {
         await store.send(\.binding.alias, "   ") {
             $0.alias = "   "
         }
+        await store.send(.saveTapped)
+    }
+
+    func test_저장이_성공하면_서버가_준_저장_장소를_올린다() async {
+        let saved = SavedPlace.mocks[0]
+        let updated = SavedPlace(
+            place: saved.place,
+            ownership: saved.ownership,
+            alias: "우리 카페",
+            memo: saved.memo,
+            savedAt: saved.savedAt
+        )
+        let store = TestStore(initialState: PlaceAliasFeature.State(savedPlace: saved)) {
+            PlaceAliasFeature()
+        } withDependencies: {
+            $0.placeClient.updateAlias = { placeID, alias in
+                XCTAssertEqual(placeID, Int(saved.place.id))
+                XCTAssertEqual(alias, "우리 카페")
+                return updated
+            }
+        }
+
+        await store.send(\.binding.alias, "우리 카페") {
+            $0.alias = "우리 카페"
+        }
+        await store.send(.saveTapped) {
+            $0.isSaving = true
+        }
+        await store.receive(.aliasSaved(updated)) {
+            $0.isSaving = false
+        }
+        await store.receive(.delegate(.saved(updated)))
+    }
+
+    func test_저장이_실패하면_시트가_안_닫히고_문구가_뜬다() async {
+        let saved = SavedPlace.mocks[0]
+        let store = TestStore(initialState: PlaceAliasFeature.State(savedPlace: saved)) {
+            PlaceAliasFeature()
+        } withDependencies: {
+            $0.placeClient.updateAlias = { _, _ in throw PlaceError.network }
+        }
+
+        await store.send(\.binding.alias, "우리 카페") {
+            $0.alias = "우리 카페"
+        }
+        await store.send(.saveTapped) {
+            $0.isSaving = true
+        }
+        await store.receive(.aliasSaveFailed(.network)) {
+            $0.isSaving = false
+            $0.errorMessage = "잠시 뒤 다시 시도해주세요"
+        }
+    }
+
+    func test_저장한_장소가_아니면_그_문구를_보인다() async {
+        let saved = SavedPlace.mocks[0]
+        let store = TestStore(initialState: PlaceAliasFeature.State(savedPlace: saved)) {
+            PlaceAliasFeature()
+        } withDependencies: {
+            $0.placeClient.updateAlias = { _, _ in throw PlaceError.notFound }
+        }
+
+        await store.send(\.binding.alias, "우리 카페") {
+            $0.alias = "우리 카페"
+        }
+        await store.send(.saveTapped) {
+            $0.isSaving = true
+        }
+        await store.receive(.aliasSaveFailed(.notFound)) {
+            $0.isSaving = false
+            $0.errorMessage = "저장한 장소가 아니에요"
+        }
+    }
+
+    func test_저장이_만료되면_세션만료를_올린다() async {
+        let saved = SavedPlace.mocks[0]
+        let store = TestStore(initialState: PlaceAliasFeature.State(savedPlace: saved)) {
+            PlaceAliasFeature()
+        } withDependencies: {
+            $0.placeClient.updateAlias = { _, _ in throw PlaceError.unauthorized }
+        }
+
+        await store.send(\.binding.alias, "우리 카페") {
+            $0.alias = "우리 카페"
+        }
+        await store.send(.saveTapped) {
+            $0.isSaving = true
+        }
+        await store.receive(.aliasSaveFailed(.unauthorized)) {
+            $0.isSaving = false
+        }
+        await store.receive(.delegate(.sessionExpired))
+    }
+
+    func test_저장_중에는_다시_누를_수_없다() async {
+        let saved = SavedPlace.mocks[0]
+        var state = PlaceAliasFeature.State(savedPlace: saved)
+        state.isSaving = true
+        let store = TestStore(initialState: state) { PlaceAliasFeature() }
+
         await store.send(.saveTapped)
     }
 }
