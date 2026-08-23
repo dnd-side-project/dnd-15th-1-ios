@@ -3,12 +3,13 @@ import CoreSocialAuth
 import CoreStorage
 import Foundation
 
-/// Auth / Profile / Couple 이 공유하는 세션 조립 결과.
+/// Auth / Profile / Couple / Push 가 공유하는 세션 조립 결과.
 /// authed client 를 한 번만 만들어 토큰 재발급 single-flight 를 공유한다.
 public struct AuthSessionAssembly: Sendable {
     let plainClient: any NetworkClient
     let authedClient: any NetworkClient
     let authLocal: AuthLocalDataSource
+    let pushLocal: PushLocalDataSource
     let socialAuth: SocialAuthCredentialProvider
 
     public static func make(
@@ -18,6 +19,7 @@ public struct AuthSessionAssembly: Sendable {
     ) -> AuthSessionAssembly {
         let plainClient = NetworkClientFactory.plain(config: networkConfig)
         let authLocal = AuthLocalDataSource(storage: keychain)
+        let pushLocal = PushLocalDataSource(storage: keychain)
         let socialAuth = SocialAuthCredentialProvider(clients: socialAuthClients)
         let plainRemote = AuthRemoteDataSource(
             plainClient: plainClient,
@@ -37,6 +39,7 @@ public struct AuthSessionAssembly: Sendable {
             plainClient: plainClient,
             authedClient: authedClient,
             authLocal: authLocal,
+            pushLocal: pushLocal,
             socialAuth: socialAuth
         )
     }
