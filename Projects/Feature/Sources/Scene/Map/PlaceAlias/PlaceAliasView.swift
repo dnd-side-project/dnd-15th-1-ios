@@ -29,6 +29,7 @@ public struct PlaceAliasView: View {
                 size: .large,
                 style: .filled,
                 accessory: .clear,
+                errorMessage: store.errorMessage,
                 sanitize: PlaceAliasFeature.sanitizedAlias,
                 isFocused: $isAliasFocused,
                 onSubmit: { isAliasFocused = false }
@@ -45,7 +46,7 @@ public struct PlaceAliasView: View {
             AppButton("저장", style: .primary, size: .xl, fullWidth: true) {
                 store.send(.saveTapped)
             }
-            .disabled(!store.isSaveEnabled)
+            .disabled(!store.isSaveEnabled || store.isSaving)
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.bottom, Spacing.s20)
