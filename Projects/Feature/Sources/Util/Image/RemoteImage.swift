@@ -11,6 +11,9 @@ public struct RemoteImage: View {
     private let cornerRadius: CGFloat
     private let placeholderImage: Image?
 
+    @Environment(\.displayScale) private var displayScale
+    @State private var measuredSize: CGSize = .zero
+
     /// 원격 이미지를 표시한다.
     /// - Parameters:
     ///   - url: 받아올 이미지 주소. `nil` 이면 실패와 같은 placeholder 가 보인다
@@ -24,27 +27,43 @@ public struct RemoteImage: View {
 
     public var body: some View {
         content
+            .onGeometryChange(for: CGSize.self) { proxy in
+                CGSize(
+                    width: floor(proxy.size.width),
+                    height: floor(proxy.size.height)
+                )
+            } action: { measuredSize = $0 }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 
     @ViewBuilder
     private var content: some View {
         if let url {
-            LazyImage(
+            if let request = RemoteImageRequest.make(
                 url: url,
-                transaction: Transaction(animation: .easeOut(duration: Self.fadeDuration))
-            ) { state in
-                if let image = state.image {
-                    // Color.clear 가 부모 제안 크기를 그대로 받아, 넘치는 부분을 자를 기준을 만든다
-                    Color.clear
-                        .overlay {
-                            image.resizable().scaledToFill()
-                        }
-                } else if state.error != nil {
-                    placeholder
-                } else {
-                    ShimmerBlock(baseColor: .gray300)
+                size: measuredSize,
+                scale: displayScale
+            ) {
+                LazyImage(
+                    request: request,
+                    transaction: Transaction(animation: .easeOut(duration: Self.fadeDuration))
+                ) { state in
+                    if let image = state.image {
+                        // Color.clear 가 부모 제안 크기를 그대로 받아, 넘치는 부분을 자를 기준을 만든다
+                        Color.clear
+                            .overlay {
+                                image.resizable().scaledToFill()
+                            }
+                    } else if state.error != nil {
+                        placeholder
+                    } else {
+                        ShimmerBlock(baseColor: .gray300)
+                    }
                 }
+                // NukeUI LazyImageContext 는 thumbnail userInfo 를 동등 비교하지 않는다
+                .id(measuredSize)
+            } else {
+                ShimmerBlock(baseColor: .gray300)
             }
         } else {
             placeholder
