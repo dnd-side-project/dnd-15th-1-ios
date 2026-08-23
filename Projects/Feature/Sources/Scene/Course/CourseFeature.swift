@@ -35,6 +35,8 @@ public struct CourseFeature {
         public var time: DateComponents?
         public var showsDateError = false
         public var activeWheel: WheelTarget?
+        // 플래그가 먼저 내려가고, 퇴장이 끝난 뒤 activeWheel 을 비운다
+        public var isWheelPresented = false
         /// 자정을 넘겨도 하한과 초기값이 다른 날을 가리키지 않게, 한 번 센 내일로 둔다
         public var tomorrow: DateComponents
         /// 시트 안에서 굴리는 임시값. `확인` 을 눌러야 date/time 으로 넘어간다
@@ -92,6 +94,7 @@ public struct CourseFeature {
         case wheelDraftChanged(DateComponents)
         case wheelConfirmed
         case wheelDismissed
+        case wheelDismissFinished
         case nextTapped
 
         // 장소 화면
@@ -140,7 +143,7 @@ public struct CourseFeature {
         case .onAppear, .retryTapped, .coursePlacesResponse, .coupleResponse:
             return load(state: &state, action: action)
         case .dateFieldTapped, .timeFieldTapped, .wheelDraftChanged, .wheelConfirmed, .wheelDismissed,
-             .nextTapped, .courseCreated, .toastDismissed:
+             .wheelDismissFinished, .nextTapped, .courseCreated, .toastDismissed:
             return updateDate(state: &state, action: action)
         case .ownershipSelected, .categoryTapped, .rowTapped, .markerTapped, .cameraChanged:
             return updatePlace(state: &state, action: action)
@@ -198,11 +201,13 @@ private extension CourseFeature {
         case .dateFieldTapped:
             state.draftDate = state.date ?? state.draftDate
             state.activeWheel = .date
+            state.isWheelPresented = true
             return .none
 
         case .timeFieldTapped:
             state.draftTime = state.time ?? state.draftTime
             state.activeWheel = .time
+            state.isWheelPresented = true
             return .none
 
         case let .wheelDraftChanged(components):
@@ -214,6 +219,10 @@ private extension CourseFeature {
             return .none
 
         case .wheelDismissed:
+            state.isWheelPresented = false
+            return .none
+
+        case .wheelDismissFinished:
             state.activeWheel = nil
             return .none
 
@@ -470,7 +479,7 @@ private extension CourseFeature {
         case .none:
             break
         }
-        state.activeWheel = nil
+        state.isWheelPresented = false
     }
 
     func toggle(_ state: inout State, id: String) {
