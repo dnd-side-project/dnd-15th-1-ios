@@ -4,10 +4,16 @@ import ThirdParty
 
 @Reducer
 public struct MyPageFeature {
+    public enum Route: Hashable {
+        case dateType
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var nickname: String
         public var iconID: Int
+        // 현재 데이트 유형. 나의 데이트 유형 화면에 미리 선택된 채로 넘긴다
+        public var datePreference: DatePreference?
         // 알림 토글. 진입 시 서버 값으로 로드되고, 바꾸면 즉시 서버에 반영
         public var savedContentAlarmOn: Bool
         public var dateScheduleAlarmOn: Bool
@@ -19,12 +25,16 @@ public struct MyPageFeature {
         public var presentedTerms: TermsType?
         // 프로필 수정 바텀시트
         @Presents public var profileEdit: ProfileEditFeature.State?
+        // 나의 데이트 유형 push 스택
+        public var path: [Route]
+        public var dateType: DateTypeFeature.State?
         public var isLoading: Bool
         public var errorMessage: String?
 
         public init(
             nickname: String = "",
             iconID: Int = 1,
+            datePreference: DatePreference? = nil,
             savedContentAlarmOn: Bool = false,
             dateScheduleAlarmOn: Bool = false,
             marketingAlarmOn: Bool = false,
@@ -32,11 +42,14 @@ public struct MyPageFeature {
             availableMarketingConsentVersion: String? = nil,
             presentedTerms: TermsType? = nil,
             profileEdit: ProfileEditFeature.State? = nil,
+            path: [Route] = [],
+            dateType: DateTypeFeature.State? = nil,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
             self.nickname = nickname
             self.iconID = iconID
+            self.datePreference = datePreference
             self.savedContentAlarmOn = savedContentAlarmOn
             self.dateScheduleAlarmOn = dateScheduleAlarmOn
             self.marketingAlarmOn = marketingAlarmOn
@@ -44,6 +57,8 @@ public struct MyPageFeature {
             self.availableMarketingConsentVersion = availableMarketingConsentVersion
             self.presentedTerms = presentedTerms
             self.profileEdit = profileEdit
+            self.path = path
+            self.dateType = dateType
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
@@ -64,6 +79,8 @@ public struct MyPageFeature {
         case logoutButtonTapped
         case logoutResponse(Result<EquatableVoid, AuthError>)
         case profileEdit(PresentationAction<ProfileEditFeature.Action>)
+        case pathChanged([Route])
+        case dateType(DateTypeFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
@@ -90,6 +107,9 @@ public struct MyPageFeature {
             .ifLet(\.$profileEdit, action: \.profileEdit) {
                 ProfileEditFeature()
             }
+            .ifLet(\.dateType, action: \.dateType) {
+                DateTypeFeature()
+            }
             .logged(as: Self.self)
     }
 
@@ -101,6 +121,7 @@ public struct MyPageFeature {
         case let .profileLoaded(profile):
             state.nickname = profile.nickname
             state.iconID = profile.iconID
+            state.datePreference = profile.datePreference
             return .none
 
         case let .notificationSettingsLoaded(settings):
@@ -135,7 +156,10 @@ public struct MyPageFeature {
         case .profileEditTapped, .profileEdit:
             return handleProfileEdit(state: &state, action: action)
 
-        case .binding, .dateTypeTapped, .connectionTapped, .withdrawTapped, .delegate:
+        case .dateTypeTapped, .pathChanged, .dateType:
+            return handleDateType(state: &state, action: action)
+
+        case .binding, .connectionTapped, .withdrawTapped, .delegate:
             // 이동할 화면들은 아직 없음. 붙는 대로 연결
             return .none
         }
@@ -174,7 +198,50 @@ public struct MyPageFeature {
         }
     }
 
-    private func handleLogout(state: inout State, action: Action) -> Effect<Action> {
+    private func handleDateType(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .dateTypeTapped:
+            // 현재 데이트 유형을 미리 채우고, 건너뛰기 없이 push
+            let pref = state.datePreference
+            state.dateType = DateTypeFeature.State(
+                indoorOutdoor: pref?.indoorOutdoor,
+                activityLevel: pref?.activityLevel,
+                dateTime: pref?.dateTime,
+                dateFocus: pref?.dateFocus,
+                showsSkip: false
+            )
+            state.path.append(.dateType)
+            return .none
+
+        case let .pathChanged(path):
+            state.path = path
+            if !path.contains(.dateType) { state.dateType = nil }
+            return .none
+
+        case let .dateType(.delegate(.saved(profile))):
+            // 저장 성공. 새 유형을 반영하고 뒤로 돌아온다
+            state.datePreference = profile.datePreference
+            state.dateType = nil
+            if !state.path.isEmpty { state.path.removeLast() }
+            return .none
+
+        case .dateType(.delegate(.sessionExpired)):
+            state.dateType = nil
+            state.path = []
+            return .send(.delegate(.sessionExpired))
+
+        case .dateType:
+            // 마이페이지엔 건너뛰기가 없어 skipped 는 오지 않는다
+            return .none
+
+        default:
+            return .none
+        }
+    }
+}
+
+private extension MyPageFeature {
+    func handleLogout(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .logoutButtonTapped:
             guard !state.isLoading else { return .none }

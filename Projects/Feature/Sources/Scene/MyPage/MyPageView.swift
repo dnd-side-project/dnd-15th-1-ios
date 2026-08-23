@@ -38,6 +38,9 @@ public struct MyPageView: View {
             }
         }
         .toolbarRole(.editor)
+        .navigationDestination(for: MyPageFeature.Route.self) { route in
+            destination(route)
+        }
         .sheet(item: presentedTermsBinding) { terms in
             if let url = terms.url {
                 SafariView(url: url)
@@ -53,6 +56,35 @@ public struct MyPageView: View {
         .toolbar(store.profileEdit == nil ? .automatic : .hidden, for: .tabBar)
         .task {
             store.send(.onAppear)
+        }
+    }
+
+    // push 목적지. 데이트 유형 화면은 하단탭을 스스로 숨긴다
+    @ViewBuilder
+    private func destination(_ route: MyPageFeature.Route) -> some View {
+        switch route {
+        case .dateType:
+            if let dateTypeStore = store.scope(state: \.dateType, action: \.dateType) {
+                DateTypeView(store: dateTypeStore)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarBackButtonHidden(true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button { store.send(.pathChanged([])) } label: {
+                                Image.arrowLeft
+                                    .renderingMode(.original)
+                                    .resizable()
+                                    .frame(width: 24, height: 24)
+                            }
+                        }
+                        ToolbarItem(placement: .principal) {
+                            Text("나의 데이트 유형")
+                                .typography(.body1SB)
+                                .foregroundStyle(Color.commonWhite)
+                        }
+                    }
+                    .toolbar(.hidden, for: .tabBar)
+            }
         }
     }
 

@@ -27,8 +27,8 @@ public struct MainTabView: View {
                 .tabItem { tabLabel("지도", icon: .map) }
                 .tag(MainTabFeature.Tab.map)
 
-            NavigationStack {
-                MyPageView(store: store.scope(state: \.myPage, action: \.myPage))
+            NavigationStack(path: myPagePath) {
+                MyPageView(store: myPageStore)
             }
             .tabItem { tabLabel("마이", icon: .my) }
             .tag(MainTabFeature.Tab.myPage)
@@ -58,6 +58,18 @@ public struct MainTabView: View {
         return Binding(
             get: { exploreStore.path },
             set: { exploreStore.send(.searchPathChanged($0)) }
+        )
+    }
+
+    private var myPageStore: StoreOf<MyPageFeature> {
+        store.scope(state: \.myPage, action: \.myPage)
+    }
+
+    private var myPagePath: Binding<[MyPageFeature.Route]> {
+        let myPageStore = myPageStore
+        return Binding(
+            get: { myPageStore.path },
+            set: { myPageStore.send(.pathChanged($0)) }
         )
     }
 
