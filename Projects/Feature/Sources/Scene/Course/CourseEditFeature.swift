@@ -80,10 +80,11 @@ public struct CourseEditFeature {
         public var toast: ToastState?
 
         public init(dateCourseID: String, now: Date = Date()) {
-            let calendar = Calendar.current
-            let tomorrowDate = calendar.date(byAdding: .day, value: 1, to: now) ?? now
-            let tomorrow = calendar.dateComponents([.year, .month, .day], from: tomorrowDate)
-            let nowTime = calendar.dateComponents([.hour, .minute], from: now)
+            var seoul = Calendar(identifier: .gregorian)
+            seoul.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .gmt
+            let tomorrowDate = seoul.date(byAdding: .day, value: 1, to: now) ?? now
+            let tomorrow = seoul.dateComponents([.year, .month, .day], from: tomorrowDate)
+            let nowTime = Calendar.current.dateComponents([.hour, .minute], from: now)
             self.dateCourseID = dateCourseID
             self.loadState = .loading
             self.version = 0

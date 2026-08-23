@@ -62,10 +62,11 @@ public struct CourseFeature {
         public var camera: MapCamera = .seoulCityHall
 
         public init(now: Date = Date(), mode: Mode = .create) {
-            let calendar = Calendar.current
-            let tomorrowDate = calendar.date(byAdding: .day, value: 1, to: now) ?? now
-            let tomorrow = calendar.dateComponents([.year, .month, .day], from: tomorrowDate)
-            let nowTime = calendar.dateComponents([.hour, .minute], from: now)
+            var seoul = Calendar(identifier: .gregorian)
+            seoul.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .gmt
+            let tomorrowDate = seoul.date(byAdding: .day, value: 1, to: now) ?? now
+            let tomorrow = seoul.dateComponents([.year, .month, .day], from: tomorrowDate)
+            let nowTime = Calendar.current.dateComponents([.hour, .minute], from: now)
             self.tomorrow = tomorrow
             self.draftDate = tomorrow
             self.draftTime = nowTime
