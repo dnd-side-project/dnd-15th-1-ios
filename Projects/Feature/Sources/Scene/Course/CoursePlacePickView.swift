@@ -134,6 +134,7 @@ private extension CoursePlacePickView {
             Text("저장한 장소")
                 .typography(.title3SB)
                 .foregroundStyle(Color.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
                     if grabFrames != [$0] { grabFrames = [$0] }
                 }
