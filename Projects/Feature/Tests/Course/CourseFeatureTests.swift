@@ -334,21 +334,25 @@ final class CoursePlacePickTests: XCTestCase {
         initial.selectedPlaceIDs = ["a", "b"]
         initial.dateCourseID = "42"
         initial.version = 0
-        let store = TestStore(initialState: initial) { CourseFeature() }
+        let saved = DateCourse(
+            id: "42",
+            title: "30.08.05 데이트",
+            scheduledAt: Date(timeIntervalSince1970: 0),
+            status: .confirmed,
+            version: 1,
+            stops: [],
+            legs: []
+        )
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.updateCourse = { _, _, _, _, _ in saved }
+        }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.buildTapped)
-        await store.receive(
-            .delegate(
-                .buildRequested(
-                    dateCourseID: "42",
-                    version: 0,
-                    date: DateComponents(year: 2030, month: 8, day: 5),
-                    time: DateComponents(hour: 13, minute: 0),
-                    placeIDs: ["a", "b"]
-                )
-            )
-        )
+        await store.receive(\.courseSaved)
+        await store.receive(.delegate(.buildRequested(saved)))
     }
 
     func test_장소를_안_고르면_코스짜기가_나가지_않는다() async {
@@ -551,5 +555,149 @@ final class CoursePlacePickCameraTests: XCTestCase {
             $0.loadState = .loaded
             $0.camera = .seoulCityHall
         }
+    }
+}
+
+@MainActor
+final class CourseSaveTests: XCTestCase {
+    private let savedPlaces: [CoursePlaceCandidate] = [
+        .courseFixture(id: "a", latitude: 37.31, longitude: 126.90),
+        .courseFixture(id: "b", latitude: 37.32, longitude: 126.91),
+    ]
+
+    private var confirmedCourse: DateCourse {
+        DateCourse(
+            id: "42",
+            title: "30.08.05 데이트",
+            scheduledAt: Date(timeIntervalSince1970: 0),
+            status: .confirmed,
+            version: 1,
+            stops: [],
+            legs: []
+        )
+    }
+
+    private func loadedPlacePickState() -> CourseFeature.State {
+        var initial = CourseFeature.State()
+        initial.places = savedPlaces
+        initial.loadState = .loaded
+        initial.date = DateComponents(year: 2030, month: 8, day: 5)
+        initial.time = DateComponents(hour: 13, minute: 0)
+        initial.selectedPlaceIDs = ["a", "b"]
+        initial.dateCourseID = "42"
+        initial.version = 0
+        return initial
+    }
+
+    private func placePickStore() -> TestStoreOf<CourseFeature> {
+        let store = TestStore(initialState: loadedPlacePickState()) { CourseFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        return store
+    }
+
+    func test_코스짜기를_누르면_저장하고_결과로_넘긴다() async {
+        let saved = confirmedCourse
+        let store = placePickStore()
+        store.dependencies.courseClient.updateCourse = { id, title, _, placeIDs, version in
+            XCTAssertEqual(id, "42")
+            XCTAssertEqual(title, "30.08.05 데이트")
+            XCTAssertEqual(placeIDs, ["a", "b"])
+            XCTAssertEqual(version, 0)
+            return saved
+        }
+        await store.send(.buildTapped) { $0.isSavingCourse = true }
+        await store.receive(\.courseSaved.success) {
+            $0.isSavingCourse = false
+            $0.version = saved.version
+        }
+        await store.receive(.delegate(.buildRequested(saved)))
+    }
+
+    func test_저장이_409면_다시_읽고_알린다() async {
+        let latest = DateCourse(
+            id: "42",
+            title: "30.08.05 데이트",
+            scheduledAt: Date(timeIntervalSince1970: 0),
+            status: .confirmed,
+            version: 2,
+            stops: [],
+            legs: []
+        )
+        let store = placePickStore()
+        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.conflict }
+        store.dependencies.courseClient.course = { _ in latest }
+        await store.send(.buildTapped) { $0.isSavingCourse = true }
+        await store.receive(\.courseSaved.failure)
+        await store.receive(\.conflictReloaded.success) {
+            $0.isSavingCourse = false
+            $0.version = latest.version
+            $0.conflictAlertMessage = "상대방이 코스를 먼저 바꿨어요. 다시 확인해주세요"
+        }
+    }
+
+    func test_409인데_다시_읽기도_실패하면_토스트가_뜬다() async {
+        let store = placePickStore()
+        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.conflict }
+        store.dependencies.courseClient.course = { _ in throw CourseError.network }
+        await store.send(.buildTapped) { $0.isSavingCourse = true }
+        await store.receive(\.courseSaved.failure)
+        await store.receive(\.conflictReloaded.failure) {
+            $0.isSavingCourse = false
+            $0.toast = ToastState(message: "잠시 뒤 다시 시도해주세요")
+        }
+    }
+
+    func test_저장_중에는_버튼이_잠긴다() async {
+        var initial = loadedPlacePickState()
+        initial.isSavingCourse = true
+        XCTAssertFalse(initial.isCTAEnabled)
+    }
+
+    func test_저장이_실패하면_토스트를_띄운다() async {
+        let store = placePickStore()
+        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.network }
+        await store.send(.buildTapped) { $0.isSavingCourse = true }
+        await store.receive(\.courseSaved.failure) {
+            $0.isSavingCourse = false
+            $0.toast = ToastState(message: "잠시 뒤 다시 시도해주세요")
+        }
+    }
+
+    func test_저장이_인증만료면_상위로_올린다() async {
+        let store = placePickStore()
+        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.unauthorized }
+        await store.send(.buildTapped) { $0.isSavingCourse = true }
+        await store.receive(\.courseSaved.failure) {
+            $0.isSavingCourse = false
+        }
+        await store.receive(.delegate(.sessionExpired))
+        XCTAssertNil(store.state.toast)
+    }
+
+    func test_저장_중_뒤로가면_저장을_끊는다() async {
+        let store = placePickStore()
+        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in
+            try await Task.never()
+        }
+        await store.send(.buildTapped) { $0.isSavingCourse = true }
+        await store.send(.backTapped) {
+            $0.isSavingCourse = false
+        }
+        await store.receive(.delegate(.dismissed))
+    }
+
+    func test_재조회_중_뒤로가면_재조회를_끊고_알림을_비운다() async {
+        let store = placePickStore()
+        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.conflict }
+        store.dependencies.courseClient.course = { _ in
+            try await Task.never()
+        }
+        await store.send(.buildTapped) { $0.isSavingCourse = true }
+        await store.receive(\.courseSaved.failure)
+        await store.send(.backTapped) {
+            $0.isSavingCourse = false
+            $0.conflictAlertMessage = nil
+        }
+        await store.receive(.delegate(.dismissed))
     }
 }

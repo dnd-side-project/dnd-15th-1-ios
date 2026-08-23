@@ -44,32 +44,6 @@ final class MapFlowCourseWiringTests: XCTestCase {
         }
     }
 
-    func test_코스짜기_delegate_삼킴() async {
-        let store = TestStore(
-            initialState: MapFlowFeature.State(
-                course: CourseFeature.State(),
-                path: [.course, .coursePlacePick]
-            )
-        ) {
-            MapFlowFeature()
-        }
-
-        // Cycle 5 가 코스 결과 화면을 붙이기 전까지는 아무 일도 안 일어난다
-        await store.send(
-            .course(
-                .delegate(
-                    .buildRequested(
-                        dateCourseID: "42",
-                        version: 0,
-                        date: DateComponents(year: 2030, month: 8, day: 5),
-                        time: nil,
-                        placeIDs: ["a"]
-                    )
-                )
-            )
-        )
-    }
-
     func test_경로가_비면_코스State_nil() async {
         let store = TestStore(
             initialState: MapFlowFeature.State(
@@ -121,4 +95,81 @@ final class MapFlowCourseWiringTests: XCTestCase {
             $0.course = nil
         }
     }
+}
+
+@MainActor
+final class MapFlowCourseResultTests: XCTestCase {
+
+    func test_저장이_끝나면_결과_화면이_열린다() async {
+        let store = TestStore(initialState: courseInProgressState()) {
+            MapFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.course(.delegate(.buildRequested(confirmedCourse)))) {
+            $0.path = [.course, .coursePlacePick, .courseResult]
+        }
+        XCTAssertEqual(store.state.courseResult?.course, confirmedCourse)
+        XCTAssertEqual(store.state.courseResult?.dateCourseID, confirmedCourse.id)
+        XCTAssertEqual(store.state.courseResult?.partnerNickname, "상대")
+    }
+
+    func test_결과에서_뒤로가면_지도_루트로_돌아간다() async {
+        let store = TestStore(initialState: courseResultState()) {
+            MapFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.courseResult(.delegate(.dismissed)))
+        await store.receive(\.pathChanged) {
+            $0.path = []
+            $0.course = nil
+            $0.courseResult = nil
+        }
+    }
+
+    func test_경로가_비면_코스_상태가_같이_지워진다() async {
+        let store = TestStore(initialState: courseResultState()) {
+            MapFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.pathChanged([])) {
+            $0.path = []
+            $0.course = nil
+            $0.courseResult = nil
+        }
+    }
+}
+
+// MARK: - Fixture
+
+private let confirmedCourse = DateCourse(
+    id: "42",
+    title: "t",
+    scheduledAt: Date(timeIntervalSince1970: 0),
+    status: .confirmed,
+    version: 0,
+    stops: [],
+    legs: []
+)
+
+private func courseInProgressState() -> MapFlowFeature.State {
+    var course = CourseFeature.State()
+    course.partnerNickname = "상대"
+    return MapFlowFeature.State(
+        course: course,
+        path: [.course, .coursePlacePick]
+    )
+}
+
+private func courseResultState() -> MapFlowFeature.State {
+    var state = courseInProgressState()
+    state.path = [.course, .coursePlacePick, .courseResult]
+    state.courseResult = CourseResultFeature.State(
+        course: confirmedCourse,
+        dateCourseID: confirmedCourse.id,
+        partnerNickname: state.course?.partnerNickname
+    )
+    return state
 }

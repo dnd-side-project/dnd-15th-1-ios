@@ -11,7 +11,8 @@ final class MapZoomTests: XCTestCase {
     private func fit(
         _ coordinates: [Coordinate],
         viewWidth: CGFloat = 390,
-        visibleHeight: CGFloat = 844 * 0.55
+        visibleHeight: CGFloat = 844 * 0.55,
+        focusRatio: CGFloat = 0.5
     ) -> Int {
         MapZoom.fit(
             coordinates: coordinates,
@@ -19,7 +20,8 @@ final class MapZoomTests: XCTestCase {
             viewWidth: viewWidth,
             visibleHeight: visibleHeight,
             maximum: MapCamera.singlePlaceZoom,
-            minimum: MapZoom.lowerBound
+            minimum: MapZoom.lowerBound,
+            focusRatio: focusRatio
         )
     }
 
@@ -61,5 +63,17 @@ final class MapZoomTests: XCTestCase {
         let wide = fit([anchor, far], visibleHeight: 844 * 0.55)
         let narrow = fit([anchor, far], visibleHeight: 844 * 0.25)
         XCTAssertLessThan(narrow, wide)
+    }
+
+    func test_초점이_아래면_남쪽_장소는_더_줌아웃된다() {
+        let south = Coordinate(latitude: 37.5565, longitude: 126.9780)
+        let centered = fit([anchor, south], viewWidth: 390, visibleHeight: 400, focusRatio: 0.5)
+        let mapped = fit(
+            [anchor, south],
+            viewWidth: 390,
+            visibleHeight: 400,
+            focusRatio: MapZoom.mapFocusRatio
+        )
+        XCTAssertLessThan(mapped, centered)
     }
 }
