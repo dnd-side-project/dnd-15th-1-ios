@@ -102,9 +102,10 @@ extension DulpickMapView {
             // 120Hz 기기에서 지도가 60Hz 로 묶이는 것을 푼다. SDK 기본값이 false 다
             controller.proMotionSupport = true
             // 가변 주사율이 낮은 값으로 내려앉으면 프레임 간격이 고르지 않다.
-            // 실기기에서 이 링크를 빼면 평균 73.8Hz 가 58.5Hz 로, 프레임 떨굼이 35% 에서 54% 로 나빠졌다
+            // 실기기에서 이 링크를 빼면 평균 73.8Hz 가 58.5Hz 로, 프레임 떨굼이 35% 에서 54% 로 나빠졌다.
+            // minimum 이 이 링크가 맡는 일이다. 범위는 요청이라 시스템이 다른 요청과 함께 고른다
             let frameRateLink = UIUpdateLink(view: container)
-            frameRateLink.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
+            frameRateLink.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
             frameRateLink.isEnabled = true
             self.frameRateLink = frameRateLink
             self.controller = controller
