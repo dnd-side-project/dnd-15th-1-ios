@@ -115,4 +115,12 @@ enum CourseDTOMapper {
         }
         return components
     }
+
+    // 요약은 시각 하나다. time 이 null 이면 날짜만 있는 응답이라 자정으로 읽는다
+    private static func scheduledAt(date: String, time: String?) throws -> Date {
+        guard let scheduledAt = CourseDateFormat.date(from: date, time: time ?? "00:00:00") else {
+            throw CourseError.unknown
+        }
+        return scheduledAt
+    }
 }
