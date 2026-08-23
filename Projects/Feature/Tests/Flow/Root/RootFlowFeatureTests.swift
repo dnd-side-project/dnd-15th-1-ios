@@ -1,5 +1,6 @@
 import Domain
 import Feature
+import SharedDesignSystem
 import ThirdParty
 import XCTest
 
@@ -97,7 +98,7 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State(userID: session.userID)
+                    myPage: MyPageFeature.State()
                 )
             )
         }
@@ -179,7 +180,7 @@ final class RootFlowFeatureTests: XCTestCase {
             initialState: RootFlowFeature.State(
                 phase: .mainTab(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State(userID: session.userID)
+                        myPage: MyPageFeature.State()
                     )
                 )
             )
@@ -193,7 +194,11 @@ final class RootFlowFeatureTests: XCTestCase {
         }
 
         await store.send(.mainTab(.delegate(.logoutSucceeded))) {
-            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
+            $0.phase = .onboardingFlow(
+                OnboardingFlowFeature.State(
+                    auth: AuthFeature.State(toast: ToastState(message: "로그아웃 되었습니다."))
+                )
+            )
         }
     }
 
@@ -226,7 +231,7 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State(userID: session.userID)
+                    myPage: MyPageFeature.State()
                 )
             )
         }
@@ -237,7 +242,7 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .map,
-                    myPage: MyPageFeature.State(userID: session.userID)
+                    myPage: MyPageFeature.State()
                 )
             )
         }
@@ -249,7 +254,7 @@ final class RootFlowFeatureTests: XCTestCase {
             initialState: RootFlowFeature.State(
                 phase: .mainTab(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State(userID: session.userID)
+                        myPage: MyPageFeature.State()
                     )
                 )
             )
@@ -362,7 +367,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State(userID: session.userID)
+                    myPage: MyPageFeature.State()
                 )
             )
         }
@@ -429,7 +434,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State(userID: session.userID)
+                    myPage: MyPageFeature.State()
                 )
             )
         }
@@ -488,7 +493,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State(userID: session.userID)
+                    myPage: MyPageFeature.State()
                 )
             )
         }
@@ -499,7 +504,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .map,
-                    myPage: MyPageFeature.State(userID: session.userID)
+                    myPage: MyPageFeature.State()
                 )
             )
         }

@@ -143,3 +143,16 @@ public extension Image {
     static var dateTypeStatic: Image { Asset.DateType.`static`.swiftUIImage }
     static var dateTypeGraphic: Image { Asset.dateTypeGraphic.swiftUIImage }
 }
+
+// MARK: - MyPage
+
+public extension Image {
+    static var profile1: Image { Asset.profile1.swiftUIImage }
+    static var profile2: Image { Asset.profile2.swiftUIImage }
+    static var profile3: Image { Asset.profile3.swiftUIImage }
+    static var profile4: Image { Asset.profile4.swiftUIImage }
+    static var profile5: Image { Asset.profile5.swiftUIImage }
+    static var disconnect: Image { Asset.disconnect.swiftUIImage }
+    static var connectionManage: Image { Asset.connectionManage.swiftUIImage }
+    static var heartWithStroke: Image { Asset.heartWithStroke.swiftUIImage }
+}

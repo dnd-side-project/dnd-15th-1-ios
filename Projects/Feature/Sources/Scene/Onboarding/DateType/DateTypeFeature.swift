@@ -14,6 +14,8 @@ public struct DateTypeFeature {
         public var isSubmitting: Bool
         public var isTooltipPresented: Bool
         public var toast: ToastState?
+        // 온보딩은 건너뛰기 노출, 마이페이지 수정은 숨김
+        public var showsSkip: Bool
 
         public init(
             indoorOutdoor: IndoorOutdoor? = nil,
@@ -22,7 +24,8 @@ public struct DateTypeFeature {
             dateFocus: DateFocus? = nil,
             isSubmitting: Bool = false,
             isTooltipPresented: Bool = false,
-            toast: ToastState? = nil
+            toast: ToastState? = nil,
+            showsSkip: Bool = true
         ) {
             self.indoorOutdoor = indoorOutdoor
             self.activityLevel = activityLevel
@@ -31,6 +34,7 @@ public struct DateTypeFeature {
             self.isSubmitting = isSubmitting
             self.isTooltipPresented = isTooltipPresented
             self.toast = toast
+            self.showsSkip = showsSkip
         }
 
         /// 4축이 전부 채워졌을 때만 만들어진다. 부분 선택은 저장 대상이 아니다

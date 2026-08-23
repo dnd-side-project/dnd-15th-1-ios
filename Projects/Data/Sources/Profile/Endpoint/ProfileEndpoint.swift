@@ -3,6 +3,9 @@ import Foundation
 
 enum ProfileEndpoint: APIEndpoint {
     case member
+    case withdraw
+    case notificationSettings
+    case updateNotificationSettings(NotificationSettingsRequestDTO)
     case initializeProfile(
         nickname: String,
         profileIcon: Int,
@@ -13,8 +16,10 @@ enum ProfileEndpoint: APIEndpoint {
 
     var path: String {
         switch self {
-        case .member:
+        case .member, .withdraw:
             return "/api/v1/members/me"
+        case .notificationSettings, .updateNotificationSettings:
+            return "/api/v1/members/me/notification-settings"
         case .initializeProfile, .updateProfile:
             return "/api/v1/members/me/profile"
         case .updateDatePreferences:
@@ -24,14 +29,16 @@ enum ProfileEndpoint: APIEndpoint {
 
     var method: HTTPMethod {
         switch self {
-        case .member:
+        case .member, .notificationSettings:
             return .get
         case .initializeProfile:
             return .post
         case .updateProfile:
             return .patch
-        case .updateDatePreferences:
+        case .updateDatePreferences, .updateNotificationSettings:
             return .put
+        case .withdraw:
+            return .delete
         }
     }
 
@@ -42,7 +49,7 @@ enum ProfileEndpoint: APIEndpoint {
     var body: Data? {
         let encoder = NetworkJSONCoding.makeEncoder()
         switch self {
-        case .member:
+        case .member, .notificationSettings, .withdraw:
             return nil
         case let .initializeProfile(nickname, profileIcon, datePreferences):
             return try? encoder.encode(
@@ -61,6 +68,8 @@ enum ProfileEndpoint: APIEndpoint {
             )
         case let .updateDatePreferences(preferences):
             return try? encoder.encode(preferences)
+        case let .updateNotificationSettings(settings):
+            return try? encoder.encode(settings)
         }
     }
 }

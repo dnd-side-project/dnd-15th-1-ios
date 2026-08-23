@@ -47,4 +47,12 @@ public struct CoupleRepository: Sendable {
             throw CoupleErrorMapper.map(error)
         }
     }
+
+    public func disconnect() async throws {
+        do {
+            try await coupleRemote.disconnect()
+        } catch {
+            throw CoupleErrorMapper.map(error)
+        }
+    }
 }

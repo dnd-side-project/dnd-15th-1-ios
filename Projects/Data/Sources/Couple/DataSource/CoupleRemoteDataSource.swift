@@ -21,4 +21,8 @@ public struct CoupleRemoteDataSource: Sendable {
     func current() async throws -> CoupleConnectionStatusResponseDTO {
         try await networkClient.request(CoupleEndpoint.current)
     }
+
+    func disconnect() async throws {
+        try await networkClient.request(CoupleEndpoint.disconnect)
+    }
 }

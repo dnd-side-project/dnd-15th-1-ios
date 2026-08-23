@@ -25,7 +25,9 @@ public struct DateTypeView: View {
 
             CTAContainer {
                 VStack(spacing: CTAMetric.spacing) {
-                    skipButton
+                    if store.showsSkip {
+                        skipButton
+                    }
                     saveButton
                 }
             }
@@ -156,7 +158,11 @@ public struct DateTypeView: View {
     }
 
     private var toastBottomInset: CGFloat {
-        CTALayout.toastInset(
+        // 건너뛰기가 없으면 저장 버튼 높이만 계산
+        guard store.showsSkip else {
+            return CTALayout.toastInset(buttonHeights: [CTALayout.xlButtonHeight])
+        }
+        return CTALayout.toastInset(
             contentHeight: CTALayout.textButtonHeight + CTAMetric.spacing + CTALayout.xlButtonHeight
         )
     }

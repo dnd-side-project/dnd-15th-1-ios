@@ -16,6 +16,9 @@ public enum CoupleClientFactory {
             },
             current: {
                 try await repository.current()
+            },
+            disconnect: {
+                try await repository.disconnect()
             }
         )
     }

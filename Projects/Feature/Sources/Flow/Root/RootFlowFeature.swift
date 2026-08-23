@@ -1,5 +1,6 @@
 import Domain
 import Foundation
+import SharedDesignSystem
 import ThirdParty
 
 @Reducer
@@ -333,14 +334,19 @@ private extension RootFlowFeature {
     ) -> Effect<Action> {
         switch delegate {
         case .logoutSucceeded:
-            return moveToSignIn(state: &state)
+            // 로그인 화면에 로그아웃 완료를 텍스트 토스트로 알린다
+            return moveToSignIn(state: &state, toast: ToastState(message: "로그아웃 되었습니다."))
+        case .accountWithdrawn:
+            return moveToSignIn(state: &state, toast: ToastState(message: "탈퇴가 완료되었습니다."))
         case .sessionExpired:
             return .send(.sessionExpired)
         }
     }
 
-    func moveToSignIn(state: inout State) -> Effect<Action> {
-        state.phase = .onboardingFlow(OnboardingFlowFeature.State())
+    func moveToSignIn(state: inout State, toast: ToastState? = nil) -> Effect<Action> {
+        state.phase = .onboardingFlow(
+            OnboardingFlowFeature.State(auth: AuthFeature.State(toast: toast))
+        )
         return .none
     }
 
@@ -350,7 +356,7 @@ private extension RootFlowFeature {
             home: HomeFeature.State(),
             explore: ExploreFeature.State(),
             map: MapFlowFeature.State(map: MapFeature.State()),
-            myPage: MyPageFeature.State(userID: userID)
+            myPage: MyPageFeature.State()
         )
     }
 
