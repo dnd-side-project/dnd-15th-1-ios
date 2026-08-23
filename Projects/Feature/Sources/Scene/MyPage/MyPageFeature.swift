@@ -161,6 +161,11 @@ public struct MyPageFeature {
             state.profileEdit = nil
             return .none
 
+        case .profileEdit(.presented(.delegate(.sessionExpired))):
+            // 시트를 닫고 세션 만료를 위로 올려 로그인으로 보낸다
+            state.profileEdit = nil
+            return .send(.delegate(.sessionExpired))
+
         case .profileEdit:
             return .none
 

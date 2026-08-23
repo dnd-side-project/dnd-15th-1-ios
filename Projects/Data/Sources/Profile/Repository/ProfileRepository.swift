@@ -42,6 +42,16 @@ public struct ProfileRepository: Sendable {
         }
     }
 
+    // 온보딩과 달리 초기화 분기 없이 곧장 PATCH 만 한다. 프로필 수정 화면용
+    public func updateProfile(nickname: String, iconID: Int) async throws -> UserProfile {
+        do {
+            let updated = try await profileRemote.updateProfile(nickname: nickname, profileIcon: iconID)
+            return ProfileDTOMapper.toDomain(updated, datePreference: nil)
+        } catch {
+            throw ProfileErrorMapper.map(error)
+        }
+    }
+
     public func updateNickname(nickname: String, iconID: Int) async throws -> UserProfile {
         do {
             let member = try await profileRemote.member()

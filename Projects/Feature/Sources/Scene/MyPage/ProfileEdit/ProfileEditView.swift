@@ -25,6 +25,21 @@ public struct ProfileEditView: View {
         }
         .padding(.horizontal, 20)
         .frame(height: UIScreen.main.bounds.height * Self.heightRatio)
+        .toast(
+            item: toastBinding,
+            bottomInset: CTALayout.toastInset(buttonHeights: [CTALayout.xlButtonHeight])
+        )
+    }
+
+    private var toastBinding: Binding<ToastState?> {
+        Binding(
+            get: { store.toast },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.dismissToast)
+                }
+            }
+        )
     }
 
     private var header: some View {
@@ -95,7 +110,7 @@ public struct ProfileEditView: View {
 
             AppTextField(
                 text: $store.nickname,
-                placeholder: "닉네임",
+                placeholder: "최대 6글자",
                 size: .large,
                 style: .filled,
                 errorMessage: store.lengthError,
