@@ -96,6 +96,7 @@ public struct HomeFeature {
         case savedPlacesLoaded([SavedPlace])
         case recommendationsLoaded([Content])
         case pastDatesLoaded([DateSchedule])
+        case placesImported
         case savedPlacesSeeAllTapped
         case savedPlaceTapped(String)
         case calendarTapped
@@ -182,14 +183,18 @@ public struct HomeFeature {
             // 표시는 지도 탭 위에서. MainTab 까지 올린다
             return .send(.delegate(.showContentDetail(id)))
 
-        case .calendarTapped, .connectFlowRequested, .courseFlowRequested, .homePathChanged,
-             .couple, .pastDateCourses, .course, .delegate:
+        case .placesImported, .calendarTapped, .connectFlowRequested, .courseFlowRequested,
+             .homePathChanged, .couple, .pastDateCourses, .course, .delegate:
             return homeNavCore(state: &state, action: action)
         }
     }
 
     private func homeNavCore(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case .placesImported:
+            // 인스타 장소 저장 후 최근 저장 장소·추천 게시글을 새로 받는다
+            return .merge(loadSavedPlaces(), loadRecommendations())
+
         case .calendarTapped:
             // 연결됐으면 지난 데이트 화면, 아니면 커플 연결로
             guard state.isConnected else { return .send(.connectFlowRequested) }
@@ -323,14 +328,17 @@ private extension HomeFeature {
 
     private func loadSavedPlaces() -> Effect<Action> {
         .run { [homeClient] send in
-            let places = (try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount)) ?? []
+            // 실패 시 기존 섹션을 지우지 않도록 빈 배열로 덮어쓰지 않는다
+            guard let places = try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount) else {
+                return
+            }
             await send(.savedPlacesLoaded(places))
         }
     }
 
     private func loadPastDates() -> Effect<Action> {
         .run { [homeClient] send in
-            let dates = (try? await homeClient.pastDates(Self.pastDateCount)) ?? []
+            guard let dates = try? await homeClient.pastDates(Self.pastDateCount) else { return }
             await send(.pastDatesLoaded(dates))
         }
     }
@@ -340,8 +348,11 @@ private extension HomeFeature {
             // datePreference 를 등록한 사용자만 취향(PREFERENCE) 정렬을 쓰고, 아니면 POPULAR
             let hasPreference = (try? await profileClient.member())?.datePreference != nil
             let sort: ContentSort = hasPreference ? .preference : .popular
-            let page = try? await exploreClient.contents(sort, 0, Self.recommendationCount)
-            await send(.recommendationsLoaded(page?.items ?? []))
+            // 실패 시 기존 추천을 지우지 않도록 빈 배열로 덮어쓰지 않는다
+            guard let page = try? await exploreClient.contents(sort, 0, Self.recommendationCount) else {
+                return
+            }
+            await send(.recommendationsLoaded(page.items))
         }
     }
 }

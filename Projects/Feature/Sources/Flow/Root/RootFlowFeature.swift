@@ -164,6 +164,9 @@ public struct RootFlowFeature {
             return applyOnboardingSession(state: &state, userID: userID)
         case .sessionExpired:
             return moveToSignIn(state: &state)
+        case .placeImport(.presented(.delegate(.placesSaved))):
+            // 저장된 장소·추천 게시글을 홈이 다시 받도록 전달한다
+            return .send(.mainTab(.home(.placesImported)))
         case .placeImport:
             return .none
         case .appIntro, .onboardingFlow, .mainTab, .overlay:
