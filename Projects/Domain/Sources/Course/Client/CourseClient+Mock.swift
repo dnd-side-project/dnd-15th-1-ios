@@ -34,7 +34,7 @@ public extension CourseClient {
                 id: id,
                 content: DateCourseContent(
                     title: DateCourseTitle.make(date: mockDateComponents),
-                    date: mockScheduledAt,
+                    date: mockDateOnly(date: mockDateComponents),
                     time: nil,
                     placeIDs: ["3", "4", "5"]
                 ),
