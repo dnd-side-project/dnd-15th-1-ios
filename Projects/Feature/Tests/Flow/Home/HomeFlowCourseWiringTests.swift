@@ -182,6 +182,117 @@ final class HomeFlowCourseWiringTests: XCTestCase {
     }
 }
 
+@MainActor
+final class HomeFlowCourseEditWiringTests: XCTestCase {
+
+    func test_수정을_누르면_경로에_수정_화면이_쌓인다() async {
+        let store = TestStore(initialState: builtCourseResultState()) {
+            HomeFlowFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.courseResult(.delegate(.editRequested(wiringCourse))))
+
+        XCTAssertEqual(store.state.path.last, .courseEdit)
+        XCTAssertEqual(store.state.courseEdit?.dateCourseID, wiringCourse.id)
+    }
+
+    func test_저장하면_수정_화면을_빼고_결과_코스를_바꾼다() async {
+        let saved = DateCourse(
+            id: wiringCourse.id,
+            title: "saved",
+            scheduledDate: wiringCourse.scheduledDate,
+            scheduledTime: wiringCourse.scheduledTime,
+            status: wiringCourse.status,
+            version: 1,
+            stops: wiringCourse.stops,
+            legs: wiringCourse.legs
+        )
+        let store = TestStore(initialState: editingCourseResultState()) {
+            HomeFlowFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.courseEdit(.delegate(.saved(saved))))
+        await store.receive(\.courseResult.courseResponse)
+
+        XCTAssertFalse(store.state.path.contains(.courseEdit))
+        XCTAssertEqual(store.state.courseResult?.course, saved)
+    }
+
+    func test_충돌하면_수정_화면을_빼고_결과를_다시_읽는다() async {
+        let store = TestStore(initialState: editingCourseResultState()) {
+            HomeFlowFeature()
+        } withDependencies: {
+            $0.courseClient.course = { _ in wiringCourse }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.courseEdit(.delegate(.conflicted)))
+        await store.receive(\.courseResult.conflictReloadRequested)
+
+        XCTAssertFalse(store.state.path.contains(.courseEdit))
+        XCTAssertNil(store.state.courseEdit)
+    }
+
+    func test_장소_추가는_고르기_모드로_화면을_쌓인다() async {
+        let store = TestStore(initialState: editingCourseResultState()) {
+            HomeFlowFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["101"]))))
+
+        XCTAssertEqual(store.state.path.last, .coursePlaceAdd)
+        XCTAssertEqual(store.state.coursePlaceAdd?.mode, .pick(excluding: ["101"]))
+        XCTAssertNotNil(store.state.course)
+    }
+
+    func test_고른_장소는_수정_화면으로_돌아간다() async {
+        let picked = [CoursePlaceCandidate.fixture(id: "102")]
+        var state = editingCourseResultState()
+        state.coursePlaceAdd = CourseFeature.State(mode: .pick(excluding: ["101"]))
+        state.path.append(.coursePlaceAdd)
+        let store = TestStore(initialState: state) {
+            HomeFlowFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.coursePlaceAdd(.delegate(.placesPicked(picked))))
+        await store.receive(\.pathChanged)
+        await store.receive(\.courseEdit.placesAdded)
+
+        XCTAssertFalse(store.state.path.contains(.coursePlaceAdd))
+        XCTAssertEqual(store.state.path.last, .courseEdit)
+    }
+
+    func test_장소_추가_뒤_경로는_만들기_고르기를_남긴다() async {
+        let store = TestStore(initialState: editingCourseResultState()) {
+            HomeFlowFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["p0"]))))
+        await store.send(.coursePlaceAdd(.delegate(.placesPicked([CoursePlaceCandidate.fixture(id: "102")]))))
+        await store.receive(\.pathChanged)
+        await store.receive(\.courseEdit.placesAdded)
+
+        XCTAssertEqual(
+            store.state.path,
+            [.course, .coursePlacePick, .courseResult, .courseEdit]
+        )
+        XCTAssertNotNil(store.state.course)
+        XCTAssertNil(store.state.coursePlaceAdd)
+    }
+}
+
+private func editingCourseResultState() -> HomeFlowFeature.State {
+    var state = builtCourseResultState()
+    state.courseEdit = CourseEditFeature.State(dateCourseID: wiringCourse.id)
+    state.path.append(.courseEdit)
+    return state
+}
+
 // MARK: - Fixture
 
 private let bannerCourse = DateCourseSummary(
