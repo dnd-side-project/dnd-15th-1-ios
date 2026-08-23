@@ -130,6 +130,12 @@ public extension Image {
     static var coupleConnectModal: Image { Asset.coupleConnectModal.swiftUIImage }
 }
 
+// MARK: - Course
+
+public extension Image {
+    static var saveModal: Image { Asset.saveModal.swiftUIImage }
+}
+
 // MARK: - DateType
 
 public extension Image {

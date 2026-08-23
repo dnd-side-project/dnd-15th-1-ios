@@ -14,17 +14,17 @@ import SwiftUI
 private enum ReorderableListMetric {
     static let rowHeight: CGFloat = 81
     static let rowSpacing: CGFloat = 20
-    static let cornerRadius: CGFloat = 12
+    static let cornerRadius: CGFloat = 16
 
     /// 보이는 손잡이 아이콘 크기. 카드 왼쪽에서 이 절반 + 좌우 여백만큼이 아이콘 중심이다.
     static let handleIconSize: CGFloat = 24
     /// 손잡이 터치 범위. 아이콘은 이 범위의 위쪽 가운데에 놓인다.
     static let handleHitSize: CGFloat = 40
 
-    // 평상시 그림자. 시안 c04 의 카드 가장자리 밝기 감쇠(위 5 · 옆 11 · 아래 17)에 맞춘 값이다
-    static let restShadowRadius: CGFloat = 3
+    // 평상시 그림자
+    static let restShadowRadius: CGFloat = 8
     static let restShadowOffsetY: CGFloat = 2
-    static let restShadowOpacity: CGFloat = 0.08
+    static let restShadowOpacity: CGFloat = 0.10
 
     // 시안 c05 에서 그림자 번짐을 빼고 테두리 획만 재면 끄는 카드는 정지 카드와 폭도 높이도 같다(353 × 81).
     // 가로 중심만 10 왼쪽으로 갈 뿐이고, 들렸다는 느낌은 전부 그림자가 낸다. 그래서 확대는 없다.
@@ -33,7 +33,7 @@ private enum ReorderableListMetric {
     static let liftShadowOffsetY: CGFloat = 4
     static let liftShadowOpacity: CGFloat = 0.12
 
-    /// 점선 중심 x. 카드 왼쪽 테두리 기준이다. 손잡이 중심(32) 과 다르다.
+    /// 점선 중심 x. 카드 왼쪽 테두리 기준이다. 손잡이 중심과 다르다.
     static let connectorCenterX: CGFloat = 16
     /// 점선이 카드에 닿지 않게 위아래로 한 주기씩 띄운다. 간격 20 안에 점 3개가 남는다.
     static let connectorInset: CGFloat = DottedVerticalLine.dotSpacing
@@ -80,7 +80,8 @@ private extension VerticalAlignment {
 ///     items: store.places,
 ///     onMove: { from, to in store.send(.placeMoved(from: from, to: to)) },
 ///     rowTitle: \.name,
-///     rowSubtitle: \.address
+///     rowSubtitle: \.address,
+///     rowCategory: { $0.category.displayName }
 /// ) { place in
 ///     deleteButton(place)
 /// }
@@ -90,6 +91,7 @@ struct ReorderableList<Item: Identifiable, Trailing: View>: View {
     private let onMove: (Int, Int) -> Void
     private let rowTitle: (Item) -> String
     private let rowSubtitle: (Item) -> String
+    private let rowCategory: ((Item) -> String)?
     private let trailing: (Item) -> Trailing
 
     @State private var draggingItemID: Item.ID?
@@ -102,12 +104,14 @@ struct ReorderableList<Item: Identifiable, Trailing: View>: View {
         onMove: @escaping (Int, Int) -> Void,
         rowTitle: @escaping (Item) -> String,
         rowSubtitle: @escaping (Item) -> String,
+        rowCategory: ((Item) -> String)? = nil,
         @ViewBuilder trailing: @escaping (Item) -> Trailing
     ) {
         self.items = items
         self.onMove = onMove
         self.rowTitle = rowTitle
         self.rowSubtitle = rowSubtitle
+        self.rowCategory = rowCategory
         self.trailing = trailing
     }
 
@@ -166,11 +170,20 @@ private extension ReorderableList {
                 .alignmentGuide(.rowTitleLine) { $0[VerticalAlignment.center] }
 
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                Text(rowTitle(item))
-                    .typography(.body1SB)
-                    .foregroundStyle(Color.textPrimary)
-                    // 이 한 줄의 중심이 카드 안 세로 기준선이 된다
-                    .alignmentGuide(.rowTitleLine) { $0[VerticalAlignment.center] }
+                HStack(alignment: .rowTitleLine, spacing: Spacing.s8) {
+                    Text(rowTitle(item))
+                        .typography(.headline)
+                        .foregroundStyle(Color.textPrimary)
+                        // 장소명 한 줄의 중심이 손잡이·휴지통 기준선이다.
+                        // 카테고리까지 묶은 HStack 중심에 두면 작은 글자 쪽으로 기운다.
+                        .alignmentGuide(.rowTitleLine) { $0[VerticalAlignment.center] }
+
+                    if let category = rowCategory?(item), !category.isEmpty {
+                        Text(category)
+                            .typography(.body2M)
+                            .foregroundStyle(Color.textTertiary)
+                    }
+                }
 
                 Text(rowSubtitle(item))
                     .typography(.caption1R)
@@ -183,7 +196,8 @@ private extension ReorderableList {
             trailing(item)
                 .alignmentGuide(.rowTitleLine) { $0[VerticalAlignment.center] }
         }
-        .padding(.horizontal, Spacing.s20)
+        .padding(.vertical, Spacing.s16)
+        .padding(.horizontal, Spacing.s12)
         .frame(height: ReorderableListMetric.rowHeight)
         .background(Color.commonWhite)
         .clipShape(RoundedRectangle(cornerRadius: ReorderableListMetric.cornerRadius, style: .continuous))
@@ -196,7 +210,7 @@ private extension ReorderableList {
     // 카드 본체가 아니라 이 손잡이에만 제스처를 단다.
     //
     // 레이아웃 자리는 보이는 아이콘 24 그대로 두고, 터치 범위 40 은 overlay 로 얹는다.
-    // 40 을 레이아웃에 넣으면 아이콘 중심이 카드 왼쪽에서 32 를 벗어난다.
+    // 40 을 레이아웃에 넣으면 아이콘 중심이 왼쪽 여백 + 아이콘 절반에서 밀린다.
     // overlay 를 위쪽에 붙여 아이콘이 터치 범위의 위쪽 가운데에 오게 한다.
     func handle(for item: Item, at index: Int) -> some View {
         Image.move
@@ -342,6 +356,7 @@ private extension ReorderableList {
 private struct ReorderableListPreviewItem: Identifiable {
     let id = UUID()
     let name: String
+    let category: String
     let address: String
 }
 
@@ -362,9 +377,9 @@ private struct ReorderableListPreviewTrashButton: View {
 // c04 · c05
 #Preview("3개") {
     @Previewable @State var items: [ReorderableListPreviewItem] = [
-        ReorderableListPreviewItem(name: "장소명", address: "경기도 안산시 모모로 145길 (뭐뭐동)"),
-        ReorderableListPreviewItem(name: "다른 장소명", address: "서울시 마포구 어디로 12 (어디동)"),
-        ReorderableListPreviewItem(name: "또 다른 장소명", address: "서울시 성동구 저기로 34 (저기동)")
+        ReorderableListPreviewItem(name: "장소명", category: "카페", address: "경기도 안산시 모모로 145길 (뭐뭐동)"),
+        ReorderableListPreviewItem(name: "다른 장소명", category: "맛집", address: "서울시 마포구 어디로 12 (어디동)"),
+        ReorderableListPreviewItem(name: "또 다른 장소명", category: "놀거리", address: "서울시 성동구 저기로 34 (저기동)")
     ]
 
     ReorderableList(
@@ -377,7 +392,8 @@ private struct ReorderableListPreviewTrashButton: View {
             )
         },
         rowTitle: \.name,
-        rowSubtitle: \.address
+        rowSubtitle: \.address,
+        rowCategory: \.category
     ) { _ in
         ReorderableListPreviewTrashButton()
     }
@@ -387,7 +403,7 @@ private struct ReorderableListPreviewTrashButton: View {
 // c04
 #Preview("1개") {
     @Previewable @State var items: [ReorderableListPreviewItem] = [
-        ReorderableListPreviewItem(name: "장소명", address: "경기도 안산시 모모로 145길 (뭐뭐동)")
+        ReorderableListPreviewItem(name: "장소명", category: "카페", address: "경기도 안산시 모모로 145길 (뭐뭐동)")
     ]
 
     ReorderableList(
@@ -399,7 +415,8 @@ private struct ReorderableListPreviewTrashButton: View {
             )
         },
         rowTitle: \.name,
-        rowSubtitle: \.address
+        rowSubtitle: \.address,
+        rowCategory: \.category
     ) { _ in
         ReorderableListPreviewTrashButton()
     }

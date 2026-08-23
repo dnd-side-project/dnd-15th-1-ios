@@ -15,6 +15,8 @@ public struct ModalContent: View {
     private let primaryAction: () -> Void
     private let secondaryTitle: String?
     private let secondaryAction: (() -> Void)?
+    private let primaryEnabled: Bool
+    private let onClose: (() -> Void)?
 
     public init(
         title: String,
@@ -23,7 +25,9 @@ public struct ModalContent: View {
         primaryTitle: String,
         primaryAction: @escaping () -> Void,
         secondaryTitle: String? = nil,
-        secondaryAction: (() -> Void)? = nil
+        secondaryAction: (() -> Void)? = nil,
+        primaryEnabled: Bool = true,
+        onClose: (() -> Void)? = nil
     ) {
         self.title = title
         self.content = content
@@ -32,13 +36,31 @@ public struct ModalContent: View {
         self.primaryAction = primaryAction
         self.secondaryTitle = secondaryTitle
         self.secondaryAction = secondaryAction
+        self.primaryEnabled = primaryEnabled
+        self.onClose = onClose
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .typography(.title2B)
-                .foregroundStyle(Color.gray900)
+            HStack(alignment: .top, spacing: 0) {
+                Text(title)
+                    .typography(.title2B)
+                    .foregroundStyle(Color.gray900)
+
+                Spacer(minLength: Spacing.s8)
+
+                if let onClose {
+                    Button(action: onClose) {
+                        // 회색 원은 에셋이 이미 그리고 있다. 배경을 따로 깔지 않는다
+                        Image.cancel
+                            .renderingMode(.template)
+                            .resizable()
+                            .frame(width: 40, height: 40)
+                            .foregroundStyle(Color.gray300)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
 
             Text(content)
                 .typography(.body1M)
@@ -81,6 +103,7 @@ public struct ModalContent: View {
                 fullWidth: true,
                 action: primaryAction
             )
+            .disabled(!primaryEnabled)
         }
     }
 }

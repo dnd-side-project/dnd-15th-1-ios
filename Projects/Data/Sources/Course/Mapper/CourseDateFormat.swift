@@ -54,6 +54,23 @@ enum CourseDateFormat {
         return nil
     }
 
+    /// "2026-08-30" → Asia/Seoul 그 날 자정
+    static func date(from date: String) -> Date? {
+        Self.date(from: date, time: "00:00:00")
+    }
+
+    /// 못 읽은 조각을 떨어뜨리면 초가 분 자리로 올라온다
+    static func timeComponents(from time: String) -> DateComponents? {
+        let parts = time.split(separator: ":")
+        guard parts.count >= 2,
+              let hour = Int(parts[0]),
+              let minute = Int(parts[1]),
+              (0...23).contains(hour),
+              (0...59).contains(minute)
+        else { return nil }
+        return DateComponents(hour: hour, minute: minute)
+    }
+
     private static func seoulComponents(
         _ components: Set<Calendar.Component>,
         from date: Date

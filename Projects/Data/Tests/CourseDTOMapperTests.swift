@@ -27,7 +27,7 @@ final class CourseDTOMapperCourseTests: XCTestCase {
         XCTAssertTrue(course.legs.isEmpty)
     }
 
-    func test_날짜와_시간을_서울_기준_한_시각으로_합친다() throws {
+    func test_날짜와_시간을_나눠_읽는다() throws {
         let dto = DateCourseResponseDTO(
             dateCourseId: 1,
             title: "t",
@@ -44,15 +44,15 @@ final class CourseDTOMapperCourseTests: XCTestCase {
         var seoul = Calendar(identifier: .gregorian)
         seoul.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Seoul"))
         let parts = seoul.dateComponents(
-            [.year, .month, .day, .hour, .minute],
-            from: course.scheduledAt
+            [.year, .month, .day],
+            from: course.scheduledDate
         )
 
         XCTAssertEqual(parts.year, 2026)
         XCTAssertEqual(parts.month, 8)
         XCTAssertEqual(parts.day, 5)
-        XCTAssertEqual(parts.hour, 13)
-        XCTAssertEqual(parts.minute, 0)
+        XCTAssertEqual(course.scheduledTime?.hour, 13)
+        XCTAssertEqual(course.scheduledTime?.minute, 0)
         XCTAssertEqual(course.status, .confirmed)
         XCTAssertEqual(course.version, 3)
     }
@@ -74,15 +74,15 @@ final class CourseDTOMapperCourseTests: XCTestCase {
         var seoul = Calendar(identifier: .gregorian)
         seoul.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Seoul"))
         let parts = seoul.dateComponents(
-            [.year, .month, .day, .hour, .minute],
-            from: course.scheduledAt
+            [.year, .month, .day],
+            from: course.scheduledDate
         )
 
         XCTAssertEqual(parts.year, 2026)
         XCTAssertEqual(parts.month, 8)
         XCTAssertEqual(parts.day, 5)
-        XCTAssertEqual(parts.hour, 13)
-        XCTAssertEqual(parts.minute, 0)
+        XCTAssertEqual(course.scheduledTime?.hour, 13)
+        XCTAssertEqual(course.scheduledTime?.minute, 0)
     }
 
     func test_모르는_상태값은_draft로_둔다() throws {
@@ -98,6 +98,72 @@ final class CourseDTOMapperCourseTests: XCTestCase {
         )
 
         XCTAssertEqual(try CourseDTOMapper.toDomain(dto).status, .draft)
+    }
+
+    func test_time_형식이_아니면_던진다() {
+        let dto = DateCourseResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: "어쩌구",
+            status: "DRAFT",
+            version: 0,
+            totalPlaceCount: nil,
+            places: nil
+        )
+
+        do {
+            _ = try CourseDTOMapper.toDomain(dto)
+            XCTFail("Expected unknown")
+        } catch let error as CourseError {
+            XCTAssertEqual(error, .unknown)
+        } catch {
+            XCTFail("Expected CourseError.unknown, got \(error)")
+        }
+    }
+
+    func test_time_분_자리를_못_읽으면_던진다() {
+        let dto = DateCourseResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: "13:ab:45",
+            status: "DRAFT",
+            version: 0,
+            totalPlaceCount: nil,
+            places: nil
+        )
+
+        do {
+            _ = try CourseDTOMapper.toDomain(dto)
+            XCTFail("Expected unknown")
+        } catch let error as CourseError {
+            XCTAssertEqual(error, .unknown)
+        } catch {
+            XCTFail("Expected CourseError.unknown, got \(error)")
+        }
+    }
+
+    func test_time_시가_범위_밖이면_던진다() {
+        let dto = DateCourseResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: "25:00:00",
+            status: "DRAFT",
+            version: 0,
+            totalPlaceCount: nil,
+            places: nil
+        )
+
+        do {
+            _ = try CourseDTOMapper.toDomain(dto)
+            XCTFail("Expected unknown")
+        } catch let error as CourseError {
+            XCTAssertEqual(error, .unknown)
+        } catch {
+            XCTFail("Expected CourseError.unknown, got \(error)")
+        }
     }
 
     func test_날짜_형식이_아니면_던진다() {
@@ -122,23 +188,39 @@ final class CourseDTOMapperCourseTests: XCTestCase {
         }
     }
 
-    func test_time이_null이면_자정으로_읽는다() throws {
+    func test_time이_null이면_scheduledTime이_nil이다() throws {
         let dto = DateCourseResponseDTO(
-            dateCourseId: 1,
-            title: "t",
-            date: "2026-08-05",
+            dateCourseId: 1001,
+            title: "성수동 데이트",
+            date: "2026-08-16",
             time: nil,
-            status: "DRAFT",
-            version: 0,
+            status: "CONFIRMED",
+            version: 3,
             totalPlaceCount: 0,
             places: []
         )
+
         let course = try CourseDTOMapper.toDomain(dto)
-        var seoul = Calendar(identifier: .gregorian)
-        seoul.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Seoul"))
-        let parts = seoul.dateComponents([.hour, .minute], from: course.scheduledAt)
-        XCTAssertEqual(parts.hour, 0)
-        XCTAssertEqual(parts.minute, 0)
+
+        XCTAssertNil(course.scheduledTime)
+    }
+
+    func test_time이_있으면_시와_분을_읽는다() throws {
+        let dto = DateCourseResponseDTO(
+            dateCourseId: 1001,
+            title: "성수동 데이트",
+            date: "2026-08-16",
+            time: "19:30:00",
+            status: "CONFIRMED",
+            version: 3,
+            totalPlaceCount: 0,
+            places: []
+        )
+
+        let course = try CourseDTOMapper.toDomain(dto)
+
+        XCTAssertEqual(course.scheduledTime?.hour, 19)
+        XCTAssertEqual(course.scheduledTime?.minute, 30)
     }
 }
 

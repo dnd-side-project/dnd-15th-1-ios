@@ -23,7 +23,8 @@ final class MapFlowCourseWiringTests: XCTestCase {
                 DateCourse(
                     id: "42",
                     title: "t",
-                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    scheduledDate: Date(timeIntervalSince1970: 0),
+                    scheduledTime: nil,
                     status: .draft,
                     version: 0,
                     stops: [],
@@ -214,7 +215,8 @@ private let mapFlowCurrentCourse = DateCourseSummary(
 private let confirmedCourse = DateCourse(
     id: "42",
     title: "t",
-    scheduledAt: Date(timeIntervalSince1970: 0),
+    scheduledDate: Date(timeIntervalSince1970: 0),
+    scheduledTime: nil,
     status: .confirmed,
     version: 0,
     stops: [],
@@ -239,4 +241,168 @@ private func courseResultState() -> MapFlowFeature.State {
         partnerNickname: state.course?.partnerNickname
     )
     return state
+}
+
+@MainActor
+final class MapFlowCourseEditWiringTests: XCTestCase {
+
+    func test_수정을_누르면_경로에_수정_화면이_쌓인다() async {
+        let store = flowStore(courseResult: .init(course: threeStopCourse, dateCourseID: "1001"))
+        store.exhaustivity = .off
+
+        await store.send(.courseResult(.delegate(.editRequested(threeStopCourse))))
+
+        XCTAssertEqual(store.state.path.last, .courseEdit)
+        XCTAssertEqual(store.state.courseEdit?.dateCourseID, "1001")
+    }
+
+    func test_충돌하면_수정_화면을_빼고_결과를_다시_읽는다() async {
+        let store = flowStore(
+            courseResult: .init(course: threeStopCourse, dateCourseID: "1001"),
+            courseEdit: .init(dateCourseID: "1001"),
+            path: [.courseResult, .courseEdit]
+        )
+        store.exhaustivity = .off
+
+        await store.send(.courseEdit(.delegate(.conflicted)))
+        await store.receive(\.courseResult.conflictReloadRequested)
+
+        XCTAssertFalse(store.state.path.contains(.courseEdit))
+        XCTAssertNil(store.state.courseEdit)
+    }
+
+    func test_저장하면_수정_화면을_빼고_결과_코스를_바꾼다() async {
+        let saved = twoStopCourse
+        let store = flowStore(
+            courseResult: .init(course: threeStopCourse, dateCourseID: "1001"),
+            courseEdit: .init(dateCourseID: "1001"),
+            path: [.courseResult, .courseEdit]
+        )
+        store.exhaustivity = .off
+
+        await store.send(.courseEdit(.delegate(.saved(saved))))
+        await store.receive(\.courseResult.courseResponse)
+
+        XCTAssertFalse(store.state.path.contains(.courseEdit))
+        XCTAssertEqual(store.state.courseResult?.course, saved)
+    }
+
+    func test_장소_추가는_고르기_모드로_화면을_쌓는다() async {
+        let store = flowStore(
+            courseEdit: .init(dateCourseID: "1001"),
+            path: [.courseResult, .courseEdit]
+        )
+        store.exhaustivity = .off
+
+        await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["101"]))))
+
+        XCTAssertEqual(store.state.path.last, .coursePlaceAdd)
+        XCTAssertEqual(store.state.coursePlaceAdd?.mode, .pick(excluding: ["101"]))
+        XCTAssertNil(store.state.course)
+    }
+
+    func test_고른_장소는_수정_화면으로_돌아간다() async {
+        let picked = [candidate102]
+        let store = flowStore(
+            courseEdit: .init(dateCourseID: "1001"),
+            coursePlaceAdd: .init(mode: .pick(excluding: ["101"])),
+            path: [.courseResult, .courseEdit, .coursePlaceAdd]
+        )
+        store.exhaustivity = .off
+
+        await store.send(.coursePlaceAdd(.delegate(.placesPicked(picked))))
+        await store.receive(\.pathChanged)
+        await store.receive(\.courseEdit.placesAdded)
+
+        XCTAssertFalse(store.state.path.contains(.coursePlaceAdd))
+        XCTAssertEqual(store.state.path.last, .courseEdit)
+    }
+
+    func test_장소_추가_뒤_경로는_만들기_고르기를_남긴다() async {
+        var course = CourseFeature.State()
+        course.partnerNickname = "상대"
+        let store = flowStore(
+            course: course,
+            courseResult: .init(course: threeStopCourse, dateCourseID: "1001"),
+            courseEdit: .init(dateCourseID: "1001"),
+            path: [.course, .coursePlacePick, .courseResult, .courseEdit]
+        )
+        store.exhaustivity = .off
+
+        await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["p0"]))))
+        await store.send(.coursePlaceAdd(.delegate(.placesPicked([candidate102]))))
+        await store.receive(\.pathChanged)
+        await store.receive(\.courseEdit.placesAdded)
+
+        XCTAssertEqual(
+            store.state.path,
+            [.course, .coursePlacePick, .courseResult, .courseEdit]
+        )
+        XCTAssertNotNil(store.state.course)
+        XCTAssertNil(store.state.coursePlaceAdd)
+    }
+}
+
+@MainActor
+private func flowStore(
+    course: CourseFeature.State? = nil,
+    courseResult: CourseResultFeature.State? = nil,
+    courseEdit: CourseEditFeature.State? = nil,
+    coursePlaceAdd: CourseFeature.State? = nil,
+    path: [MapFlowFeature.Route] = []
+) -> TestStoreOf<MapFlowFeature> {
+    TestStore(
+        initialState: MapFlowFeature.State(
+            course: course,
+            courseResult: courseResult,
+            courseEdit: courseEdit,
+            coursePlaceAdd: coursePlaceAdd,
+            path: path
+        )
+    ) {
+        MapFlowFeature()
+    } withDependencies: {
+        $0.courseClient.course = { _ in threeStopCourse }
+    }
+}
+
+private let threeStopCourse = makeCourse(
+    stopCount: 3,
+    legs: [
+        Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500),
+        Domain.CourseLeg(walkingMinutes: 80, distanceMeters: 5300),
+    ]
+)
+
+private let twoStopCourse = makeCourse(
+    stopCount: 2,
+    legs: [
+        Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500),
+    ]
+)
+
+private let candidate102 = CoursePlaceCandidate.fixture(id: "102")
+
+private func makeCourse(
+    stopCount: Int,
+    legs: [Domain.CourseLeg?]
+) -> DateCourse {
+    DateCourse(
+        id: "1001",
+        title: "26.08.05 데이트",
+        scheduledDate: Date(timeIntervalSince1970: 0),
+        scheduledTime: nil,
+        status: .confirmed,
+        version: 1,
+        stops: (0..<stopCount).map { index in
+            Domain.CourseStop(
+                place: .fixture(
+                    id: "p\(index)",
+                    latitude: 37.31 + Double(index) * 0.01,
+                    longitude: 126.90 + Double(index) * 0.01
+                )
+            )
+        },
+        legs: legs
+    )
 }

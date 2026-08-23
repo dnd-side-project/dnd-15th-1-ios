@@ -22,7 +22,8 @@ enum CourseDTOMapper {
         return DateCourse(
             id: String(dto.dateCourseId),
             title: dto.title,
-            scheduledAt: try scheduledAt(date: dto.date, time: dto.time),
+            scheduledDate: try Self.dateOnly(dto.date),
+            scheduledTime: try Self.timeOnly(dto.time),
             status: status(dto.status),
             version: dto.version,
             stops: stops,
@@ -97,9 +98,25 @@ enum CourseDTOMapper {
         }
     }
 
-    // 서버가 `2026-08-05` 와 `13:00:00` 을 따로 준다. 타임존 표기가 없고 Asia/Seoul 기준이다
-    // time 이 null 이면 날짜만 있는 응답이라 자정으로 읽는다
-    // 틀린 시각을 만들어 아래로 흘리느니 실패로 끝낸다
+    // 서버가 `2026-08-05` 를 타임존 없이 준다. Asia/Seoul 그 날 자정으로 읽는다
+    // 틀린 날짜를 만들어 아래로 흘리느니 실패로 끝낸다
+    private static func dateOnly(_ date: String) throws -> Date {
+        guard let scheduledDate = CourseDateFormat.date(from: date) else {
+            throw CourseError.unknown
+        }
+        return scheduledDate
+    }
+
+    // 시간 없는 코스는 nil. 문자열이 있는데 못 읽으면 틀린 시간을 흘리지 않는다
+    private static func timeOnly(_ time: String?) throws -> DateComponents? {
+        guard let time else { return nil }
+        guard let components = CourseDateFormat.timeComponents(from: time) else {
+            throw CourseError.unknown
+        }
+        return components
+    }
+
+    // 요약은 시각 하나다. time 이 null 이면 날짜만 있는 응답이라 자정으로 읽는다
     private static func scheduledAt(date: String, time: String?) throws -> Date {
         guard let scheduledAt = CourseDateFormat.date(from: date, time: time ?? "00:00:00") else {
             throw CourseError.unknown

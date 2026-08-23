@@ -14,6 +14,8 @@ public struct MapFlowFeature {
         case course
         case coursePlacePick
         case courseResult
+        case courseEdit
+        case coursePlaceAdd
     }
 
     @ObservableState
@@ -21,6 +23,8 @@ public struct MapFlowFeature {
         public var map: MapFeature.State
         public var course: CourseFeature.State?
         public var courseResult: CourseResultFeature.State?
+        public var courseEdit: CourseEditFeature.State?
+        public var coursePlaceAdd: CourseFeature.State?
         public var path: [Route]
         public var placeSearch: PlaceSearchFeature.State?
 
@@ -43,6 +47,8 @@ public struct MapFlowFeature {
             map: MapFeature.State = MapFeature.State(),
             course: CourseFeature.State? = nil,
             courseResult: CourseResultFeature.State? = nil,
+            courseEdit: CourseEditFeature.State? = nil,
+            coursePlaceAdd: CourseFeature.State? = nil,
             path: [Route] = [],
             placeSearch: PlaceSearchFeature.State? = nil,
             detail: PlaceDetailFeature.State? = nil,
@@ -52,6 +58,8 @@ public struct MapFlowFeature {
             self.map = map
             self.course = course
             self.courseResult = courseResult
+            self.courseEdit = courseEdit
+            self.coursePlaceAdd = coursePlaceAdd
             self.path = path
             self.placeSearch = placeSearch
             self.detail = detail
@@ -75,6 +83,8 @@ public struct MapFlowFeature {
         case map(MapFeature.Action)
         case course(CourseFeature.Action)
         case courseResult(CourseResultFeature.Action)
+        case courseEdit(CourseEditFeature.Action)
+        case coursePlaceAdd(CourseFeature.Action)
         case placeSearch(PlaceSearchFeature.Action)
         case detail(PresentationAction<PlaceDetailFeature.Action>)
         case alias(PresentationAction<PlaceAliasFeature.Action>)
@@ -103,6 +113,12 @@ public struct MapFlowFeature {
             .ifLet(\.courseResult, action: \.courseResult) {
                 CourseResultFeature()
             }
+            .ifLet(\.courseEdit, action: \.courseEdit) {
+                CourseEditFeature()
+            }
+            .ifLet(\.coursePlaceAdd, action: \.coursePlaceAdd) {
+                CourseFeature()
+            }
             .ifLet(\.$detail, action: \.detail) {
                 PlaceDetailFeature()
             }
@@ -129,11 +145,15 @@ public struct MapFlowFeature {
             return handle(courseDelegate: delegate, state: &state)
         case let .courseResult(.delegate(delegate)):
             return handle(courseResultDelegate: delegate, state: &state)
+        case let .courseEdit(.delegate(delegate)):
+            return handle(courseEditDelegate: delegate, state: &state)
+        case let .coursePlaceAdd(.delegate(delegate)):
+            return handle(coursePlaceAddDelegate: delegate, state: &state)
         case let .placeSearch(.delegate(delegate)):
             return handle(searchDelegate: delegate, state: &state)
         case .detail, .alias, .postDetail:
             return handleChild(state: &state, action: action)
-        case .map, .course, .courseResult, .placeSearch, .delegate:
+        case .map, .course, .courseResult, .courseEdit, .coursePlaceAdd, .placeSearch, .delegate:
             return .none
         }
     }
@@ -144,6 +164,26 @@ private extension MapFlowFeature {
         switch action {
         case let .pathChanged(path):
             return applyPath(path, state: &state)
+        case .presentContentDetail, .presentPlaceDetail, .presentSearchPlaceDetail:
+            return handlePresent(action, state: &state)
+        case .showAllSaved:
+            // 어떤 모드에서 불려도 전체 저장 상태가 되도록 저장 목록 모드로 되돌린 뒤 필터를 푼다
+            return .merge(
+                .send(.map(.searchClearTapped)),
+                .send(.map(.filtersReset))
+            )
+        case .finishReturnToPreviousTab:
+            return finishReturnToPreviousTab(state: &state)
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+}
+
+private extension MapFlowFeature {
+    func handlePresent(_ action: Action, state: inout State) -> Effect<Action> {
+        switch action {
         case let .presentContentDetail(id):
             // 상세는 시트가 스스로 불러온다. 로드되면 그 places 로 핀을 세운다
             state.showsContentPins = true
@@ -198,6 +238,12 @@ private extension MapFlowFeature {
         if !path.contains(.courseResult) {
             state.courseResult = nil
         }
+        if !path.contains(.courseEdit) {
+            state.courseEdit = nil
+        }
+        if !path.contains(.coursePlaceAdd) {
+            state.coursePlaceAdd = nil
+        }
         guard leftCourseResult else { return .none }
         return .send(.map(.currentCourseRequested))
     }
@@ -250,6 +296,10 @@ private extension MapFlowFeature {
         switch courseDelegate {
         case .placePickRequested:
             return applyPath(state.path + [.coursePlacePick], state: &state)
+        case .placesPicked:
+            // 만들기 모드는 이 신호를 안 쏜다. 고르기는 coursePlaceAdd 가 받는다
+            return .none
+
         case .dismissed:
             var next = state.path
             // 코스 화면이 스스로 닫는 신호라, 맨 위가 코스 경로일 때만 뺀다
@@ -277,10 +327,82 @@ private extension MapFlowFeature {
         case .dismissed:
             // 결과에서 뒤로 가면 코스 흐름을 닫는다. 장소 선택으로 돌아가지 않는다
             return .send(.pathChanged([]))
-        case .editRequested:
+        case let .editRequested(course):
+            state.courseEdit = CourseEditFeature.State(dateCourseID: course.id)
+            state.path.append(.courseEdit)
             return .none
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
+        }
+    }
+
+    func handle(
+        courseEditDelegate: CourseEditFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch courseEditDelegate {
+        case let .placeAddRequested(excluding):
+            state.coursePlaceAdd = CourseFeature.State(mode: .pick(excluding: excluding))
+            state.path.append(.coursePlaceAdd)
+            return .none
+
+        case let .saved(course):
+            // PUT 응답이 최신 코스라 결과 화면이 서버를 다시 부르지 않는다
+            var next = state.path
+            if next.last == .courseEdit {
+                next.removeLast()
+            }
+            return .concatenate(
+                .send(.pathChanged(next)),
+                .send(.courseResult(.courseResponse(.success(course))))
+            )
+
+        case .dismissed:
+            var next = state.path
+            if next.last == .courseEdit {
+                next.removeLast()
+            }
+            return .send(.pathChanged(next))
+
+        case .conflicted:
+            var next = state.path
+            if next.last == .courseEdit {
+                next.removeLast()
+            }
+            return .concatenate(
+                .send(.pathChanged(next)),
+                .send(.courseResult(.conflictReloadRequested))
+            )
+
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        }
+    }
+
+    func handle(
+        coursePlaceAddDelegate: CourseFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch coursePlaceAddDelegate {
+        case let .placesPicked(candidates):
+            var next = state.path
+            if next.last == .coursePlaceAdd {
+                next.removeLast()
+            }
+            return .concatenate(
+                .send(.pathChanged(next)),
+                .send(.courseEdit(.placesAdded(candidates)))
+            )
+        case .dismissed:
+            var next = state.path
+            if next.last == .coursePlaceAdd {
+                next.removeLast()
+            }
+            return .send(.pathChanged(next))
+        case .sessionExpired:
+            return .send(.delegate(.sessionExpired))
+        case .placePickRequested, .buildRequested:
+            return .none
         }
     }
 

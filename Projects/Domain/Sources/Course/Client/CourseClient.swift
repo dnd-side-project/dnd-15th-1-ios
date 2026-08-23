@@ -8,7 +8,7 @@ public struct CourseClient: Sendable {
     public var createCourse: @Sendable (
         _ title: String,
         _ date: DateComponents,
-        _ time: DateComponents
+        _ time: DateComponents?
     ) async throws -> DateCourse
 
     /// GET /api/v1/date-courses/places
@@ -24,9 +24,7 @@ public struct CourseClient: Sendable {
     /// 확정 저장이다
     public var updateCourse: @Sendable (
         _ id: String,
-        _ title: String,
-        _ scheduledAt: Date,
-        _ placeIDs: [String],
+        _ content: DateCourseContent,
         _ version: Int
     ) async throws -> DateCourse
 

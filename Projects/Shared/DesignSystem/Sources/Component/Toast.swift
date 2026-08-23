@@ -47,17 +47,23 @@ private struct ToastView: View {
             Text(state.message)
                 .typography(.body1M)
                 .foregroundStyle(Color.commonWhite)
+                .frame(minHeight: Typography.body1M.lineHeight)
 
             if let actionTitle = state.actionTitle {
                 Button(action: onAction) {
                     Text(actionTitle)
                         .typography(.body2SB)
                         .foregroundStyle(Color.textTertiary)
+                        .frame(minHeight: Typography.body2SB.lineHeight)
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
             }
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 12)
+        // 시안의 여백 12 와 높이 48 이 안 맞아 48 을 택했다
+        .padding(.vertical, 10)
+        .frame(minHeight: 48)
         .background(Color.gray900.opacity(0.95))
         .clipShape(Capsule())
     }

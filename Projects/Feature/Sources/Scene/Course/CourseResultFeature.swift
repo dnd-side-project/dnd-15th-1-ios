@@ -61,6 +61,7 @@ public struct CourseResultFeature {
     public enum Action: Equatable {
         case onAppear
         case reloadRequested
+        case conflictReloadRequested
         case courseResponse(Result<DateCourse, CourseError>)
         case mapSizeChanged(width: CGFloat, visibleHeight: CGFloat)
         case cameraChanged(MapCamera)
@@ -97,7 +98,7 @@ public struct CourseResultFeature {
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
-        case .onAppear, .reloadRequested, .courseResponse:
+        case .onAppear, .reloadRequested, .conflictReloadRequested, .courseResponse:
             return load(state: &state, action: action)
         case .mapSizeChanged, .cameraChanged:
             return updateMap(state: &state, action: action)
@@ -124,6 +125,12 @@ private extension CourseResultFeature {
 
         case .reloadRequested:
             // 옛 코스를 둔 채 읽는다. 화면을 비우면 로딩이 깜빡인다
+            return fetchCourse(id: state.dateCourseID)
+
+        case .conflictReloadRequested:
+            state.course = nil
+            state.loadState = .loading
+            state.toast = ToastState(message: "상대방이 먼저 바꿔서 최신 코스를 불러왔어요")
             return fetchCourse(id: state.dateCourseID)
 
         case let .courseResponse(.success(course)):

@@ -4,10 +4,9 @@ import SwiftUI
 // MARK: - CourseInputField Metric
 
 private enum CourseInputFieldMetric {
-    /// AppTextField 의 filled + large 와 같은 값이다
-    static let height: CGFloat = 56
+    static let height: CGFloat = 48
     static let horizontalPadding: CGFloat = 20
-    static let cornerRadius: CGFloat = 16
+    static let cornerRadius: CGFloat = 12
     static let iconSide: CGFloat = 24
     static let errorLeading: CGFloat = 8
     static let stackSpacing: CGFloat = 8
@@ -18,7 +17,6 @@ private enum CourseInputFieldMetric {
 /// 눌러서 시트를 여는 표시 전용 입력 필드.
 ///
 /// 키보드가 뜨면 안 되는 자리에 쓴다. 값이 없으면 placeholder 를 흐리게 보인다.
-/// 생김새는 `AppTextField` 의 `.filled` + `.large` 와 같고, 에러 타이포만 `.body2M` 이다.
 ///
 /// ```swift
 /// CourseInputField(value: "2026.08.05", placeholder: "날짜를 입력하세요", icon: .calendar) { }
@@ -77,7 +75,7 @@ private extension CourseInputField {
                         width: CourseInputFieldMetric.iconSide,
                         height: CourseInputFieldMetric.iconSide
                     )
-                    .foregroundStyle(Color.gray900)
+                    .foregroundStyle(Color.textTertiary)
             }
             .padding(.horizontal, CourseInputFieldMetric.horizontalPadding)
             .frame(height: CourseInputFieldMetric.height)

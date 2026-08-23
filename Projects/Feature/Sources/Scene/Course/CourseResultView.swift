@@ -238,7 +238,8 @@ private extension Place {
 
 private enum CourseResultPreviewData {
     static let title = "26.08.05 데이트"
-    static let scheduledAt = Date(timeIntervalSince1970: 1_785_931_200)
+    static let scheduledDate = Date(timeIntervalSince1970: 1_785_931_200)
+    static let scheduledTime = DateComponents(hour: 13, minute: 0)
     static let shortLeg = Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500)
     static let longLeg = Domain.CourseLeg(walkingMinutes: 80, distanceMeters: 5300)
 
@@ -251,7 +252,8 @@ private enum CourseResultPreviewData {
     static let threeStops = DateCourse(
         id: "1",
         title: title,
-        scheduledAt: scheduledAt,
+        scheduledDate: scheduledDate,
+        scheduledTime: scheduledTime,
         status: .confirmed,
         version: 1,
         stops: stops,
@@ -261,7 +263,8 @@ private enum CourseResultPreviewData {
     static let missingFirstLeg = DateCourse(
         id: "1",
         title: title,
-        scheduledAt: scheduledAt,
+        scheduledDate: scheduledDate,
+        scheduledTime: scheduledTime,
         status: .confirmed,
         version: 1,
         stops: stops,

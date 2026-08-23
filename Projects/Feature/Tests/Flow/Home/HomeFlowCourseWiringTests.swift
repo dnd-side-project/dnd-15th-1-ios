@@ -203,7 +203,8 @@ private let wiringHomeSummary = HomeSummary(
 private let wiringCourse = DateCourse(
     id: "42",
     title: "t",
-    scheduledAt: Date(timeIntervalSince1970: 0),
+    scheduledDate: Date(timeIntervalSince1970: 0),
+    scheduledTime: nil,
     status: .confirmed,
     version: 0,
     stops: [],
