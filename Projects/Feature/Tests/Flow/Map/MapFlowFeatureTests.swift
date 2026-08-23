@@ -135,6 +135,7 @@ final class MapFlowFeatureTests: XCTestCase {
 
         await store.send(.map(.delegate(.aliasRequested("7")))) {
             $0.alias = PlaceAliasFeature.State(savedPlace: saved)
+            $0.isAliasPresented = true
         }
         XCTAssertEqual(store.state.path, [])
     }
@@ -230,13 +231,17 @@ final class MapFlowFeatureTests: XCTestCase {
             $0.map.bookmarkedPlaceIDs = ["7"]
         }
     }
+}
 
+@MainActor
+final class MapFlowAliasSheetTests: XCTestCase {
     func test_별칭을_저장하면_목록을_지도에_넘긴다() async {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var map = MapFeature.State()
         map.places = [saved]
         var state = MapFlowFeature.State(map: map)
         state.alias = PlaceAliasFeature.State(savedPlace: saved)
+        state.isAliasPresented = true
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         }
@@ -249,24 +254,49 @@ final class MapFlowFeatureTests: XCTestCase {
             savedAt: saved.savedAt
         )
         await store.send(.alias(.presented(.delegate(.saved(updated))))) {
-            $0.alias = nil
+            $0.isAliasPresented = false
         }
         await store.receive(\.map.aliasSaved) {
             $0.map.places[0] = updated
             $0.map.toast = ToastState(message: "별칭을 저장했어요")
         }
+        await store.send(.alias(.dismiss)) {
+            $0.alias = nil
+        }
+    }
+
+    func test_별칭을_닫아도_시트가_내리기_전에는_본문이_남는다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        map.bookmarkedPlaceIDs = [saved.id]
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.map(.delegate(.aliasRequested("7")))) {
+            $0.alias = PlaceAliasFeature.State(savedPlace: saved)
+            $0.isAliasPresented = true
+        }
+        await store.send(.aliasCloseRequested) {
+            $0.isAliasPresented = false
+        }
+        XCTAssertNotNil(store.state.alias)
     }
 
     func test_별칭저장이_만료되면_시트를_닫고_위로_올린다() async {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var state = MapFlowFeature.State()
         state.alias = PlaceAliasFeature.State(savedPlace: saved)
+        state.isAliasPresented = true
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         }
 
         await store.send(.alias(.presented(.delegate(.sessionExpired)))) {
             $0.alias = nil
+            $0.isAliasPresented = false
         }
         await store.receive(\.delegate.sessionExpired)
     }

@@ -5,7 +5,7 @@ import SharedDesignSystem
 import XCTest
 
 @MainActor
-final class CourseDateInputTests: XCTestCase {
+final class CourseFeatureTests: XCTestCase {
 
     func test_State_tomorrow와_draftDate는_now의_다음날이다() {
         let calendar = Calendar.current
@@ -61,13 +61,14 @@ final class CourseDateInputTests: XCTestCase {
 
         await store.send(.dateFieldTapped) {
             $0.activeWheel = .date
+            $0.isWheelPresented = true
         }
         await store.send(.wheelDraftChanged(DateComponents(year: 2030, month: 8, day: 5))) {
             $0.draftDate = DateComponents(year: 2030, month: 8, day: 5)
         }
         await store.send(.wheelConfirmed) {
             $0.date = DateComponents(year: 2030, month: 8, day: 5)
-            $0.activeWheel = nil
+            $0.isWheelPresented = false
             $0.showsDateError = false
         }
         await store.send(.nextTapped)
@@ -224,11 +225,16 @@ final class CourseDateInputTests: XCTestCase {
 
         await store.send(.timeFieldTapped) {
             $0.activeWheel = .time
+            $0.isWheelPresented = true
         }
         await store.send(.wheelDraftChanged(DateComponents(hour: 15, minute: 30))) {
             $0.draftTime = DateComponents(hour: 15, minute: 30)
         }
         await store.send(.wheelDismissed) {
+            $0.isWheelPresented = false
+        }
+        XCTAssertEqual(store.state.activeWheel, .time)
+        await store.send(.wheelDismissFinished) {
             $0.activeWheel = nil
         }
         XCTAssertNil(store.state.time)
@@ -248,6 +254,7 @@ final class CourseDateInputTests: XCTestCase {
 
         await store.send(.timeFieldTapped) {
             $0.activeWheel = .time
+            $0.isWheelPresented = true
             $0.draftTime = DateComponents(hour: 15, minute: 30)
         }
     }
