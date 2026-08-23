@@ -21,6 +21,7 @@ public enum CourseClientFactory {
                 try await repository.coursePlaces()
             },
             course: { try await repository.course(id: $0) },
+            currentCourse: { try await repository.currentCourse() },
             updateCourse: {
                 try await repository.updateCourse(
                     id: $0,

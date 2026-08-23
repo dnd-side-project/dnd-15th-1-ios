@@ -142,6 +142,73 @@ final class CourseDTOMapperCourseTests: XCTestCase {
     }
 }
 
+final class CourseDTOMapperSummaryTests: XCTestCase {
+
+    func test_요약_응답을_도메인으로_옮긴다() throws {
+        let dto = DateCourseSummaryResponseDTO(
+            dateCourseId: 42,
+            title: "26.08.05 데이트",
+            date: "2026-08-05",
+            time: "13:00:00",
+            status: "CONFIRMED",
+            version: 1,
+            totalPlaceCount: 3
+        )
+
+        let summary = try CourseDTOMapper.toDomain(dto)
+
+        XCTAssertEqual(summary.id, "42")
+        XCTAssertEqual(summary.title, "26.08.05 데이트")
+        XCTAssertEqual(summary.status, .confirmed)
+        XCTAssertEqual(summary.version, 1)
+        XCTAssertEqual(summary.totalPlaceCount, 3)
+
+        var seoul = Calendar(identifier: .gregorian)
+        seoul.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Seoul"))
+        let parts = seoul.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: summary.scheduledAt
+        )
+        XCTAssertEqual(parts.year, 2026)
+        XCTAssertEqual(parts.month, 8)
+        XCTAssertEqual(parts.day, 5)
+        XCTAssertEqual(parts.hour, 13)
+        XCTAssertEqual(parts.minute, 0)
+    }
+
+    func test_time이_null이면_자정으로_읽는다() throws {
+        let dto = DateCourseSummaryResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: nil,
+            status: "CONFIRMED",
+            version: 0,
+            totalPlaceCount: 0
+        )
+        let summary = try CourseDTOMapper.toDomain(dto)
+        var seoul = Calendar(identifier: .gregorian)
+        seoul.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Seoul"))
+        let parts = seoul.dateComponents([.hour, .minute], from: summary.scheduledAt)
+        XCTAssertEqual(parts.hour, 0)
+        XCTAssertEqual(parts.minute, 0)
+    }
+
+    func test_모르는_상태값은_draft로_둔다() throws {
+        let dto = DateCourseSummaryResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: "13:00:00",
+            status: "ARCHIVED",
+            version: 0,
+            totalPlaceCount: 0
+        )
+
+        XCTAssertEqual(try CourseDTOMapper.toDomain(dto).status, .draft)
+    }
+}
+
 final class CourseDTOMapperLegTests: XCTestCase {
 
     func test_구간을_장소_사이_개수만큼_만든다() throws {

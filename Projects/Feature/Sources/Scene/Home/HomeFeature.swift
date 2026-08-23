@@ -17,7 +17,7 @@ public struct HomeFeature {
     public struct State: Equatable {
         public var nickname: String
         public var partnerName: String?
-        public var upcomingSchedule: UpcomingSchedule?
+        public var upcomingSchedule: DateCourseSummary?
         public var recommendations: [Content]
         public var pastSchedules: [DateSchedule]
         public var savedPlaces: [SavedPlace]
@@ -47,7 +47,7 @@ public struct HomeFeature {
         public init(
             nickname: String = "",
             partnerName: String? = nil,
-            upcomingSchedule: UpcomingSchedule? = nil,
+            upcomingSchedule: DateCourseSummary? = nil,
             recommendations: [Content] = [],
             pastSchedules: [DateSchedule] = [],
             savedPlaces: [SavedPlace] = []

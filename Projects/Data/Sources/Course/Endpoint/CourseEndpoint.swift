@@ -12,6 +12,7 @@ enum CourseEndpoint: APIEndpoint {
     case create(CreateDateCourseRequestDTO)
     case placePool
     case detail(String)
+    case current
     case save(String, SaveDateCourseRequestDTO)
     case notifyPartner(String)
 
@@ -23,6 +24,8 @@ enum CourseEndpoint: APIEndpoint {
             return "/api/v1/date-courses/places"
         case let .detail(id):
             return "/api/v1/date-courses/\(id)"
+        case .current:
+            return "/api/v1/date-courses/current"
         case let .save(id, _):
             return "/api/v1/date-courses/\(id)"
         case let .notifyPartner(id):
@@ -34,7 +37,7 @@ enum CourseEndpoint: APIEndpoint {
         switch self {
         case .create, .notifyPartner:
             return .post
-        case .placePool, .detail:
+        case .placePool, .detail, .current:
             return .get
         case .save:
             return .put
@@ -49,7 +52,7 @@ enum CourseEndpoint: APIEndpoint {
             return try? NetworkJSONCoding.makeEncoder().encode(request)
         case let .save(_, request):
             return try? NetworkJSONCoding.makeEncoder().encode(request)
-        case .placePool, .detail, .notifyPartner:
+        case .placePool, .detail, .current, .notifyPartner:
             return nil
         }
     }

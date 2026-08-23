@@ -35,6 +35,16 @@ public extension CourseClient {
                 placeIDs: ["3", "4", "5"]
             )
         },
+        currentCourse: {
+            DateCourseSummary(
+                id: "course-mock",
+                title: DateCourseTitle.make(date: mockDateComponents),
+                scheduledAt: mockScheduledAt,
+                status: .confirmed,
+                version: 1,
+                totalPlaceCount: 3
+            )
+        },
         updateCourse: { id, title, scheduledAt, placeIDs, _ in
             mockCourse(
                 id: id,

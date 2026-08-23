@@ -30,6 +30,17 @@ enum CourseDTOMapper {
         )
     }
 
+    static func toDomain(_ dto: DateCourseSummaryResponseDTO) throws -> DateCourseSummary {
+        DateCourseSummary(
+            id: String(dto.dateCourseId),
+            title: dto.title,
+            scheduledAt: try scheduledAt(date: dto.date, time: dto.time),
+            status: status(dto.status),
+            version: dto.version,
+            totalPlaceCount: dto.totalPlaceCount
+        )
+    }
+
     static func toDomain(_ dto: DateCoursePlaceCandidateResponseDTO) -> CoursePlaceCandidate {
         CoursePlaceCandidate(
             id: String(dto.placeId),

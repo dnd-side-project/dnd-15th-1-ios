@@ -7,6 +7,7 @@ final class CourseRepositoryTests: XCTestCase {
     private let createPath = "/api/v1/date-courses"
     private let placePoolPath = "/api/v1/date-courses/places"
     private let detailPath = "/api/v1/date-courses/42"
+    private let currentPath = "/api/v1/date-courses/current"
 
     func test_날짜와_시간을_서버_형식_문자열로_보낸다() async throws {
         let network = StubNetworkClient()
@@ -108,6 +109,44 @@ final class CourseRepositoryTests: XCTestCase {
         XCTAssertEqual(sent.placeIds, [10, 11])
         XCTAssertEqual(sent.version, 0)
         XCTAssertNil(sent.saveType)
+    }
+
+    func test_예정_코스_조회는_current_경로를_부른다() async throws {
+        let network = StubNetworkClient()
+        network.responses["GET \(currentPath)"] = CurrentDateCourseResponseDTO(
+            currentDateCourse: DateCourseSummaryResponseDTO(
+                dateCourseId: 42,
+                title: "26.08.05 데이트",
+                date: "2026-08-05",
+                time: "09:05:00",
+                status: "CONFIRMED",
+                version: 1,
+                totalPlaceCount: 3
+            )
+        )
+        let repository = makeRepository(network: network)
+
+        let course = try await repository.currentCourse()
+
+        XCTAssertEqual(network.requestedKeys, ["GET \(currentPath)"])
+        XCTAssertEqual(course?.id, "42")
+        XCTAssertEqual(course?.title, "26.08.05 데이트")
+        XCTAssertEqual(course?.status, .confirmed)
+        XCTAssertEqual(course?.version, 1)
+        XCTAssertEqual(course?.totalPlaceCount, 3)
+    }
+
+    func test_예정_코스가_없으면_nil을_돌려준다() async throws {
+        let network = StubNetworkClient()
+        network.responses["GET \(currentPath)"] = CurrentDateCourseResponseDTO(
+            currentDateCourse: nil
+        )
+        let repository = makeRepository(network: network)
+
+        let course = try await repository.currentCourse()
+
+        XCTAssertEqual(network.requestedKeys, ["GET \(currentPath)"])
+        XCTAssertNil(course)
     }
 
     func test_상대_알리기는_경로만_부르고_바디는_없다() async throws {

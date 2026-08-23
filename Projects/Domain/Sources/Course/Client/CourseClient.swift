@@ -17,6 +17,9 @@ public struct CourseClient: Sendable {
     /// GET /api/v1/date-courses/{dateCourseId}
     public var course: @Sendable (_ id: String) async throws -> DateCourse
 
+    /// GET /api/v1/date-courses/current
+    public var currentCourse: @Sendable () async throws -> DateCourseSummary?
+
     /// PUT /api/v1/date-courses/{dateCourseId}
     /// 확정 저장이다
     public var updateCourse: @Sendable (
