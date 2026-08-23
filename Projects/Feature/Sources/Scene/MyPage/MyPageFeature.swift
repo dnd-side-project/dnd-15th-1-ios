@@ -54,7 +54,6 @@ public struct MyPageFeature {
         case profileEditTapped
         case dateTypeTapped
         case connectionTapped
-        case feedbackTapped
         case termsLinkTapped(TermsType)
         case dismissTerms
         case withdrawTapped
@@ -126,7 +125,7 @@ public struct MyPageFeature {
             return .none
 
         case .binding, .profileEditTapped, .dateTypeTapped, .connectionTapped,
-             .feedbackTapped, .withdrawTapped, .delegate:
+             .withdrawTapped, .delegate:
             // 이동할 화면들은 아직 없음. 붙는 대로 연결
             return .none
         }

@@ -5,6 +5,10 @@ import ThirdParty
 
 public struct MyPageView: View {
     @Bindable public var store: StoreOf<MyPageFeature>
+    @Environment(\.openURL) private var openURL
+
+    // 피드백 수신 서비스 메일
+    private static let feedbackEmail = "dulpick.co@gmail.com"
 
     public init(store: StoreOf<MyPageFeature>) {
         self.store = store
@@ -97,8 +101,18 @@ public struct MyPageView: View {
 
     private var inquiryCard: some View {
         card("문의하기") {
-            navRow("서비스 피드백하기", edge: .only) { store.send(.feedbackTapped) }
+            navRow("서비스 피드백하기", edge: .only) { sendFeedbackMail() }
         }
+    }
+
+    // 기본 메일 앱으로 서비스 메일 작성 화면을 연다
+    private func sendFeedbackMail() {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = Self.feedbackEmail
+        components.queryItems = [URLQueryItem(name: "subject", value: "둘픽 서비스 피드백")]
+        guard let url = components.url else { return }
+        openURL(url)
     }
 
     private var footer: some View {
