@@ -247,7 +247,7 @@ final class MapFeatureFilterTests: XCTestCase {
         XCTAssertEqual(store.state.filteredPlaces.first?.id, "2")
     }
 
-    func test_저장자를_골라_목록이_비면_서울_시청으로_간다() async {
+    func test_필터로_목록이_비어도_카메라를_유지한다() async {
         var state = MapFeature.State()
         state.places = [mixed[0]]
         state.loadState = .loaded
@@ -256,9 +256,12 @@ final class MapFeatureFilterTests: XCTestCase {
 
         await store.send(.ownershipSelected(.partner)) {
             $0.selectedOwnership = .partner
-            $0.camera = .seoulCityHall
         }
         XCTAssertTrue(store.state.filteredPlaces.isEmpty)
+        XCTAssertEqual(
+            store.state.camera,
+            .focusing(mixed[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        )
     }
 
     func test_카테고리를_고르면_핀과_목록이_같이_줄어든다() async {

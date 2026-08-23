@@ -573,10 +573,16 @@ public extension MapFeature.State {
 
 private extension MapFeature {
 
-    /// 여러 장소를 보는 자리. 첫 행이 없으면 서울 시청이다
+    /// 여러 장소를 보는 자리. 저장이 없으면 서울 시청이다
     static func overview(of state: State) -> MapCamera {
-        guard let first = state.filteredPlaces.first else { return .seoulCityHall }
-        return .focusing(first.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        if let first = state.filteredPlaces.first {
+            return .focusing(first.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+        if state.places.isEmpty {
+            return .seoulCityHall
+        }
+        // 필터로 빈 건 저장이 없는 게 아니라서 보던 자리를 지킨다
+        return state.camera
     }
 
     /// 검색 결과와 저장 목록 어느 쪽에서든 그 id 의 좌표를 찾는다

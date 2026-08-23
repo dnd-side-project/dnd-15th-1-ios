@@ -36,6 +36,6 @@ public extension MapCamera {
 
 public enum MapCameraMove {
     /// 승인 스펙. 켜면 짧은 이동에서도 카메라를 들어 핀이 같이 끊긴다
-    public static let autoElevation = false
+    public static let autoElevation = true
     public static let durationInMillis: UInt = 250
 }
