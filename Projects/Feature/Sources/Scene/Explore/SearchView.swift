@@ -117,6 +117,11 @@ public struct SearchView: View {
             if store.hasSearchResult {
                 segmentTabs
                     .transition(.opacity)
+            } else if store.isFirstSearch {
+                // 로딩 중에도 탭은 보여주되 선택은 막는다
+                segmentTabs
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
             }
             resultBody
         }
@@ -127,9 +132,14 @@ public struct SearchView: View {
         if store.hasSearchResult, store.hasResult {
             resultList
                 .transition(.opacity)
-        } else if store.isSearching, store.isFirstSearch {
-            // 첫 검색만 로딩(빈 화면). 이후 재검색은 직전 화면 유지 → 빈 상태 안 깜빡임
-            Spacer()
+        } else if store.isFirstSearch {
+            // 첫 결과 전(디바운스 대기·검색 중)엔 게시글 스켈레톤. 빈 상태가 먼저 깜빡이지 않게 한다
+            // 실제 결과(resultList)와 같은 ScrollView 구조로 감싸 위치를 맞춘다. 이후 재검색은 직전 화면 유지
+            ScrollView {
+                ContentGridSkeleton()
+            }
+            .scrollDisabled(true)
+            .transition(.opacity)
         } else {
             EmptyStateView(
                 image: .placeEmpty,

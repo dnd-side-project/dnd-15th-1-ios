@@ -31,6 +31,8 @@ public struct MyPageFeature {
         // 마케팅 약관 버전. 마케팅을 켤 때 함께 보낸다
         public var marketingConsentVersion: String?
         public var availableMarketingConsentVersion: String?
+        // 최초 데이터 로드 중. 이때 마이페이지 전체를 스켈레톤으로 보인다
+        public var isSkeleton: Bool
         // 시트로 여는 약관 웹뷰 대상
         public var presentedTerms: TermsType?
         // 프로필 수정 바텀시트
@@ -56,6 +58,7 @@ public struct MyPageFeature {
             marketingAlarmOn: Bool = false,
             marketingConsentVersion: String? = nil,
             availableMarketingConsentVersion: String? = nil,
+            isSkeleton: Bool = true,
             presentedTerms: TermsType? = nil,
             profileEdit: ProfileEditFeature.State? = nil,
             path: [Route] = [],
@@ -76,6 +79,7 @@ public struct MyPageFeature {
             self.marketingAlarmOn = marketingAlarmOn
             self.marketingConsentVersion = marketingConsentVersion
             self.availableMarketingConsentVersion = availableMarketingConsentVersion
+            self.isSkeleton = isSkeleton
             self.presentedTerms = presentedTerms
             self.profileEdit = profileEdit
             self.path = path
@@ -95,6 +99,7 @@ public struct MyPageFeature {
         case onAppear
         case profileLoaded(UserProfile)
         case notificationSettingsLoaded(NotificationSettings)
+        case notificationSettingsLoadFailed
         case notificationSettingsUpdateFailed
         case profileEditTapped
         case dateTypeTapped
@@ -168,6 +173,7 @@ public struct MyPageFeature {
             return .none
 
         case let .notificationSettingsLoaded(settings):
+            state.isSkeleton = false
             state.savedContentAlarmOn = settings.contentSavedEnabled
             state.dateScheduleAlarmOn = settings.dateScheduleEnabled
             state.marketingAlarmOn = settings.marketingEnabled
@@ -175,9 +181,8 @@ public struct MyPageFeature {
             state.availableMarketingConsentVersion = settings.availableMarketingConsentVersion
             return .none
 
-        case .notificationSettingsUpdateFailed:
-            // 저장 실패면 서버 값으로 되돌려 화면과 서버를 다시 맞춘다
-            return loadNotificationSettings()
+        case .notificationSettingsLoadFailed, .notificationSettingsUpdateFailed:
+            return handleNotificationFailure(state: &state, action: action)
 
         case .binding(\.savedContentAlarmOn), .binding(\.dateScheduleAlarmOn),
              .binding(\.marketingAlarmOn):
@@ -287,6 +292,22 @@ public struct MyPageFeature {
 }
 
 private extension MyPageFeature {
+    func handleNotificationFailure(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .notificationSettingsLoadFailed:
+            // 최초 로드 실패면 스켈레톤을 걷고 기본 화면을 보인다
+            state.isSkeleton = false
+            return .none
+
+        case .notificationSettingsUpdateFailed:
+            // 저장 실패면 서버 값으로 되돌려 화면과 서버를 다시 맞춘다
+            return loadNotificationSettings()
+
+        default:
+            return .none
+        }
+    }
+
     func handleConnection(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .connectionTapped:
@@ -506,8 +527,13 @@ private extension MyPageFeature {
 
     private func loadNotificationSettings() -> Effect<Action> {
         .run { [profileClient] send in
-            guard let settings = try? await profileClient.notificationSettings() else { return }
-            await send(.notificationSettingsLoaded(settings))
+            do {
+                let settings = try await profileClient.notificationSettings()
+                await send(.notificationSettingsLoaded(settings))
+            } catch {
+                // 실패해도 스켈레톤은 걷는다(무한 로딩 방지)
+                await send(.notificationSettingsLoadFailed)
+            }
         }
     }
 
