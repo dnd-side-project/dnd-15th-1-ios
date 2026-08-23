@@ -1,5 +1,6 @@
 import Domain
 import Foundation
+import SharedDesignSystem
 import ThirdParty
 
 @Reducer
@@ -30,6 +31,8 @@ public struct MyPageFeature {
         public var dateType: DateTypeFeature.State?
         // 회원탈퇴 확인 모달
         public var isWithdrawModalPresented: Bool
+        public var isWithdrawing: Bool
+        public var toast: ToastState?
         public var isLoading: Bool
         public var errorMessage: String?
 
@@ -47,6 +50,8 @@ public struct MyPageFeature {
             path: [Route] = [],
             dateType: DateTypeFeature.State? = nil,
             isWithdrawModalPresented: Bool = false,
+            isWithdrawing: Bool = false,
+            toast: ToastState? = nil,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
@@ -63,6 +68,8 @@ public struct MyPageFeature {
             self.path = path
             self.dateType = dateType
             self.isWithdrawModalPresented = isWithdrawModalPresented
+            self.isWithdrawing = isWithdrawing
+            self.toast = toast
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
@@ -82,6 +89,9 @@ public struct MyPageFeature {
         case withdrawTapped
         case withdrawConfirmed
         case dismissWithdrawModal
+        case withdrawSucceeded
+        case withdrawFailed(ProfileError)
+        case dismissToast
         case logoutButtonTapped
         case logoutResponse(Result<EquatableVoid, AuthError>)
         case profileEdit(PresentationAction<ProfileEditFeature.Action>)
@@ -158,7 +168,8 @@ public struct MyPageFeature {
         case .dateTypeTapped, .pathChanged, .dateType:
             return handleDateType(state: &state, action: action)
 
-        case .withdrawTapped, .withdrawConfirmed, .dismissWithdrawModal:
+        case .withdrawTapped, .withdrawConfirmed, .dismissWithdrawModal,
+             .withdrawSucceeded, .withdrawFailed, .dismissToast:
             return handleWithdraw(state: &state, action: action)
 
         case .binding, .connectionTapped, .delegate:
@@ -267,16 +278,58 @@ private extension MyPageFeature {
             return .none
 
         case .withdrawConfirmed:
-            // 실제 탈퇴 API 는 이후 연결. 지금은 모달만 닫는다
+            guard !state.isWithdrawing else { return .none }
+            state.isWithdrawing = true
+            return withdraw()
+
+        case .withdrawSucceeded:
+            // 탈퇴 성공. 세션은 이미 정리됐고 로그인으로 보낸다
+            state.isWithdrawing = false
             state.isWithdrawModalPresented = false
+            return .send(.delegate(.logoutSucceeded))
+
+        case let .withdrawFailed(error):
+            state.isWithdrawing = false
+            state.isWithdrawModalPresented = false
+            // 인증 만료는 로그인으로, 나머지는 토스트
+            if error == .unauthorized {
+                return .send(.delegate(.sessionExpired))
+            }
+            state.toast = Self.withdrawToast(for: error)
             return .none
 
         case .dismissWithdrawModal:
             state.isWithdrawModalPresented = false
             return .none
 
+        case .dismissToast:
+            state.toast = nil
+            return .none
+
         default:
             return .none
+        }
+    }
+
+    // 탈퇴 후 로컬 세션까지 정리. 서버 로그아웃 실패는 무시
+    func withdraw() -> Effect<Action> {
+        .run { [profileClient, authClient] send in
+            do {
+                try await profileClient.withdraw()
+                try? await authClient.logout()
+                await send(.withdrawSucceeded)
+            } catch {
+                await send(.withdrawFailed(error as? ProfileError ?? .unknown))
+            }
+        }
+    }
+
+    static func withdrawToast(for error: ProfileError) -> ToastState {
+        switch error {
+        case .network:
+            .error("네트워크 연결을 확인해 주세요.")
+        case .invalidNickname, .unauthorized, .unknown:
+            .error("탈퇴에 실패했어요. 잠시 후 다시 시도해 주세요.")
         }
     }
 

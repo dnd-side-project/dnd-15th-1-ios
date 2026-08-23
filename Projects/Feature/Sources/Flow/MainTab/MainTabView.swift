@@ -34,6 +34,18 @@ public struct MainTabView: View {
             .tag(MainTabFeature.Tab.myPage)
         }
         .tint(Color.primaryPink)
+        // 회원탈퇴 모달은 탭뷰 위에 올려 탭바까지 덮고 탭 선택을 막는다
+        .modal(isPresented: withdrawModalBinding) {
+            ModalContent(
+                title: "정말 탈퇴하시나요?",
+                content: "지금까지 저장된 데이터가 모두 날아가요",
+                image: .disconnect,
+                primaryTitle: "탈퇴하기",
+                primaryAction: { myPageStore.send(.withdrawConfirmed) },
+                secondaryTitle: "취소",
+                secondaryAction: { myPageStore.send(.dismissWithdrawModal) }
+            )
+        }
     }
 
     // 커플 연결 스택은 홈 스토어가 소유하고, 홈 탭 NavigationStack 이 그 path 를 그대로 민다
@@ -70,6 +82,18 @@ public struct MainTabView: View {
         return Binding(
             get: { myPageStore.path },
             set: { myPageStore.send(.pathChanged($0)) }
+        )
+    }
+
+    private var withdrawModalBinding: Binding<Bool> {
+        let myPageStore = myPageStore
+        return Binding(
+            get: { myPageStore.isWithdrawModalPresented },
+            set: { isPresented in
+                if !isPresented {
+                    myPageStore.send(.dismissWithdrawModal)
+                }
+            }
         )
     }
 
