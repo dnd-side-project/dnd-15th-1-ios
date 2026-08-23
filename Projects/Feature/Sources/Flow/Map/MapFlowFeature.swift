@@ -537,8 +537,13 @@ private extension MapFlowFeature {
             syncPlaceSaved(state: &state, id: id, isSaved: isSaved)
             return .none
 
-        case let .detail(.presented(.delegate(.bookmarkSaved(id, serverID)))):
-            state.map.savedServerIDs[id] = serverID
+        case let .detail(.presented(.delegate(.bookmarkSaved(id, saved)))):
+            state.map.savedServerIDs[id] = saved.place.id
+            state.map.applySavedPlace(saved)
+            return .none
+
+        case let .detail(.presented(.delegate(.bookmarkRemoved(serverID)))):
+            state.map.places.removeAll { $0.id == serverID }
             return .none
 
         default:

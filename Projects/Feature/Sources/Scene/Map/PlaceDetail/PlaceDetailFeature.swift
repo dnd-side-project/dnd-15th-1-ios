@@ -115,7 +115,8 @@ public struct PlaceDetailFeature {
         case contentsLoadFailed
         case retryContentsTapped
         case bookmarkTapped
-        case bookmarkSaved(serverID: String)
+        case bookmarkSaved(SavedPlace)
+        case bookmarkRemoved(serverID: String)
         case bookmarkFailed(wasBookmarked: Bool)
         case addressToggled
         case contentTapped(String)
@@ -127,8 +128,10 @@ public struct PlaceDetailFeature {
         public enum Delegate: Equatable {
             /// 장소 id 와 바뀐 뒤 표시 상태. 지도 아이콘 집합을 맞춘다
             case bookmarkToggled(String, Bool)
-            /// 저장 응답의 서버 placeId. 검색 행 id 와 다를 수 있어 지도 맵에 넣는다
-            case bookmarkSaved(String, String)
+            /// 저장 응답. 검색 행 id 와 서버 placeId 가 다를 수 있어 지도 맵·목록에 넣는다
+            case bookmarkSaved(String, SavedPlace)
+            /// 삭제 성공의 서버 placeId. 낙관적 토글과 달리 목록 한 줄을 뺀다
+            case bookmarkRemoved(String)
             case contentSelected(String)
             case closed
         }
@@ -150,7 +153,7 @@ public struct PlaceDetailFeature {
             return loadDetail(state: &state, action: action)
         case .contentsResponse, .contentsLoadFailed, .retryContentsTapped, .moreTapped:
             return handleContents(state: &state, action: action)
-        case .bookmarkTapped, .bookmarkSaved, .bookmarkFailed:
+        case .bookmarkTapped, .bookmarkSaved, .bookmarkRemoved, .bookmarkFailed:
             return updateBookmark(state: &state, action: action)
         case .addressToggled, .contentTapped, .closeTapped, .delegate:
             return updateSheet(state: &state, action: action)
@@ -262,9 +265,12 @@ public struct PlaceDetailFeature {
             state.didToggleBookmark = true
             return toggleBookmark(state: &state)
 
-        case let .bookmarkSaved(serverID):
-            state.savedServerID = serverID
-            return .send(.delegate(.bookmarkSaved(state.id, serverID)))
+        case let .bookmarkSaved(saved):
+            state.savedServerID = saved.place.id
+            return .send(.delegate(.bookmarkSaved(state.id, saved)))
+
+        case let .bookmarkRemoved(serverID):
+            return .send(.delegate(.bookmarkRemoved(serverID)))
 
         case let .bookmarkFailed(wasBookmarked):
             // 서버 실패 → 표시를 되돌리고 지도에도 원래 값을 알린다
@@ -298,10 +304,18 @@ public struct PlaceDetailFeature {
             return .none
         }
     }
+}
+
+private extension PlaceDetailFeature {
+    enum CancelID {
+        case bookmark
+        case detail
+        case contents
+    }
 
     /// 저장 버튼. 저장 안 된 상태면 저장, 저장된 상태면 삭제.
     /// 표시를 먼저 뒤집고 서버를 부른 뒤, 실패하면 되돌린다
-    private func toggleBookmark(state: inout State) -> Effect<Action> {
+    func toggleBookmark(state: inout State) -> Effect<Action> {
         let wasBookmarked = state.isBookmarked
         // 저장하려는데 카카오 식별자가 없으면 부를 수 없다
         if !wasBookmarked, state.place.kakaoPlaceID == nil { return .none }
@@ -314,15 +328,17 @@ public struct PlaceDetailFeature {
         )
     }
 
-    private func runBookmark(place: Place, serverID: String?, wasBookmarked: Bool) -> Effect<Action> {
+    func runBookmark(place: Place, serverID: String?, wasBookmarked: Bool) -> Effect<Action> {
         .run { [placeClient] send in
             do {
                 if wasBookmarked {
                     // 삭제엔 서버 placeId 를 쓴다. 검색 장소는 place.id 가 kakaoId 일 수 있다
-                    try await placeClient.removePlace(serverID ?? place.id)
+                    let removedID = serverID ?? place.id
+                    try await placeClient.removePlace(removedID)
+                    await send(.bookmarkRemoved(serverID: removedID))
                 } else if let kakaoID = place.kakaoPlaceID {
                     let saved = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
-                    await send(.bookmarkSaved(serverID: saved.place.id))
+                    await send(.bookmarkSaved(saved))
                 }
             } catch {
                 await send(.bookmarkFailed(wasBookmarked: wasBookmarked))
@@ -330,13 +346,5 @@ public struct PlaceDetailFeature {
         }
         // 같은 장소를 연달아 누르면 앞 요청은 버린다
         .cancellable(id: CancelID.bookmark, cancelInFlight: true)
-    }
-}
-
-private extension PlaceDetailFeature {
-    enum CancelID {
-        case bookmark
-        case detail
-        case contents
     }
 }
