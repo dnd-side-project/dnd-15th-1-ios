@@ -93,6 +93,7 @@ public enum ProjectSettings {
             "TARGETED_DEVICE_FAMILY": "1",
             "CODE_SIGN_ENTITLEMENTS": "Dulpick-Debug.entitlements",
             "FIREBASE_OPTIONS_RESOURCE": "GoogleService-Info-Debug",
+            "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIconDev",
         ]) { _, new in new }
 
         let releaseSettings = release.merging([
@@ -103,6 +104,7 @@ public enum ProjectSettings {
             "TARGETED_DEVICE_FAMILY": "1",
             "CODE_SIGN_ENTITLEMENTS": "Dulpick-Release.entitlements",
             "FIREBASE_OPTIONS_RESOURCE": "GoogleService-Info-Release",
+            "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
         ]) { _, new in new }
 
         return .settings(
