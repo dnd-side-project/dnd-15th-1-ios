@@ -133,12 +133,14 @@ public struct HomeFlowFeature {
 private extension HomeFlowFeature {
     /// 스택에서 빠진 화면의 스토어를 내려 다음 진입이 새 상태로 시작하게 한다
     func applyPath(_ path: [Route], state: inout State) -> Effect<Action> {
+        let leftCourseResult = state.path.contains(.courseResult) && !path.contains(.courseResult)
         state.path = path
         if !path.contains(.pastDateCourses) { state.pastDateCourses = nil }
         if !path.contains(where: \.isCouple) { state.couple = nil }
         if !path.contains(where: \.isCourse) { state.course = nil }
         if !path.contains(.courseResult) { state.courseResult = nil }
-        return .none
+        guard leftCourseResult else { return .none }
+        return .send(.home(.reloadRequested))
     }
 
     /// 지난 진입의 날짜·장소를 물려받지 않게 새 상태로 연다

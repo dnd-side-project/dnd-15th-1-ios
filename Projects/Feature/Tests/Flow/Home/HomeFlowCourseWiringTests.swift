@@ -37,6 +37,8 @@ final class HomeFlowCourseWiringTests: XCTestCase {
             $0.course = nil
             $0.courseResult = nil
         }
+        await store.receive(\.home.reloadRequested)
+        await store.skipReceivedActions()
     }
 
     func test_지난데이트_행을_누르면_결과_화면이_열린다() async {
@@ -175,6 +177,8 @@ final class HomeFlowCourseWiringTests: XCTestCase {
             $0.course = nil
             $0.courseResult = nil
         }
+        await store.receive(\.home.reloadRequested)
+        await store.skipReceivedActions()
     }
 }
 

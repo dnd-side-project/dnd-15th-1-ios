@@ -182,6 +182,7 @@ private extension MapFlowFeature {
     }
 
     func applyPath(_ path: [Route], state: inout State) -> Effect<Action> {
+        let leftCourseResult = state.path.contains(.courseResult) && !path.contains(.courseResult)
         state.path = path
         if !path.contains(.search) {
             state.placeSearch = nil
@@ -192,7 +193,8 @@ private extension MapFlowFeature {
         if !path.contains(.courseResult) {
             state.courseResult = nil
         }
-        return .none
+        guard leftCourseResult else { return .none }
+        return .send(.map(.currentCourseRequested))
     }
 
     /// 지도가 올린 신호로 시트나 경로를 연다. 화면 이동이 아닌 것은 여기서 삼킨다

@@ -118,6 +118,8 @@ final class MapFlowCourseResultTests: XCTestCase {
     func test_결과에서_뒤로가면_지도_루트로_돌아간다() async {
         let store = TestStore(initialState: courseResultState()) {
             MapFlowFeature()
+        } withDependencies: {
+            $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -127,19 +129,7 @@ final class MapFlowCourseResultTests: XCTestCase {
             $0.course = nil
             $0.courseResult = nil
         }
-    }
-
-    func test_경로가_비면_코스_상태가_같이_지워진다() async {
-        let store = TestStore(initialState: courseResultState()) {
-            MapFlowFeature()
-        }
-        store.exhaustivity = .off(showSkippedAssertions: false)
-
-        await store.send(.pathChanged([])) {
-            $0.path = []
-            $0.course = nil
-            $0.courseResult = nil
-        }
+        await store.skipReceivedActions()
     }
 
     func test_예정_코스_버튼은_결과_화면을_연다() async {
@@ -159,6 +149,54 @@ final class MapFlowCourseResultTests: XCTestCase {
         XCTAssertNil(store.state.courseResult?.course)
         XCTAssertEqual(store.state.courseResult?.partnerNickname, "상대")
         XCTAssertEqual(store.state.courseResult?.origin, .courseBuilt)
+    }
+
+    func test_결과에서_뒤로가면_예정_코스를_다시_받는다() async {
+        let courseCalls = LockIsolated(0)
+        let placeCalls = LockIsolated(0)
+        let store = TestStore(initialState: courseResultState()) {
+            MapFlowFeature()
+        } withDependencies: {
+            $0.courseClient.currentCourse = {
+                courseCalls.withValue { $0 += 1 }
+                return mapFlowCurrentCourse
+            }
+            $0.placeClient.savedPlaces = {
+                placeCalls.withValue { $0 += 1 }
+                return []
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.courseResult(.delegate(.dismissed)))
+        await store.receive(\.pathChanged) {
+            $0.path = []
+            $0.course = nil
+            $0.courseResult = nil
+        }
+        await store.receive(\.map.currentCourseRequested)
+        await store.receive(\.map.currentCourseResponse) {
+            $0.map.currentCourse = mapFlowCurrentCourse
+        }
+        XCTAssertEqual(courseCalls.value, 1)
+        XCTAssertEqual(placeCalls.value, 0)
+    }
+
+    func test_경로가_비면_코스_상태가_같이_지워진다() async {
+        let store = TestStore(initialState: courseResultState()) {
+            MapFlowFeature()
+        } withDependencies: {
+            $0.courseClient.currentCourse = { nil }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.pathChanged([])) {
+            $0.path = []
+            $0.course = nil
+            $0.courseResult = nil
+        }
+        await store.receive(\.map.currentCourseRequested)
+        await store.skipReceivedActions()
     }
 }
 
