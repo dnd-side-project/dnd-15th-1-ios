@@ -60,31 +60,75 @@ public struct MyPageView: View {
         }
     }
 
-    // push 목적지. 데이트 유형 화면은 하단탭을 스스로 숨긴다
+    // push 목적지. 각 화면은 하단탭을 스스로 숨긴다
     @ViewBuilder
     private func destination(_ route: MyPageFeature.Route) -> some View {
         switch route {
         case .dateType:
-            if let dateTypeStore = store.scope(state: \.dateType, action: \.dateType) {
-                DateTypeView(store: dateTypeStore)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .navigationBarBackButtonHidden(true)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button { store.send(.pathChanged([])) } label: {
-                                Image.arrowLeft
-                                    .renderingMode(.original)
-                                    .resizable()
-                                    .frame(width: 24, height: 24)
-                            }
-                        }
-                        ToolbarItem(placement: .principal) {
-                            Text("나의 데이트 유형")
-                                .typography(.body1SB)
-                                .foregroundStyle(Color.commonWhite)
-                        }
+            dateTypeDestination
+        case .connection:
+            connectionDestination
+        case .connect, .codeInput, .complete:
+            coupleDestination(route)
+        }
+    }
+
+    // 미연결 시 타는 커플 연결 3화면. 각 뷰가 자체 back·nav 를 가진다
+    @ViewBuilder
+    private func coupleDestination(_ route: MyPageFeature.Route) -> some View {
+        if let coupleStore = store.scope(state: \.couple, action: \.couple) {
+            Group {
+                switch route {
+                case .codeInput:
+                    CoupleCodeInputView(store: coupleStore)
+                case .complete:
+                    CoupleCompleteView(store: coupleStore)
+                default:
+                    CoupleConnectView(store: coupleStore)
+                }
+            }
+            .toolbar(.hidden, for: .tabBar)
+        }
+    }
+
+    @ViewBuilder
+    private var dateTypeDestination: some View {
+        if let dateTypeStore = store.scope(state: \.dateType, action: \.dateType) {
+            DateTypeView(store: dateTypeStore)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(true)
+                .toolbar {
+                    backToolbarItem
+                    ToolbarItem(placement: .principal) {
+                        Text("나의 데이트 유형")
+                            .typography(.body1SB)
+                            .foregroundStyle(Color.commonWhite)
                     }
-                    .toolbar(.hidden, for: .tabBar)
+                }
+                .toolbar(.hidden, for: .tabBar)
+        }
+    }
+
+    @ViewBuilder
+    private var connectionDestination: some View {
+        if let connectionStore = store.scope(state: \.connection, action: \.connection) {
+            ConnectionManageView(store: connectionStore)
+                .navigationTitle("연결 관리")
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(true)
+                .toolbar { backToolbarItem }
+                .toolbar(.hidden, for: .tabBar)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var backToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button { store.send(.pathChanged([])) } label: {
+                Image.arrowLeft
+                    .renderingMode(.original)
+                    .resizable()
+                    .frame(width: 24, height: 24)
             }
         }
     }

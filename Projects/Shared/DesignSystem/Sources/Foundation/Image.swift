@@ -153,4 +153,6 @@ public extension Image {
     static var profile4: Image { Asset.profile4.swiftUIImage }
     static var profile5: Image { Asset.profile5.swiftUIImage }
     static var disconnect: Image { Asset.disconnect.swiftUIImage }
+    static var connectionManage: Image { Asset.connectionManage.swiftUIImage }
+    static var heartWithStroke: Image { Asset.heartWithStroke.swiftUIImage }
 }
