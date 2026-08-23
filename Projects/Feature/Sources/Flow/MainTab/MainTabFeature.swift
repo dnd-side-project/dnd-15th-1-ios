@@ -19,7 +19,7 @@ public struct MainTabFeature {
         public var map: MapFlowFeature.State
         public var myPage: MyPageFeature.State
 
-        /// 게시글 상세를 열기 직전 탭. 상세를 닫으면 이 탭으로 되돌린다
+        /// 상세를 열기 직전 탭. 상세를 닫으면 이 탭으로 되돌린다
         public var contentReturnTab: Tab?
 
         public init(
@@ -117,9 +117,7 @@ public struct MainTabFeature {
         case let .showContentDetail(id):
             return presentContentDetail(state: &state, id: id)
         case let .showPlaceDetail(place):
-            // 장소 상세는 지도 탭에서 연다. 닫아도 지도 탭에 머무른다(전체보기와 동일)
-            state.selectedTab = .map
-            return .send(.map(.presentPlaceDetail(place)))
+            return presentPlaceDetail(state: &state, place: place)
         }
     }
 
@@ -131,12 +129,12 @@ public struct MainTabFeature {
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         case .contentDetailClosed:
-            // 게시글을 고르기 전 탭으로 되돌린다
+            // 원래 탭으로 먼저 되돌린다. 시트는 숨겨진 지도에서 걷는다
             if let tab = state.contentReturnTab {
                 state.selectedTab = tab
                 state.contentReturnTab = nil
             }
-            return .none
+            return .send(.map(.finishReturnToPreviousTab))
         }
     }
 
@@ -159,6 +157,13 @@ public struct MainTabFeature {
         state.contentReturnTab = state.selectedTab
         state.selectedTab = .map
         return .send(.map(.presentContentDetail(id)))
+    }
+
+    /// 지금 탭을 기억해 두고 지도 탭으로 옮겨 저장 장소 상세를 연다. 닫으면 그 탭으로 돌아온다
+    private func presentPlaceDetail(state: inout State, place: SavedPlace) -> Effect<Action> {
+        state.contentReturnTab = state.selectedTab
+        state.selectedTab = .map
+        return .send(.map(.presentPlaceDetail(place)))
     }
 
     /// 지금 탭을 기억해 두고 지도 탭으로 옮겨 검색 장소 상세를 연다. 닫으면 그 탭으로 돌아온다
