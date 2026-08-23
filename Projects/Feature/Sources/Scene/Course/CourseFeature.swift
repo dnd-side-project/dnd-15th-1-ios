@@ -29,15 +29,12 @@ public struct CourseFeature {
         public var date: DateComponents?
         public var time: DateComponents?
         public var showsDateError = false
-        public var showsTimeError = false
         public var activeWheel: WheelTarget?
-        /// 자정을 넘겨도 하한과 초기값이 다른 날을 가리키지 않게, 한 번 센 오늘을 같이 쓴다
-        public var today: DateComponents
-        /// 화면을 연 시각의 시·분. `today` 와 같은 순간에 센다
-        public var nowTime: DateComponents
+        /// 자정을 넘겨도 하한과 초기값이 다른 날을 가리키지 않게, 한 번 센 내일로 둔다
+        public var tomorrow: DateComponents
         /// 시트 안에서 굴리는 임시값. `확인` 을 눌러야 date/time 으로 넘어간다
         public var draftDate: DateComponents
-        public var draftTime: DateComponents = Self.defaultTime
+        public var draftTime: DateComponents
         /// POST /api/v1/date-courses 응답. 다음 화면이 들고 간다
         public var dateCourseID: String?
         /// 낙관적 락 번호. 서버 응답 값을 그대로 들고 다닌다
@@ -60,10 +57,12 @@ public struct CourseFeature {
 
         public init(now: Date = Date()) {
             let calendar = Calendar.current
-            let today = calendar.dateComponents([.year, .month, .day], from: now)
-            self.today = today
-            self.nowTime = calendar.dateComponents([.hour, .minute], from: now)
-            self.draftDate = today
+            let tomorrowDate = calendar.date(byAdding: .day, value: 1, to: now) ?? now
+            let tomorrow = calendar.dateComponents([.year, .month, .day], from: tomorrowDate)
+            let nowTime = calendar.dateComponents([.hour, .minute], from: now)
+            self.tomorrow = tomorrow
+            self.draftDate = tomorrow
+            self.draftTime = nowTime
         }
     }
 
@@ -119,7 +118,6 @@ public struct CourseFeature {
 
     @Dependency(\.courseClient) var courseClient
     @Dependency(\.coupleClient) var coupleClient
-    @Dependency(\.date) var date
 
     public init() {}
 
@@ -245,11 +243,6 @@ private extension CourseFeature {
         state.showsDateError = false
 
         let time = state.time ?? State.defaultTime
-        if State.isTimePast(date: date, time: time, now: self.date.now) {
-            state.showsTimeError = true
-            return .none
-        }
-        state.showsTimeError = false
         state.isCreatingCourse = true
 
         let title = DateCourseTitle.make(date: date)
@@ -458,10 +451,8 @@ private extension CourseFeature {
         case .date:
             state.date = state.draftDate
             state.showsDateError = false
-            state.showsTimeError = false
         case .time:
             state.time = state.draftTime
-            state.showsTimeError = false
         case .none:
             break
         }
@@ -555,17 +546,6 @@ public extension CourseFeature.State {
         let hour12 = hour % 12 == 0 ? 12 : hour % 12
         return String(format: "%@ %d:%02d", isMorning ? "오전" : "오후", hour12, minute)
     }
-
-    /// 고른 날짜가 오늘일 때만 시각 휠 하한. 날짜를 아직 안 골랐으면 `draftDate` 가 오늘이라 하한이 걸린다.
-    var timeWheelMinimum: DateComponents? {
-        let selected = date ?? draftDate
-        guard
-            selected.year == today.year,
-            selected.month == today.month,
-            selected.day == today.day
-        else { return nil }
-        return Self.ceiledToMinuteStep(nowTime, step: Self.timeMinuteStep)
-    }
 }
 
 // MARK: - Badge
@@ -582,47 +562,9 @@ public extension CourseFeature.State {
 
 private extension CourseFeature.State {
 
-    static let timeMinuteStep = 5
-
     /// 시안 b03·c10 이 `오후 1:00` 을 보인다
     static var defaultTime: DateComponents {
         DateComponents(hour: 13, minute: 0)
-    }
-
-    static func ceiledToMinuteStep(_ time: DateComponents, step: Int) -> DateComponents {
-        let hour = time.hour ?? 0
-        let minute = time.minute ?? 0
-        let remainder = minute % step
-        if remainder == 0 {
-            return DateComponents(hour: hour, minute: minute)
-        }
-        let lifted = minute + (step - remainder)
-        if lifted < 60 {
-            return DateComponents(hour: hour, minute: lifted)
-        }
-        let nextHour = hour + 1
-        if nextHour >= 24 {
-            // 자정으로 올리면 같은 날 0시가 되어 지난 시각을 고른 것처럼 보인다. 마지막 눈금에 두고 날짜를 바꾸게 한다
-            return DateComponents(hour: 23, minute: 60 - step)
-        }
-        return DateComponents(hour: nextHour, minute: 0)
-    }
-
-    static func isTimePast(date: DateComponents, time: DateComponents, now: Date) -> Bool {
-        let calendar = Calendar.current
-        let today = calendar.dateComponents([.year, .month, .day], from: now)
-        let nowTime = calendar.dateComponents([.hour, .minute], from: now)
-        guard
-            date.year == today.year,
-            date.month == today.month,
-            date.day == today.day
-        else { return false }
-        let hour = time.hour ?? 0
-        let minute = time.minute ?? 0
-        let nowHour = nowTime.hour ?? 0
-        let nowMinute = nowTime.minute ?? 0
-        if hour != nowHour { return hour < nowHour }
-        return minute < nowMinute
     }
 }
 
