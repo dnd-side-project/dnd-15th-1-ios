@@ -11,6 +11,9 @@ public enum ProfileClientFactory {
             member: {
                 try await repository.member()
             },
+            notificationSettings: {
+                try await repository.notificationSettings()
+            },
             updateNickname: { nickname, iconID in
                 try await repository.updateNickname(nickname: nickname, iconID: iconID)
             },

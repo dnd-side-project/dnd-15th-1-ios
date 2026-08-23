@@ -51,6 +51,14 @@ enum ProfileDTOMapper {
         )
     }
 
+    static func toDomain(_ dto: NotificationSettingsResponseDTO) -> NotificationSettings {
+        NotificationSettings(
+            contentSavedEnabled: dto.contentSavedEnabled,
+            dateScheduleEnabled: dto.dateScheduleEnabled,
+            marketingEnabled: dto.marketingEnabled
+        )
+    }
+
     static func toRequest(_ preference: DatePreference) -> DatePreferencesRequestDTO {
         DatePreferencesRequestDTO(
             indoorOutdoor: preference.indoorOutdoor.rawValue,

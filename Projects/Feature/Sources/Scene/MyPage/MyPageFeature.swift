@@ -38,6 +38,7 @@ public struct MyPageFeature {
         case binding(BindingAction<State>)
         case onAppear
         case profileLoaded(UserProfile)
+        case notificationSettingsLoaded(NotificationSettings)
         case profileEditTapped
         case dateTypeTapped
         case connectionTapped
@@ -73,11 +74,17 @@ public struct MyPageFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
-            return loadProfile()
+            return .merge(loadProfile(), loadNotificationSettings())
 
         case let .profileLoaded(profile):
             state.nickname = profile.nickname
             state.iconID = profile.iconID
+            return .none
+
+        case let .notificationSettingsLoaded(settings):
+            state.savedContentAlarmOn = settings.contentSavedEnabled
+            state.dateScheduleAlarmOn = settings.dateScheduleEnabled
+            state.marketingAlarmOn = settings.marketingEnabled
             return .none
 
         case .logoutButtonTapped:
@@ -109,6 +116,13 @@ public struct MyPageFeature {
         .run { [profileClient] send in
             guard let profile = try? await profileClient.member() else { return }
             await send(.profileLoaded(profile))
+        }
+    }
+
+    private func loadNotificationSettings() -> Effect<Action> {
+        .run { [profileClient] send in
+            guard let settings = try? await profileClient.notificationSettings() else { return }
+            await send(.notificationSettingsLoaded(settings))
         }
     }
 
