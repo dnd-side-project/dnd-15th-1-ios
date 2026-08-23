@@ -59,6 +59,8 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.bookmarkCount = 123
         }
         await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkRemoved)
+        await store.receive(\.delegate.bookmarkRemoved)
 
         await store.send(.bookmarkTapped) {
             $0.isBookmarked = true
@@ -68,6 +70,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
         await store.receive(\.bookmarkSaved) {
             $0.savedServerID = SavedPlace.mocks[0].place.id
         }
+        await store.receive(.delegate(.bookmarkSaved("7", SavedPlace.mocks[0])))
     }
 
     func test_카운트는_0_아래로_내려가지_않는다() async {
@@ -86,6 +89,8 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.bookmarkCount = 0
         }
         await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkRemoved)
+        await store.receive(\.delegate.bookmarkRemoved)
     }
 
     func test_주소_펼침이_켜졌다_꺼진다() async {
