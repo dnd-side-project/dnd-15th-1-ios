@@ -82,7 +82,7 @@ public struct SearchFeature {
             /// 결과 카드 탭. 탐색 → MainTab 으로 올라가 지도 탭에서 상세를 연다
             case showContentDetail(String)
             /// 장소 결과 탭. 지도 탭에서 장소 상세를 연다
-            case showPlaceDetail(Place)
+            case showPlaceDetail(Place, query: String)
         }
     }
 
@@ -171,7 +171,10 @@ public struct SearchFeature {
     // 장소 결과 탭. 지도 탭에서 장소 상세를 열도록 상위에 올린다
     private func placeTapped(state: inout State, id: String) -> Effect<Action> {
         guard let place = state.places.first(where: { $0.id == id }) else { return .none }
-        return .send(.delegate(.showPlaceDetail(place)))
+        return .send(.delegate(.showPlaceDetail(
+            place,
+            query: state.query.trimmingCharacters(in: .whitespaces)
+        )))
     }
 
     // 최근 검색어·탭 전환 처리
@@ -308,8 +311,10 @@ public struct SearchFeature {
         }
         .cancellable(id: CancelID.loadMore, cancelInFlight: true)
     }
+}
 
-    private func debounceSearch() -> Effect<Action> {
+private extension SearchFeature {
+    func debounceSearch() -> Effect<Action> {
         .run { [clock] send in
             try await clock.sleep(for: .milliseconds(300))
             await send(.queryChangeDebounced)
