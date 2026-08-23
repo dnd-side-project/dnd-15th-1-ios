@@ -44,9 +44,27 @@ public struct MyPageView: View {
                     .ignoresSafeArea()
             }
         }
+        .bottomSheet(isPresented: profileEditBinding) {
+            if let editStore = store.scope(state: \.profileEdit, action: \.profileEdit.presented) {
+                ProfileEditView(store: editStore)
+            }
+        }
+        // 시트가 올라오면 탭바를 감춰 시트가 화면 전체를 덮게 한다
+        .toolbar(store.profileEdit == nil ? .automatic : .hidden, for: .tabBar)
         .task {
             store.send(.onAppear)
         }
+    }
+
+    private var profileEditBinding: Binding<Bool> {
+        Binding(
+            get: { store.profileEdit != nil },
+            set: { isPresented in
+                if !isPresented {
+                    store.send(.profileEdit(.dismiss))
+                }
+            }
+        )
     }
 
     private var presentedTermsBinding: Binding<TermsType?> {
@@ -129,14 +147,14 @@ public struct MyPageView: View {
             .frame(maxWidth: .infinity)
     }
 
-    // 아이콘 ID 를 프로필 이미지로. profile1 은 selected 변형을 쓰고, 미매핑 값도 여기로 떨어진다
+    // 아이콘 ID 를 프로필 이미지로. 미매핑 값은 기본 프로필로 떨어진다
     private var profileImage: Image {
         switch store.iconID {
         case 2: .profile2
         case 3: .profile3
         case 4: .profile4
         case 5: .profile5
-        default: .profile1Selected
+        default: .profile1
         }
     }
 }

@@ -17,6 +17,8 @@ public struct MyPageFeature {
         public var availableMarketingConsentVersion: String?
         // 시트로 여는 약관 웹뷰 대상
         public var presentedTerms: TermsType?
+        // 프로필 수정 바텀시트
+        @Presents public var profileEdit: ProfileEditFeature.State?
         public var isLoading: Bool
         public var errorMessage: String?
 
@@ -29,6 +31,7 @@ public struct MyPageFeature {
             marketingConsentVersion: String? = nil,
             availableMarketingConsentVersion: String? = nil,
             presentedTerms: TermsType? = nil,
+            profileEdit: ProfileEditFeature.State? = nil,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
@@ -40,6 +43,7 @@ public struct MyPageFeature {
             self.marketingConsentVersion = marketingConsentVersion
             self.availableMarketingConsentVersion = availableMarketingConsentVersion
             self.presentedTerms = presentedTerms
+            self.profileEdit = profileEdit
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
@@ -59,6 +63,7 @@ public struct MyPageFeature {
         case withdrawTapped
         case logoutButtonTapped
         case logoutResponse(Result<EquatableVoid, AuthError>)
+        case profileEdit(PresentationAction<ProfileEditFeature.Action>)
         case delegate(Delegate)
 
         @CasePathable
@@ -82,6 +87,9 @@ public struct MyPageFeature {
     public var body: some ReducerOf<Self> {
         BindingReducer()
         Reduce(core)
+            .ifLet(\.$profileEdit, action: \.profileEdit) {
+                ProfileEditFeature()
+            }
             .logged(as: Self.self)
     }
 
@@ -124,9 +132,39 @@ public struct MyPageFeature {
             state.presentedTerms = nil
             return .none
 
-        case .binding, .profileEditTapped, .dateTypeTapped, .connectionTapped,
-             .withdrawTapped, .delegate:
+        case .profileEditTapped, .profileEdit:
+            return handleProfileEdit(state: &state, action: action)
+
+        case .binding, .dateTypeTapped, .connectionTapped, .withdrawTapped, .delegate:
             // 이동할 화면들은 아직 없음. 붙는 대로 연결
+            return .none
+        }
+    }
+
+    private func handleProfileEdit(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .profileEditTapped:
+            state.profileEdit = ProfileEditFeature.State(
+                nickname: state.nickname,
+                selectedIconID: state.iconID
+            )
+            return .none
+
+        case let .profileEdit(.presented(.delegate(.saved(nickname, iconID)))):
+            // API 는 이후. 지금은 화면 값만 갱신하고 닫는다
+            state.nickname = nickname
+            state.iconID = iconID
+            state.profileEdit = nil
+            return .none
+
+        case .profileEdit(.presented(.delegate(.dismiss))):
+            state.profileEdit = nil
+            return .none
+
+        case .profileEdit:
+            return .none
+
+        default:
             return .none
         }
     }
