@@ -6,6 +6,7 @@ public struct CoupleClient: Sendable {
     public var inviteCode: @Sendable () async throws -> InviteCode
     public var connect: @Sendable (_ inviteCode: String) async throws -> Couple
     public var current: @Sendable () async throws -> CoupleStatus?
+    public var disconnect: @Sendable () async throws -> Void
 }
 
 extension CoupleClient: TestDependencyKey {

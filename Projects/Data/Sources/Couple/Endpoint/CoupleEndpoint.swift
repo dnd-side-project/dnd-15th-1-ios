@@ -5,6 +5,7 @@ enum CoupleEndpoint: APIEndpoint {
     case connectionCode
     case connect(connectionCode: String)
     case current
+    case disconnect
 
     var path: String {
         switch self {
@@ -12,7 +13,7 @@ enum CoupleEndpoint: APIEndpoint {
             return "/api/v1/connection-codes/me"
         case .connect:
             return "/api/v1/couples"
-        case .current:
+        case .current, .disconnect:
             return "/api/v1/couples/me"
         }
     }
@@ -23,6 +24,8 @@ enum CoupleEndpoint: APIEndpoint {
             return .get
         case .connect:
             return .post
+        case .disconnect:
+            return .delete
         }
     }
 
@@ -33,7 +36,7 @@ enum CoupleEndpoint: APIEndpoint {
     var body: Data? {
         let encoder = NetworkJSONCoding.makeEncoder()
         switch self {
-        case .connectionCode, .current:
+        case .connectionCode, .current, .disconnect:
             return nil
         case let .connect(connectionCode):
             return try? encoder.encode(
