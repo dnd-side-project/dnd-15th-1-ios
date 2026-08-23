@@ -114,12 +114,14 @@ public struct MyPageFeature {
         case dateType(DateTypeFeature.Action)
         case connection(ConnectionManageFeature.Action)
         case connectionStatusResolved(CoupleStatus?)
+        case connectionStatusFailed(CoupleError)
         case couple(CoupleConnectFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
         public enum Delegate: Equatable {
             case logoutSucceeded
+            case accountWithdrawn
             case sessionExpired
         }
     }
@@ -193,7 +195,8 @@ public struct MyPageFeature {
         case .dateTypeTapped, .pathChanged, .dateType:
             return handleDateType(state: &state, action: action)
 
-        case .connectionTapped, .connectionStatusResolved, .connection, .couple:
+        case .connectionTapped, .connectionStatusResolved, .connectionStatusFailed,
+             .connection, .couple:
             return handleConnection(state: &state, action: action)
 
         case .withdrawTapped, .withdrawConfirmed, .dismissWithdrawModal,
@@ -289,11 +292,16 @@ private extension MyPageFeature {
         case .connectionTapped:
             // 연결 여부를 먼저 확인해 관리 화면·연결 플로우를 가른다
             return .run { [coupleClient] send in
-                let status = try? await coupleClient.current()
-                await send(.connectionStatusResolved(status))
+                do {
+                    let status = try await coupleClient.current()
+                    await send(.connectionStatusResolved(status))
+                } catch {
+                    await send(.connectionStatusFailed(error as? CoupleError ?? .unknown))
+                }
             }
 
         case let .connectionStatusResolved(status):
+            // 성공 응답. nil 은 진짜 미연결(404)이라 연결 플로우로 보낸다
             if status?.connected == true {
                 state.connection = ConnectionManageFeature.State(
                     me: status?.me,
@@ -305,6 +313,14 @@ private extension MyPageFeature {
                 state.couple = CoupleConnectFeature.State(myNickname: state.nickname, showsSkip: false)
                 state.path.append(.connect)
             }
+            return .none
+
+        case let .connectionStatusFailed(error):
+            // 조회 실패를 미연결로 오해하지 않도록 이동 없이 알린다
+            if error == .unauthorized {
+                return .send(.delegate(.sessionExpired))
+            }
+            state.toast = Self.connectionStatusToast(for: error)
             return .none
 
         case let .couple(.delegate(delegate)):
@@ -397,10 +413,10 @@ private extension MyPageFeature {
             return withdraw()
 
         case .withdrawSucceeded:
-            // 탈퇴 성공. 세션은 이미 정리됐고 로그인으로 보낸다
+            // 탈퇴 성공. 세션은 이미 정리됐고 탈퇴 안내와 함께 로그인으로 보낸다
             state.isWithdrawing = false
             state.isWithdrawModalPresented = false
-            return .send(.delegate(.logoutSucceeded))
+            return .send(.delegate(.accountWithdrawn))
 
         case let .withdrawFailed(error):
             state.isWithdrawing = false
@@ -444,6 +460,15 @@ private extension MyPageFeature {
             .error("네트워크 연결을 확인해 주세요.")
         case .invalidNickname, .unauthorized, .unknown:
             .error("탈퇴에 실패했어요. 잠시 후 다시 시도해 주세요.")
+        }
+    }
+
+    static func connectionStatusToast(for error: CoupleError) -> ToastState {
+        switch error {
+        case .network:
+            .error("네트워크 연결을 확인해 주세요.")
+        default:
+            .error("연결 상태를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
         }
     }
 

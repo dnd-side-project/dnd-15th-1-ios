@@ -336,6 +336,8 @@ private extension RootFlowFeature {
         case .logoutSucceeded:
             // 로그인 화면에 로그아웃 완료를 텍스트 토스트로 알린다
             return moveToSignIn(state: &state, toast: ToastState(message: "로그아웃 되었습니다."))
+        case .accountWithdrawn:
+            return moveToSignIn(state: &state, toast: ToastState(message: "탈퇴가 완료되었습니다."))
         case .sessionExpired:
             return .send(.sessionExpired)
         }
