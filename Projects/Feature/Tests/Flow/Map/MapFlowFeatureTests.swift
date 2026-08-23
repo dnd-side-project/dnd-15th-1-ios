@@ -330,6 +330,7 @@ final class MapFlowSearchServerIDTests: XCTestCase {
                 id: place.id,
                 coordinate: place.coordinate
             )
+            $0.topDetail = .place
         }
     }
 
