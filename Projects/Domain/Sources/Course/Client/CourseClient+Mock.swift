@@ -6,10 +6,13 @@ public extension CourseClient {
         createCourse: { title, date, time in
             mockCourse(
                 id: "course-mock",
-                title: title,
-                scheduledAt: mockDate(date: date, time: time),
-                status: .draft,
-                placeIDs: []
+                content: DateCourseContent(
+                    title: title,
+                    date: mockDateOnly(date: date),
+                    time: time,
+                    placeIDs: []
+                ),
+                status: .draft
             )
         },
         coursePlaces: {
@@ -29,10 +32,13 @@ public extension CourseClient {
         course: { id in
             mockCourse(
                 id: id,
-                title: DateCourseTitle.make(date: mockDateComponents),
-                scheduledAt: mockScheduledAt,
-                status: .confirmed,
-                placeIDs: ["3", "4", "5"]
+                content: DateCourseContent(
+                    title: DateCourseTitle.make(date: mockDateComponents),
+                    date: mockScheduledAt,
+                    time: nil,
+                    placeIDs: ["3", "4", "5"]
+                ),
+                status: .confirmed
             )
         },
         currentCourse: {
@@ -45,13 +51,11 @@ public extension CourseClient {
                 totalPlaceCount: 3
             )
         },
-        updateCourse: { id, title, scheduledAt, placeIDs, _ in
+        updateCourse: { id, content, _ in
             mockCourse(
                 id: id,
-                title: title,
-                scheduledAt: scheduledAt,
-                status: .confirmed,
-                placeIDs: placeIDs
+                content: content,
+                status: .confirmed
             )
         },
         notifyPartner: { _ in }
@@ -71,24 +75,23 @@ private let mockLegValues: [(walkingMinutes: Int, distanceMeters: Int)] = [
 private let mockScheduledAt = Date(timeIntervalSince1970: 1_785_931_200)
 private let mockDateComponents = DateComponents(year: 2026, month: 8, day: 5)
 
-private func mockDate(date: DateComponents, time: DateComponents) -> Date {
-    var merged = date
-    merged.hour = time.hour
-    merged.minute = time.minute
-    merged.timeZone = TimeZone(identifier: "Asia/Seoul")
-    return Calendar(identifier: .gregorian).date(from: merged) ?? mockScheduledAt
+private func mockDateOnly(date: DateComponents) -> Date {
+    var midnight = date
+    midnight.hour = 0
+    midnight.minute = 0
+    midnight.second = 0
+    midnight.timeZone = TimeZone(identifier: "Asia/Seoul")
+    return Calendar(identifier: .gregorian).date(from: midnight) ?? mockScheduledAt
 }
 
 private func mockCourse(
     id: String,
-    title: String,
-    scheduledAt: Date,
-    status: CourseStatus,
-    placeIDs: [String]
+    content: DateCourseContent,
+    status: CourseStatus
 ) -> DateCourse {
     // 확정된 코스는 한 번은 저장된 것이라 버전이 1 이다
     let version = status == .draft ? 0 : 1
-    let stops = placeIDs
+    let stops = content.placeIDs
         .compactMap { placeID in Place.mocks.first { $0.id == placeID } }
         .map(CourseStop.init(place:))
 
@@ -102,8 +105,9 @@ private func mockCourse(
 
     return DateCourse(
         id: id,
-        title: title,
-        scheduledAt: scheduledAt,
+        title: content.title,
+        scheduledDate: content.date,
+        scheduledTime: content.time,
         status: status,
         version: version,
         stops: stops,

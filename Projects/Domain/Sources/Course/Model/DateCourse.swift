@@ -4,7 +4,10 @@ public struct DateCourse: Equatable, Identifiable, Sendable {
     public let id: String
     /// 시안 `26.08.05 데이트`
     public let title: String
-    public let scheduledAt: Date
+    /// Asia/Seoul 기준 그 날 자정
+    public let scheduledDate: Date
+    /// `hour` 와 `minute` 만 채운다. 날짜만 저장된 코스면 nil
+    public let scheduledTime: DateComponents?
     public let status: CourseStatus
     /// 낙관적 락 번호. 클라이언트가 세지 않고 서버 응답 값을 그대로 들고 다닌다
     public let version: Int
@@ -16,7 +19,8 @@ public struct DateCourse: Equatable, Identifiable, Sendable {
     public init(
         id: String,
         title: String,
-        scheduledAt: Date,
+        scheduledDate: Date,
+        scheduledTime: DateComponents?,
         status: CourseStatus,
         version: Int,
         stops: [CourseStop],
@@ -24,7 +28,8 @@ public struct DateCourse: Equatable, Identifiable, Sendable {
     ) {
         self.id = id
         self.title = title
-        self.scheduledAt = scheduledAt
+        self.scheduledDate = scheduledDate
+        self.scheduledTime = scheduledTime
         self.status = status
         self.version = version
         self.stops = stops
