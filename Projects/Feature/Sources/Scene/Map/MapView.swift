@@ -211,8 +211,8 @@ private extension MapView {
 private extension MapView {
     var floatingControls: some View {
         HStack(spacing: Spacing.s12) {
-            if !store.isSearching {
-                MapFloatingButton(title: "데이트 코스 짜러가기") {
+            if store.showsCourseButton {
+                MapFloatingButton(title: store.courseButtonTitle) {
                     store.send(.courseButtonTapped)
                 }
             }

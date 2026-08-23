@@ -22,6 +22,7 @@ final class MapFeatureTests: XCTestCase {
                 return places
             }
             $0.coupleClient.current = { nil }
+            $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -323,6 +324,7 @@ final class MapFeatureLoadTests: XCTestCase {
         } withDependencies: {
             $0.placeClient.savedPlaces = { throw PlaceError.network }
             $0.coupleClient.current = { nil }
+            $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -351,6 +353,7 @@ final class MapFeatureLoadTests: XCTestCase {
                 return loaded
             }
             $0.coupleClient.current = { nil }
+            $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -378,12 +381,14 @@ final class MapFeatureLoadTests: XCTestCase {
                     daysTogether: nil
                 )
             }
+            $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.onAppear)
         await store.receive(\.coupleResponse) {
             $0.isCoupleConnected = true
+            $0.partnerNickname = "둘"
         }
     }
 
@@ -394,6 +399,7 @@ final class MapFeatureLoadTests: XCTestCase {
         } withDependencies: {
             $0.placeClient.savedPlaces = { loaded }
             $0.coupleClient.current = { throw CoupleError.network }
+            $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -405,6 +411,129 @@ final class MapFeatureLoadTests: XCTestCase {
         XCTAssertEqual(store.state.loadState, .loaded)
         XCTAssertEqual(store.state.places, loaded)
         XCTAssertFalse(store.state.isCoupleConnected)
+    }
+
+    func test_미연결이면_코스버튼이_안_보인다() async {
+        let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
+        XCTAssertFalse(store.state.showsCourseButton)
+    }
+
+    func test_연결됐고_검색중이_아니면_코스버튼이_보인다() async {
+        var state = MapFeature.State()
+        state.isCoupleConnected = true
+        let store = TestStore(initialState: state) { MapFeature() }
+        XCTAssertTrue(store.state.showsCourseButton)
+    }
+
+    func test_연결됐어도_검색중이면_코스버튼이_안_보인다() async {
+        var state = MapFeature.State()
+        state.isCoupleConnected = true
+        state.mode = .searchResult(query: "카페", places: [])
+        let store = TestStore(initialState: state) { MapFeature() }
+        XCTAssertFalse(store.state.showsCourseButton)
+    }
+
+    func test_연결됐고_예정코스가_없으면_짜러가기_문구다() async {
+        var state = MapFeature.State()
+        state.isCoupleConnected = true
+        let store = TestStore(initialState: state) { MapFeature() }
+        XCTAssertEqual(store.state.courseButtonTitle, "데이트 코스 짜러가기")
+        XCTAssertTrue(store.state.showsCourseButton)
+    }
+
+    func test_연결됐고_예정코스가_있으면_보러가기_문구다() async {
+        var state = MapFeature.State()
+        state.isCoupleConnected = true
+        state.currentCourse = mapCurrentCourse
+        let store = TestStore(initialState: state) { MapFeature() }
+        XCTAssertEqual(store.state.courseButtonTitle, "데이트 코스 보러가기")
+        XCTAssertTrue(store.state.showsCourseButton)
+    }
+
+    func test_미연결이면_예정코스가_있어도_코스버튼이_안_보인다() async {
+        var state = MapFeature.State()
+        state.currentCourse = mapCurrentCourse
+        let store = TestStore(initialState: state) { MapFeature() }
+        XCTAssertFalse(store.state.showsCourseButton)
+    }
+
+    func test_onAppear_예정코스를_받는다() async {
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.placeClient.savedPlaces = { [] }
+            $0.coupleClient.current = { nil }
+            $0.courseClient.currentCourse = { mapCurrentCourse }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.onAppear)
+        await store.finish()
+        await store.skipReceivedActions()
+        XCTAssertEqual(store.state.currentCourse, mapCurrentCourse)
+    }
+
+    func test_다시시도를_누르면_예정코스도_다시_받는다() async {
+        let courseCalls = LockIsolated(0)
+        var state = MapFeature.State()
+        state.loadState = .failed
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.placeClient.savedPlaces = { [] }
+            $0.coupleClient.current = { nil }
+            $0.courseClient.currentCourse = {
+                courseCalls.withValue { $0 += 1 }
+                return mapCurrentCourse
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.retryTapped) {
+            $0.loadState = .loading
+            $0.toast = nil
+        }
+        await store.finish()
+        await store.skipReceivedActions()
+        XCTAssertEqual(store.state.currentCourse, mapCurrentCourse)
+        XCTAssertEqual(courseCalls.value, 1)
+    }
+
+    func test_예정코스만_다시_받으면_장소는_안_부른다() async {
+        let placeCalls = LockIsolated(0)
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.placeClient.savedPlaces = {
+                placeCalls.withValue { $0 += 1 }
+                return []
+            }
+            $0.courseClient.currentCourse = { mapCurrentCourse }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentCourseRequested)
+        await store.receive(\.currentCourseResponse) {
+            $0.currentCourse = mapCurrentCourse
+        }
+        XCTAssertEqual(placeCalls.value, 0)
+    }
+
+    func test_예정코스_조회가_실패하면_기존_값을_유지한다() async {
+        var state = MapFeature.State()
+        state.isCoupleConnected = true
+        state.currentCourse = mapCurrentCourse
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.courseClient.currentCourse = { throw CourseError.network }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.currentCourseRequested)
+        await store.finish()
+        XCTAssertEqual(store.state.currentCourse, mapCurrentCourse)
+        XCTAssertEqual(store.state.courseButtonTitle, "데이트 코스 보러가기")
     }
 }
 
@@ -473,6 +602,15 @@ final class MapFeatureDelegateTests: XCTestCase {
 
         await store.send(.courseButtonTapped)
         await store.receive(\.delegate.courseRequested)
+    }
+
+    func test_예정코스가_있으면_코스버튼은_결과화면을_올린다() async {
+        var state = MapFeature.State()
+        state.currentCourse = mapCurrentCourse
+        let store = TestStore(initialState: state) { MapFeature() }
+
+        await store.send(.courseButtonTapped)
+        await store.receive(.delegate(.courseResultRequested(dateCourseID: mapCurrentCourse.id)))
     }
 }
 
@@ -718,3 +856,12 @@ final class MapCameraMoveTests: XCTestCase {
         XCTAssertEqual(MapCamera.seoulCityHall.center.longitude, 126.9780, accuracy: 0.00001)
     }
 }
+
+private let mapCurrentCourse = DateCourseSummary(
+    id: "42",
+    title: "성수동 데이트",
+    scheduledAt: Date(timeIntervalSince1970: 0),
+    status: .confirmed,
+    version: 1,
+    totalPlaceCount: 5
+)

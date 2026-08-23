@@ -141,9 +141,37 @@ final class MapFlowCourseResultTests: XCTestCase {
             $0.courseResult = nil
         }
     }
+
+    func test_예정_코스_버튼은_결과_화면을_연다() async {
+        var map = MapFeature.State()
+        map.currentCourse = mapFlowCurrentCourse
+        map.partnerNickname = "상대"
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.map(.courseButtonTapped))
+        await store.receive(\.map.delegate.courseResultRequested) {
+            $0.path = [.courseResult]
+        }
+        XCTAssertEqual(store.state.courseResult?.dateCourseID, mapFlowCurrentCourse.id)
+        XCTAssertNil(store.state.courseResult?.course)
+        XCTAssertEqual(store.state.courseResult?.partnerNickname, "상대")
+        XCTAssertEqual(store.state.courseResult?.origin, .courseBuilt)
+    }
 }
 
 // MARK: - Fixture
+
+private let mapFlowCurrentCourse = DateCourseSummary(
+    id: "42",
+    title: "성수동 데이트",
+    scheduledAt: Date(timeIntervalSince1970: 0),
+    status: .confirmed,
+    version: 1,
+    totalPlaceCount: 5
+)
 
 private let confirmedCourse = DateCourse(
     id: "42",

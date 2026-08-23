@@ -118,6 +118,28 @@ public struct MapFlowFeature {
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case .pathChanged, .presentContentDetail, .presentPlaceDetail,
+             .presentSearchPlaceDetail, .showAllSaved:
+            return handlePresentation(state: &state, action: action)
+        case let .map(.delegate(delegate)):
+            return handle(mapDelegate: delegate, state: &state)
+        case let .course(.delegate(delegate)):
+            return handle(courseDelegate: delegate, state: &state)
+        case let .courseResult(.delegate(delegate)):
+            return handle(courseResultDelegate: delegate, state: &state)
+        case let .placeSearch(.delegate(delegate)):
+            return handle(searchDelegate: delegate, state: &state)
+        case .detail, .alias, .postDetail:
+            return handleChild(state: &state, action: action)
+        case .map, .course, .courseResult, .placeSearch, .delegate:
+            return .none
+        }
+    }
+}
+
+private extension MapFlowFeature {
+    func handlePresentation(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case let .pathChanged(path):
             return applyPath(path, state: &state)
         case let .presentContentDetail(id):
@@ -153,23 +175,12 @@ public struct MapFlowFeature {
                 .send(.map(.searchClearTapped)),
                 .send(.map(.filtersReset))
             )
-        case let .map(.delegate(delegate)):
-            return handle(mapDelegate: delegate, state: &state)
-        case let .course(.delegate(delegate)):
-            return handle(courseDelegate: delegate, state: &state)
-        case let .courseResult(.delegate(delegate)):
-            return handle(courseResultDelegate: delegate, state: &state)
-        case let .placeSearch(.delegate(delegate)):
-            return handle(searchDelegate: delegate, state: &state)
-        case .detail, .alias, .postDetail:
-            return handleChild(state: &state, action: action)
-        case .map, .course, .courseResult, .placeSearch, .delegate:
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
     }
-}
 
-private extension MapFlowFeature {
     func applyPath(_ path: [Route], state: inout State) -> Effect<Action> {
         state.path = path
         if !path.contains(.search) {
@@ -195,19 +206,23 @@ private extension MapFlowFeature {
             return .none
         case .searchRequested:
             state.placeSearch = PlaceSearchFeature.State()
-            state.path.append(.search)
-            return .none
+            return applyPath(state.path + [.search], state: &state)
         case let .searchReopenRequested(query):
             state.placeSearch = PlaceSearchFeature.State(query: query)
-            if !state.path.contains(.search) {
-                state.path.append(.search)
-            }
-            return .none
+            guard !state.path.contains(.search) else { return .none }
+            return applyPath(state.path + [.search], state: &state)
         case .courseRequested:
             // 지난 진입의 날짜·장소를 물려받으면 안 된다
             state.course = CourseFeature.State()
-            state.path.append(.course)
-            return .none
+            return applyPath(state.path + [.course], state: &state)
+        case let .courseResultRequested(dateCourseID):
+            state.courseResult = CourseResultFeature.State(
+                course: nil,
+                dateCourseID: dateCourseID,
+                partnerNickname: state.map.partnerNickname,
+                origin: .courseBuilt
+            )
+            return applyPath(state.path + [.courseResult], state: &state)
         case let .aliasRequested(id):
             if let saved = state.map.places.first(where: { $0.id == id }) {
                 state.alias = PlaceAliasFeature.State(savedPlace: saved)
@@ -227,8 +242,7 @@ private extension MapFlowFeature {
     ) -> Effect<Action> {
         switch courseDelegate {
         case .placePickRequested:
-            state.path.append(.coursePlacePick)
-            return .none
+            return applyPath(state.path + [.coursePlacePick], state: &state)
         case .dismissed:
             var next = state.path
             // 코스 화면이 스스로 닫는 신호라, 맨 위가 코스 경로일 때만 뺀다
@@ -242,8 +256,7 @@ private extension MapFlowFeature {
                 dateCourseID: course.id,
                 partnerNickname: state.course?.partnerNickname
             )
-            state.path.append(.courseResult)
-            return .none
+            return applyPath(state.path + [.courseResult], state: &state)
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         }
