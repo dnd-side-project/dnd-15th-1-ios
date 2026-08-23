@@ -28,6 +28,8 @@ public struct MyPageFeature {
         // 나의 데이트 유형 push 스택
         public var path: [Route]
         public var dateType: DateTypeFeature.State?
+        // 회원탈퇴 확인 모달
+        public var isWithdrawModalPresented: Bool
         public var isLoading: Bool
         public var errorMessage: String?
 
@@ -44,6 +46,7 @@ public struct MyPageFeature {
             profileEdit: ProfileEditFeature.State? = nil,
             path: [Route] = [],
             dateType: DateTypeFeature.State? = nil,
+            isWithdrawModalPresented: Bool = false,
             isLoading: Bool = false,
             errorMessage: String? = nil
         ) {
@@ -59,6 +62,7 @@ public struct MyPageFeature {
             self.profileEdit = profileEdit
             self.path = path
             self.dateType = dateType
+            self.isWithdrawModalPresented = isWithdrawModalPresented
             self.isLoading = isLoading
             self.errorMessage = errorMessage
         }
@@ -76,6 +80,8 @@ public struct MyPageFeature {
         case termsLinkTapped(TermsType)
         case dismissTerms
         case withdrawTapped
+        case withdrawConfirmed
+        case dismissWithdrawModal
         case logoutButtonTapped
         case logoutResponse(Result<EquatableVoid, AuthError>)
         case profileEdit(PresentationAction<ProfileEditFeature.Action>)
@@ -143,15 +149,8 @@ public struct MyPageFeature {
         case .logoutButtonTapped, .logoutResponse:
             return handleLogout(state: &state, action: action)
 
-        case let .termsLinkTapped(terms):
-            // 약관 웹뷰를 시트로 연다. 지원 URL 이 아니면 무시(로그인과 동일)
-            guard let url = terms.url, SupportedWebURL.isSupported(url) else { return .none }
-            state.presentedTerms = terms
-            return .none
-
-        case .dismissTerms:
-            state.presentedTerms = nil
-            return .none
+        case .termsLinkTapped, .dismissTerms:
+            return handleTerms(state: &state, action: action)
 
         case .profileEditTapped, .profileEdit:
             return handleProfileEdit(state: &state, action: action)
@@ -159,7 +158,10 @@ public struct MyPageFeature {
         case .dateTypeTapped, .pathChanged, .dateType:
             return handleDateType(state: &state, action: action)
 
-        case .binding, .connectionTapped, .withdrawTapped, .delegate:
+        case .withdrawTapped, .withdrawConfirmed, .dismissWithdrawModal:
+            return handleWithdraw(state: &state, action: action)
+
+        case .binding, .connectionTapped, .delegate:
             // 이동할 화면들은 아직 없음. 붙는 대로 연결
             return .none
         }
@@ -241,6 +243,43 @@ public struct MyPageFeature {
 }
 
 private extension MyPageFeature {
+    func handleTerms(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .termsLinkTapped(terms):
+            // 약관 웹뷰를 시트로 연다. 지원 URL 이 아니면 무시(로그인과 동일)
+            guard let url = terms.url, SupportedWebURL.isSupported(url) else { return .none }
+            state.presentedTerms = terms
+            return .none
+
+        case .dismissTerms:
+            state.presentedTerms = nil
+            return .none
+
+        default:
+            return .none
+        }
+    }
+
+    func handleWithdraw(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .withdrawTapped:
+            state.isWithdrawModalPresented = true
+            return .none
+
+        case .withdrawConfirmed:
+            // 실제 탈퇴 API 는 이후 연결. 지금은 모달만 닫는다
+            state.isWithdrawModalPresented = false
+            return .none
+
+        case .dismissWithdrawModal:
+            state.isWithdrawModalPresented = false
+            return .none
+
+        default:
+            return .none
+        }
+    }
+
     func handleLogout(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .logoutButtonTapped:

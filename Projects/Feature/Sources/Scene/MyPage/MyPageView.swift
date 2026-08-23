@@ -52,6 +52,17 @@ public struct MyPageView: View {
                 ProfileEditView(store: editStore)
             }
         }
+        .modal(isPresented: withdrawModalBinding) {
+            ModalContent(
+                title: "정말 탈퇴하시나요?",
+                content: "지금까지 저장된 데이터가 모두 날아가요",
+                image: .disconnect,
+                primaryTitle: "탈퇴하기",
+                primaryAction: { store.send(.withdrawConfirmed) },
+                secondaryTitle: "취소",
+                secondaryAction: { store.send(.dismissWithdrawModal) }
+            )
+        }
         // 시트가 올라오면 탭바를 감춰 시트가 화면 전체를 덮게 한다
         .toolbar(store.profileEdit == nil ? .automatic : .hidden, for: .tabBar)
         .task {
@@ -94,6 +105,17 @@ public struct MyPageView: View {
             set: { isPresented in
                 if !isPresented {
                     store.send(.profileEdit(.dismiss))
+                }
+            }
+        )
+    }
+
+    private var withdrawModalBinding: Binding<Bool> {
+        Binding(
+            get: { store.isWithdrawModalPresented },
+            set: { isPresented in
+                if !isPresented {
+                    store.send(.dismissWithdrawModal)
                 }
             }
         )
