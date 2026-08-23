@@ -40,6 +40,7 @@ enum Dependencies {
         )
 
         values.notificationClient = NotificationClientFactory.make(
+            session: authSession,
             client: infra.remoteNotificationClient
         )
 
