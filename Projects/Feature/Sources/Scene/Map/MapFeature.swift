@@ -35,8 +35,10 @@ public struct MapFeature {
         public var camera: MapCamera = .seoulCityHall
         public var mode: Mode = .saved
 
-        /// 저장 여부 표시. 서버 계약이 없어 화면 안에서만 산다
+        /// 저장 여부 표시. 탭하면 먼저 뒤집고, 서버 실패 시 되돌린다
         public var bookmarkedPlaceIDs: Set<String> = []
+        /// 저장 응답이 준 서버 placeId. 검색 행 id 는 kakaoId 일 수 있어 삭제엔 이걸 쓴다
+        public var savedServerIDs: [String: String] = [:]
         public var places: [SavedPlace] = []
         public var loadState: LoadState = .loading
 
@@ -113,6 +115,8 @@ public struct MapFeature {
         case searchClearTapped
         case searchBackTapped
         case bookmarkTapped(String)
+        case bookmarkSaved(id: String, serverID: String)
+        case bookmarkFailed(id: String, wasBookmarked: Bool)
         /// 별칭 시트가 저장한 뒤 목록을 갈아 끼운다
         case aliasSaved(SavedPlace)
         case delegate(Delegate)
@@ -136,11 +140,12 @@ public struct MapFeature {
         }
     }
 
-    private enum CancelID {
+    private enum CancelID: Hashable {
         case load
         case couple
         case currentCourse
         case location
+        case bookmark(String)
     }
 
     @Dependency(\.placeClient) var placeClient
@@ -167,7 +172,8 @@ public struct MapFeature {
             return updateFilter(state: &state, action: action)
         case .editTapped, .deleteTapped, .markerTapped, .rowTapped, .searchBarTapped, .courseButtonTapped:
             return raise(state: &state, action: action)
-        case .searchResultsApplied, .contentPlacesApplied, .searchClearTapped, .searchBackTapped, .bookmarkTapped:
+        case .searchResultsApplied, .contentPlacesApplied, .searchClearTapped, .searchBackTapped,
+             .bookmarkTapped, .bookmarkSaved, .bookmarkFailed:
             return updateSearch(state: &state, action: action)
         case .aliasSaved:
             return applyAlias(state: &state, action: action)
@@ -460,17 +466,70 @@ private extension MapFeature {
         case .searchBackTapped:
             guard let query = state.searchQuery else { return .none }
             return .send(.delegate(.searchReopenRequested(query: query)))
+        case .bookmarkTapped, .bookmarkSaved, .bookmarkFailed:
+            return updateBookmark(state: &state, action: action)
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    func updateBookmark(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case let .bookmarkTapped(id):
-            if state.bookmarkedPlaceIDs.contains(id) {
-                state.bookmarkedPlaceIDs.remove(id)
-            } else {
+            return toggleBookmark(state: &state, id: id)
+        case let .bookmarkSaved(id, serverID):
+            state.savedServerIDs[id] = serverID
+            return .none
+        case let .bookmarkFailed(id, wasBookmarked):
+            if wasBookmarked {
                 state.bookmarkedPlaceIDs.insert(id)
+            } else {
+                state.bookmarkedPlaceIDs.remove(id)
             }
             return .none
         default:
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
+    }
+
+    func toggleBookmark(state: inout State, id: String) -> Effect<Action> {
+        guard let place = state.searchResults.first(where: { $0.id == id }) else { return .none }
+        let wasBookmarked = state.bookmarkedPlaceIDs.contains(id)
+        if !wasBookmarked, place.kakaoPlaceID == nil { return .none }
+        if wasBookmarked {
+            state.bookmarkedPlaceIDs.remove(id)
+        } else {
+            state.bookmarkedPlaceIDs.insert(id)
+        }
+        return runBookmark(
+            id: id,
+            place: place,
+            serverID: state.savedServerIDs[id],
+            wasBookmarked: wasBookmarked
+        )
+    }
+
+    func runBookmark(
+        id: String,
+        place: Place,
+        serverID: String?,
+        wasBookmarked: Bool
+    ) -> Effect<Action> {
+        .run { [placeClient] send in
+            do {
+                if wasBookmarked {
+                    try await placeClient.removePlace(serverID ?? place.id)
+                } else if let kakaoID = place.kakaoPlaceID {
+                    let saved = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
+                    await send(.bookmarkSaved(id: id, serverID: saved.place.id))
+                }
+            } catch {
+                await send(.bookmarkFailed(id: id, wasBookmarked: wasBookmarked))
+            }
+        }
+        .cancellable(id: CancelID.bookmark(id), cancelInFlight: true)
     }
 
     func applyAlias(state: inout State, action: Action) -> Effect<Action> {
@@ -570,7 +629,6 @@ public extension MapFeature.State {
         bookmarkedPlaceIDs.contains(placeID)
     }
 }
-
 private extension MapFeature {
 
     /// 여러 장소를 보는 자리. 저장이 없으면 서울 시청이다
