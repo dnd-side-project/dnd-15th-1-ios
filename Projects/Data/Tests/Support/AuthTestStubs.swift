@@ -138,7 +138,8 @@ extension AuthRepository {
         plainClient: StubNetworkClient,
         authedClient: StubNetworkClient? = nil,
         authLocal: AuthLocalDataSource,
-        socialAuth: SocialAuthCredentialProvider = .stub()
+        socialAuth: SocialAuthCredentialProvider = .stub(),
+        notificationRepository: NotificationRepository? = nil
     ) -> AuthRepository {
         let authed = authedClient ?? plainClient
         return AuthRepository(
@@ -148,7 +149,8 @@ extension AuthRepository {
             ),
             authLocal: authLocal,
             socialAuth: socialAuth,
-            profileRemote: ProfileRemoteDataSource(networkClient: authed)
+            profileRemote: ProfileRemoteDataSource(networkClient: authed),
+            notificationRepository: notificationRepository
         )
     }
 }

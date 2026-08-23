@@ -90,6 +90,7 @@ final class RootFlowFeatureTests: XCTestCase {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
                 return false
             }
+            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(.onAppear)
@@ -119,6 +120,7 @@ final class RootFlowFeatureTests: XCTestCase {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
                 return false
             }
+            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(.onAppear)
@@ -212,6 +214,7 @@ final class RootFlowFeatureTests: XCTestCase {
             RootFlowFeature()
         } withDependencies: {
             $0.notificationClient.requestAuthorization = { true }
+            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
         }
         store.exhaustivity = .off
 
@@ -325,6 +328,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             RootFlowFeature()
         } withDependencies: {
             $0.notificationClient.requestAuthorization = { true }
+            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(
@@ -355,6 +359,7 @@ final class RootFlowOnboardingTests: XCTestCase {
                 authorizationCount.withValue { $0 += 1 }
                 return true
             }
+            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(
@@ -390,6 +395,7 @@ final class RootFlowOnboardingTests: XCTestCase {
                 authorizationCount.withValue { $0 += 1 }
                 return true
             }
+            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(
@@ -538,5 +544,148 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.pendingDeepLink = .home
         }
         await store.send(.routeDeepLink(.signIn))
+    }
+}
+
+@MainActor
+final class RootFlowPushTests: XCTestCase {
+    private let sampleSession = AuthSession(
+        accessToken: "access",
+        refreshToken: "refresh",
+        userID: "1"
+    )
+
+    func test_로그인하면_FCM_토큰으로_기기를_등록한다() async {
+        let registered = LockIsolated<[String]>([])
+        let store = TestStore(
+            initialState: RootFlowFeature.State(
+                phase: .onboardingFlow(OnboardingFlowFeature.State())
+            )
+        ) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.notificationClient.fcmTokenStream = {
+                AsyncStream { continuation in
+                    continuation.yield("fcm-token")
+                    continuation.finish()
+                }
+            }
+            $0.notificationClient.registerDevice = { token in
+                registered.withValue { $0.append(token) }
+            }
+            $0.notificationClient.requestAuthorization = { true }
+        }
+        store.exhaustivity = .off
+
+        await store.send(
+            .onboardingFlow(.delegate(.authenticated(userID: "42", isOnboardingCompleted: true)))
+        )
+        await store.finish()
+
+        XCTAssertEqual(registered.value, ["fcm-token"])
+    }
+
+    func test_앱_재실행으로_세션을_복구해도_기기를_등록한다() async {
+        let registered = LockIsolated<[String]>([])
+        let session = sampleSession
+        let store = TestStore(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.notificationClient.fcmTokenStream = {
+                AsyncStream { continuation in
+                    continuation.yield("fcm-token")
+                    continuation.finish()
+                }
+            }
+            $0.notificationClient.registerDevice = { token in
+                registered.withValue { $0.append(token) }
+            }
+            $0.notificationClient.requestAuthorization = {
+                XCTFail("앱 재실행에서는 권한을 다시 묻지 않는다")
+                return false
+            }
+        }
+        store.exhaustivity = .off
+
+        await store.send(
+            .sessionRestored(.success(AuthBootstrap(session: session, isOnboardingCompleted: true)))
+        )
+        await store.finish()
+
+        XCTAssertEqual(registered.value, ["fcm-token"])
+    }
+
+    func test_마이페이지_로그아웃_뒤에는_새_토큰으로_등록하지_않는다() async {
+        let registered = LockIsolated<[String]>([])
+        let firstRegistered = expectation(description: "first token registered")
+        let (stream, continuation) = AsyncStream.makeStream(of: String.self)
+        let store = TestStore(
+            initialState: RootFlowFeature.State(
+                phase: .onboardingFlow(OnboardingFlowFeature.State())
+            )
+        ) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.notificationClient.fcmTokenStream = { stream }
+            $0.notificationClient.registerDevice = { token in
+                registered.withValue { $0.append(token) }
+                if token == "fcm-token" {
+                    firstRegistered.fulfill()
+                }
+            }
+            $0.notificationClient.requestAuthorization = { true }
+        }
+        store.exhaustivity = .off
+
+        await store.send(
+            .onboardingFlow(.delegate(.authenticated(userID: "42", isOnboardingCompleted: true)))
+        )
+        continuation.yield("fcm-token")
+        await fulfillment(of: [firstRegistered], timeout: 1)
+
+        await store.send(.mainTab(.delegate(.logoutSucceeded)))
+        continuation.yield("fcm-token-after-logout")
+        continuation.finish()
+        await store.finish()
+
+        XCTAssertEqual(registered.value, ["fcm-token"])
+    }
+
+    func test_온보딩완료_세션없으면_새_토큰으로_등록하지_않는다() async {
+        let registered = LockIsolated<[String]>([])
+        let firstRegistered = expectation(description: "first token registered")
+        let (stream, continuation) = AsyncStream.makeStream(of: String.self)
+        let session = sampleSession
+        let store = TestStore(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.notificationClient.fcmTokenStream = { stream }
+            $0.notificationClient.registerDevice = { token in
+                registered.withValue { $0.append(token) }
+                if token == "fcm-token" {
+                    firstRegistered.fulfill()
+                }
+            }
+            $0.notificationClient.requestAuthorization = {
+                XCTFail("앱 재실행에서는 권한을 다시 묻지 않는다")
+                return false
+            }
+            $0.authClient.currentSession = { nil }
+        }
+        store.exhaustivity = .off
+
+        await store.send(
+            .sessionRestored(.success(AuthBootstrap(session: session, isOnboardingCompleted: false)))
+        )
+        continuation.yield("fcm-token")
+        await fulfillment(of: [firstRegistered], timeout: 1)
+
+        await store.send(.onboardingFlow(.delegate(.onboardingCompleted)))
+        await store.receive(\.onboardingSessionResolved)
+        continuation.yield("fcm-token-after-session-gone")
+        continuation.finish()
+        await store.finish()
+
+        XCTAssertEqual(registered.value, ["fcm-token"])
     }
 }

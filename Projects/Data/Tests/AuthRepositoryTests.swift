@@ -168,6 +168,35 @@ final class AuthRepositoryTests: XCTestCase {
         XCTAssertNil(restored)
     }
 
+    func test_logout_은_세션을_지우기_전에_기기_해제를_부른다() async throws {
+        let keychain = StubKeychainStorage()
+        let local = AuthLocalDataSource(storage: keychain)
+        try await local.saveStubSession(userID: "1", isOnboardingCompleted: true)
+
+        let network = StubNetworkClient()
+        let repository = AuthRepository.stub(
+            plainClient: network,
+            authLocal: local,
+            notificationRepository: NotificationRepository(
+                pushRemote: PushRemoteDataSource(networkClient: network),
+                pushLocal: PushLocalDataSource(storage: keychain),
+                appVersion: nil
+            )
+        )
+
+        try await repository.logout()
+
+        let pushIndex = network.requestedPaths.firstIndex { $0.contains("push-devices") }
+        let logoutIndex = network.requestedPaths.firstIndex(of: AuthStubFixture.logoutPath)
+        XCTAssertNotNil(pushIndex)
+        XCTAssertNotNil(logoutIndex)
+        if let pushIndex, let logoutIndex {
+            XCTAssertLessThan(pushIndex, logoutIndex)
+        }
+        let restored = try await local.loadSession()
+        XCTAssertNil(restored)
+    }
+
     func test_refresh_토큰을_회전하고_온보딩_플래그를_유지한다() async throws {
         let network = StubNetworkClient()
         network.responses[AuthStubFixture.reissuePath] = AuthTokenDTO(
