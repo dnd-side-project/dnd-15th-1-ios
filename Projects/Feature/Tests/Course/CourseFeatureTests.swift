@@ -46,7 +46,8 @@ final class CourseDateInputTests: XCTestCase {
                 DateCourse(
                     id: "1",
                     title: "t",
-                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    scheduledDate: Date(timeIntervalSince1970: 0),
+                    scheduledTime: nil,
                     status: .draft,
                     version: 0,
                     stops: [],
@@ -83,7 +84,8 @@ final class CourseDateInputTests: XCTestCase {
                 DateCourse(
                     id: "1",
                     title: "t",
-                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    scheduledDate: Date(timeIntervalSince1970: 0),
+                    scheduledTime: nil,
                     status: .draft,
                     version: 0,
                     stops: [],
@@ -107,11 +109,12 @@ final class CourseDateInputTests: XCTestCase {
             $0.courseClient.createCourse = { title, date, time in
                 XCTAssertEqual(title, "30.08.05 데이트")
                 XCTAssertEqual(date.day, 5)
-                XCTAssertEqual(time.hour, 13)
+                XCTAssertNil(time)
                 return DateCourse(
                     id: "42",
                     title: title,
-                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    scheduledDate: Date(timeIntervalSince1970: 0),
+                    scheduledTime: nil,
                     status: .draft,
                     version: 0,
                     stops: [],
@@ -135,18 +138,19 @@ final class CourseDateInputTests: XCTestCase {
         await store.receive(.delegate(.placePickRequested(dateCourseID: "42")))
     }
 
-    func test_시간을_안_고르면_오후_한시를_보낸다() async {
+    func test_시간을_안_고르면_저장에_시간을_안_보낸다() async {
+        let received = LockIsolated<DateComponents??>(nil)
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
             $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, time in
-                XCTAssertEqual(time.hour, 13)
-                XCTAssertEqual(time.minute, 0)
+                received.setValue(time)
                 return DateCourse(
                     id: "1",
                     title: "t",
-                    scheduledAt: Date(timeIntervalSince1970: 0),
+                    scheduledDate: Date(timeIntervalSince1970: 0),
+                    scheduledTime: nil,
                     status: .draft,
                     version: 0,
                     stops: [],
@@ -154,14 +158,13 @@ final class CourseDateInputTests: XCTestCase {
                 )
             }
         }
-        store.exhaustivity = .off(showSkippedAssertions: false)
+        store.exhaustivity = .off
 
         await store.send(.dateFieldTapped)
-        await store.send(.wheelDraftChanged(DateComponents(year: 2030, month: 8, day: 5)))
         await store.send(.wheelConfirmed)
         await store.send(.nextTapped)
-        await store.receive(\.courseCreated)
-        await store.receive(.delegate(.placePickRequested(dateCourseID: "1")))
+
+        XCTAssertEqual(received.value, .some(.none))
     }
 
     func test_코스_만들기가_실패하면_화면에_남고_토스트를_띄운다() async {
@@ -225,6 +228,24 @@ final class CourseDateInputTests: XCTestCase {
             $0.activeWheel = nil
         }
         XCTAssertNil(store.state.time)
+    }
+
+    func test_이미_고른_시간이_있으면_휠을_열어도_그_값이다() async {
+        let calendar = Calendar.current
+        let now = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 23, hour: 22, minute: 3)
+        ) ?? Date.distantPast
+        var initial = CourseFeature.State(now: now)
+        initial.time = DateComponents(hour: 15, minute: 30)
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.timeFieldTapped) {
+            $0.activeWheel = .time
+            $0.draftTime = DateComponents(hour: 15, minute: 30)
+        }
     }
 }
 
@@ -362,7 +383,8 @@ final class CoursePlacePickTests: XCTestCase {
         let saved = DateCourse(
             id: "42",
             title: "30.08.05 데이트",
-            scheduledAt: Date(timeIntervalSince1970: 0),
+            scheduledDate: Date(timeIntervalSince1970: 0),
+            scheduledTime: nil,
             status: .confirmed,
             version: 1,
             stops: [],
@@ -371,7 +393,7 @@ final class CoursePlacePickTests: XCTestCase {
         let store = TestStore(initialState: initial) {
             CourseFeature()
         } withDependencies: {
-            $0.courseClient.updateCourse = { _, _, _, _, _ in saved }
+            $0.courseClient.updateCourse = { _, _, _ in saved }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -390,6 +412,48 @@ final class CoursePlacePickTests: XCTestCase {
         let store = TestStore(initialState: initial) { CourseFeature() }
 
         await store.send(.buildTapped)
+    }
+}
+
+@MainActor
+final class CoursePickModeTests: XCTestCase {
+
+    func test_고르기_모드는_저장하지_않고_고른_것을_올린다() async {
+        let places = pickModeCandidates
+        let store = TestStore(
+            initialState: CourseFeature.State(mode: .pick(excluding: ["101"]))
+        ) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.coursePlaces = { places }
+            $0.coupleClient.current = { nil }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.onAppear)
+        await store.receive(\.coursePlacesResponse)
+        await store.send(.rowTapped("102"))
+        await store.send(.buildTapped)
+
+        await store.receive(.delegate(.placesPicked(places.filter { $0.id == "102" })))
+    }
+
+    func test_고르기_모드는_이미_담긴_장소를_안_보인다() async {
+        let places = pickModeCandidates
+        let store = TestStore(
+            initialState: CourseFeature.State(mode: .pick(excluding: ["101"]))
+        ) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.coursePlaces = { places }
+            $0.coupleClient.current = { nil }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.onAppear)
+        await store.receive(\.coursePlacesResponse)
+
+        XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["102"])
     }
 }
 
@@ -554,6 +618,11 @@ private extension CoursePlaceCandidate {
     }
 }
 
+private let pickModeCandidates: [CoursePlaceCandidate] = [
+    .courseFixture(id: "101", latitude: 37.31, longitude: 126.90),
+    .courseFixture(id: "102", latitude: 37.32, longitude: 126.91),
+]
+
 @MainActor
 final class CoursePlacePickCameraTests: XCTestCase {
 
@@ -594,7 +663,8 @@ final class CourseSaveTests: XCTestCase {
         DateCourse(
             id: "42",
             title: "30.08.05 데이트",
-            scheduledAt: Date(timeIntervalSince1970: 0),
+            scheduledDate: Date(timeIntervalSince1970: 0),
+            scheduledTime: nil,
             status: .confirmed,
             version: 1,
             stops: [],
@@ -623,10 +693,10 @@ final class CourseSaveTests: XCTestCase {
     func test_코스짜기를_누르면_저장하고_결과로_넘긴다() async {
         let saved = confirmedCourse
         let store = placePickStore()
-        store.dependencies.courseClient.updateCourse = { id, title, _, placeIDs, version in
+        store.dependencies.courseClient.updateCourse = { id, content, version in
             XCTAssertEqual(id, "42")
-            XCTAssertEqual(title, "30.08.05 데이트")
-            XCTAssertEqual(placeIDs, ["a", "b"])
+            XCTAssertEqual(content.title, "30.08.05 데이트")
+            XCTAssertEqual(content.placeIDs, ["a", "b"])
             XCTAssertEqual(version, 0)
             return saved
         }
@@ -642,14 +712,15 @@ final class CourseSaveTests: XCTestCase {
         let latest = DateCourse(
             id: "42",
             title: "30.08.05 데이트",
-            scheduledAt: Date(timeIntervalSince1970: 0),
+            scheduledDate: Date(timeIntervalSince1970: 0),
+            scheduledTime: nil,
             status: .confirmed,
             version: 2,
             stops: [],
             legs: []
         )
         let store = placePickStore()
-        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.conflict }
+        store.dependencies.courseClient.updateCourse = { _, _, _ in throw CourseError.conflict }
         store.dependencies.courseClient.course = { _ in latest }
         await store.send(.buildTapped) { $0.isSavingCourse = true }
         await store.receive(\.courseSaved.failure)
@@ -662,7 +733,7 @@ final class CourseSaveTests: XCTestCase {
 
     func test_409인데_다시_읽기도_실패하면_토스트가_뜬다() async {
         let store = placePickStore()
-        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.conflict }
+        store.dependencies.courseClient.updateCourse = { _, _, _ in throw CourseError.conflict }
         store.dependencies.courseClient.course = { _ in throw CourseError.network }
         await store.send(.buildTapped) { $0.isSavingCourse = true }
         await store.receive(\.courseSaved.failure)
@@ -680,7 +751,7 @@ final class CourseSaveTests: XCTestCase {
 
     func test_저장이_실패하면_토스트를_띄운다() async {
         let store = placePickStore()
-        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.network }
+        store.dependencies.courseClient.updateCourse = { _, _, _ in throw CourseError.network }
         await store.send(.buildTapped) { $0.isSavingCourse = true }
         await store.receive(\.courseSaved.failure) {
             $0.isSavingCourse = false
@@ -690,7 +761,7 @@ final class CourseSaveTests: XCTestCase {
 
     func test_저장이_인증만료면_상위로_올린다() async {
         let store = placePickStore()
-        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.unauthorized }
+        store.dependencies.courseClient.updateCourse = { _, _, _ in throw CourseError.unauthorized }
         await store.send(.buildTapped) { $0.isSavingCourse = true }
         await store.receive(\.courseSaved.failure) {
             $0.isSavingCourse = false
@@ -701,7 +772,7 @@ final class CourseSaveTests: XCTestCase {
 
     func test_저장_중_뒤로가면_저장을_끊는다() async {
         let store = placePickStore()
-        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in
+        store.dependencies.courseClient.updateCourse = { _, _, _ in
             try await Task.never()
         }
         await store.send(.buildTapped) { $0.isSavingCourse = true }
@@ -713,7 +784,7 @@ final class CourseSaveTests: XCTestCase {
 
     func test_재조회_중_뒤로가면_재조회를_끊고_알림을_비운다() async {
         let store = placePickStore()
-        store.dependencies.courseClient.updateCourse = { _, _, _, _, _ in throw CourseError.conflict }
+        store.dependencies.courseClient.updateCourse = { _, _, _ in throw CourseError.conflict }
         store.dependencies.courseClient.course = { _ in
             try await Task.never()
         }

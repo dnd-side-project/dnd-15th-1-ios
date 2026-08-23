@@ -316,6 +316,18 @@ final class CourseResultLoadTests: XCTestCase {
         await store.send(.onAppear)
         await store.receive(.delegate(.sessionExpired))
     }
+
+    func test_충돌하면_코스를_비우고_토스트와_함께_다시_읽는다() async {
+        let store = resultStore(course: threeStopCourse)
+        store.dependencies.courseClient.course = { _ in threeStopCourse }
+
+        await store.send(.conflictReloadRequested) {
+            $0.course = nil
+            $0.loadState = .loading
+            $0.toast = ToastState(message: "상대방이 먼저 바꿔서 최신 코스를 불러왔어요")
+        }
+        await store.receive(\.courseResponse)
+    }
 }
 
 // MARK: - Store
@@ -362,7 +374,8 @@ private let missingFirstLegCourse = makeCourse(
 private let mixedCategoryCourse = DateCourse(
     id: "1",
     title: "26.08.05 데이트",
-    scheduledAt: Date(timeIntervalSince1970: 0),
+    scheduledDate: Date(timeIntervalSince1970: 0),
+    scheduledTime: nil,
     status: .confirmed,
     version: 1,
     stops: [
@@ -382,7 +395,8 @@ private let mixedCategoryCourse = DateCourse(
 private let southStopCourse = DateCourse(
     id: "1",
     title: "26.08.05 데이트",
-    scheduledAt: Date(timeIntervalSince1970: 0),
+    scheduledDate: Date(timeIntervalSince1970: 0),
+    scheduledTime: nil,
     status: .confirmed,
     version: 1,
     stops: [
@@ -398,11 +412,16 @@ private let southStopCourse = DateCourse(
     ]
 )
 
-private func makeCourse(stopCount: Int, legs: [Domain.CourseLeg?]) -> DateCourse {
+private func makeCourse(
+    stopCount: Int,
+    legs: [Domain.CourseLeg?],
+    scheduledTime: DateComponents? = nil
+) -> DateCourse {
     DateCourse(
         id: "1",
         title: "26.08.05 데이트",
-        scheduledAt: Date(timeIntervalSince1970: 0),
+        scheduledDate: seoulDate(year: 2026, month: 8, day: 5),
+        scheduledTime: scheduledTime,
         status: .confirmed,
         version: 1,
         stops: (0..<stopCount).map { index in
@@ -416,6 +435,12 @@ private func makeCourse(stopCount: Int, legs: [Domain.CourseLeg?]) -> DateCourse
         },
         legs: legs
     )
+}
+
+private func seoulDate(year: Int, month: Int, day: Int) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .gmt
+    return calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? Date.distantPast
 }
 
 @MainActor
@@ -471,7 +496,8 @@ private let originFixtureStop = Domain.CourseStop(
 private let originFixtureCourse = DateCourse(
     id: "42",
     title: "t",
-    scheduledAt: Date(timeIntervalSince1970: 0),
+    scheduledDate: Date(timeIntervalSince1970: 0),
+    scheduledTime: nil,
     status: .confirmed,
     version: 0,
     stops: [originFixtureStop],
@@ -481,7 +507,8 @@ private let originFixtureCourse = DateCourse(
 private let emptyFixtureCourse = DateCourse(
     id: "42",
     title: "t",
-    scheduledAt: Date(timeIntervalSince1970: 0),
+    scheduledDate: Date(timeIntervalSince1970: 0),
+    scheduledTime: nil,
     status: .confirmed,
     version: 0,
     stops: [],
