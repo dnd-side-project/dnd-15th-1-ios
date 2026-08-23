@@ -527,8 +527,13 @@ private extension MyPageFeature {
 
     private func loadNotificationSettings() -> Effect<Action> {
         .run { [profileClient] send in
-            guard let settings = try? await profileClient.notificationSettings() else { return }
-            await send(.notificationSettingsLoaded(settings))
+            do {
+                let settings = try await profileClient.notificationSettings()
+                await send(.notificationSettingsLoaded(settings))
+            } catch {
+                // 실패해도 스켈레톤은 걷는다(무한 로딩 방지)
+                await send(.notificationSettingsLoadFailed)
+            }
         }
     }
 

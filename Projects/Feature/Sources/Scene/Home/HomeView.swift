@@ -144,7 +144,7 @@ public struct HomeView: View {
         VStack(alignment: .leading, spacing: 16) {
             recommendationTitle
 
-            if store.recommendations.isEmpty {
+            if !store.didLoadRecommendations {
                 recommendationSkeletonRow
             } else {
                 recommendationScroll

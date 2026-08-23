@@ -49,8 +49,10 @@ public struct HomeFeature {
         public var homePath: [HomeRoute]
         // 요약(GET /home) 로드 완료. 헤더·배너를 이 이후 실제로 그린다
         public var didLoadSummary = false
-        // 최근 저장 장소 로드 완료. 로딩과 빈 상태를 구분한다
+        // 최근 저장 장소 로드 완료(성공·실패 모두). 로딩과 빈 상태를 구분한다
         public var didLoadSaved = false
+        // 추천 로드 완료(성공·실패 모두). 실패해도 스켈레톤을 걷는다
+        public var didLoadRecommendations = false
 
         public var isConnected: Bool {
             partnerName != nil
@@ -98,7 +100,9 @@ public struct HomeFeature {
         case homeLoaded(HomeSummary)
         case homeLoadFailed(HomeError)
         case savedPlacesLoaded([SavedPlace])
+        case savedPlacesLoadFinished
         case recommendationsLoaded([Content])
+        case recommendationsLoadFinished
         case pastDatesLoaded([DateSchedule])
         case placesImported
         case savedPlacesSeeAllTapped
@@ -148,6 +152,32 @@ public struct HomeFeature {
         case .onAppear:
             return .merge(loadHome(), loadSavedPlaces(), loadRecommendations())
 
+        case .homeLoaded, .homeLoadFailed, .savedPlacesLoaded, .savedPlacesLoadFinished,
+             .recommendationsLoaded, .recommendationsLoadFinished, .pastDatesLoaded:
+            return handleLoadResponse(state: &state, action: action)
+
+        case .savedPlacesSeeAllTapped:
+            // 전체보기는 지도 탭으로 이동. 실제 탭 전환은 상위(MainTab)가 처리
+            return .send(.delegate(.showAllSavedPlaces))
+
+        case let .savedPlaceTapped(id):
+            // 장소 상세는 지도 탭에서 연다. 전체보기와 같은 길
+            guard let place = state.savedPlaces.first(where: { $0.id == id }) else { return .none }
+            return .send(.delegate(.showPlaceDetail(place)))
+
+        case let .recommendationTapped(id):
+            // 표시는 지도 탭 위에서. MainTab 까지 올린다
+            return .send(.delegate(.showContentDetail(id)))
+
+        case .placesImported, .calendarTapped, .connectFlowRequested, .courseFlowRequested,
+             .homePathChanged, .couple, .pastDateCourses, .course, .delegate:
+            return homeNavCore(state: &state, action: action)
+        }
+    }
+
+    // 요약·저장·추천·지난 데이터의 응답을 모은다. 실패로 끝나도 스켈레톤은 걷는다
+    private func handleLoadResponse(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case let .homeLoaded(summary):
             state.didLoadSummary = true
             state.nickname = summary.myNickname
@@ -169,30 +199,26 @@ public struct HomeFeature {
             state.savedPlaces = places
             return .none
 
+        case .savedPlacesLoadFinished:
+            // 실패로 끝나도 스켈레톤은 걷고 기존 데이터는 유지한다
+            state.didLoadSaved = true
+            return .none
+
         case let .recommendationsLoaded(contents):
+            state.didLoadRecommendations = true
             state.recommendations = contents
+            return .none
+
+        case .recommendationsLoadFinished:
+            state.didLoadRecommendations = true
             return .none
 
         case let .pastDatesLoaded(schedules):
             state.pastSchedules = schedules
             return .none
 
-        case .savedPlacesSeeAllTapped:
-            // 전체보기는 지도 탭으로 이동. 실제 탭 전환은 상위(MainTab)가 처리
-            return .send(.delegate(.showAllSavedPlaces))
-
-        case let .savedPlaceTapped(id):
-            // 장소 상세는 지도 탭에서 연다. 전체보기와 같은 길
-            guard let place = state.savedPlaces.first(where: { $0.id == id }) else { return .none }
-            return .send(.delegate(.showPlaceDetail(place)))
-
-        case let .recommendationTapped(id):
-            // 표시는 지도 탭 위에서. MainTab 까지 올린다
-            return .send(.delegate(.showContentDetail(id)))
-
-        case .placesImported, .calendarTapped, .connectFlowRequested, .courseFlowRequested,
-             .homePathChanged, .couple, .pastDateCourses, .course, .delegate:
-            return homeNavCore(state: &state, action: action)
+        default:
+            return .none
         }
     }
 
@@ -335,8 +361,9 @@ private extension HomeFeature {
 
     private func loadSavedPlaces() -> Effect<Action> {
         .run { [homeClient] send in
-            // 실패 시 기존 섹션을 지우지 않도록 빈 배열로 덮어쓰지 않는다
+            // 실패 시 기존 섹션을 지우지 않도록 데이터는 그대로 두고, 완료만 알려 스켈레톤을 걷는다
             guard let places = try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount) else {
+                await send(.savedPlacesLoadFinished)
                 return
             }
             await send(.savedPlacesLoaded(places))
@@ -355,8 +382,9 @@ private extension HomeFeature {
             // datePreference 를 등록한 사용자만 취향(PREFERENCE) 정렬을 쓰고, 아니면 POPULAR
             let hasPreference = (try? await profileClient.member())?.datePreference != nil
             let sort: ContentSort = hasPreference ? .preference : .popular
-            // 실패 시 기존 추천을 지우지 않도록 빈 배열로 덮어쓰지 않는다
+            // 실패 시 기존 추천은 그대로 두고, 완료만 알려 스켈레톤을 걷는다
             guard let page = try? await exploreClient.contents(sort, 0, Self.recommendationCount) else {
+                await send(.recommendationsLoadFinished)
                 return
             }
             await send(.recommendationsLoaded(page.items))
