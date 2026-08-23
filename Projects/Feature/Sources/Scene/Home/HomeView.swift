@@ -12,9 +12,6 @@ public struct HomeView: View {
 
     public var body: some View {
         scrollContent
-            .navigationDestination(for: HomeFeature.HomeRoute.self) { route in
-                destination(route)
-            }
     }
 
     private var scrollContent: some View {
@@ -32,59 +29,24 @@ public struct HomeView: View {
             .ignoresSafeArea()
         }
         .toolbar(.hidden, for: .navigationBar)
+        .refreshable {
+            await store.send(.refreshRequested).finish()
+            store.send(.refreshFinished)
+        }
+        .tint(Color.commonWhite)
+        .toast(item: toastBinding)
         .task { store.send(.onAppear) }
     }
 
-    @ViewBuilder
-    private func destination(_ route: HomeFeature.HomeRoute) -> some View {
-        switch route {
-        case .connect, .codeInput, .complete:
-            coupleDestination(route)
-        case .pastDateCourses:
-            // 검색 화면과 동일하게 뷰를 직접 렌더하고 tabBar 숨김은 그 뷰가 스스로 처리한다
-            if let pastStore {
-                PastDateCoursesView(store: pastStore)
-            }
-        case .course:
-            // 코스 두 화면도 tabBar 숨김을 스스로 하므로 직접 렌더한다
-            if let courseStore {
-                CourseDateView(store: courseStore)
-            }
-        case .coursePlacePick:
-            if let courseStore {
-                CoursePlacePickView(store: courseStore)
-            }
-        }
-    }
-
-    // 커플 세 화면은 같은 스토어를 공유. push 동안 하단탭은 숨긴다
-    @ViewBuilder
-    private func coupleDestination(_ route: HomeFeature.HomeRoute) -> some View {
-        if let coupleStore {
-            Group {
-                switch route {
-                case .codeInput:
-                    CoupleCodeInputView(store: coupleStore)
-                case .complete:
-                    CoupleCompleteView(store: coupleStore)
-                default:
-                    CoupleConnectView(store: coupleStore)
+    private var toastBinding: Binding<ToastState?> {
+        Binding(
+            get: { store.toast },
+            set: { newValue in
+                if newValue == nil {
+                    store.send(.toastDismissed)
                 }
             }
-            .toolbar(.hidden, for: .tabBar)
-        }
-    }
-
-    private var coupleStore: StoreOf<CoupleConnectFeature>? {
-        store.scope(state: \.couple, action: \.couple)
-    }
-
-    private var pastStore: StoreOf<PastDateCoursesFeature>? {
-        store.scope(state: \.pastDateCourses, action: \.pastDateCourses)
-    }
-
-    private var courseStore: StoreOf<CourseFeature>? {
-        store.scope(state: \.course, action: \.course)
+        )
     }
 
     private var topSection: some View {
@@ -106,7 +68,7 @@ public struct HomeView: View {
                         upcomingSchedule: store.upcomingSchedule,
                         connectTapped: { store.send(.connectFlowRequested) },
                         createCourseTapped: { store.send(.courseFlowRequested) },
-                        bannerTapped: {}
+                        bannerTapped: { store.send(.bannerTapped) }
                     )
                 } else {
                     skeletonBanner
@@ -192,7 +154,12 @@ public struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(store.visiblePastSchedules) { schedule in
-                        DateScheduleCard(schedule: schedule)
+                        Button {
+                            store.send(.pastScheduleTapped(schedule.id))
+                        } label: {
+                            DateScheduleCard(schedule: schedule)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)

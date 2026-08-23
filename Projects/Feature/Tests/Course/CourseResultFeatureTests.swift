@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Domain
 @testable import Feature
+import Foundation
 import SharedDesignSystem
 import XCTest
 
@@ -416,3 +417,73 @@ private func makeCourse(stopCount: Int, legs: [Domain.CourseLeg?]) -> DateCourse
         legs: legs
     )
 }
+
+@MainActor
+final class CourseResultOriginTests: XCTestCase {
+
+    func test_코스를_짜서_들어오면_수정과_알리기가_보인다() {
+        let state = CourseResultFeature.State(
+            course: originFixtureCourse,
+            dateCourseID: "42"
+        )
+
+        XCTAssertTrue(state.showsEditButton)
+        XCTAssertTrue(state.showsNotifyButton)
+    }
+
+    func test_지난데이트로_들어오면_수정과_알리기가_없다() {
+        let state = CourseResultFeature.State(
+            course: originFixtureCourse,
+            dateCourseID: "42",
+            origin: .pastDate
+        )
+
+        XCTAssertFalse(state.showsEditButton)
+        XCTAssertFalse(state.showsNotifyButton)
+    }
+
+    func test_장소가_없으면_코스를_짜서_들어와도_알리기가_없다() {
+        let state = CourseResultFeature.State(
+            course: emptyFixtureCourse,
+            dateCourseID: "42"
+        )
+
+        XCTAssertFalse(state.showsNotifyButton)
+    }
+}
+
+// MARK: - Origin Fixture
+
+private let originFixtureStop = Domain.CourseStop(
+    place: Place(
+        id: "p0",
+        kakaoPlaceID: nil,
+        name: "장소",
+        category: .food,
+        address: "주소",
+        roadAddress: "도로명",
+        coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
+        bookmarkCount: 0,
+        thumbnailURLs: []
+    )
+)
+
+private let originFixtureCourse = DateCourse(
+    id: "42",
+    title: "t",
+    scheduledAt: Date(timeIntervalSince1970: 0),
+    status: .confirmed,
+    version: 0,
+    stops: [originFixtureStop],
+    legs: []
+)
+
+private let emptyFixtureCourse = DateCourse(
+    id: "42",
+    title: "t",
+    scheduledAt: Date(timeIntervalSince1970: 0),
+    status: .confirmed,
+    version: 0,
+    stops: [],
+    legs: []
+)

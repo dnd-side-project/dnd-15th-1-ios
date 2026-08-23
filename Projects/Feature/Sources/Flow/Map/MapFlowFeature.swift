@@ -64,12 +64,14 @@ public struct MapFlowFeature {
         case pathChanged([Route])
         /// 다른 탭에서 고른 게시글 상세를 지도 위에 연다
         case presentContentDetail(String)
-        /// 홈에서 고른 저장 장소 상세를 지도 위에 연다
+        /// 홈에서 고른 저장 장소 상세를 지도 위에 연다. 닫으면 원래 탭으로 되돌린다
         case presentPlaceDetail(SavedPlace)
         /// 탐색 검색에서 고른 장소 상세를 지도 위에 연다. 닫으면 원래 탭으로 되돌린다
         case presentSearchPlaceDetail(Place, query: String)
         /// 홈 전체보기로 들어온다. 걸린 필터를 풀고 전체를 보여준다
         case showAllSaved
+        /// 원래 탭으로 되돌린 뒤 숨겨진 지도의 상세를 걷는다
+        case finishReturnToPreviousTab
         case map(MapFeature.Action)
         case course(CourseFeature.Action)
         case courseResult(CourseResultFeature.Action)
@@ -118,6 +120,28 @@ public struct MapFlowFeature {
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case .pathChanged, .presentContentDetail, .presentPlaceDetail,
+             .presentSearchPlaceDetail, .showAllSaved, .finishReturnToPreviousTab:
+            return handlePresentation(state: &state, action: action)
+        case let .map(.delegate(delegate)):
+            return handle(mapDelegate: delegate, state: &state)
+        case let .course(.delegate(delegate)):
+            return handle(courseDelegate: delegate, state: &state)
+        case let .courseResult(.delegate(delegate)):
+            return handle(courseResultDelegate: delegate, state: &state)
+        case let .placeSearch(.delegate(delegate)):
+            return handle(searchDelegate: delegate, state: &state)
+        case .detail, .alias, .postDetail:
+            return handleChild(state: &state, action: action)
+        case .map, .course, .courseResult, .placeSearch, .delegate:
+            return .none
+        }
+    }
+}
+
+private extension MapFlowFeature {
+    func handlePresentation(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case let .pathChanged(path):
             return applyPath(path, state: &state)
         case let .presentContentDetail(id):
@@ -128,7 +152,8 @@ public struct MapFlowFeature {
             state.map.mode = .content(places: [])
             return .send(.postDetail(.presented(.onAppear)))
         case let .presentPlaceDetail(savedPlace):
-            // 저장 장소라 북마크는 켜 둔다. 상세를 닫아도 지도 탭에 머무른다
+            // 홈에서 연 저장 장소. 닫으면 원래 탭으로 되돌린다
+            state.returnsAfterDetailClose = true
             state.detail = PlaceDetailFeature.State(savedPlace: savedPlace)
             state.map.selectedPlace = MapFeature.State.SelectedPlace(
                 id: savedPlace.id,
@@ -153,24 +178,16 @@ public struct MapFlowFeature {
                 .send(.map(.searchClearTapped)),
                 .send(.map(.filtersReset))
             )
-        case let .map(.delegate(delegate)):
-            return handle(mapDelegate: delegate, state: &state)
-        case let .course(.delegate(delegate)):
-            return handle(courseDelegate: delegate, state: &state)
-        case let .courseResult(.delegate(delegate)):
-            return handle(courseResultDelegate: delegate, state: &state)
-        case let .placeSearch(.delegate(delegate)):
-            return handle(searchDelegate: delegate, state: &state)
-        case .detail, .alias, .postDetail:
-            return handleChild(state: &state, action: action)
-        case .map, .course, .courseResult, .placeSearch, .delegate:
+        case .finishReturnToPreviousTab:
+            return finishReturnToPreviousTab(state: &state)
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
     }
-}
 
-private extension MapFlowFeature {
     func applyPath(_ path: [Route], state: inout State) -> Effect<Action> {
+        let leftCourseResult = state.path.contains(.courseResult) && !path.contains(.courseResult)
         state.path = path
         if !path.contains(.search) {
             state.placeSearch = nil
@@ -181,7 +198,8 @@ private extension MapFlowFeature {
         if !path.contains(.courseResult) {
             state.courseResult = nil
         }
-        return .none
+        guard leftCourseResult else { return .none }
+        return .send(.map(.currentCourseRequested))
     }
 
     /// 지도가 올린 신호로 시트나 경로를 연다. 화면 이동이 아닌 것은 여기서 삼킨다
@@ -195,19 +213,23 @@ private extension MapFlowFeature {
             return .none
         case .searchRequested:
             state.placeSearch = PlaceSearchFeature.State()
-            state.path.append(.search)
-            return .none
+            return applyPath(state.path + [.search], state: &state)
         case let .searchReopenRequested(query):
             state.placeSearch = PlaceSearchFeature.State(query: query)
-            if !state.path.contains(.search) {
-                state.path.append(.search)
-            }
-            return .none
+            guard !state.path.contains(.search) else { return .none }
+            return applyPath(state.path + [.search], state: &state)
         case .courseRequested:
             // 지난 진입의 날짜·장소를 물려받으면 안 된다
             state.course = CourseFeature.State()
-            state.path.append(.course)
-            return .none
+            return applyPath(state.path + [.course], state: &state)
+        case let .courseResultRequested(dateCourseID):
+            state.courseResult = CourseResultFeature.State(
+                course: nil,
+                dateCourseID: dateCourseID,
+                partnerNickname: state.map.partnerNickname,
+                origin: .courseBuilt
+            )
+            return applyPath(state.path + [.courseResult], state: &state)
         case let .aliasRequested(id):
             if let saved = state.map.places.first(where: { $0.id == id }) {
                 state.alias = PlaceAliasFeature.State(savedPlace: saved)
@@ -227,8 +249,7 @@ private extension MapFlowFeature {
     ) -> Effect<Action> {
         switch courseDelegate {
         case .placePickRequested:
-            state.path.append(.coursePlacePick)
-            return .none
+            return applyPath(state.path + [.coursePlacePick], state: &state)
         case .dismissed:
             var next = state.path
             // 코스 화면이 스스로 닫는 신호라, 맨 위가 코스 경로일 때만 뺀다
@@ -242,8 +263,7 @@ private extension MapFlowFeature {
                 dateCourseID: course.id,
                 partnerNickname: state.course?.partnerNickname
             )
-            state.path.append(.courseResult)
-            return .none
+            return applyPath(state.path + [.courseResult], state: &state)
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         }
@@ -317,14 +337,12 @@ private extension MapFlowFeature {
             return .send(.map(.contentPlacesApplied(places: detail.places.map(place))))
 
         case .postDetail(.presented(.delegate(.closeRequested))), .postDetail(.dismiss):
-            state.postDetail = nil
-            guard state.showsContentPins else { return .none }
-            // 핀 모드를 풀고 지도를 저장 목록으로 되돌린 뒤, 게시글 고르기 전 탭으로 되돌리도록 올린다
-            state.showsContentPins = false
-            return .merge(
-                .send(.map(.searchClearTapped)),
-                .send(.delegate(.contentDetailClosed))
-            )
+            guard state.showsContentPins else {
+                state.postDetail = nil
+                return .none
+            }
+            // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
+            return .send(.delegate(.contentDetailClosed))
 
         case .postDetail(.presented(.delegate(.sessionExpired))):
             return .send(.delegate(.sessionExpired))
@@ -353,14 +371,12 @@ private extension MapFlowFeature {
             return .send(.postDetail(.presented(.onAppear)))
 
         case .detail(.presented(.delegate(.closed))), .detail(.dismiss):
-            dismissDetail(state: &state)
-            // 탐색 검색에서 열린 상세면 지도를 저장 목록으로 되돌린 뒤 원래 탭으로 되돌린다
-            guard state.returnsAfterDetailClose else { return .none }
-            state.returnsAfterDetailClose = false
-            return .merge(
-                .send(.map(.searchClearTapped)),
-                .send(.delegate(.contentDetailClosed))
-            )
+            guard state.returnsAfterDetailClose else {
+                dismissDetail(state: &state)
+                return .none
+            }
+            // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
+            return .send(.delegate(.contentDetailClosed))
 
         case let .detail(.presented(.delegate(.bookmarkToggled(id, isSaved)))):
             // 장소 상세에서 바뀐 저장 상태를 게시글 상세 목록·지도 핀에 맞춘다
@@ -449,6 +465,15 @@ private extension MapFlowFeature {
     func dismissDetail(state: inout State) {
         state.detail = nil
         state.map.selectedPlace = nil
+    }
+
+    func finishReturnToPreviousTab(state: inout State) -> Effect<Action> {
+        // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
+        state.showsContentPins = false
+        state.returnsAfterDetailClose = false
+        state.postDetail = nil
+        dismissDetail(state: &state)
+        return .send(.map(.searchClearTapped))
     }
 
     /// 게시글 장소를 지도 핀·장소 상세용 Place 로 바꾼다. 저장수는 응답에 없어 0 으로 둔다

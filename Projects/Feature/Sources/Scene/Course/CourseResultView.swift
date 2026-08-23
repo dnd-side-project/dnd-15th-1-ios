@@ -133,8 +133,11 @@ private extension CourseResultView {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            AppButton("수정", style: .outlined, size: .sm) {
-                store.send(.editTapped)
+            // 지난 데이트로 들어오면 수정을 안 낸다. 제목이 그 폭을 가져간다
+            if store.showsEditButton {
+                AppButton("수정", style: .outlined, size: .sm) {
+                    store.send(.editTapped)
+                }
             }
         }
         .padding(.horizontal, Spacing.s20)

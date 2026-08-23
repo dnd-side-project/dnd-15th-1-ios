@@ -22,10 +22,20 @@ public struct CourseResultFeature {
 
     @ObservableState
     public struct State: Equatable {
+        /// 이 화면에 어디서 들어왔는지. 지난 데이트면 수정·알리기를 안 낸다.
+        /// `status` 로 대신하면 안 된다. 지난 데이트도 `CONFIRMED` 라 예정 데이트와 구별이 안 된다
+        public enum Origin: Equatable {
+            /// 코스를 짜서 저장한 직후, 또는 예정 데이트
+            case courseBuilt
+            /// 지난 데이트 목록에서 열었다
+            case pastDate
+        }
+
         /// 앞 화면이 넘겨준 코스. 재진입이면 nil 로 시작한다
         public var course: DateCourse?
         public var dateCourseID: String
         public var partnerNickname: String?
+        public var origin: Origin
         public var loadState: LoadState
         public var camera: MapCamera = .seoulCityHall
         public var hasUserMovedCamera = false
@@ -35,11 +45,13 @@ public struct CourseResultFeature {
         public init(
             course: DateCourse?,
             dateCourseID: String,
-            partnerNickname: String? = nil
+            partnerNickname: String? = nil,
+            origin: Origin = .courseBuilt
         ) {
             self.course = course
             self.dateCourseID = dateCourseID
             self.partnerNickname = partnerNickname
+            self.origin = origin
             self.loadState = course == nil ? .loading : .loaded
         }
     }
@@ -261,7 +273,13 @@ public extension CourseResultFeature.State {
         return "\(course.stops.count)곳 · 도보 약 \(duration) · 총 이동 \(distance)"
     }
 
-    var showsNotifyButton: Bool { !(course?.stops.isEmpty ?? true) }
+    /// 지난 데이트는 고칠 이유가 없다. 서버는 안 막으니 화면이 막는다
+    var showsEditButton: Bool { origin != .pastDate }
+
+    /// 장소가 없으면 알릴 것이 없고, 지난 데이트는 알릴 이유가 없다
+    var showsNotifyButton: Bool {
+        origin != .pastDate && !(course?.stops.isEmpty ?? true)
+    }
 
     var notifyTitle: String {
         guard let nickname = partnerNickname else { return "상대에게 코스 알리기" }

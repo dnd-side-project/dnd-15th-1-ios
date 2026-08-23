@@ -1,3 +1,4 @@
+import Domain
 import Feature
 import ThirdParty
 import XCTest
@@ -36,5 +37,62 @@ final class MainTabMapDelegateTests: XCTestCase {
         await store.send(.map(.map(.delegate(.sessionExpired))))
         await store.receive(\.map.delegate.sessionExpired)
         await store.receive(\.delegate.sessionExpired)
+    }
+}
+
+@MainActor
+final class MainTabContentReturnTests: XCTestCase {
+    func test_홈_저장장소상세는_홈탭을_기억하고_지도로_옮긴다() async {
+        let place = SavedPlace.fixture(id: "7")
+        let store = TestStore(initialState: MainTabFeature.State()) {
+            MainTabFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.home(.delegate(.showPlaceDetail(place)))) {
+            $0.contentReturnTab = .home
+            $0.selectedTab = .map
+        }
+        await store.receive(\.map.presentPlaceDetail)
+        XCTAssertEqual(store.state.contentReturnTab, .home)
+        XCTAssertEqual(store.state.selectedTab, .map)
+        XCTAssertTrue(store.state.map.returnsAfterDetailClose)
+    }
+
+    func test_홈_저장장소상세를_닫으면_홈으로_돌아온_뒤_지도를_걷는다() async {
+        let place = SavedPlace.fixture(id: "7")
+        var state = MainTabFeature.State()
+        state.selectedTab = .map
+        state.contentReturnTab = .home
+        state.map.returnsAfterDetailClose = true
+        state.map.detail = PlaceDetailFeature.State(savedPlace: place)
+        let store = TestStore(initialState: state) {
+            MainTabFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.map(.delegate(.contentDetailClosed))) {
+            $0.selectedTab = .home
+            $0.contentReturnTab = nil
+        }
+        await store.receive(\.map.finishReturnToPreviousTab)
+        await store.skipReceivedActions()
+        XCTAssertEqual(store.state.selectedTab, .home)
+        XCTAssertNil(store.state.map.detail)
+    }
+
+    func test_전체보기는_돌아갈_탭을_기억하지_않는다() async {
+        let store = TestStore(initialState: MainTabFeature.State()) {
+            MainTabFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.home(.delegate(.showAllSavedPlaces))) {
+            $0.selectedTab = .map
+        }
+        await store.receive(\.map.showAllSaved)
+        await store.skipReceivedActions()
+        XCTAssertNil(store.state.contentReturnTab)
+        XCTAssertEqual(store.state.selectedTab, .map)
     }
 }

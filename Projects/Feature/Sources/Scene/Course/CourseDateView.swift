@@ -149,7 +149,7 @@ private extension CourseDateView {
                 activeWheel: store.activeWheel,
                 draftDate: draftDateBinding,
                 draftTime: draftTimeBinding,
-                today: store.today
+                tomorrow: store.tomorrow
             )
         }
     }
@@ -188,7 +188,7 @@ private struct DeferredWheel: View {
     let activeWheel: CourseFeature.WheelTarget?
     @Binding var draftDate: DateComponents
     @Binding var draftTime: DateComponents
-    let today: DateComponents
+    let tomorrow: DateComponents
     @State private var isReady = false
 
     var body: some View {
@@ -203,10 +203,13 @@ private struct DeferredWheel: View {
                     DateWheelPicker(
                         selection: $draftDate,
                         yearRange: 2024 ... 2034,
-                        minimum: today
+                        minimum: tomorrow
                     )
                 case .time:
-                    TimeWheelPicker(selection: $draftTime, minuteStep: 5)
+                    TimeWheelPicker(
+                        selection: $draftTime,
+                        minuteStep: 5
+                    )
                 case .none:
                     EmptyView()
                 }

@@ -18,6 +18,20 @@ struct DateCourseResponseDTO: Decodable, Sendable {
     let places: [DateCoursePlaceResponseDTO]?
 }
 
+struct CurrentDateCourseResponseDTO: Decodable, Sendable {
+    let currentDateCourse: DateCourseSummaryResponseDTO?
+}
+
+struct DateCourseSummaryResponseDTO: Decodable, Sendable {
+    let dateCourseId: Int
+    let title: String
+    let date: String
+    let time: String?
+    let status: String
+    let version: Int
+    let totalPlaceCount: Int
+}
+
 struct DateCoursePlaceResponseDTO: Decodable, Sendable {
     let order: Int
     let placeId: Int64

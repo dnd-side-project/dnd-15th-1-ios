@@ -43,6 +43,12 @@ public struct MapFeature {
         /// 커플이 연동되어야 저장자 칩이 보인다. 미연동이면 `함께 저장한`(전부) 으로 고정된다
         public var isCoupleConnected = false
 
+        /// 연동된 상대 닉네임. 결과 화면 알리기 문구에 쓴다
+        public var partnerNickname: String?
+
+        /// 예정 코스. `nil` 이면 버튼이 「짜러가기」다
+        public var currentCourse: DateCourseSummary?
+
         /// `nil` 이면 전체다
         public var selectedCategory: PlaceCategory?
         public var selectedOwnership: PlaceOwnership = .together
@@ -81,7 +87,9 @@ public struct MapFeature {
     public enum Action: Equatable {
         case onAppear
         case savedPlacesResponse(Result<[SavedPlace], PlaceError>)
-        case coupleResponse(Bool)
+        case coupleResponse(CoupleStatus?)
+        case currentCourseResponse(DateCourseSummary?)
+        case currentCourseRequested
         case cameraChanged(MapCamera)
         case categoryTapped(PlaceCategory?)
         case ownershipSelected(PlaceOwnership)
@@ -118,6 +126,8 @@ public struct MapFeature {
             case searchReopenRequested(query: String)
             /// `데이트 코스 짜러가기`
             case courseRequested
+            /// 예정 코스가 있을 때. 흐름이 결과 화면을 연다
+            case courseResultRequested(dateCourseID: String)
             /// 행 메뉴 수정. 흐름이 별칭 시트를 연다
             case aliasRequested(String)
             case deleteRequested(String)
@@ -129,11 +139,13 @@ public struct MapFeature {
     private enum CancelID {
         case load
         case couple
+        case currentCourse
         case location
     }
 
     @Dependency(\.placeClient) var placeClient
     @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.courseClient) var courseClient
     @Dependency(\.locationClient) var locationClient
 
     public init() {}
@@ -145,7 +157,8 @@ public struct MapFeature {
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
-        case .onAppear, .retryTapped, .savedPlacesResponse, .coupleResponse:
+        case .onAppear, .retryTapped, .savedPlacesResponse, .coupleResponse,
+             .currentCourseResponse, .currentCourseRequested:
             return load(state: &state, action: action)
         case .cameraChanged, .currentLocationTapped,
              .locationAuthorizationResponse, .currentLocationResponse, .permissionModalDismissed:
@@ -167,14 +180,14 @@ public struct MapFeature {
         switch action {
         case .onAppear:
             state.loadState = .loading
-            return .merge(loadPlaces(), loadCouple())
+            return .merge(loadPlaces(), loadCouple(), loadCurrentCourse())
 
         case .retryTapped:
             state.loadState = .loading
             state.toast = nil
             // 커플 조회도 같이 다시 부른다. 안 그러면 첫 조회가 실패했을 때
             // 저장자 필터를 되살릴 길이 없다
-            return .merge(loadPlaces(), loadCouple())
+            return .merge(loadPlaces(), loadCouple(), loadCurrentCourse())
 
         case let .savedPlacesResponse(.success(places)):
             state.places = places
@@ -201,13 +214,21 @@ public struct MapFeature {
             )
             return .none
 
-        case let .coupleResponse(isConnected):
-            state.isCoupleConnected = isConnected
+        case let .coupleResponse(status):
+            state.partnerNickname = status?.partner?.nickname
+            state.isCoupleConnected = status?.connected ?? false
             // 연동이 풀린 채로 저장자 필터가 남아 있으면 목록이 이유 없이 좁아진다
-            if !isConnected {
+            if !state.isCoupleConnected {
                 state.selectedOwnership = .together
             }
             return .none
+
+        case let .currentCourseResponse(course):
+            state.currentCourse = course
+            return .none
+
+        case .currentCourseRequested:
+            return loadCurrentCourse()
 
         default:
             // core 가 이 묶음으로 안 보내는 액션이라 도달하지 않는다.
@@ -294,6 +315,9 @@ public struct MapFeature {
             return .send(.delegate(.searchRequested))
 
         case .courseButtonTapped:
+            if let id = state.currentCourse?.id {
+                return .send(.delegate(.courseResultRequested(dateCourseID: id)))
+            }
             return .send(.delegate(.courseRequested))
 
         default:
@@ -303,8 +327,10 @@ public struct MapFeature {
             return .none
         }
     }
+}
 
-    private func loadPlaces() -> Effect<Action> {
+private extension MapFeature {
+    func loadPlaces() -> Effect<Action> {
         .run { [placeClient] send in
             do {
                 await send(.savedPlacesResponse(.success(try await placeClient.savedPlaces())))
@@ -319,17 +345,27 @@ public struct MapFeature {
         .cancellable(id: CancelID.load, cancelInFlight: true)
     }
 
-    private func loadCouple() -> Effect<Action> {
+    func loadCouple() -> Effect<Action> {
         .run { [coupleClient] send in
             // 커플 조회가 실패해도 목록은 그대로 뜬다. 저장자 칩만 안 보인다
             let status = try? await coupleClient.current()
-            await send(.coupleResponse(status?.connected == true))
+            await send(.coupleResponse(status))
         }
         .cancellable(id: CancelID.couple, cancelInFlight: true)
     }
-}
 
-private extension MapFeature {
+    func loadCurrentCourse() -> Effect<Action> {
+        .run { [courseClient] send in
+            // 실패해도 기존 코스를 빈 값으로 덮지 않는다
+            do {
+                await send(.currentCourseResponse(try await courseClient.currentCourse()))
+            } catch {
+                return
+            }
+        }
+        .cancellable(id: CancelID.currentCourse, cancelInFlight: true)
+    }
+
     func updateMap(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case let .cameraChanged(camera):
@@ -490,6 +526,15 @@ public extension MapFeature.State {
     var isSearching: Bool {
         if case .searchResult = mode { return true }
         return false
+    }
+
+    /// 커플이 연동되어야 나온다. 검색 중이면 숨긴다
+    var showsCourseButton: Bool {
+        isCoupleConnected && !isSearching
+    }
+
+    var courseButtonTitle: String {
+        currentCourse == nil ? "데이트 코스 짜러가기" : "데이트 코스 보러가기"
     }
 
     /// 게시글 핀 모드 여부. 이때는 지도 검색·필터 UI 를 감춘다

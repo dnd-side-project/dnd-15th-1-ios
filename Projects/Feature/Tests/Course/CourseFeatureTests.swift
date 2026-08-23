@@ -7,6 +7,25 @@ import XCTest
 @MainActor
 final class CourseDateInputTests: XCTestCase {
 
+    func test_State_tomorrow와_draftDate는_now의_다음날이다() {
+        let calendar = Calendar.current
+        let now = calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 23, hour: 22, minute: 3)
+        ) ?? Date.distantPast
+        let state = CourseFeature.State(now: now)
+        let expected = calendar.dateComponents(
+            [.year, .month, .day],
+            from: calendar.date(byAdding: .day, value: 1, to: now) ?? now
+        )
+        let today = calendar.dateComponents([.year, .month, .day], from: now)
+
+        XCTAssertEqual(state.tomorrow, expected)
+        XCTAssertEqual(state.draftDate, expected)
+        XCTAssertEqual(state.draftTime.hour, 22)
+        XCTAssertEqual(state.draftTime.minute, 3)
+        XCTAssertNotEqual(state.tomorrow, today)
+    }
+
     func test_날짜없이_다음_에러표시() async {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
@@ -22,6 +41,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in
                 DateCourse(
                     id: "1",
@@ -58,6 +78,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: initial) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in
                 DateCourse(
                     id: "1",
@@ -82,6 +103,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { title, date, time in
                 XCTAssertEqual(title, "30.08.05 데이트")
                 XCTAssertEqual(date.day, 5)
@@ -117,6 +139,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, time in
                 XCTAssertEqual(time.hour, 13)
                 XCTAssertEqual(time.minute, 0)
@@ -145,6 +168,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in throw CourseError.network }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
@@ -166,6 +190,7 @@ final class CourseDateInputTests: XCTestCase {
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
             $0.courseClient.createCourse = { _, _, _ in throw CourseError.unauthorized }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)

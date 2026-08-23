@@ -14,8 +14,10 @@ enum HomeDTOMapper {
             connected: dto.connected,
             myNickname: dto.myNickname ?? "",
             partnerNickname: dto.connected ? dto.partnerNickname : nil,
-            // 미연결이면 현재 코스도 없다
-            currentDateCourse: dto.connected ? dto.currentDateCourse.map(toUpcoming) : nil
+            // 미연결이거나 파싱이 깨지면 현재 코스는 없다
+            currentDateCourse: dto.connected
+                ? dto.currentDateCourse.flatMap { try? toCurrent($0) }
+                : nil
         )
     }
 
@@ -31,9 +33,18 @@ enum HomeDTOMapper {
         )
     }
 
-    private static func toUpcoming(_ dto: HomeDateCourseResponseDTO) -> UpcomingSchedule {
-        // 배너는 코스 제목을 보여준다
-        UpcomingSchedule(title: dto.title, placeCount: dto.totalPlaceCount)
+    private static func toCurrent(_ dto: HomeDateCourseResponseDTO) throws -> DateCourseSummary {
+        try CourseDTOMapper.toDomain(
+            DateCourseSummaryResponseDTO(
+                dateCourseId: dto.dateCourseId,
+                title: dto.title,
+                date: dto.date,
+                time: dto.time,
+                status: dto.status ?? "",
+                version: dto.version ?? 0,
+                totalPlaceCount: dto.totalPlaceCount
+            )
+        )
     }
 
     private static func toDateSchedule(_ dto: HomeDateCourseResponseDTO) -> DateSchedule {

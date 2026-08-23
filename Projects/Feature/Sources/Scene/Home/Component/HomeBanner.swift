@@ -11,7 +11,7 @@ import SwiftUI
 
 struct HomeBanner: View {
     let isConnected: Bool
-    let upcomingSchedule: UpcomingSchedule?
+    let upcomingSchedule: DateCourseSummary?
     let connectTapped: () -> Void
     let createCourseTapped: () -> Void
     let bannerTapped: () -> Void
@@ -111,7 +111,7 @@ struct HomeBanner: View {
         .buttonStyle(.plain)
     }
 
-    private func upcomingBanner(_ schedule: UpcomingSchedule) -> some View {
+    private func upcomingBanner(_ schedule: DateCourseSummary) -> some View {
         Button(action: bannerTapped) {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
@@ -119,7 +119,7 @@ struct HomeBanner: View {
                         .typography(.title3SB)
                         .foregroundStyle(Color.commonWhite)
 
-                    Text("총 \(schedule.placeCount)곳의 장소")
+                    Text("총 \(schedule.totalPlaceCount)곳의 장소")
                         .typography(.body2M)
                         .foregroundStyle(Color.commonWhite)
                         .padding(.horizontal, 12)

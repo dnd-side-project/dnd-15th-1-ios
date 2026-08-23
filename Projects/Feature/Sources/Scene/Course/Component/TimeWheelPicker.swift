@@ -12,24 +12,34 @@ import SwiftUI
 /// `selection` 에는 `hour`(0...23) · `minute` 만 쓴다. 나머지 필드는 받은 그대로 둔다.
 struct TimeWheelPicker: View {
 
-    /// 12시간제 표시 순서. 12 가 맨 위다.
-    private static let hours: [Int] = [12] + Array(1...11)
-
     @Binding private var selection: DateComponents
-    private let minuteStep: Int
+    private let range: WheelTimeRange
 
-    init(selection: Binding<DateComponents>, minuteStep: Int) {
+    init(
+        selection: Binding<DateComponents>,
+        minuteStep: Int,
+        minimum: DateComponents? = nil
+    ) {
         self._selection = selection
-        self.minuteStep = minuteStep
+        self.range = WheelTimeRange(minuteStep: minuteStep, minimum: minimum)
     }
 
     var body: some View {
+        let resolved = range.resolved(selection)
+        let period = period(of: resolved)
+        let hour = hour12(of: resolved)
+        let minutes = range.minutes(period: period, hour: hour)
+
         ZStack {
             WheelSelectionBar()
 
             HStack(spacing: WheelMetrics.columnSpacing) {
-                WheelColumn(items: DayPeriod.allCases, selection: periodBinding) { $0.title }
-                WheelColumn(items: Self.hours, selection: hourBinding, title: WheelFormat.twoDigits)
+                WheelColumn(items: range.periods, selection: periodBinding) { $0.title }
+                WheelColumn(
+                    items: range.hours(period: period),
+                    selection: hourBinding,
+                    title: WheelFormat.twoDigits
+                )
                 WheelColumn(items: minutes, selection: minuteBinding, title: WheelFormat.twoDigits)
             }
         }
@@ -44,90 +54,72 @@ struct TimeWheelPicker: View {
 
     private var periodBinding: Binding<DayPeriod?> {
         Binding(
-            get: { resolvedPeriod },
+            get: { period(of: range.resolved(selection)) },
             set: { newValue in
                 guard let newValue else { return }
-                update(period: newValue, hour: resolvedHour, minute: resolvedMinute)
+                let resolved = range.resolved(selection)
+                update(period: newValue, hour: hour12(of: resolved), minute: resolved.minute ?? 0)
             }
         )
     }
 
     private var hourBinding: Binding<Int?> {
         Binding(
-            get: { resolvedHour },
+            get: { hour12(of: range.resolved(selection)) },
             set: { newValue in
                 guard let newValue else { return }
-                update(period: resolvedPeriod, hour: newValue, minute: resolvedMinute)
+                let resolved = range.resolved(selection)
+                update(period: period(of: resolved), hour: newValue, minute: resolved.minute ?? 0)
             }
         )
     }
 
     private var minuteBinding: Binding<Int?> {
         Binding(
-            get: { resolvedMinute },
+            get: { range.resolved(selection).minute },
             set: { newValue in
                 guard let newValue else { return }
-                update(period: resolvedPeriod, hour: resolvedHour, minute: newValue)
+                let resolved = range.resolved(selection)
+                update(period: period(of: resolved), hour: hour12(of: resolved), minute: newValue)
             }
         )
     }
 
     // MARK: - Value
 
-    /// 1 미만이거나 60을 넘는 간격은 1분으로 본다.
-    private var resolvedStep: Int {
-        (1...60).contains(minuteStep) ? minuteStep : 1
-    }
-
-    private var minutes: [Int] {
-        Array(stride(from: 0, to: 60, by: resolvedStep))
-    }
-
-    private var resolvedHour24: Int {
-        min(max(selection.hour ?? 0, 0), 23)
-    }
-
-    private var resolvedPeriod: DayPeriod {
-        resolvedHour24 < 12 ? .am : .pm
-    }
-
-    /// 12시간제 시각. 0시와 12시는 둘 다 `12` 로 보인다.
-    private var resolvedHour: Int {
-        let hour = resolvedHour24 % 12
-        return hour == 0 ? 12 : hour
-    }
-
-    /// 간격에 없는 분은 바로 아래 눈금으로 내린다.
-    private var resolvedMinute: Int {
-        let minute = min(max(selection.minute ?? 0, 0), 59)
-        return minutes.last(where: { $0 <= minute }) ?? 0
-    }
-
-    /// 빈 필드나 간격에 없는 분을 들고 들어온 경우 밖의 값도 휠이 보여주는 값으로 맞춰준다.
+    /// 빈 필드나 하한보다 앞선 시각을 들고 들어온 경우 밖의 값도 휠이 보여주는 값으로 맞춰준다.
     ///
     /// 이미 맞으면 아무것도 쓰지 않아 `onChange` 가 스스로를 다시 불러 되먹임하는 일이 없다.
     private func normalizeSelection() {
-        let hour = resolvedHour24
-        let minute = resolvedMinute
-
-        guard selection.hour != hour || selection.minute != minute else {
+        let resolved = range.resolved(selection)
+        guard selection.hour != resolved.hour || selection.minute != resolved.minute else {
             return
         }
 
-        update(period: resolvedPeriod, hour: resolvedHour, minute: minute)
+        selection = resolved
     }
 
     private func update(period: DayPeriod, hour: Int, minute: Int) {
         var components = selection
         components.hour = (hour % 12) + (period == .pm ? 12 : 0)
         components.minute = minute
-        selection = components
+        selection = range.resolved(components)
+    }
+
+    private func period(of components: DateComponents) -> DayPeriod {
+        min(max(components.hour ?? 0, 0), 23) < 12 ? .am : .pm
+    }
+
+    /// 12시간제 시각. 0시와 12시는 둘 다 `12` 로 보인다.
+    private func hour12(of components: DateComponents) -> Int {
+        let hour = min(max(components.hour ?? 0, 0), 23) % 12
+        return hour == 0 ? 12 : hour
     }
 }
 
 // MARK: - DayPeriod
 
-private enum DayPeriod: CaseIterable {
+public enum DayPeriod: CaseIterable, Hashable, Sendable {
     case am
     case pm
 

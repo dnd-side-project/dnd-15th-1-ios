@@ -12,13 +12,13 @@ public struct HomeSummary: Equatable, Sendable {
     public let connected: Bool
     public let myNickname: String
     public let partnerNickname: String?
-    public let currentDateCourse: UpcomingSchedule?
+    public let currentDateCourse: DateCourseSummary?
 
     public init(
         connected: Bool,
         myNickname: String,
         partnerNickname: String?,
-        currentDateCourse: UpcomingSchedule?
+        currentDateCourse: DateCourseSummary?
     ) {
         self.connected = connected
         self.myNickname = myNickname

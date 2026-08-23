@@ -30,11 +30,11 @@ public struct CourseFeature {
         public var time: DateComponents?
         public var showsDateError = false
         public var activeWheel: WheelTarget?
-        /// 자정을 넘겨도 하한과 초기값이 다른 날을 가리키지 않게, 한 번 센 오늘을 같이 쓴다
-        public var today: DateComponents
+        /// 자정을 넘겨도 하한과 초기값이 다른 날을 가리키지 않게, 한 번 센 내일로 둔다
+        public var tomorrow: DateComponents
         /// 시트 안에서 굴리는 임시값. `확인` 을 눌러야 date/time 으로 넘어간다
         public var draftDate: DateComponents
-        public var draftTime: DateComponents = Self.defaultTime
+        public var draftTime: DateComponents
         /// POST /api/v1/date-courses 응답. 다음 화면이 들고 간다
         public var dateCourseID: String?
         /// 낙관적 락 번호. 서버 응답 값을 그대로 들고 다닌다
@@ -55,10 +55,14 @@ public struct CourseFeature {
         public var selectedPlaceIDs: [String] = []
         public var camera: MapCamera = .seoulCityHall
 
-        public init() {
-            let today = Calendar.current.dateComponents([.year, .month, .day], from: Date())
-            self.today = today
-            self.draftDate = today
+        public init(now: Date = Date()) {
+            let calendar = Calendar.current
+            let tomorrowDate = calendar.date(byAdding: .day, value: 1, to: now) ?? now
+            let tomorrow = calendar.dateComponents([.year, .month, .day], from: tomorrowDate)
+            let nowTime = calendar.dateComponents([.hour, .minute], from: now)
+            self.tomorrow = tomorrow
+            self.draftDate = tomorrow
+            self.draftTime = nowTime
         }
     }
 
@@ -237,9 +241,10 @@ private extension CourseFeature {
             return .none
         }
         state.showsDateError = false
-        state.isCreatingCourse = true
 
         let time = state.time ?? State.defaultTime
+        state.isCreatingCourse = true
+
         let title = DateCourseTitle.make(date: date)
 
         return .run { [courseClient] send in

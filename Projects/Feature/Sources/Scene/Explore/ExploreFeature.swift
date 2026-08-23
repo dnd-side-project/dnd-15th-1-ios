@@ -16,10 +16,6 @@ public struct ExploreFeature {
     /// 항상 맨 앞에 두는 기본 필터. 뒤로 서버 인기 태그가 붙는다
     static let popularFilter = "인기"
 
-    public enum Route: Hashable {
-        case search
-    }
-
     @ObservableState
     public struct State: Equatable {
         var contents: [Content] = []
@@ -28,8 +24,6 @@ public struct ExploreFeature {
         var isLoadingContents: Bool = false
         var filters: [String] = [ExploreFeature.popularFilter]
         var selectedFilter: String = ExploreFeature.popularFilter
-        var search: SearchFeature.State?
-        var path: [Route] = []
 
         // 인기면 기본 제목, 태그를 고르면 그 태그를 제목으로
         var sectionTitle: String {
@@ -51,9 +45,7 @@ public struct ExploreFeature {
         case contentsLoadFailed
         case filterTapped(String)
         case searchButtonTapped
-        case searchPathChanged([Route])
         case contentTapped(String)
-        case search(SearchFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
@@ -63,6 +55,8 @@ public struct ExploreFeature {
             case showContentDetail(String)
             /// 장소 결과 탭. MainTab 이 지도 탭으로 옮겨 장소 상세를 연다
             case showPlaceDetail(Place, query: String)
+            /// 검색 버튼 탭. 검색 화면 스택은 ExploreFlow 가 갖는다
+            case searchRequested
         }
     }
 
@@ -74,10 +68,7 @@ public struct ExploreFeature {
 
     public var body: some ReducerOf<Self> {
         Reduce(core)
-        .ifLet(\.search, action: \.search) {
-            SearchFeature()
-        }
-        .logged(as: Self.self)
+            .logged(as: Self.self)
     }
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
@@ -113,37 +104,14 @@ public struct ExploreFeature {
             state.isLoadingContents = false
             return loadNext(state: &state)
 
-        case .searchButtonTapped, .searchPathChanged, .contentTapped,
-             .search, .delegate:
-            return navCore(state: &state, action: action)
-        }
-    }
-
-    private func navCore(state: inout State, action: Action) -> Effect<Action> {
-        switch action {
         case .searchButtonTapped:
-            state.search = SearchFeature.State()
-            state.path = [.search]
-            return .none
-
-        case let .searchPathChanged(path):
-            state.path = path
-            if path.isEmpty { state.search = nil }
-            return .none
+            return .send(.delegate(.searchRequested))
 
         case let .contentTapped(id):
-            // 표시는 지도 탭 위에서. MainTab 까지 올린다
+            // 표시는 지도 탭 위에서. ExploreFlow 를 거쳐 MainTab 까지 올린다
             return .send(.delegate(.showContentDetail(id)))
 
-        case let .search(.delegate(.showContentDetail(id))):
-            // 검색 결과 카드도 같은 길을 탄다
-            return .send(.delegate(.showContentDetail(id)))
-
-        case let .search(.delegate(.showPlaceDetail(place, query))):
-            // 검색 장소 결과는 지도 탭에서 장소 상세를 연다
-            return .send(.delegate(.showPlaceDetail(place, query: query)))
-
-        default:
+        case .delegate:
             return .none
         }
     }

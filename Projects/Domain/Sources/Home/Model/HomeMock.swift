@@ -17,6 +17,13 @@ public extension DateSchedule {
     ]
 }
 
-public extension UpcomingSchedule {
-    static let mock = UpcomingSchedule(title: "성수동 데이트", placeCount: 5)
+public extension DateCourseSummary {
+    static let mock = DateCourseSummary(
+        id: "1",
+        title: "성수동 데이트",
+        scheduledAt: Date(timeIntervalSince1970: 1_785_931_200),
+        status: .confirmed,
+        version: 1,
+        totalPlaceCount: 5
+    )
 }

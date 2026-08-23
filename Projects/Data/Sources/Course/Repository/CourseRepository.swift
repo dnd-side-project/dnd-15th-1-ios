@@ -48,6 +48,14 @@ public struct CourseRepository: Sendable {
         }
     }
 
+    public func currentCourse() async throws -> DateCourseSummary? {
+        do {
+            return try await remote.current().currentDateCourse.map(CourseDTOMapper.toDomain)
+        } catch {
+            throw CourseErrorMapper.map(error)
+        }
+    }
+
     public func updateCourse(
         id: String,
         title: String,

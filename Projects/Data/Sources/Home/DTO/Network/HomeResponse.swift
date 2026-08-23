@@ -14,11 +14,14 @@ struct HomeSummaryResponseDTO: Decodable, Sendable {
     let currentDateCourse: HomeDateCourseResponseDTO?
 }
 
-// 현재 데이트 코스·지난 데이트가 같은 형태로 온다. 쓰는 필드만 선언
+// 지난 데이트 목록엔 status·version 이 안 와서 옵셔널이다
 struct HomeDateCourseResponseDTO: Decodable, Sendable {
     let dateCourseId: Int
     let title: String
     let date: String
+    let time: String?
+    let status: String?
+    let version: Int?
     let totalPlaceCount: Int
 }
 
