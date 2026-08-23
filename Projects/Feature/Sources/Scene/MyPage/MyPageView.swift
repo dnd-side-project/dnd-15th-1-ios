@@ -230,7 +230,7 @@ public struct MyPageView: View {
 
     private var withdrawButton: some View {
         Button("회원탈퇴") { store.send(.withdrawTapped) }
-            .typography(.caption1R)
+            .typography(.caption2M)
             .foregroundStyle(.statusError)
             .frame(maxWidth: .infinity)
     }
