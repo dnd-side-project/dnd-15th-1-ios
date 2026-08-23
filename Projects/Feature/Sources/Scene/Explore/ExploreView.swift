@@ -80,16 +80,35 @@ public struct ExploreView: View {
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(store.filters, id: \.self) { filter in
-                    FilterChip(
-                        title: filter,
-                        isSelected: store.selectedFilter == filter
-                    ) {
-                        store.send(.filterTapped(filter))
+                if store.isInitialLoading {
+                    // 로딩 중엔 인기 칩도 선명하면 어색해 칩 자리를 스켈레톤 4개로만 채운다
+                    ForEach(0 ..< ExploreViewMetric.skeletonChipCount, id: \.self) { _ in
+                        skeletonChip
+                    }
+                } else {
+                    ForEach(store.filters, id: \.self) { filter in
+                        FilterChip(
+                            title: filter,
+                            isSelected: store.selectedFilter == filter
+                        ) {
+                            store.send(.filterTapped(filter))
+                        }
                     }
                 }
             }
         }
+    }
+
+    // 실제 FilterChip 과 같은 글자·패딩으로 자리를 잡고 그 위를 시머로 덮는다
+    private var skeletonChip: some View {
+        Text(ExploreViewMetric.skeletonChipPlaceholder)
+            .typography(.body1M)
+            .foregroundStyle(Color.clear)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .background {
+                ShimmerBlock(cornerRadius: 12, baseColor: .bgSubtle)
+            }
     }
 
     private var popularSection: some View {
@@ -98,29 +117,70 @@ public struct ExploreView: View {
                 .typography(.title2B)
                 .foregroundStyle(Color.textPrimary)
 
-            LazyVGrid(columns: columns, spacing: Spacing.s32) {
-                ForEach(store.contents) { content in
-                    Button {
-                        store.send(.contentTapped(content.id))
-                    } label: {
-                        ContentCard(content: content)
+            if store.isInitialLoading {
+                skeletonGrid
+            } else {
+                LazyVGrid(columns: columns, spacing: Spacing.s32) {
+                    ForEach(store.contents) { content in
+                        Button {
+                            store.send(.contentTapped(content.id))
+                        } label: {
+                            ContentCard(content: content)
+                        }
+                        .buttonStyle(.plain)
+                        .onAppear {
+                            prefetchIfNeeded(content)
+                            prefetcher.start(content.thumbnailURLs)
+                        }
+                        .onDisappear { prefetcher.stop(content.thumbnailURLs) }
                     }
-                    .buttonStyle(.plain)
-                    .onAppear {
-                        prefetchIfNeeded(content)
-                        prefetcher.start(content.thumbnailURLs)
-                    }
-                    .onDisappear { prefetcher.stop(content.thumbnailURLs) }
                 }
-            }
 
-            if store.isLoadingContents {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                // 다음 페이지를 이어 받을 때만. 최초 로딩은 위 스켈레톤이 대신한다
+                if store.isLoadingContents {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                }
             }
         }
     }
+
+    // 실제 그리드와 같은 열·간격으로 2×2 카드 골격을 깐다
+    private var skeletonGrid: some View {
+        LazyVGrid(columns: columns, spacing: Spacing.s32) {
+            ForEach(0 ..< ExploreViewMetric.skeletonCardCount, id: \.self) { _ in
+                skeletonCard
+            }
+        }
+    }
+
+    // ContentCard 와 같은 비율·모서리·간격으로 이미지와 2줄 제목 자리를 시머로 채운다
+    private var skeletonCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.s8) {
+            Color.clear
+                .aspectRatio(170.0 / 227.0, contentMode: .fit)
+                .overlay {
+                    ShimmerBlock(baseColor: .gray300)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            // 제목 2줄 자리. 둘째 줄은 짧게 둬 실제 텍스트처럼 보이게 한다
+            VStack(alignment: .leading, spacing: 6) {
+                ShimmerBlock(cornerRadius: 4, baseColor: .gray300)
+                    .frame(height: 14)
+                ShimmerBlock(cornerRadius: 4, baseColor: .gray300)
+                    .frame(width: 60, height: 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+private enum ExploreViewMetric {
+    static let skeletonChipPlaceholder = "#태그"
+    static let skeletonChipCount = 4
+    static let skeletonCardCount = 4
 }
 
 #Preview {

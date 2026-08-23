@@ -36,6 +36,11 @@ public struct ExploreFeature {
             selectedFilter == ExploreFeature.popularFilter ? "지금 인기있는 장소" : selectedFilter
         }
 
+        // 목록이 비어 있으면서 로딩 중인 최초 진입·필터 전환 구간. 이때만 스켈레톤을 보인다
+        var isInitialLoading: Bool {
+            contents.isEmpty && isLoadingContents
+        }
+
         public init() {}
     }
 
