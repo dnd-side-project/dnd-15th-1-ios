@@ -125,8 +125,10 @@ public struct PlaceDetailFeature {
 
         @CasePathable
         public enum Delegate: Equatable {
-            /// 장소 id 와 바뀐 뒤 상태. 서버 계약이 없어 받는 쪽도 지금은 삼킨다
+            /// 장소 id 와 바뀐 뒤 표시 상태. 지도 아이콘 집합을 맞춘다
             case bookmarkToggled(String, Bool)
+            /// 저장 응답의 서버 placeId. 검색 행 id 와 다를 수 있어 지도 맵에 넣는다
+            case bookmarkSaved(String, String)
             case contentSelected(String)
             case closed
         }
@@ -262,7 +264,7 @@ public struct PlaceDetailFeature {
 
         case let .bookmarkSaved(serverID):
             state.savedServerID = serverID
-            return .none
+            return .send(.delegate(.bookmarkSaved(state.id, serverID)))
 
         case let .bookmarkFailed(wasBookmarked):
             // 서버 실패 → 표시를 되돌리고 지도에도 원래 값을 알린다

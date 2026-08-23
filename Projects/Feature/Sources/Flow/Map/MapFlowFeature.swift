@@ -537,6 +537,10 @@ private extension MapFlowFeature {
             syncPlaceSaved(state: &state, id: id, isSaved: isSaved)
             return .none
 
+        case let .detail(.presented(.delegate(.bookmarkSaved(id, serverID)))):
+            state.map.savedServerIDs[id] = serverID
+            return .none
+
         default:
             return .none
         }
@@ -572,6 +576,7 @@ private extension MapFlowFeature {
         } else {
             state.postDetail?.savedPlaceIDs.remove(id)
             state.map.bookmarkedPlaceIDs.remove(id)
+            state.map.savedServerIDs.removeValue(forKey: id)
         }
     }
 
@@ -656,6 +661,7 @@ private extension MapFlowFeature {
     func presentDetail(state: inout State, place: Place, query: String) {
         var detail = PlaceDetailFeature.State(place: place, query: query)
         detail.isBookmarked = state.map.bookmarkedPlaceIDs.contains(place.id)
+        detail.savedServerID = state.map.savedServerIDs[place.id]
         state.detail = detail
         state.map.selectedPlace = MapFeature.State.SelectedPlace(
             id: place.id,
