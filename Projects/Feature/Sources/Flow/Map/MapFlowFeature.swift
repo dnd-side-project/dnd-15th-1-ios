@@ -174,21 +174,8 @@ private extension MapFlowFeature {
             )
         case .finishReturnToPreviousTab:
             return finishReturnToPreviousTab(state: &state)
-        case let .map(.delegate(delegate)):
-            return handle(mapDelegate: delegate, state: &state)
-        case let .course(.delegate(delegate)):
-            return handle(courseDelegate: delegate, state: &state)
-        case let .courseResult(.delegate(delegate)):
-            return handle(courseResultDelegate: delegate, state: &state)
-        case let .courseEdit(.delegate(delegate)):
-            return handle(courseEditDelegate: delegate, state: &state)
-        case let .coursePlaceAdd(.delegate(delegate)):
-            return handle(coursePlaceAddDelegate: delegate, state: &state)
-        case let .placeSearch(.delegate(delegate)):
-            return handle(searchDelegate: delegate, state: &state)
-        case .detail, .alias, .postDetail:
-            return handleChild(state: &state, action: action)
-        case .map, .course, .courseResult, .courseEdit, .coursePlaceAdd, .placeSearch, .delegate:
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
     }
