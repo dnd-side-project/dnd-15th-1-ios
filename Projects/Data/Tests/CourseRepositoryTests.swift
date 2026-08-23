@@ -91,9 +91,12 @@ final class CourseRepositoryTests: XCTestCase {
 
         _ = try await repository.updateCourse(
             id: "42",
-            title: "26.08.05 데이트",
-            scheduledAt: scheduledAt,
-            placeIDs: ["10", "11"],
+            content: DateCourseContent(
+                title: "26.08.05 데이트",
+                date: scheduledAt,
+                time: DateComponents(hour: 9, minute: 5),
+                placeIDs: ["10", "11"]
+            ),
             version: 0
         )
 
@@ -149,6 +152,102 @@ final class CourseRepositoryTests: XCTestCase {
         XCTAssertNil(course)
     }
 
+    func test_생성에서_시간이_없으면_요청에_time을_안_싣는다() async throws {
+        let network = StubNetworkClient()
+        network.responses["POST \(createPath)"] = DateCourseResponseDTO(
+            dateCourseId: 42,
+            title: "26.08.05 데이트",
+            date: "2026-08-05",
+            time: nil,
+            status: "DRAFT",
+            version: 0,
+            totalPlaceCount: nil,
+            places: nil
+        )
+        let repository = makeRepository(network: network)
+
+        _ = try await repository.createCourse(
+            title: "26.08.05 데이트",
+            date: DateComponents(year: 2026, month: 8, day: 5),
+            time: nil
+        )
+
+        guard let body = network.requestedBodies["POST \(createPath)"] as? Data else {
+            XCTFail("Expected create body")
+            return
+        }
+        let sent = try JSONDecoder().decode(CreateBody.self, from: body)
+        XCTAssertNil(sent.time)
+    }
+
+    func test_시간이_없으면_요청에_time을_안_싣는다() async throws {
+        let path = "/api/v1/date-courses/1001"
+        let network = StubNetworkClient()
+        network.responses["PUT \(path)"] = DateCourseResponseDTO(
+            dateCourseId: 1001,
+            title: "성수동 데이트",
+            date: "2026-08-16",
+            time: nil,
+            status: "CONFIRMED",
+            version: 3,
+            totalPlaceCount: nil,
+            places: nil
+        )
+        let repository = makeRepository(network: network)
+
+        _ = try? await repository.updateCourse(
+            id: "1001",
+            content: DateCourseContent(
+                title: "성수동 데이트",
+                date: Date(timeIntervalSince1970: 0),
+                time: nil,
+                placeIDs: ["101"]
+            ),
+            version: 3
+        )
+
+        guard let body = network.requestedBodies["PUT \(path)"] as? Data else {
+            XCTFail("Expected save body")
+            return
+        }
+        let sent = try JSONDecoder().decode(SaveBody.self, from: body)
+        XCTAssertNil(sent.time)
+    }
+
+    func test_시간이_있으면_요청에_time을_싣는다() async throws {
+        let path = "/api/v1/date-courses/1001"
+        let network = StubNetworkClient()
+        network.responses["PUT \(path)"] = DateCourseResponseDTO(
+            dateCourseId: 1001,
+            title: "성수동 데이트",
+            date: "2026-08-16",
+            time: "19:30:00",
+            status: "CONFIRMED",
+            version: 3,
+            totalPlaceCount: nil,
+            places: nil
+        )
+        let repository = makeRepository(network: network)
+
+        _ = try? await repository.updateCourse(
+            id: "1001",
+            content: DateCourseContent(
+                title: "성수동 데이트",
+                date: Date(timeIntervalSince1970: 0),
+                time: DateComponents(hour: 19, minute: 30),
+                placeIDs: ["101"]
+            ),
+            version: 3
+        )
+
+        guard let body = network.requestedBodies["PUT \(path)"] as? Data else {
+            XCTFail("Expected save body")
+            return
+        }
+        let sent = try JSONDecoder().decode(SaveBody.self, from: body)
+        XCTAssertEqual(sent.time, "19:30:00")
+    }
+
     func test_상대_알리기는_경로만_부르고_바디는_없다() async throws {
         let notifyPath = "/api/v1/date-courses/42/notify-partner"
         let network = StubNetworkClient()
@@ -175,9 +274,12 @@ final class CourseRepositoryTests: XCTestCase {
         do {
             _ = try await repository.updateCourse(
                 id: "42",
-                title: "t",
-                scheduledAt: Date(),
-                placeIDs: ["10", "abc"],
+                content: DateCourseContent(
+                    title: "t",
+                    date: Date(),
+                    time: nil,
+                    placeIDs: ["10", "abc"]
+                ),
                 version: 0
             )
             XCTFail("Expected unknown")
@@ -188,6 +290,12 @@ final class CourseRepositoryTests: XCTestCase {
         }
 
         XCTAssertTrue(network.requestedKeys.isEmpty)
+    }
+
+    private struct CreateBody: Decodable {
+        let title: String
+        let date: String
+        let time: String?
     }
 
     private struct SaveBody: Decodable {
