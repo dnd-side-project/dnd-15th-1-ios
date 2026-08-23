@@ -32,7 +32,8 @@ public enum AuthClientFactory {
             authRemote: authRemote,
             authLocal: session.authLocal,
             socialAuth: session.socialAuth,
-            profileRemote: ProfileRemoteDataSource(networkClient: session.authedClient)
+            profileRemote: ProfileRemoteDataSource(networkClient: session.authedClient),
+            notificationRepository: NotificationClientFactory.makeRepository(session: session)
         )
     }
 }

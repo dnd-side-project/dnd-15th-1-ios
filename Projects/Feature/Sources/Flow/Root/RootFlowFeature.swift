@@ -99,6 +99,30 @@ public struct RootFlowFeature {
 
     public init() {}
 
+    private enum CancelID {
+        case pushRegistration
+    }
+
+    /// FCM 토큰이 올 때마다 기기를 등록한다. 구독 시 마지막 토큰을 먼저 받으므로
+    /// 로그인 직후와 앱 재실행 직후에도 한 번 등록된다.
+    private var registerPushDevice: Effect<Action> {
+        .run { [notificationClient] _ in
+            for await token in await notificationClient.fcmTokenStream() {
+                do {
+                    try await notificationClient.registerDevice(token)
+                } catch {
+                    FeatureLog.error(
+                        scene: "RootFlow",
+                        operation: "registerPushDevice",
+                        error: String(describing: error),
+                        userVisible: false
+                    )
+                }
+            }
+        }
+        .cancellable(id: CancelID.pushRegistration, cancelInFlight: true)
+    }
+
     public var body: some ReducerOf<Self> {
         Scope(state: \.overlay, action: \.overlay) {
             OverlayFeature()
@@ -278,17 +302,18 @@ private extension RootFlowFeature {
             }
             guard isOnboardingCompleted else {
                 // 스택은 이미 닉네임을 올렸다. 여기서는 phase 를 건드리지 않는다
-                return requestNotificationAuthorization
+                return .merge(requestNotificationAuthorization, registerPushDevice)
             }
             return .merge(
                 requestNotificationAuthorization,
+                registerPushDevice,
                 moveToMain(state: &state, userID: userID)
             )
         case .onboardingCompleted:
             return resolveOnboardingSession()
         case .signedOut:
-            // 스택은 이미 로그인 root 로 물러났다. 여기서 더 할 일이 없다
-            return .none
+            // 스택은 이미 로그인 root 로 물러났다. 구독만 끊는다
+            return .cancel(id: CancelID.pushRegistration)
         case .sessionExpired:
             return .send(.sessionExpired)
         }
@@ -318,9 +343,9 @@ private extension RootFlowFeature {
     ) -> Effect<Action> {
         guard isOnboardingCompleted else {
             state.phase = .onboardingFlow(.resumingOnboarding)
-            return .none
+            return registerPushDevice
         }
-        return moveToMain(state: &state, userID: userID)
+        return .merge(registerPushDevice, moveToMain(state: &state, userID: userID))
     }
 
     func moveToMain(state: inout State, userID: String) -> Effect<Action> {
@@ -344,10 +369,11 @@ private extension RootFlowFeature {
     }
 
     func moveToSignIn(state: inout State, toast: ToastState? = nil) -> Effect<Action> {
+        // 이 경로로 로그인 화면에 돌아오면 푸시 등록 구독을 끊는다
         state.phase = .onboardingFlow(
             OnboardingFlowFeature.State(auth: AuthFeature.State(toast: toast))
         )
-        return .none
+        return .cancel(id: CancelID.pushRegistration)
     }
 
     func makeMainState(userID: String) -> MainTabFeature.State {
