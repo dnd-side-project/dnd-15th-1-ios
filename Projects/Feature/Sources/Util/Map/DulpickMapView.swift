@@ -456,10 +456,9 @@ private extension DulpickMapView.Coordinator {
         map.animateCamera(
             cameraUpdate: update,
             options: CameraAnimationOptions(
-                // 멀리 옮길 때 카메라를 들어 올렸다 내린다. 화면이 당겨진 채 미끄러지면 어지럽다
-                autoElevation: true,
+                autoElevation: ObjCBool(MapCameraMove.autoElevation),
                 consecutive: false,
-                durationInMillis: 150
+                durationInMillis: MapCameraMove.durationInMillis
             )
         )
     }
