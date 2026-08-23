@@ -176,8 +176,8 @@ final class CourseRepositoryTests: XCTestCase {
             XCTFail("Expected create body")
             return
         }
-        let sent = try JSONDecoder().decode(CreateBody.self, from: body)
-        XCTAssertNil(sent.time)
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertFalse(json.keys.contains("time"))
     }
 
     func test_시간이_없으면_요청에_time을_안_싣는다() async throws {
@@ -210,8 +210,8 @@ final class CourseRepositoryTests: XCTestCase {
             XCTFail("Expected save body")
             return
         }
-        let sent = try JSONDecoder().decode(SaveBody.self, from: body)
-        XCTAssertNil(sent.time)
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertFalse(json.keys.contains("time"))
     }
 
     func test_시간이_있으면_요청에_time을_싣는다() async throws {
@@ -290,12 +290,6 @@ final class CourseRepositoryTests: XCTestCase {
         }
 
         XCTAssertTrue(network.requestedKeys.isEmpty)
-    }
-
-    private struct CreateBody: Decodable {
-        let title: String
-        let date: String
-        let time: String?
     }
 
     private struct SaveBody: Decodable {
