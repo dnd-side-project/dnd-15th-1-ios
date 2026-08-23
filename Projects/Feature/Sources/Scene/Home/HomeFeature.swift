@@ -328,14 +328,17 @@ private extension HomeFeature {
 
     private func loadSavedPlaces() -> Effect<Action> {
         .run { [homeClient] send in
-            let places = (try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount)) ?? []
+            // 실패 시 기존 섹션을 지우지 않도록 빈 배열로 덮어쓰지 않는다
+            guard let places = try? await homeClient.recentSavedPlaces(Self.recentSavedPlaceCount) else {
+                return
+            }
             await send(.savedPlacesLoaded(places))
         }
     }
 
     private func loadPastDates() -> Effect<Action> {
         .run { [homeClient] send in
-            let dates = (try? await homeClient.pastDates(Self.pastDateCount)) ?? []
+            guard let dates = try? await homeClient.pastDates(Self.pastDateCount) else { return }
             await send(.pastDatesLoaded(dates))
         }
     }
@@ -345,8 +348,11 @@ private extension HomeFeature {
             // datePreference 를 등록한 사용자만 취향(PREFERENCE) 정렬을 쓰고, 아니면 POPULAR
             let hasPreference = (try? await profileClient.member())?.datePreference != nil
             let sort: ContentSort = hasPreference ? .preference : .popular
-            let page = try? await exploreClient.contents(sort, 0, Self.recommendationCount)
-            await send(.recommendationsLoaded(page?.items ?? []))
+            // 실패 시 기존 추천을 지우지 않도록 빈 배열로 덮어쓰지 않는다
+            guard let page = try? await exploreClient.contents(sort, 0, Self.recommendationCount) else {
+                return
+            }
+            await send(.recommendationsLoaded(page.items))
         }
     }
 }
