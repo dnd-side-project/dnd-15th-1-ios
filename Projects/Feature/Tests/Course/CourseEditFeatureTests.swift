@@ -203,9 +203,11 @@ final class CourseEditFeatureTests: XCTestCase {
             from: DateComponents(year: 2026, month: 8, day: 23, hour: 22, minute: 3)
         ) ?? Date.distantPast
         let state = CourseEditFeature.State(dateCourseID: "1", now: now)
-        let expected = calendar.dateComponents(
+        var seoul = Calendar(identifier: .gregorian)
+        seoul.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .gmt
+        let expected = seoul.dateComponents(
             [.year, .month, .day],
-            from: calendar.date(byAdding: .day, value: 1, to: now) ?? now
+            from: seoul.date(byAdding: .day, value: 1, to: now) ?? now
         )
         let today = calendar.dateComponents([.year, .month, .day], from: now)
 

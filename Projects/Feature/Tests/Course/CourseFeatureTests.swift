@@ -13,9 +13,11 @@ final class CourseDateInputTests: XCTestCase {
             from: DateComponents(year: 2026, month: 8, day: 23, hour: 22, minute: 3)
         ) ?? Date.distantPast
         let state = CourseFeature.State(now: now)
-        let expected = calendar.dateComponents(
+        var seoul = Calendar(identifier: .gregorian)
+        seoul.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .gmt
+        let expected = seoul.dateComponents(
             [.year, .month, .day],
-            from: calendar.date(byAdding: .day, value: 1, to: now) ?? now
+            from: seoul.date(byAdding: .day, value: 1, to: now) ?? now
         )
         let today = calendar.dateComponents([.year, .month, .day], from: now)
 
@@ -163,6 +165,8 @@ final class CourseDateInputTests: XCTestCase {
         await store.send(.dateFieldTapped)
         await store.send(.wheelConfirmed)
         await store.send(.nextTapped)
+        await store.receive(\.courseCreated)
+        await store.receive(.delegate(.placePickRequested(dateCourseID: "1")))
 
         XCTAssertEqual(received.value, .some(.none))
     }
