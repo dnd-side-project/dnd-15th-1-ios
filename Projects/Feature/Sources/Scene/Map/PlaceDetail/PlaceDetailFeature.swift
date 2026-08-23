@@ -14,16 +14,27 @@ public struct PlaceDetailFeature {
 
     @ObservableState
     public struct State: Equatable, Identifiable {
-        public var id: String { place.id }
+        /// 상세를 어느 API 로 조회할지. 저장 목록·게시글 장소는 서버 ID,
+        /// 검색 결과는 카카오 ID 와 검색어를 쓴다
+        public enum Source: Equatable, Sendable {
+            case server(placeID: Int)
+            case kakao(kakaoPlaceID: String, query: String)
+        }
 
-        public let place: Place
+        // id 를 저장 프로퍼티로 둔다. place 를 갈아 끼워도 화면 식별자가 흔들리면 안 된다
+        public let id: String
+
+        public var place: Place
         public let alias: String?
+        public let source: Source?
 
         /// 저장 목록에서 오면 켜 둔다. 검색 결과는 꺼 두고 지도가 북마크 집합으로 맞춘다
         public var isBookmarked: Bool
 
-        /// 시안의 `저장한 사람 N`. 서버에 이 값을 바꾸는 길이 없어 화면 안에서만 오르내린다
+        /// 시안의 `저장한 사람 N`. 상세 조회의 savedMemberCount 로 채운다
         public var bookmarkCount: Int
+        /// 조회 응답이 북마크 상태를 덮지 않게 하는 표시
+        public var didToggleBookmark = false
 
         /// 저장 응답이 준 서버 placeId. 검색 장소는 place.id 가 kakaoId 라 삭제 경로엔 이걸 쓴다
         public var savedServerID: String?
@@ -43,21 +54,38 @@ public struct PlaceDetailFeature {
         public var title: String { alias ?? place.name }
 
         public init(savedPlace: SavedPlace) {
+            id = savedPlace.place.id
             place = savedPlace.place
             alias = savedPlace.alias
             isBookmarked = true
             bookmarkCount = savedPlace.place.bookmarkCount
+            source = Int(savedPlace.place.id).map { .server(placeID: $0) }
         }
 
-        public init(place: Place) {
+        /// 게시글 상세의 장소. 게시글 응답의 placeId 가 항상 있어 서버 ID 로 조회한다
+        public init(contentPlace place: Place) {
+            id = place.id
             self.place = place
             alias = nil
             isBookmarked = false
             bookmarkCount = place.bookmarkCount
+            source = Int(place.id).map { .server(placeID: $0) }
+        }
+
+        /// 검색 결과에서 고른 장소. 카카오 상세는 검색어가 필수다
+        public init(place: Place, query: String) {
+            id = place.id
+            self.place = place
+            alias = nil
+            isBookmarked = false
+            bookmarkCount = place.bookmarkCount
+            source = place.kakaoPlaceID.map { .kakao(kakaoPlaceID: $0, query: query) }
         }
     }
 
     public enum Action: Equatable {
+        case onAppear
+        case detailLoaded(PlaceDetail)
         case bookmarkTapped
         case bookmarkSaved(serverID: String)
         case bookmarkFailed(wasBookmarked: Bool)
@@ -82,6 +110,7 @@ public struct PlaceDetailFeature {
 
     private enum CancelID {
         case bookmark
+        case detail
     }
 
     public init() {}
@@ -93,7 +122,65 @@ public struct PlaceDetailFeature {
 
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case .onAppear, .detailLoaded:
+            return loadDetail(state: &state, action: action)
+        case .bookmarkTapped, .bookmarkSaved, .bookmarkFailed:
+            return updateBookmark(state: &state, action: action)
+        case .addressToggled, .moreTapped, .mapButtonTapped, .contentTapped, .closeTapped, .delegate:
+            return updateSheet(state: &state, action: action)
+        }
+    }
+
+    private func loadDetail(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .onAppear:
+            guard let source = state.source else { return .none }
+            return .run { [placeClient] send in
+                do {
+                    let detail: PlaceDetail
+                    switch source {
+                    case let .server(placeID):
+                        detail = try await placeClient.placeDetail(placeID)
+                    case let .kakao(kakaoPlaceID, query):
+                        detail = try await placeClient.kakaoPlaceDetail(kakaoPlaceID, query)
+                    }
+                    await send(.detailLoaded(detail))
+                } catch {
+                    // 넘겨받은 값을 그대로 둔다. 사용자에게 알리지 않는다
+                }
+            }
+            .cancellable(id: CancelID.detail, cancelInFlight: true)
+
+        case let .detailLoaded(detail):
+            // id 는 안 바꾼다. 화면 식별자가 흔들리면 시트가 다시 그려진다
+            state.place = Place(
+                id: state.id,
+                kakaoPlaceID: detail.place.kakaoPlaceID,
+                name: detail.place.name,
+                category: detail.place.category,
+                address: detail.place.address,
+                roadAddress: detail.place.roadAddress,
+                coordinate: detail.place.coordinate,
+                bookmarkCount: detail.savedMemberCount,
+                thumbnailURLs: detail.place.thumbnailURLs
+            )
+            state.bookmarkCount = detail.savedMemberCount
+            // 조회 중에 북마크를 눌렀으면 응답의 savedByMe 는 이미 낡은 값이다
+            if !state.didToggleBookmark {
+                state.isBookmarked = detail.savedByMe
+            }
+            return .none
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    private func updateBookmark(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .bookmarkTapped:
+            state.didToggleBookmark = true
             return toggleBookmark(state: &state)
 
         case let .bookmarkSaved(serverID):
@@ -106,6 +193,14 @@ public struct PlaceDetailFeature {
             state.bookmarkCount = max(0, state.bookmarkCount + (wasBookmarked ? 1 : -1))
             return .send(.delegate(.bookmarkToggled(state.id, wasBookmarked)))
 
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    private func updateSheet(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case .addressToggled:
             state.isAddressExpanded.toggle()
             return .none
@@ -124,6 +219,10 @@ public struct PlaceDetailFeature {
             return .send(.delegate(.closed))
 
         case .delegate:
+            return .none
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
     }

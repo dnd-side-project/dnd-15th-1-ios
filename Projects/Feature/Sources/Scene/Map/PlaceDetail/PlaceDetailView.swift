@@ -34,6 +34,7 @@ public struct PlaceDetailView: View {
         ) {
             content
         }
+        .onAppear { store.send(.onAppear) }
     }
 }
 
