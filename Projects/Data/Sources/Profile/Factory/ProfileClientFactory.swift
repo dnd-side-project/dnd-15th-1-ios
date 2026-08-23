@@ -11,6 +11,9 @@ public enum ProfileClientFactory {
             member: {
                 try await repository.member()
             },
+            withdraw: {
+                try await repository.withdraw()
+            },
             notificationSettings: {
                 try await repository.notificationSettings()
             },

@@ -12,6 +12,10 @@ public struct ProfileRemoteDataSource: Sendable {
         try await networkClient.request(ProfileEndpoint.member)
     }
 
+    func withdraw() async throws {
+        try await networkClient.request(ProfileEndpoint.withdraw)
+    }
+
     func notificationSettings() async throws -> NotificationSettingsResponseDTO {
         try await networkClient.request(ProfileEndpoint.notificationSettings)
     }

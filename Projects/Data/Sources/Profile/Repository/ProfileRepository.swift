@@ -42,6 +42,14 @@ public struct ProfileRepository: Sendable {
         }
     }
 
+    public func withdraw() async throws {
+        do {
+            try await profileRemote.withdraw()
+        } catch {
+            throw ProfileErrorMapper.map(error)
+        }
+    }
+
     // 온보딩과 달리 초기화 분기 없이 곧장 PATCH 만 한다. 프로필 수정 화면용
     public func updateProfile(nickname: String, iconID: Int) async throws -> UserProfile {
         do {
