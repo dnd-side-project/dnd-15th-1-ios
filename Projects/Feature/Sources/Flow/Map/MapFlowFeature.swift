@@ -545,7 +545,7 @@ private extension MapFlowFeature {
         case let .detail(.presented(.delegate(.bookmarkRemoved(serverID)))):
             state.map.places.removeAll { $0.id == serverID }
             state.map.savedServerIDs = state.map.savedServerIDs.filter {
-                $0.key != serverID && $0.value != serverID
+                $0.value != serverID
             }
             return .none
 
