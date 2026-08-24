@@ -362,6 +362,10 @@ final class MapFlowSearchServerIDTests: XCTestCase {
 
         await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", false))))) {
             $0.map.bookmarkedPlaceIDs = []
+        }
+        XCTAssertEqual(store.state.map.savedServerIDs, ["7": "3"])
+
+        await store.send(.detail(.presented(.delegate(.bookmarkRemoved("3"))))) {
             $0.map.savedServerIDs = [:]
         }
     }
@@ -379,12 +383,13 @@ final class MapFlowSearchServerIDTests: XCTestCase {
 
         await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", false))))) {
             $0.map.bookmarkedPlaceIDs = []
-            $0.map.savedServerIDs = [:]
         }
         XCTAssertEqual(store.state.map.places, [saved])
+        XCTAssertEqual(store.state.map.savedServerIDs, ["7": saved.id])
 
         await store.send(.detail(.presented(.delegate(.bookmarkRemoved(saved.id))))) {
             $0.map.places = []
+            $0.map.savedServerIDs = [:]
         }
     }
 }
