@@ -206,6 +206,9 @@ public struct PlaceDetailFeature {
                 ? nil
                 : Int(detail.place.id)
             state.serverPlaceID = state.serverPlaceID ?? mappedServerID
+            if detail.savedByMe, detail.place.id != detail.place.kakaoPlaceID {
+                state.savedServerID = detail.place.id
+            }
             return loadContents(state: &state)
 
         case .detailLoadFailed:
