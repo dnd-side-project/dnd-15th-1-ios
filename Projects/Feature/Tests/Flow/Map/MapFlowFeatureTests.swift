@@ -370,6 +370,20 @@ final class MapFlowSearchServerIDTests: XCTestCase {
         }
     }
 
+    func test_장소상세_저장해제는_키가_같아도_값이_다른_매핑은_남긴다() async {
+        let place = Place.fixture(id: "kakao-99", name: "검색 장소")
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(place: place, query: "카페")
+        state.map.savedServerIDs = ["3": "17", "kakao-99": "3"]
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.bookmarkRemoved("3"))))) {
+            $0.map.savedServerIDs = ["3": "17"]
+        }
+    }
+
     func test_장소상세_삭제성공은_목록에서_빼고_토글만으로는_안_뺀다() async {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var state = MapFlowFeature.State()
