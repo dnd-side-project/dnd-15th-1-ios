@@ -59,6 +59,8 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.bookmarkCount = 123
         }
         await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkRemoved)
+        await store.receive(\.delegate.bookmarkRemoved)
 
         await store.send(.bookmarkTapped) {
             $0.isBookmarked = true
@@ -68,6 +70,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
         await store.receive(\.bookmarkSaved) {
             $0.savedServerID = SavedPlace.mocks[0].place.id
         }
+        await store.receive(.delegate(.bookmarkSaved("7", SavedPlace.mocks[0])))
     }
 
     func test_카운트는_0_아래로_내려가지_않는다() async {
@@ -86,6 +89,8 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.bookmarkCount = 0
         }
         await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkRemoved)
+        await store.receive(\.delegate.bookmarkRemoved)
     }
 
     func test_주소_펼침이_켜졌다_꺼진다() async {
@@ -147,6 +152,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.bookmarkCount = 77
             $0.isBookmarked = true
             $0.kakaoPlaceURL = updated.kakaoPlaceURL
+            $0.savedServerID = updated.place.id
             $0.contentsLoadState = .loading
         }
         await store.receive(\.contentsResponse) {
@@ -277,6 +283,68 @@ final class PlaceDetailFeatureTests: XCTestCase {
     }
 }
 
+// 위 클래스가 type_body_length 한계라 검색 상세 서버 id 는 따로 둔다
+@MainActor
+final class PlaceDetailFeatureSavedServerIDTests: XCTestCase {
+    func test_저장된_검색_상세는_서버id를_savedServerID로_남긴다() async {
+        let serverPlace = Place.mocks[0]
+        guard let kakaoID = serverPlace.kakaoPlaceID else {
+            return XCTFail("mock 카카오 id")
+        }
+        let searchPlace = Place(
+            id: kakaoID,
+            kakaoPlaceID: kakaoID,
+            name: serverPlace.name,
+            category: serverPlace.category,
+            address: serverPlace.address,
+            roadAddress: serverPlace.roadAddress,
+            coordinate: serverPlace.coordinate,
+            bookmarkCount: serverPlace.bookmarkCount,
+            thumbnailURLs: serverPlace.thumbnailURLs
+        )
+        let detail = PlaceDetail(
+            place: serverPlace, savedByMe: true, savedMemberCount: 5, ownership: .mine
+        )
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(place: searchPlace, query: "성수 카페")
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.kakaoPlaceDetail = { _, _ in detail }
+            $0.exploreClient.placeContents = { _, _, _ in
+                ContentPage(items: [], hasNext: false, popularTags: [])
+            }
+        }
+
+        await store.send(.onAppear)
+        await store.receive(\.detailLoaded) {
+            $0.place = Place(
+                id: $0.id,
+                kakaoPlaceID: serverPlace.kakaoPlaceID,
+                name: serverPlace.name,
+                category: serverPlace.category,
+                address: serverPlace.address,
+                roadAddress: serverPlace.roadAddress,
+                coordinate: serverPlace.coordinate,
+                bookmarkCount: 5,
+                thumbnailURLs: serverPlace.thumbnailURLs
+            )
+            $0.bookmarkCount = 5
+            $0.isBookmarked = true
+            $0.serverPlaceID = 1
+            $0.savedServerID = serverPlace.id
+            $0.contentsLoadState = .loading
+        }
+        await store.receive(\.contentsResponse) {
+            $0.contentsPage = 1
+            $0.hasNextContents = false
+            $0.contentsLoadState = .loaded
+        }
+        XCTAssertEqual(store.state.place.id, kakaoID)
+        XCTAssertEqual(store.state.savedServerID, serverPlace.id)
+    }
+}
+
 @MainActor
 final class PlaceDetailFeatureMapTests: XCTestCase {
     func test_카카오_장소ID_가_있으면_앱_주소를_만든다() {
@@ -328,6 +396,7 @@ final class PlaceDetailFeatureMapTests: XCTestCase {
             )
             $0.bookmarkCount = 1
             $0.kakaoPlaceURL = serverURL
+            $0.savedServerID = detail.place.id
             $0.contentsLoadState = .loading
         }
         await store.receive(\.contentsResponse) {
@@ -430,6 +499,7 @@ final class PlaceDetailFeatureContentsTests: XCTestCase {
                 thumbnailURLs: detail.place.thumbnailURLs
             )
             $0.bookmarkCount = 1
+            $0.savedServerID = detail.place.id
             $0.contentsLoadState = .loading
         }
         await store.receive(\.contentsResponse) {
@@ -501,6 +571,7 @@ final class PlaceDetailFeatureContentsTests: XCTestCase {
                 thumbnailURLs: detail.place.thumbnailURLs
             )
             $0.bookmarkCount = 1
+            $0.savedServerID = detail.place.id
             $0.contentsLoadState = .loading
         }
         await store.receive(\.contentsLoadFailed) { $0.contentsLoadState = .failed }
