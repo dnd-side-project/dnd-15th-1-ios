@@ -6,6 +6,7 @@ struct CoupleCodeInputView: View {
     let store: StoreOf<CoupleConnectFeature>
 
     @State private var isCodeFocused = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,6 +43,11 @@ struct CoupleCodeInputView: View {
         .toast(item: toastBinding, bottomInset: ToastMetric.bottomInset)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
+        .onChange(of: scenePhase) { _, newPhase in
+            // 상대가 이미 연결했으면 내가 코드를 넣어도 실패한다. 돌아온 순간 넘겨준다
+            guard newPhase == .active else { return }
+            store.send(.sceneBecameActive)
+        }
         .toolbar {
             backToolbar
             ToolbarItem(placement: .principal) {
