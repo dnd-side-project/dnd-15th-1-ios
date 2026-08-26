@@ -44,16 +44,7 @@ public struct AppIntroView: View {
     @ToolbarContentBuilder
     private var backToolbar: some ToolbarContent {
         if !store.isFirstPage {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    store.send(.backButtonTapped)
-                } label: {
-                    Image.arrowLeft
-                        .renderingMode(.original)
-                        .resizable()
-                        .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
-                }
-            }
+            BackToolbarItem { store.send(.backButtonTapped) }
         }
     }
 
@@ -126,10 +117,6 @@ public struct AppIntroView: View {
             }
         }
     }
-}
-
-private enum BackButtonMetric {
-    static let iconSize: CGFloat = 24
 }
 
 private enum PageMetric {

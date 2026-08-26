@@ -9,7 +9,6 @@ private enum CourseDateViewMetric {
     static let titleTopPadding: CGFloat = 28
     static let subtitleTopPadding: CGFloat = Spacing.s8
     static let fieldsTopPadding: CGFloat = Spacing.s32
-    static let backButtonSize: CGFloat = 24
     static let sheetAnimationDuration: Duration = .seconds(Motion.sheetDuration)
 }
 
@@ -43,9 +42,7 @@ public struct CourseDateView: View {
                         .typography(.body1SB)
                         .foregroundStyle(Color.gray900)
                 }
-                ToolbarItem(placement: .topBarLeading) {
-                    backButton
-                }
+                BackToolbarItem { store.send(.backTapped) }
             }
             .toast(item: toastBinding)
             .task { store.send(.onAppear) }
@@ -116,21 +113,6 @@ private extension CourseDateView {
             ) {
                 store.send(.timeFieldTapped)
             }
-        }
-    }
-
-    var backButton: some View {
-        Button {
-            store.send(.backTapped)
-        } label: {
-            Image.arrowLeft
-                .renderingMode(.template)
-                .resizable()
-                .frame(
-                    width: CourseDateViewMetric.backButtonSize,
-                    height: CourseDateViewMetric.backButtonSize
-                )
-                .foregroundStyle(Color.textSecondary)
         }
     }
 

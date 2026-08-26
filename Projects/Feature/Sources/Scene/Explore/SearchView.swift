@@ -44,17 +44,7 @@ public struct SearchView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image.arrowLeft
-                        .renderingMode(.template)
-                        .resizable()
-                        .frame(width: 24, height: 24)
-                        .foregroundStyle(Color.textSecondary)
-                }
-            }
+            BackToolbarItem { dismiss() }
             ToolbarItem(placement: .principal) {
                 Text("검색")
                     .typography(.body1SB)
