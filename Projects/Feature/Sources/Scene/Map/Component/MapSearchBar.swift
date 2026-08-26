@@ -7,9 +7,8 @@ private enum MapSearchBarMetric {
     static let height: CGFloat = 48
     static let cornerRadius: CGFloat = 12
     static let borderWidth: CGFloat = 1
+    /// 오른쪽 돋보기. 뒤로가기 원(44)과 크기가 다르다
     static let buttonSize: CGFloat = 48
-    /// 검색 모드 뒤로가기. 오른쪽 돋보기 버튼(48)과 크기가 다르다
-    static let backButtonSize: CGFloat = 44
     static let buttonCornerRadius: CGFloat = 12
     static let iconSize: CGFloat = 24
 }
@@ -45,7 +44,7 @@ struct MapSearchBar: View {
         if onBack != nil {
             // 기본 네비바 뒤로가기와 같은 높이에 서게 입력칸 가운데가 아니라 위에 붙인다
             HStack(alignment: .top, spacing: Spacing.s12) {
-                backButton
+                BackButton { onBack?() }
                 field
             }
         } else {
@@ -54,27 +53,6 @@ struct MapSearchBar: View {
                 searchButton
             }
         }
-    }
-
-    private var backButton: some View {
-        Button {
-            onBack?()
-        } label: {
-            Image.arrowLeft
-                .renderingMode(.template)
-                .resizable()
-                .frame(
-                    width: MapSearchBarMetric.iconSize,
-                    height: MapSearchBarMetric.iconSize
-                )
-                .foregroundStyle(Color.textSecondary)
-                .frame(
-                    width: MapSearchBarMetric.backButtonSize,
-                    height: MapSearchBarMetric.backButtonSize
-                )
-        }
-        .buttonStyle(.plain)
-        .glassCircleBackground()
     }
 
     private var field: some View {

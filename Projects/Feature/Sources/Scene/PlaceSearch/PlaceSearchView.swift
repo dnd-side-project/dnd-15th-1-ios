@@ -6,8 +6,6 @@ import ThirdParty
 // MARK: - PlaceSearchMetric
 
 private enum PlaceSearchMetric {
-    static let backIconSize: CGFloat = 24
-    static let backButtonSize: CGFloat = 44
     /// 최근 검색어 행 왼쪽 돋보기의 배경 원
     static let recentSearchIconBackgroundSize: CGFloat = 28
     /// 그 안의 돋보기
@@ -63,7 +61,7 @@ public struct PlaceSearchView: View {
     private var topBar: some View {
         // 기본 네비바 뒤로가기와 같은 높이에 서게 입력칸 가운데가 아니라 위에 붙인다
         HStack(alignment: .top, spacing: Spacing.s12) {
-            backButton
+            BackButton { store.send(.backTapped) }
 
             AppTextField(
                 text: $store.query,
@@ -78,27 +76,6 @@ public struct PlaceSearchView: View {
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.bottom, PlaceSearchMetric.topBarBottomInset)
-    }
-
-    private var backButton: some View {
-        Button {
-            store.send(.backTapped)
-        } label: {
-            Image.arrowLeft
-                .renderingMode(.template)
-                .resizable()
-                .frame(
-                    width: PlaceSearchMetric.backIconSize,
-                    height: PlaceSearchMetric.backIconSize
-                )
-                .foregroundStyle(Color.textSecondary)
-                .frame(
-                    width: PlaceSearchMetric.backButtonSize,
-                    height: PlaceSearchMetric.backButtonSize
-                )
-        }
-        .buttonStyle(.plain)
-        .glassCircleBackground()
     }
 
     @ViewBuilder
