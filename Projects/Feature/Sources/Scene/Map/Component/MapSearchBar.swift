@@ -47,11 +47,14 @@ struct MapSearchBar: View {
                 BackButton { onBack?() }
                 field
             }
+            .padding(.leading, BackButtonMetric.leadingInset)
+            .padding(.trailing, Spacing.s20)
         } else {
             HStack(spacing: Spacing.s4) {
                 field
                 searchButton
             }
+            .padding(.horizontal, Spacing.s20)
         }
     }
 
@@ -120,7 +123,6 @@ struct MapSearchBar: View {
     ZStack(alignment: .top) {
         Color.gray300.ignoresSafeArea()
         MapSearchBar(placeholder: "원하는 장소를 검색하세요", onTap: {})
-            .padding(.horizontal, Spacing.s20)
     }
 }
 
@@ -134,7 +136,6 @@ struct MapSearchBar: View {
             onClear: {},
             onBack: {}
         )
-        .padding(.horizontal, Spacing.s20)
     }
 }
 #endif

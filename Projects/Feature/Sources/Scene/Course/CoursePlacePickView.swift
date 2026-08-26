@@ -93,7 +93,7 @@ private extension CoursePlacePickView {
     /// 뒤로가기가 서치바 자리에 선다. 시트 펼침 한계가 그 자리를 기준으로 잡혀 있다
     var backButtonLayer: some View {
         BackButton { store.send(.backTapped) }
-            .padding(.horizontal, Spacing.s20)
+            .padding(.leading, BackButtonMetric.leadingInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 

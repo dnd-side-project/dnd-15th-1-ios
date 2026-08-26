@@ -74,7 +74,8 @@ public struct PlaceSearchView: View {
                 onSubmit: { store.send(.submitted) }
             )
         }
-        .padding(.horizontal, Spacing.s20)
+        .padding(.leading, BackButtonMetric.leadingInset)
+        .padding(.trailing, Spacing.s20)
         .padding(.bottom, PlaceSearchMetric.topBarBottomInset)
     }
 

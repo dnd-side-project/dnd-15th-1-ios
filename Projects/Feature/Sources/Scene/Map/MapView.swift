@@ -186,7 +186,6 @@ private extension MapView {
             onClear: { store.send(.searchClearTapped) },
             onBack: store.isSearching ? { store.send(.searchBackTapped) } : nil
         )
-        .padding(.horizontal, Spacing.s20)
         .shadow(
             color: Color.commonBlack.opacity(MapViewMetric.topControlsShadowOpacity),
             radius: MapViewMetric.topControlsShadowRadius,
