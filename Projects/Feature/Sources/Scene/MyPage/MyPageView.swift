@@ -124,16 +124,8 @@ public struct MyPageView: View {
         }
     }
 
-    @ToolbarContentBuilder
     private var backToolbarItem: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button { store.send(.pathChanged([])) } label: {
-                Image.arrowLeft
-                    .renderingMode(.original)
-                    .resizable()
-                    .frame(width: 24, height: 24)
-            }
-        }
+        BackToolbarItem { store.send(.pathChanged([])) }
     }
 
     private var profileEditBinding: Binding<Bool> {

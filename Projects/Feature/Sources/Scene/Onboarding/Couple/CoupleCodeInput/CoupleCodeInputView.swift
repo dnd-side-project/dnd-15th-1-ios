@@ -67,18 +67,8 @@ struct CoupleCodeInputView: View {
         }
     }
 
-    @ToolbarContentBuilder
     private var backToolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button {
-                store.send(.backButtonTapped)
-            } label: {
-                Image.arrowLeft
-                    .renderingMode(.original)
-                    .resizable()
-                    .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
-            }
-        }
+        BackToolbarItem { store.send(.backButtonTapped) }
     }
 
     private var codeBinding: Binding<String> {
@@ -98,10 +88,6 @@ struct CoupleCodeInputView: View {
             }
         )
     }
-}
-
-private enum BackButtonMetric {
-    static let iconSize: CGFloat = 24
 }
 
 private enum TitleMetric {
