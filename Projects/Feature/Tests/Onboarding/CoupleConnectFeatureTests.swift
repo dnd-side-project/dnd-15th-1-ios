@@ -6,10 +6,6 @@ import XCTest
 @MainActor
 final class CoupleConnectFeatureTests: XCTestCase {
     private let inviteCode = InviteCode(value: "AB12C", shareURL: nil)
-    private let couple = Couple(
-        partnerNickname: "픽둘",
-        partnerIconID: 1
-    )
 
     func test_진입_내코드_로딩후_표시() async {
         let inviteCode = self.inviteCode
@@ -17,11 +13,16 @@ final class CoupleConnectFeatureTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { inviteCode }
+            $0.coupleClient.current = { nil }
         }
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
             $0.hasAttemptedInviteCode = true
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
         }
         await store.receive(\.inviteCodeResponse.success) {
             $0.isLoadingInviteCode = false
@@ -41,11 +42,16 @@ final class CoupleConnectFeatureTests: XCTestCase {
                 }
                 return inviteCode
             }
+            $0.coupleClient.current = { nil }
         }
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
             $0.hasAttemptedInviteCode = true
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
         }
         await store.receive(\.inviteCodeResponse.failure) {
             $0.isLoadingInviteCode = false
@@ -70,11 +76,16 @@ final class CoupleConnectFeatureTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unknown }
+            $0.coupleClient.current = { nil }
         }
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
             $0.hasAttemptedInviteCode = true
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
         }
         await store.receive(\.inviteCodeResponse.failure) {
             $0.isLoadingInviteCode = false
@@ -88,11 +99,16 @@ final class CoupleConnectFeatureTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unauthorized }
+            $0.coupleClient.current = { nil }
         }
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
             $0.hasAttemptedInviteCode = true
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
         }
         await store.receive(\.inviteCodeResponse.failure) {
             $0.isLoadingInviteCode = false
@@ -102,6 +118,15 @@ final class CoupleConnectFeatureTests: XCTestCase {
         XCTAssertNil(store.state.toast)
         XCTAssertNil(store.state.inviteCodeError)
     }
+}
+
+// 스킵·코드 입력·연결 성공은 케이스가 많아 별도 클래스로 둔다. type_body_length 한계 때문이다
+@MainActor
+final class CoupleConnectInteractionTests: XCTestCase {
+    private let couple = Couple(
+        partnerNickname: "픽둘",
+        partnerIconID: 1
+    )
 
     func test_스킵확인_네_스킵델리게이트() async {
         let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽")) {
@@ -331,11 +356,16 @@ final class CoupleConnectInviteCodePlaceholderTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unauthorized }
+            $0.coupleClient.current = { nil }
         }
 
         await store.send(.onAppear) {
             $0.isLoadingInviteCode = true
             $0.hasAttemptedInviteCode = true
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
         }
         await store.receive(\.inviteCodeResponse.failure) {
             $0.isLoadingInviteCode = false
@@ -347,5 +377,155 @@ final class CoupleConnectInviteCodePlaceholderTests: XCTestCase {
         XCTAssertFalse(store.state.isLoadingInviteCode)
         XCTAssertNil(store.state.inviteCode)
         XCTAssertNil(store.state.inviteCodeError)
+    }
+}
+
+// 연결 상태 조회는 케이스가 많아 별도 클래스로 둔다. type_body_length 한계 때문이다
+@MainActor
+final class CoupleConnectStatusCheckTests: XCTestCase {
+    private let inviteCode = InviteCode(value: "AB12C", shareURL: nil)
+
+    private func connectedStatus() -> CoupleStatus {
+        CoupleStatus(
+            connected: true,
+            me: CoupleMember(nickname: "둘픽", iconID: 1),
+            partner: CoupleMember(nickname: "픽둘", iconID: 2),
+            daysTogether: 0
+        )
+    }
+
+    func test_진입시_이미연결이면_완료화면으로() async {
+        let inviteCode = self.inviteCode
+        let status = connectedStatus()
+        let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽", inviteCode: inviteCode)) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.current = { status }
+        }
+
+        await store.send(.onAppear) {
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
+            $0.connectedCouple = Couple(partnerNickname: "픽둘", partnerIconID: 2)
+        }
+        await store.receive(\.delegate.showComplete)
+    }
+
+    func test_진입시_미연결이면_그대로머문다() async {
+        let inviteCode = self.inviteCode
+        let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽", inviteCode: inviteCode)) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.current = { nil }
+        }
+
+        await store.send(.onAppear) {
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
+        }
+        XCTAssertNil(store.state.connectedCouple)
+    }
+
+    func test_상대정보가없으면_안넘어간다() async {
+        let inviteCode = self.inviteCode
+        let status = CoupleStatus(
+            connected: true,
+            me: CoupleMember(nickname: "둘픽", iconID: 1),
+            partner: nil,
+            daysTogether: nil
+        )
+        let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽", inviteCode: inviteCode)) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.current = { status }
+        }
+
+        await store.send(.onAppear) {
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
+        }
+        XCTAssertNil(store.state.connectedCouple)
+    }
+
+    func test_앱이앞으로오면_다시묻는다() async {
+        let status = connectedStatus()
+        let store = TestStore(
+            initialState: CoupleConnectFeature.State(myNickname: "둘픽", inviteCode: inviteCode)
+        ) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.current = { status }
+        }
+
+        await store.send(.sceneBecameActive) {
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
+            $0.connectedCouple = Couple(partnerNickname: "픽둘", partnerIconID: 2)
+        }
+        await store.receive(\.delegate.showComplete)
+    }
+
+    func test_이미완료화면이면_안묻는다() async {
+        let store = TestStore(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                inviteCode: inviteCode,
+                connectedCouple: Couple(partnerNickname: "픽둘", partnerIconID: 2)
+            )
+        ) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.current = {
+                XCTFail("이미 연결된 뒤에는 조회하지 않아야 한다")
+                return nil
+            }
+        }
+
+        await store.send(.sceneBecameActive)
+    }
+
+    func test_네트워크실패는_조용하다() async {
+        let store = TestStore(
+            initialState: CoupleConnectFeature.State(myNickname: "둘픽", inviteCode: inviteCode)
+        ) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.current = { throw CoupleError.network }
+        }
+
+        await store.send(.sceneBecameActive) {
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.failure) {
+            $0.isCheckingConnection = false
+        }
+        XCTAssertNil(store.state.toast)
+        XCTAssertNil(store.state.connectedCouple)
+    }
+
+    func test_세션만료는_위로올린다() async {
+        let store = TestStore(
+            initialState: CoupleConnectFeature.State(myNickname: "둘픽", inviteCode: inviteCode)
+        ) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.current = { throw CoupleError.unauthorized }
+        }
+
+        await store.send(.sceneBecameActive) {
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.failure) {
+            $0.isCheckingConnection = false
+        }
+        await store.receive(\.delegate.sessionExpired)
     }
 }
