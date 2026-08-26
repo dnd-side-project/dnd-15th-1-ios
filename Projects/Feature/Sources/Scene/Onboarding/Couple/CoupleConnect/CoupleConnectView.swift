@@ -6,6 +6,8 @@ import ThirdParty
 public struct CoupleConnectView: View {
     @Bindable public var store: StoreOf<CoupleConnectFeature>
 
+    @Environment(\.scenePhase) private var scenePhase
+
     private let shareButtonStyle = AppButtonStyle(variant: .outlined, size: .xl, fullWidth: true)
 
     public init(store: StoreOf<CoupleConnectFeature>) {
@@ -26,6 +28,11 @@ public struct CoupleConnectView: View {
             }
             .onAppear {
                 store.send(.onAppear)
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                // 앱이 뒤에 있는 동안 상대가 연결했을 수 있다. 돌아온 순간 한 번 묻는다
+                guard newPhase == .active else { return }
+                store.send(.sceneBecameActive)
             }
             .modal(isPresented: skipConfirmBinding) {
                 ModalContent(

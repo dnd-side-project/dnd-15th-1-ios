@@ -27,6 +27,7 @@ public struct CoupleConnectFeature {
         public var code: String
         public var isConnecting: Bool
         public var connectedCouple: Couple?
+        public var isCheckingConnection: Bool = false
         public var toast: ToastState?
 
         public init(
@@ -75,6 +76,8 @@ public struct CoupleConnectFeature {
         case codeChanged(String)
         case connectButtonTapped
         case connectResponse(Result<Couple, CoupleError>)
+        case sceneBecameActive
+        case connectionStatusResponse(Result<CoupleStatus?, CoupleError>)
         case completeButtonTapped
         case backButtonTapped
         case dismissToast
@@ -109,6 +112,8 @@ public struct CoupleConnectFeature {
             case let .codeChanged(code): return codeChanged(code, state: &state)
             case .connectButtonTapped: return connectButtonTapped(state: &state)
             case let .connectResponse(result): return connectResponse(result, state: &state)
+            case .sceneBecameActive: return sceneBecameActive(state: &state)
+            case let .connectionStatusResponse(result): return connectionStatusResponse(result, state: &state)
             case .completeButtonTapped: return completeButtonTapped(state: &state)
             case .backButtonTapped: return backButtonTapped(state: &state)
             case .dismissToast: return dismissToast(state: &state)
@@ -120,8 +125,32 @@ public struct CoupleConnectFeature {
 
 private extension CoupleConnectFeature {
     func onAppear(state: inout State) -> Effect<Action> {
+        .merge(
+            loadInviteCodeIfNeeded(state: &state),
+            checkConnectionIfNeeded(state: &state)
+        )
+    }
+
+    func loadInviteCodeIfNeeded(state: inout State) -> Effect<Action> {
         guard state.inviteCode == nil, !state.isLoadingInviteCode else { return .none }
         return loadInviteCode(state: &state)
+    }
+
+    func sceneBecameActive(state: inout State) -> Effect<Action> {
+        checkConnectionIfNeeded(state: &state)
+    }
+
+    func checkConnectionIfNeeded(state: inout State) -> Effect<Action> {
+        guard state.connectedCouple == nil, !state.isCheckingConnection else { return .none }
+        state.isCheckingConnection = true
+        return .run { [coupleClient] send in
+            do {
+                let status = try await coupleClient.current()
+                await send(.connectionStatusResponse(.success(status)))
+            } catch {
+                await send(.connectionStatusResponse(.failure(mapCoupleError(error))))
+            }
+        }
     }
 
     func retryInviteCodeButtonTapped(state: inout State) -> Effect<Action> {
@@ -235,10 +264,37 @@ private extension CoupleConnectFeature {
         state.isConnecting = false
         switch result {
         case let .success(couple):
+            guard state.connectedCouple == nil else { return .none }
             state.connectedCouple = couple
             return .send(.delegate(.showComplete))
         case let .failure(error):
             return handleConnectFailure(error, state: &state)
+        }
+    }
+
+    func connectionStatusResponse(
+        _ result: Result<CoupleStatus?, CoupleError>,
+        state: inout State
+    ) -> Effect<Action> {
+        state.isCheckingConnection = false
+        switch result {
+        case let .success(status):
+            // 연결 요청과 조회가 겹쳐 응답하면 완료 화면이 두 장 쌓인다
+            guard state.connectedCouple == nil else { return .none }
+            // 상대 정보가 비면 완료 화면의 이름 칸이 빈다. 그 상태로는 안 넘긴다
+            guard let status, status.connected, let partner = status.partner else { return .none }
+            state.connectedCouple = Couple(
+                partnerNickname: partner.nickname,
+                partnerIconID: partner.iconID
+            )
+            return .send(.delegate(.showComplete))
+
+        case .failure(.unauthorized):
+            return .send(.delegate(.sessionExpired))
+
+        // 사용자가 누른 조회가 아니라 배경 확인이다. 실패를 알리면 사용자가 자기 잘못을 찾게 된다
+        case .failure:
+            return .none
         }
     }
 

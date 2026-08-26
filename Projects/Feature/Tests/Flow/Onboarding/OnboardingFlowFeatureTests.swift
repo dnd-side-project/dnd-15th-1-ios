@@ -440,11 +440,16 @@ final class OnboardingFlowSessionExpiredTests: XCTestCase {
             OnboardingFlowFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unauthorized }
+            $0.coupleClient.current = { nil }
         }
 
         await store.send(.couple(.onAppear)) {
             $0.couple?.isLoadingInviteCode = true
             $0.couple?.hasAttemptedInviteCode = true
+            $0.couple?.isCheckingConnection = true
+        }
+        await store.receive(\.couple.connectionStatusResponse.success) {
+            $0.couple?.isCheckingConnection = false
         }
         await store.receive(\.couple.inviteCodeResponse.failure) {
             $0.couple?.isLoadingInviteCode = false
