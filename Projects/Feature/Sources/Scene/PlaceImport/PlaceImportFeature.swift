@@ -62,8 +62,8 @@ public struct PlaceImportFeature {
     }
 
     // retryAfterSeconds 가 없을 때 쓰는 기본 폴링 간격
-    private let fallbackDelay = 5
-    private let maxPollCount = 60
+    private let fallbackDelay = 2
+    private let maxPollCount = 7
 
     @Dependency(\.placeImportClient) var placeImportClient
     @Dependency(\.dismiss) var dismiss
