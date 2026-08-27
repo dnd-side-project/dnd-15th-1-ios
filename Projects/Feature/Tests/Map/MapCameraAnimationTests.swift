@@ -7,7 +7,7 @@ final class MapCameraAnimationTests: XCTestCase {
         XCTAssertTrue(MapCameraMove.autoElevation)
     }
 
-    func test_카메라_이동_시간은_250밀리초다() {
-        XCTAssertEqual(MapCameraMove.durationInMillis, 250)
+    func test_카메라_이동_시간은_150밀리초다() {
+        XCTAssertEqual(MapCameraMove.durationInMillis, 150)
     }
 }
