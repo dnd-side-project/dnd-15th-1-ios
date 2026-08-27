@@ -623,9 +623,8 @@ private extension MapFlowFeature {
                 presentDetail(state: &state, place: place, query: state.map.searchQuery ?? "")
             }
         case .content:
-            if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
-                presentContentPlaceDetail(state: &state, place: place)
-            }
+            // 지도 핀 탭도 리스트 탭과 똑같이 게시글을 남겨 둔다. 장소를 닫으면 게시글로 돌아간다
+            focusContentPlaceDetail(state: &state, id: id)
         }
     }
 

@@ -25,6 +25,9 @@ public struct ProfileEditView: View {
         }
         .padding(.horizontal, 20)
         .frame(height: UIScreen.main.bounds.height * Self.heightRatio)
+        // 입력칸·버튼 밖 빈 곳을 누르면 키보드를 내린다
+        .contentShape(Rectangle())
+        .onTapGesture { dismissKeyboard() }
         .toast(
             item: toastBinding,
             bottomInset: CTALayout.toastInset(buttonHeights: [CTALayout.xlButtonHeight])

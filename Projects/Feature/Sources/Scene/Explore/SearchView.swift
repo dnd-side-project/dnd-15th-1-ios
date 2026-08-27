@@ -39,6 +39,9 @@ public struct SearchView: View {
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.top, Spacing.s20)
+        // 입력칸·버튼 밖 빈 곳을 누르면 키보드를 내린다
+        .contentShape(Rectangle())
+        .onTapGesture { dismissKeyboard() }
         .task { store.send(.onAppear) }
         .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
