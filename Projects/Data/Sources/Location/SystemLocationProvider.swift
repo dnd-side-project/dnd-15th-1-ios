@@ -9,10 +9,13 @@ import Foundation
 @MainActor
 final class SystemLocationProvider: NSObject {
     private let manager = CLLocationManager()
+    private let maxCacheAge: Duration
     private var authorizationContinuation: CheckedContinuation<LocationAuthorization, Never>?
     private var coordinateContinuation: CheckedContinuation<Coordinate, Error>?
+    private var isRequestingCoordinate = false
 
-    override init() {
+    init(maxCacheAge: Duration = .seconds(10)) {
+        self.maxCacheAge = maxCacheAge
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
@@ -47,6 +50,17 @@ final class SystemLocationProvider: NSObject {
         guard Self.mapped(manager.authorizationStatus) == .authorized else {
             throw LocationError.denied
         }
+        // 지도 화면은 최근 좌표를 이미 들고 있는 때가 많다. 그때 새로 재면 얻는 것이 없다
+        if let cached = manager.location,
+           // 오차가 음수면 좌표를 못 잡았다는 뜻이다. 그 값은 0,0 이라 지도가 엉뚱한 데로 간다
+           cached.horizontalAccuracy >= 0,
+           Self.isCacheFresh(age: Date().timeIntervalSince(cached.timestamp), maxAge: maxCacheAge) {
+            return Coordinate(
+                latitude: cached.coordinate.latitude,
+                longitude: cached.coordinate.longitude
+            )
+        }
+
         let timer = Task { [weak self] in
             try? await Task.sleep(for: timeout)
             guard !Task.isCancelled else { return }
@@ -58,7 +72,11 @@ final class SystemLocationProvider: NSObject {
             // 앞 요청이 아직 안 끝났으면 그것을 실패로 닫고 자리를 넘긴다
             coordinateContinuation?.resume(throwing: LocationError.unavailable)
             coordinateContinuation = continuation
-            manager.requestLocation()
+            // 이미 도는 측위 위에 다시 요청하면 CoreLocation 이 답을 안 준다
+            if !isRequestingCoordinate {
+                isRequestingCoordinate = true
+                manager.requestLocation()
+            }
         }
     }
 
@@ -70,9 +88,16 @@ final class SystemLocationProvider: NSObject {
 
     /// 시간 상한이 지났을 때 기다리는 쪽을 깨운다. 이미 답이 왔으면 아무것도 안 한다
     private func failPending() {
+        isRequestingCoordinate = false
         guard let continuation = coordinateContinuation else { return }
         coordinateContinuation = nil
         continuation.resume(throwing: LocationError.unavailable)
+    }
+
+    /// 캐시 나이가 유효 시간 안인지 본다
+    nonisolated static func isCacheFresh(age: TimeInterval, maxAge: Duration) -> Bool {
+        guard age >= 0 else { return false }
+        return age <= maxAge.timeInterval
     }
 
     static func mapped(_ status: CLAuthorizationStatus) -> LocationAuthorization {
@@ -109,6 +134,7 @@ extension SystemLocationProvider: CLLocationManagerDelegate {
         didUpdateLocations locations: [CLLocation]
     ) {
         MainActor.assumeIsolated {
+            isRequestingCoordinate = false
             guard let continuation = coordinateContinuation else { return }
             coordinateContinuation = nil
             guard let location = locations.last else {
@@ -129,10 +155,19 @@ extension SystemLocationProvider: CLLocationManagerDelegate {
         didFailWithError error: Error
     ) {
         MainActor.assumeIsolated {
+            isRequestingCoordinate = false
             guard let continuation = coordinateContinuation else { return }
             coordinateContinuation = nil
             let mapped: LocationError = (error as? CLError)?.code == .denied ? .denied : .unavailable
             continuation.resume(throwing: mapped)
         }
+    }
+}
+
+private extension Duration {
+    var timeInterval: TimeInterval {
+        let components = self.components
+        return TimeInterval(components.seconds)
+            + TimeInterval(components.attoseconds) / 1_000_000_000_000_000_000
     }
 }
