@@ -9,7 +9,7 @@ public enum ProjectEnvironment {
     public static let displayName = "둘픽"
 
     public static let appVersion = "1.0.0"
-    public static let appBuildNumber = "1"
+    public static let appBuildNumber = "3"
 
     public static let swiftVersion = "6"
     public static let deploymentTarget = "18.0"
