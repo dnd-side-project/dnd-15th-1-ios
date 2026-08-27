@@ -1,0 +1,106 @@
+import ProjectDescription
+
+/// 모듈 카탈로그.
+/// 이름/경로/번들 suffix/의존성 참조를 한곳에서 관리한다.
+public enum Module: String, CaseIterable {
+    case sharedUtils
+    case sharedDesignSystem
+    case sharedLogger
+    case thirdParty
+    case thirdPartyUI
+    case thirdPartyCore
+    case domain
+    case data
+    case feature
+    case app
+    case coreNetwork
+    case coreStorage
+    case coreSocialAuth
+    case coreNotification
+
+    public var targetName: String {
+        switch self {
+        case .sharedUtils: return "SharedUtils"
+        case .sharedDesignSystem: return "SharedDesignSystem"
+        case .sharedLogger: return "SharedLogger"
+        case .thirdParty: return "ThirdParty"
+        case .thirdPartyUI: return "ThirdPartyUI"
+        case .thirdPartyCore: return "ThirdPartyCore"
+        case .domain: return "Domain"
+        case .data: return "Data"
+        case .feature: return "Feature"
+        case .app: return "App"
+        case .coreNetwork: return "CoreNetwork"
+        case .coreStorage: return "CoreStorage"
+        case .coreSocialAuth: return "CoreSocialAuth"
+        case .coreNotification: return "CoreNotification"
+        }
+    }
+
+    public var pathString: String {
+        switch self {
+        case .sharedUtils: return "Projects/Shared/Util"
+        case .sharedDesignSystem: return "Projects/Shared/DesignSystem"
+        case .sharedLogger: return "Projects/Shared/Logger"
+        case .thirdParty: return "Projects/ThirdParty/ThirdParty"
+        case .thirdPartyUI: return "Projects/ThirdParty/ThirdPartyUI"
+        case .thirdPartyCore: return "Projects/ThirdParty/ThirdPartyCore"
+        case .domain: return "Projects/Domain"
+        case .data: return "Projects/Data"
+        case .feature: return "Projects/Feature"
+        case .app: return "Projects/App"
+        case .coreNetwork: return "Projects/Core/Network"
+        case .coreStorage: return "Projects/Core/Storage"
+        case .coreSocialAuth: return "Projects/Core/SocialAuth"
+        case .coreNotification: return "Projects/Core/Notification"
+        }
+    }
+
+    public var path: Path {
+        .relativeToRoot(pathString)
+    }
+
+    public var bundleIdSuffix: String {
+        switch self {
+        case .sharedUtils: return "shared.utils"
+        case .sharedDesignSystem: return "shared.designsystem"
+        case .sharedLogger: return "shared.logger"
+        case .thirdParty: return "thirdparty"
+        case .thirdPartyUI: return "thirdpartyui"
+        case .thirdPartyCore: return "thirdpartycore"
+        case .domain: return "domain"
+        case .data: return "data"
+        case .feature: return "feature"
+        case .app: return "app"
+        case .coreNetwork: return "core.network"
+        case .coreStorage: return "core.storage"
+        case .coreSocialAuth: return "core.socialauth"
+        case .coreNotification: return "core.notification"
+        }
+    }
+
+    public var dependency: TargetDependency {
+        .project(target: targetName, path: path)
+    }
+
+    /// Workspace에 등록할 모듈 경로 (생성 순서와 무관하게 전체 목록).
+    public static var workspaceProjectPaths: [Path] {
+        allCases.map(\.path)
+    }
+}
+
+public extension TargetDependency {
+    static var sharedUtils: TargetDependency { Module.sharedUtils.dependency }
+    static var sharedDesignSystem: TargetDependency { Module.sharedDesignSystem.dependency }
+    static var sharedLogger: TargetDependency { Module.sharedLogger.dependency }
+    static var thirdParty: TargetDependency { Module.thirdParty.dependency }
+    static var thirdPartyUI: TargetDependency { Module.thirdPartyUI.dependency }
+    static var thirdPartyCore: TargetDependency { Module.thirdPartyCore.dependency }
+    static var domain: TargetDependency { Module.domain.dependency }
+    static var data: TargetDependency { Module.data.dependency }
+    static var feature: TargetDependency { Module.feature.dependency }
+    static var coreNetwork: TargetDependency { Module.coreNetwork.dependency }
+    static var coreStorage: TargetDependency { Module.coreStorage.dependency }
+    static var coreSocialAuth: TargetDependency { Module.coreSocialAuth.dependency }
+    static var coreNotification: TargetDependency { Module.coreNotification.dependency }
+}

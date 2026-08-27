@@ -1,0 +1,34 @@
+# Xcode
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Tuist
+*.xcodeproj
+*.xcworkspace
+Derived/
+graph.dot
+.tuist/
+
+# SwiftPM
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Misc
+*.log
+
+# Local Xcode derived data for CLI builds
+.derivedData/
+
+# Local config secrets (keep Example.xcconfig tracked)
+Config/Debug.xcconfig
+Config/Release.xcconfig
+
+# Firebase (실제 값은 커밋하지 않는다. Config/GoogleService-Info-Example.plist 를 복사해서 쓴다)
+Config/GoogleService-Info-Debug.plist
+Config/GoogleService-Info-Release.plist

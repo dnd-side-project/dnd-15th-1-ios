@@ -1,0 +1,66 @@
+//
+//  HomeDTOMapper.swift
+//  Dulpick
+//
+//  Created by 이인호 on 8/21/26.
+//
+
+import Domain
+import Foundation
+
+enum HomeDTOMapper {
+    static func toDomain(_ dto: HomeSummaryResponseDTO) -> HomeSummary {
+        HomeSummary(
+            connected: dto.connected,
+            myNickname: dto.myNickname ?? "",
+            partnerNickname: dto.connected ? dto.partnerNickname : nil,
+            // 미연결이거나 파싱이 깨지면 현재 코스는 없다
+            currentDateCourse: dto.connected
+                ? dto.currentDateCourse.flatMap { try? toCurrent($0) }
+                : nil
+        )
+    }
+
+    static func toPastDates(_ dtos: [HomeDateCourseResponseDTO]) -> [DateSchedule] {
+        dtos.map(toDateSchedule)
+    }
+
+    static func toPastCoursePage(_ dto: PastDateCoursesResponseDTO) -> PastDateCoursePage {
+        PastDateCoursePage(
+            courses: dto.dateCourses.map(toDateSchedule),
+            totalCount: dto.totalCount,
+            hasNext: dto.hasNext
+        )
+    }
+
+    private static func toCurrent(_ dto: HomeDateCourseResponseDTO) throws -> DateCourseSummary {
+        try CourseDTOMapper.toDomain(
+            DateCourseSummaryResponseDTO(
+                dateCourseId: dto.dateCourseId,
+                title: dto.title,
+                date: dto.date,
+                time: dto.time,
+                status: dto.status ?? "",
+                version: dto.version ?? 0,
+                totalPlaceCount: dto.totalPlaceCount
+            )
+        )
+    }
+
+    private static func toDateSchedule(_ dto: HomeDateCourseResponseDTO) -> DateSchedule {
+        DateSchedule(
+            id: String(dto.dateCourseId),
+            title: dto.title,
+            placeCount: dto.totalPlaceCount,
+            // 지난 데이트는 yy.MM.dd
+            date: shortDate(dto.date)
+        )
+    }
+
+    // "2026-08-16" → "26.08.16"
+    private static func shortDate(_ raw: String) -> String {
+        let parts = raw.split(separator: "-")
+        guard parts.count == 3 else { return raw }
+        return "\(parts[0].suffix(2)).\(parts[1]).\(parts[2])"
+    }
+}

@@ -1,0 +1,917 @@
+import Domain
+@testable import Feature
+import SharedDesignSystem
+import ThirdParty
+import XCTest
+
+@MainActor
+final class MapFlowFeatureTests: XCTestCase {
+    func test_핀을_탭하면_경로가_안_쌓이고_흐름이_상세를_연다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.markerTapped("7"))) {
+            $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
+        await store.receive(\.map.delegate.placeDetailRequested) {
+            $0.detail = PlaceDetailFeature.State(savedPlace: saved)
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: saved.id,
+                coordinate: saved.place.coordinate
+            )
+            $0.topDetail = .place
+        }
+        XCTAssertEqual(store.state.path, [])
+    }
+
+    func test_행을_탭해도_경로가_안_쌓이고_흐름이_상세를_연다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.rowTapped("7"))) {
+            $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
+        await store.receive(\.map.delegate.placeDetailRequested) {
+            $0.detail = PlaceDetailFeature.State(savedPlace: saved)
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: saved.id,
+                coordinate: saved.place.coordinate
+            )
+            $0.topDetail = .place
+        }
+        XCTAssertEqual(store.state.path, [])
+    }
+
+    func test_목록에_없는_id_면_상세가_안_선다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.rowTapped("없는id")))
+        await store.receive(\.map.delegate.placeDetailRequested)
+        XCTAssertNil(store.state.detail)
+        XCTAssertNil(store.state.map.selectedPlace)
+    }
+
+    func test_검색_결과에서_행을_누르면_상세가_선다() async {
+        let place = Place.fixture(id: "s1", name: "검색 장소")
+        var map = MapFeature.State()
+        map.mode = .searchResult(query: "카페", places: [place])
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.rowTapped("s1"))) {
+            $0.map.camera = .focusing(place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
+        await store.receive(\.map.delegate.placeDetailRequested) {
+            $0.detail = PlaceDetailFeature.State(place: place, query: "카페")
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: place.id,
+                coordinate: place.coordinate
+            )
+            $0.topDetail = .place
+        }
+        XCTAssertNil(store.state.detail?.alias)
+        XCTAssertEqual(store.state.path, [])
+    }
+
+    func test_검색바와_코스_버튼이_각자_경로를_쌓는다() async {
+        let store = TestStore(initialState: MapFlowFeature.State()) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.searchBarTapped))
+        await store.receive(\.map.delegate.searchRequested) {
+            $0.placeSearch = PlaceSearchFeature.State()
+            $0.path = [.search]
+        }
+
+        await store.send(.map(.courseButtonTapped))
+        await store.receive(\.map.delegate.courseRequested) {
+            $0.path = [.search, .course]
+            $0.course = CourseFeature.State()
+        }
+    }
+
+    func test_뷰가_경로를_비우면_지도로_돌아온다() async {
+        let store = TestStore(
+            initialState: MapFlowFeature.State(path: [.search, .course])
+        ) {
+            MapFlowFeature()
+        }
+
+        await store.send(.pathChanged([.search])) {
+            $0.path = [.search]
+        }
+        await store.send(.pathChanged([])) {
+            $0.path = []
+        }
+    }
+
+    func test_수정을_요청하면_별칭시트가_서고_경로는_안_바뀐다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.delegate(.aliasRequested("7")))) {
+            $0.alias = PlaceAliasFeature.State(savedPlace: saved)
+            $0.isAliasPresented = true
+        }
+        XCTAssertEqual(store.state.path, [])
+    }
+
+    func test_삭제는_화면_이동이_아니라_경로를_안_바꾼다() async {
+        let store = TestStore(
+            initialState: MapFlowFeature.State(map: MapFeature.State())
+        ) {
+            MapFlowFeature()
+        }
+
+        // PlaceClient 에 계약이 생기면 데이터 갱신으로 받는다. path 를 쓰지 않는다
+        await store.send(.map(.delegate(.deleteRequested("7"))))
+
+        XCTAssertEqual(store.state.path, [])
+    }
+
+    func test_세션_만료는_경로를_안_쌓고_위로_올린다() async {
+        let store = TestStore(initialState: MapFlowFeature.State()) {
+            MapFlowFeature()
+        }
+
+        // 전역 에러라 RootFlow 까지 올라가야 로그인으로 되돌아간다
+        await store.send(.map(.delegate(.sessionExpired)))
+        await store.receive(\.delegate.sessionExpired)
+
+        XCTAssertEqual(store.state.path, [])
+    }
+
+    func test_상세를_닫으면_자식이_사라지고_선택핀이_빠진다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: saved.id,
+            coordinate: saved.place.coordinate
+        )
+        var state = MapFlowFeature.State(map: map)
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.closed)))) {
+            $0.detail = nil
+            $0.map.selectedPlace = nil
+        }
+    }
+
+    func test_검색을_엔터로_확정하면_보고있던_상세가_내린다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        let places = [Place.fixture(id: "s1", latitude: 37.5, longitude: 127.0)]
+        var map = MapFeature.State()
+        map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: saved.id,
+            coordinate: saved.place.coordinate
+        )
+        var state = MapFlowFeature.State(map: map)
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.placeSearch = PlaceSearchFeature.State()
+        state.path = [.search]
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.placeSearch(.delegate(.searchConfirmed(query: "음식점", places: places)))) {
+            $0.detail = nil
+            $0.map.selectedPlace = nil
+        }
+        await store.receive(\.pathChanged) {
+            $0.path = []
+            $0.placeSearch = nil
+        }
+        await store.receive(\.map.searchResultsApplied) {
+            $0.map.mode = .searchResult(query: "음식점", places: places)
+            $0.map.camera = .focusing(places[0].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_장소상세_북마크는_지도_저장목록에_반영된다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.map.bookmarkedPlaceIDs = ["7"]
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", false))))) {
+            $0.map.bookmarkedPlaceIDs = []
+        }
+        await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", true))))) {
+            $0.map.bookmarkedPlaceIDs = ["7"]
+        }
+    }
+}
+
+@MainActor
+final class MapFlowAliasSheetTests: XCTestCase {
+    func test_별칭을_저장하면_목록을_지도에_넘긴다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        var state = MapFlowFeature.State(map: map)
+        state.alias = PlaceAliasFeature.State(savedPlace: saved)
+        state.isAliasPresented = true
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        let updated = SavedPlace(
+            place: saved.place,
+            ownership: saved.ownership,
+            alias: "우리 첫 카페",
+            memo: saved.memo,
+            savedAt: saved.savedAt
+        )
+        await store.send(.alias(.presented(.delegate(.saved(updated))))) {
+            $0.isAliasPresented = false
+        }
+        await store.receive(\.map.aliasSaved) {
+            $0.map.places[0] = updated
+            $0.map.toast = ToastState(message: "별칭을 저장했어요")
+        }
+        await store.send(.alias(.dismiss)) {
+            $0.alias = nil
+        }
+    }
+
+    func test_별칭을_닫아도_시트가_내리기_전에는_본문이_남는다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        map.bookmarkedPlaceIDs = [saved.id]
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.map(.delegate(.aliasRequested("7")))) {
+            $0.alias = PlaceAliasFeature.State(savedPlace: saved)
+            $0.isAliasPresented = true
+        }
+        await store.send(.aliasCloseRequested) {
+            $0.isAliasPresented = false
+        }
+        XCTAssertNotNil(store.state.alias)
+    }
+
+    func test_별칭저장이_만료되면_시트를_닫고_위로_올린다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.alias = PlaceAliasFeature.State(savedPlace: saved)
+        state.isAliasPresented = true
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.alias(.presented(.delegate(.sessionExpired)))) {
+            $0.alias = nil
+            $0.isAliasPresented = false
+        }
+        await store.receive(\.delegate.sessionExpired)
+    }
+}
+
+// 위 클래스가 type_body_length 한계라 검색 저장 서버 id 는 따로 둔다
+@MainActor
+final class MapFlowSearchServerIDTests: XCTestCase {
+    func test_검색결과_상세를_열면_지도의_서버id를_넘긴다() async {
+        let place = Place.fixture(id: "s1", name: "검색 장소")
+        var map = MapFeature.State()
+        map.mode = .searchResult(query: "카페", places: [place])
+        map.bookmarkedPlaceIDs = ["s1"]
+        map.savedServerIDs = ["s1": "3"]
+        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.rowTapped("s1"))) {
+            $0.map.camera = .focusing(place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
+        await store.receive(\.map.delegate.placeDetailRequested) {
+            var detail = PlaceDetailFeature.State(place: place, query: "카페")
+            detail.isBookmarked = true
+            detail.savedServerID = "3"
+            $0.detail = detail
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: place.id,
+                coordinate: place.coordinate
+            )
+            $0.topDetail = .place
+        }
+    }
+
+    func test_장소상세_저장성공은_지도_서버id맵에_넣는다() async {
+        let place = Place.fixture(id: "s1", name: "검색 장소")
+        let saved = SavedPlace.mocks[0]
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(place: place, query: "카페")
+        state.map.bookmarkedPlaceIDs = ["s1"]
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.bookmarkSaved("s1", saved))))) {
+            $0.map.savedServerIDs = ["s1": saved.place.id]
+            $0.map.places = [saved]
+        }
+    }
+
+    func test_장소상세_저장해제는_지도_서버id맵에서_뺀다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.map.bookmarkedPlaceIDs = ["7"]
+        state.map.savedServerIDs = ["7": "3"]
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", false))))) {
+            $0.map.bookmarkedPlaceIDs = []
+        }
+        XCTAssertEqual(store.state.map.savedServerIDs, ["7": "3"])
+
+        await store.send(.detail(.presented(.delegate(.bookmarkRemoved("3"))))) {
+            $0.map.savedServerIDs = [:]
+        }
+    }
+
+    func test_장소상세_저장해제는_키가_같아도_값이_다른_매핑은_남긴다() async {
+        let place = Place.fixture(id: "kakao-99", name: "검색 장소")
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(place: place, query: "카페")
+        state.map.savedServerIDs = ["3": "17", "kakao-99": "3"]
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.bookmarkRemoved("3"))))) {
+            $0.map.savedServerIDs = ["3": "17"]
+        }
+    }
+
+    func test_장소상세_삭제성공은_목록에서_빼고_토글만으로는_안_뺀다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.map.places = [saved]
+        state.map.bookmarkedPlaceIDs = ["7"]
+        state.map.savedServerIDs = ["7": saved.id]
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", false))))) {
+            $0.map.bookmarkedPlaceIDs = []
+        }
+        XCTAssertEqual(store.state.map.places, [saved])
+        XCTAssertEqual(store.state.map.savedServerIDs, ["7": saved.id])
+
+        await store.send(.detail(.presented(.delegate(.bookmarkRemoved(saved.id))))) {
+            $0.map.places = []
+            $0.map.savedServerIDs = [:]
+        }
+    }
+}
+
+@MainActor
+final class MapFlowPostDetailTests: XCTestCase {
+    func test_장소상세에서_게시글을_누르면_게시글시트가_열리고_불러오기가_시작된다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        let loaded = PostDetailContent.fixture(id: "1")
+        var map = MapFeature.State()
+        map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: saved.id,
+            coordinate: saved.place.coordinate
+        )
+        var state = MapFlowFeature.State(map: map)
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        } withDependencies: {
+            $0.postDetailContentClient.contentDetail = { _ in loaded }
+        }
+
+        await store.send(.detail(.presented(.delegate(.contentSelected("1"))))) {
+            $0.postDetail = PostDetailFeature.State(contentID: "1")
+            $0.topDetail = .post
+        }
+        await store.receive(\.postDetail.presented.onAppear) {
+            $0.postDetail?.isLoading = true
+        }
+        await store.receive(\.postDetail.presented.detailResponse) {
+            $0.postDetail?.detail = loaded
+            $0.postDetail?.savedPlaceIDs = ["101", "103"]
+            $0.postDetail?.isLoading = false
+        }
+        await store.receive(\.postDetail.presented.delegate.detailLoaded)
+        XCTAssertNotNil(store.state.detail)
+        XCTAssertNotNil(store.state.postDetail)
+        XCTAssertEqual(store.state.topDetail, .post)
+    }
+
+    func test_게시글상세를_닫으면_게시글이_사라지고_장소상세는_남는다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: saved.id,
+            coordinate: saved.place.coordinate
+        )
+        var state = MapFlowFeature.State(map: map)
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        state.topDetail = .post
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.postDetail(.presented(.delegate(.closeRequested)))) {
+            $0.postDetail = nil
+            $0.topDetail = .place
+        }
+        XCTAssertNotNil(store.state.detail)
+    }
+
+    func test_게시글시트가_떠있을때_장소상세를_열면_게시글시트가_사라진다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var map = MapFeature.State()
+        map.places = [saved]
+        // 실제로는 저장 목록을 받을 때 둘을 같이 채운다. 상세가 북마크 여부를 이 집합에서 읽는다
+        map.bookmarkedPlaceIDs = [saved.id]
+        var state = MapFlowFeature.State(map: map)
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.markerTapped("7"))) {
+            $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
+        await store.receive(\.map.delegate.placeDetailRequested) {
+            $0.detail = PlaceDetailFeature.State(savedPlace: saved)
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: saved.id,
+                coordinate: saved.place.coordinate
+            )
+            $0.postDetail = nil
+            $0.topDetail = .place
+        }
+    }
+
+    func test_게시글시트가_떠있을때_검색장소상세를_열면_게시글시트가_사라진다() async {
+        let place = Place.fixture(id: "s1", name: "검색 장소")
+        var map = MapFeature.State()
+        map.mode = .searchResult(query: "카페", places: [place])
+        var state = MapFlowFeature.State(map: map)
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.rowTapped("s1"))) {
+            $0.map.camera = .focusing(place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
+        await store.receive(\.map.delegate.placeDetailRequested) {
+            $0.detail = PlaceDetailFeature.State(place: place, query: "카페")
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: place.id,
+                coordinate: place.coordinate
+            )
+            $0.postDetail = nil
+            $0.topDetail = .place
+        }
+    }
+
+    func test_게시글핀으로_연_저장된_장소는_북마크가_켜진다() async {
+        let place = Place.fixture(id: "101", name: "가게 하나")
+        var map = MapFeature.State()
+        map.mode = .content(places: [place])
+        var state = MapFlowFeature.State(map: map)
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        state.postDetail?.savedPlaceIDs = ["101"]
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.map(.markerTapped("101"))) {
+            $0.map.camera = .focusing(place.coordinate, zoomLevel: map.camera.zoomLevel)
+        }
+        await store.receive(\.map.delegate.placeDetailRequested) {
+            var detail = PlaceDetailFeature.State(contentPlace: place)
+            detail.isBookmarked = true
+            $0.detail = detail
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: place.id,
+                coordinate: place.coordinate
+            )
+            $0.postDetail = nil
+            $0.topDetail = .place
+        }
+        XCTAssertEqual(store.state.detail?.isBookmarked, true)
+        XCTAssertNil(store.state.postDetail)
+    }
+
+    func test_게시글의_onAppear가_자식_리듀서를_통과한다() async {
+        let loaded = PostDetailContent(
+            id: "1",
+            title: "제목",
+            caption: "본문",
+            canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
+            places: [
+                PostDetailPlace(id: "101", name: "가게 하나", category: .cafe, isSaved: true,
+                                coordinate: Coordinate(latitude: 37.5, longitude: 127.0)),
+                PostDetailPlace(id: "102", name: "가게 둘", category: .food, isSaved: false,
+                                coordinate: Coordinate(latitude: 37.6, longitude: 127.1)),
+            ]
+        )
+        var state = MapFlowFeature.State()
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        } withDependencies: {
+            $0.postDetailContentClient.contentDetail = { _ in loaded }
+        }
+
+        await store.send(.postDetail(.presented(.onAppear))) {
+            $0.postDetail?.isLoading = true
+        }
+        await store.receive(\.postDetail.presented.detailResponse) {
+            $0.postDetail?.detail = loaded
+            $0.postDetail?.savedPlaceIDs = ["101"]
+            $0.postDetail?.isLoading = false
+        }
+        await store.receive(\.postDetail.presented.delegate.detailLoaded)
+    }
+}
+
+@MainActor
+final class MapFlowDetailStackTests: XCTestCase {
+    func test_장소에서_연_게시글의_장소행을_누르면_장소가_위고_게시글은_남는다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        let row = PostDetailPlace(
+            id: "201",
+            name: "행 장소",
+            category: .cafe,
+            isSaved: false,
+            coordinate: Coordinate(latitude: 37.5, longitude: 127.0)
+        )
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        state.postDetail?.detail = PostDetailContent(
+            id: "1",
+            title: "제목",
+            caption: nil,
+            canonicalURL: nil,
+            places: [row]
+        )
+        state.topDetail = .post
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+        let expectedPlace = Place(
+            id: row.id,
+            kakaoPlaceID: row.kakaoPlaceID,
+            name: row.name,
+            category: row.category,
+            address: row.address,
+            roadAddress: row.roadAddress,
+            coordinate: row.coordinate,
+            bookmarkCount: 0,
+            thumbnailURLs: row.imageURLs
+        )
+
+        await store.send(.postDetail(.presented(.delegate(.placeSelected("201"))))) {
+            $0.map.camera = .focusing(row.coordinate, zoomLevel: state.map.camera.zoomLevel)
+            $0.detail = PlaceDetailFeature.State(contentPlace: expectedPlace)
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: row.id,
+                coordinate: row.coordinate
+            )
+            $0.topDetail = .place
+        }
+        XCTAssertNotNil(store.state.postDetail)
+        XCTAssertEqual(store.state.detail?.id, "201")
+        XCTAssertEqual(store.state.topDetail, .place)
+    }
+
+    func test_장소A에서_게시글P에서_장소B를_열면_A는_없고_P는_남는다() async {
+        let savedA = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        let rowB = PostDetailPlace(
+            id: "202",
+            name: "장소 B",
+            category: .food,
+            isSaved: false,
+            coordinate: Coordinate(latitude: 37.6, longitude: 127.1)
+        )
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(savedPlace: savedA)
+        state.postDetail = PostDetailFeature.State(contentID: "P")
+        state.postDetail?.detail = PostDetailContent(
+            id: "P",
+            title: "게시글 P",
+            caption: nil,
+            canonicalURL: nil,
+            places: [rowB]
+        )
+        state.topDetail = .post
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+        let expectedPlace = Place(
+            id: rowB.id,
+            kakaoPlaceID: rowB.kakaoPlaceID,
+            name: rowB.name,
+            category: rowB.category,
+            address: rowB.address,
+            roadAddress: rowB.roadAddress,
+            coordinate: rowB.coordinate,
+            bookmarkCount: 0,
+            thumbnailURLs: rowB.imageURLs
+        )
+
+        await store.send(.postDetail(.presented(.delegate(.placeSelected("202"))))) {
+            $0.map.camera = .focusing(rowB.coordinate, zoomLevel: state.map.camera.zoomLevel)
+            $0.detail = PlaceDetailFeature.State(contentPlace: expectedPlace)
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: rowB.id,
+                coordinate: rowB.coordinate
+            )
+            $0.topDetail = .place
+        }
+        XCTAssertEqual(store.state.detail?.id, "202")
+        XCTAssertNotEqual(store.state.detail?.id, savedA.place.id)
+        XCTAssertEqual(store.state.postDetail?.contentID, "P")
+        XCTAssertEqual(store.state.topDetail, .place)
+    }
+}
+
+@MainActor
+final class MapFlowSelectedPinTests: XCTestCase {
+    private let savedPlaces: [SavedPlace] = [
+        .fixture(id: "1", latitude: 37.3128, longitude: 126.9040),
+        .fixture(id: "2", latitude: 37.3141, longitude: 126.9068),
+    ]
+
+    private func loadedStore() -> TestStoreOf<MapFlowFeature> {
+        var map = MapFeature.State()
+        map.places = savedPlaces
+        map.loadState = .loaded
+        return TestStore(initialState: MapFlowFeature.State(map: map)) {
+            MapFlowFeature()
+        }
+    }
+
+    func test_상세가_없으면_마커개수가_기존과_같다() async {
+        let store = loadedStore()
+        XCTAssertEqual(store.state.map.markers.count, store.state.map.filteredPlaces.count)
+        XCTAssertEqual(store.state.map.markers.map(\.kind), [.category(.cafe), .category(.cafe)])
+    }
+
+    func test_상세가_열리면_선택핀이_맨뒤에_붙는다() async {
+        let store = loadedStore()
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.map(.markerTapped("1")))
+        await store.receive(\.map.delegate.placeDetailRequested)
+
+        XCTAssertEqual(store.state.map.markers.count, 3)
+        XCTAssertEqual(store.state.map.markers.last?.kind, .selected)
+        XCTAssertEqual(
+            store.state.map.markers.last?.coordinate,
+            savedPlaces[0].place.coordinate
+        )
+    }
+
+    func test_상세가_열려도_기존_카테고리핀은_그대로다() async {
+        let store = loadedStore()
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        let before = store.state.map.markers
+
+        await store.send(.map(.markerTapped("1")))
+        await store.receive(\.map.delegate.placeDetailRequested)
+
+        XCTAssertEqual(Array(store.state.map.markers.dropLast()), before)
+    }
+
+    func test_상세를_닫으면_선택핀이_빠진다() async {
+        let store = loadedStore()
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.map(.markerTapped("1")))
+        await store.receive(\.map.delegate.placeDetailRequested)
+        XCTAssertEqual(store.state.map.markers.count, 3)
+
+        await store.send(.detail(.presented(.delegate(.closed))))
+        XCTAssertEqual(store.state.map.markers.count, 2)
+        XCTAssertFalse(store.state.map.markers.contains { $0.kind == .selected })
+    }
+}
+
+@MainActor
+final class MapFlowContentReturnTests: XCTestCase {
+    func test_홈저장장소상세는_닫으면_원래탭으로_되돌린다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        let store = TestStore(initialState: MapFlowFeature.State()) {
+            MapFlowFeature()
+        }
+        let zoom = store.state.map.camera.zoomLevel
+
+        await store.send(.presentPlaceDetail(saved)) {
+            $0.returnsAfterDetailClose = true
+            $0.detail = PlaceDetailFeature.State(savedPlace: saved)
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: saved.id,
+                coordinate: saved.place.coordinate
+            )
+            $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: zoom)
+            $0.topDetail = .place
+        }
+    }
+
+    func test_홈저장장소상세를_닫으면_시트는_남기고_닫힘을_올린다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.returnsAfterDetailClose = true
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: saved.id,
+            coordinate: saved.place.coordinate
+        )
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.closed))))
+        await store.receive(\.delegate.contentDetailClosed)
+        XCTAssertNotNil(store.state.detail)
+        XCTAssertTrue(store.state.returnsAfterDetailClose)
+    }
+
+    func test_핀모드_게시글상세를_닫으면_시트는_남기고_닫힘을_올린다() async {
+        var state = MapFlowFeature.State()
+        state.showsContentPins = true
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        state.topDetail = .post
+        state.map.mode = .content(places: [])
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.postDetail(.presented(.delegate(.closeRequested))))
+        await store.receive(\.delegate.contentDetailClosed)
+        XCTAssertNotNil(store.state.postDetail)
+        XCTAssertTrue(store.state.showsContentPins)
+    }
+
+    func test_이전탭복귀_마무리는_상세시트와_핀모드를_걷는다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.showsContentPins = true
+        state.returnsAfterDetailClose = true
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: saved.id,
+            coordinate: saved.place.coordinate
+        )
+        state.map.mode = .content(places: [])
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.finishReturnToPreviousTab) {
+            $0.postDetail = nil
+            $0.showsContentPins = false
+            $0.returnsAfterDetailClose = false
+            $0.detail = nil
+            $0.map.selectedPlace = nil
+        }
+        await store.receive(\.map.searchClearTapped) {
+            $0.map.mode = .saved
+        }
+    }
+
+    func test_홈저장장소를_열면_게시글시트가_사라진다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+        let zoom = store.state.map.camera.zoomLevel
+
+        await store.send(.presentPlaceDetail(saved)) {
+            $0.returnsAfterDetailClose = true
+            $0.detail = PlaceDetailFeature.State(savedPlace: saved)
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: saved.id,
+                coordinate: saved.place.coordinate
+            )
+            $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: zoom)
+            $0.postDetail = nil
+            $0.topDetail = .place
+        }
+        XCTAssertNil(store.state.postDetail)
+    }
+
+    func test_홈게시글을_열면_장소상세가_사라진다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: saved.id,
+            coordinate: saved.place.coordinate
+        )
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        } withDependencies: {
+            $0.postDetailContentClient.contentDetail = { _ in .fixture(id: "1") }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.presentContentDetail("1"))
+        await store.skipReceivedActions()
+
+        XCTAssertNil(store.state.detail)
+        XCTAssertNil(store.state.map.selectedPlace)
+        XCTAssertEqual(store.state.postDetail?.contentID, "1")
+        XCTAssertEqual(store.state.topDetail, .post)
+        XCTAssertTrue(store.state.showsContentPins)
+    }
+
+    func test_핀모드에서_장소행을_닫으면_게시글이_남고_탭은_안_돌아간다() async {
+        let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
+        var state = MapFlowFeature.State()
+        state.showsContentPins = true
+        state.detail = PlaceDetailFeature.State(savedPlace: saved)
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        state.topDetail = .place
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: saved.id,
+            coordinate: saved.place.coordinate
+        )
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.detail(.presented(.delegate(.closed)))) {
+            $0.detail = nil
+            $0.map.selectedPlace = nil
+            $0.topDetail = .post
+        }
+        XCTAssertNotNil(store.state.postDetail)
+        XCTAssertTrue(store.state.showsContentPins)
+    }
+
+    func test_핀모드에서_마지막게시글을_닫으면_닫힘을_올린다() async {
+        var state = MapFlowFeature.State()
+        state.showsContentPins = true
+        state.postDetail = PostDetailFeature.State(contentID: "1")
+        state.topDetail = .post
+        state.map.mode = .content(places: [])
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        }
+
+        await store.send(.postDetail(.presented(.delegate(.closeRequested))))
+        await store.receive(\.delegate.contentDetailClosed)
+        XCTAssertNotNil(store.state.postDetail)
+        XCTAssertTrue(store.state.showsContentPins)
+        XCTAssertEqual(store.state.topDetail, .post)
+    }
+}

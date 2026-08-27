@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "bannerCalendar.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
