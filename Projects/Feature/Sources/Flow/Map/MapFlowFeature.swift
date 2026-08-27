@@ -624,7 +624,7 @@ private extension MapFlowFeature {
             }
         case .content:
             if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
-                presentOutsideContentPlace(state: &state, place: place)
+                presentContentPlaceDetail(state: &state, place: place)
             }
         }
     }
@@ -654,21 +654,6 @@ private extension MapFlowFeature {
             ?? state.map.bookmarkedPlaceIDs.contains(place.id)
         state.detail = detail
         state.topDetail = .place
-        state.map.selectedPlace = MapFeature.State.SelectedPlace(
-            id: place.id,
-            coordinate: place.coordinate
-        )
-    }
-
-    /// 핀 모드 지도 핀은 밖이라 게시글 시트를 지운다. 북마크는 지우기 전 목록에서 읽는다
-    func presentOutsideContentPlace(state: inout State, place: Place) {
-        let isBookmarked = state.postDetail?.savedPlaceIDs.contains(place.id)
-            ?? state.map.bookmarkedPlaceIDs.contains(place.id)
-        state.postDetail = nil
-        state.topDetail = .place
-        var detail = PlaceDetailFeature.State(contentPlace: place)
-        detail.isBookmarked = isBookmarked
-        state.detail = detail
         state.map.selectedPlace = MapFeature.State.SelectedPlace(
             id: place.id,
             coordinate: place.coordinate
