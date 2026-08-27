@@ -112,6 +112,8 @@ public struct MapFeature {
         case dismissToast
         case searchResultsApplied(query: String, places: [Place])
         case contentPlacesApplied(places: [Place])
+        /// 상세를 닫고 이전 지도 상태로 되돌린다. 선택 핀이 있으면 그 장소를 가운데 잡는다
+        case modeRestored(State.Mode)
         case searchClearTapped
         case searchBackTapped
         case bookmarkTapped(String)
@@ -173,7 +175,7 @@ public struct MapFeature {
             return updateFilter(state: &state, action: action)
         case .editTapped, .deleteTapped, .markerTapped, .rowTapped, .searchBarTapped, .courseButtonTapped:
             return raise(state: &state, action: action)
-        case .searchResultsApplied, .contentPlacesApplied, .searchClearTapped, .searchBackTapped,
+        case .searchResultsApplied, .contentPlacesApplied, .modeRestored, .searchClearTapped, .searchBackTapped,
              .bookmarkTapped, .bookmarkSaved, .bookmarkRemoved, .bookmarkFailed:
             return updateSearch(state: &state, action: action)
         case .aliasSaved:
@@ -459,6 +461,14 @@ private extension MapFeature {
             // 카메라는 맨 첫 장소를 가운데로 고정한다
             if let first = places.first {
                 state.camera = .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+            }
+            return .none
+        case let .modeRestored(mode):
+            state.mode = mode
+            state.menuTargetPlaceID = nil
+            // 되돌린 뒤 보여줄 곳은 지금 열린 상세의 장소다. 저장 목록 첫 행 규칙과 같은 배율을 쓴다
+            if let selected = state.selectedPlace {
+                state.camera = .focusing(selected.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
             }
             return .none
         case .searchClearTapped:

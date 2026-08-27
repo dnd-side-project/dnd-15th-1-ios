@@ -28,10 +28,10 @@ public struct MapFlowFeature {
         public var path: [Route]
         public var placeSearch: PlaceSearchFeature.State?
 
-        /// 게시글 상세를 다른 탭에서 열어 지도 핀 모드로 들어온 경우. 닫을 때 원래 탭으로 되돌린다
-        public var showsContentPins: Bool = false
+        /// 장소 상세에서 게시글을 열기 직전의 지도 모드. 그 게시글을 닫으면 이 모드로 되돌린다
+        public var modeBeforeContentDetail: MapFeature.State.Mode?
 
-        /// 탐색 검색에서 장소 상세를 열어 들어온 경우. 상세를 닫으면 원래 탭으로 되돌린다
+        /// 상세를 다른 탭에서 열어 들어온 경우. 상세를 닫으면 원래 탭으로 되돌린다
         public var returnsAfterDetailClose: Bool = false
 
         /// 핀·행·검색에서 뜬 장소 상세. 시트 표시는 `MapFlowView` 가 한다
@@ -201,7 +201,9 @@ private extension MapFlowFeature {
         switch action {
         case let .presentContentDetail(id):
             // 상세는 시트가 스스로 불러온다. 로드되면 그 places 로 핀을 세운다
-            state.showsContentPins = true
+            state.returnsAfterDetailClose = true
+            // 이 길은 탭 복귀가 지도를 씻는다. 앞서 담아둔 모드를 들고 가면 엉뚱한 핀으로 되돌아간다
+            state.modeBeforeContentDetail = nil
             state.detail = nil
             state.map.selectedPlace = nil
             state.topDetail = .post
@@ -212,6 +214,7 @@ private extension MapFlowFeature {
         case let .presentPlaceDetail(savedPlace):
             // 홈에서 연 저장 장소. 닫으면 원래 탭으로 되돌린다
             state.returnsAfterDetailClose = true
+            state.modeBeforeContentDetail = nil
             state.postDetail = nil
             state.topDetail = .place
             state.detail = PlaceDetailFeature.State(savedPlace: savedPlace)
@@ -495,8 +498,7 @@ private extension MapFlowFeature {
             return handleDetail(state: &state, action: action)
 
         case let .postDetail(.presented(.delegate(.detailLoaded(detail)))):
-            // 다른 탭에서 열어 핀 모드로 들어온 경우에만 상세의 places 로 핀·카메라를 세운다
-            guard state.showsContentPins else { return .none }
+            // 어느 길로 열었든 상세의 places 로 핀·카메라를 세운다
             return .send(.map(.contentPlacesApplied(places: detail.places.map(place))))
 
         case .postDetail(.presented(.delegate(.closeRequested))), .postDetail(.dismiss):
@@ -524,6 +526,8 @@ private extension MapFlowFeature {
         switch action {
         case let .detail(.presented(.delegate(.contentSelected(id)))):
             // 장소 상세를 닫지 않는다. 게시글을 닫으면 그 자리로 돌아가야 한다
+            state.modeBeforeContentDetail = state.map.mode
+            // 핀은 로드된 뒤에 바뀐다. 여기서 미리 바꾸면 로딩 동안 핀이 사라진다
             state.postDetail = PostDetailFeature.State(contentID: id)
             state.topDetail = .post
             // 화면 등장에 안 기댄다. 내려가던 시트를 도로 올리면 등장이 안 온다
@@ -556,24 +560,44 @@ private extension MapFlowFeature {
 
     func closePlaceDetail(state: inout State) -> Effect<Action> {
         let other = state.postDetail
-        if other == nil, state.showsContentPins || state.returnsAfterDetailClose {
+        if other == nil, state.returnsAfterDetailClose {
             // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
             return .send(.delegate(.contentDetailClosed))
         }
         dismissDetail(state: &state)
         state.topDetail = other != nil ? .post : nil
-        return .none
+        guard other == nil else { return .none }
+        return restoreModeAfterContentDetail(state: &state)
     }
 
     func closePostDetail(state: inout State) -> Effect<Action> {
         let other = state.detail
-        if other == nil, state.showsContentPins || state.returnsAfterDetailClose {
+        if other == nil, state.returnsAfterDetailClose {
             // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
             return .send(.delegate(.contentDetailClosed))
         }
         state.postDetail = nil
         state.topDetail = other != nil ? .place : nil
-        return .none
+        if other != nil {
+            let mode = state.modeBeforeContentDetail
+            state.modeBeforeContentDetail = nil
+            // 게시글이 로드되기 전에 닫히면 지도는 바뀐 적이 없다. 그때 되돌리면 배율만 튄다
+            guard state.map.isContentMode, let mode else { return .none }
+            return .send(.map(.modeRestored(mode)))
+        }
+        return restoreModeAfterContentDetail(state: &state)
+    }
+
+    /// 담아둔 모드가 있으면 그것으로, 없으면 저장 목록으로 되돌린다
+    func restoreModeAfterContentDetail(state: inout State) -> Effect<Action> {
+        let mode = state.modeBeforeContentDetail
+        state.modeBeforeContentDetail = nil
+        guard state.map.isContentMode else { return .none }
+        // 시트가 한 장도 안 남았다. 게시글 핀으로 되돌리면 저장 목록으로 갈 조작이 화면에 없다
+        if case .content = mode {
+            return .send(.map(.modeRestored(.saved)))
+        }
+        return .send(.map(.modeRestored(mode ?? .saved)))
     }
 
     /// 게시글 상세 목록·지도 핀의 저장 상태를 한곳에서 맞춘다
@@ -600,7 +624,7 @@ private extension MapFlowFeature {
             }
         case .content:
             if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
-                presentOutsideContentPlace(state: &state, place: place)
+                presentContentPlaceDetail(state: &state, place: place)
             }
         }
     }
@@ -636,21 +660,6 @@ private extension MapFlowFeature {
         )
     }
 
-    /// 핀 모드 지도 핀은 밖이라 게시글 시트를 지운다. 북마크는 지우기 전 목록에서 읽는다
-    func presentOutsideContentPlace(state: inout State, place: Place) {
-        let isBookmarked = state.postDetail?.savedPlaceIDs.contains(place.id)
-            ?? state.map.bookmarkedPlaceIDs.contains(place.id)
-        state.postDetail = nil
-        state.topDetail = .place
-        var detail = PlaceDetailFeature.State(contentPlace: place)
-        detail.isBookmarked = isBookmarked
-        state.detail = detail
-        state.map.selectedPlace = MapFeature.State.SelectedPlace(
-            id: place.id,
-            coordinate: place.coordinate
-        )
-    }
-
     func presentDetail(state: inout State, savedPlace: SavedPlace) {
         var detail = PlaceDetailFeature.State(savedPlace: savedPlace)
         // 검색 모드에서 끈 북마크가 저장 목록에서 다시 켜져 보이면 안 된다. 두 길이 같은 집합을 본다
@@ -661,6 +670,7 @@ private extension MapFlowFeature {
             coordinate: savedPlace.place.coordinate
         )
         // 게시글 상세가 떠 있으면 지운다. 두 상세가 동시에 살아 있으면 안 된다
+        state.modeBeforeContentDetail = nil
         state.postDetail = nil
         state.topDetail = .place
     }
@@ -675,6 +685,7 @@ private extension MapFlowFeature {
             coordinate: place.coordinate
         )
         // 게시글 상세가 떠 있으면 지운다. 두 상세가 동시에 살아 있으면 안 된다
+        state.modeBeforeContentDetail = nil
         state.postDetail = nil
         state.topDetail = .place
     }
@@ -687,7 +698,7 @@ private extension MapFlowFeature {
 
     func finishReturnToPreviousTab(state: inout State) -> Effect<Action> {
         // 탭이 바뀐 뒤에 시트를 내린다. 같이 내리면 지도가 먼저 보인다
-        state.showsContentPins = false
+        state.modeBeforeContentDetail = nil
         state.returnsAfterDetailClose = false
         state.postDetail = nil
         dismissDetail(state: &state)
