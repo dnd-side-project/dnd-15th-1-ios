@@ -599,9 +599,8 @@ private extension MapFlowFeature {
                 presentDetail(state: &state, place: place, query: state.map.searchQuery ?? "")
             }
         case .content:
-            if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
-                presentOutsideContentPlace(state: &state, place: place)
-            }
+            // 지도 핀 탭도 리스트 탭과 똑같이 게시글을 남겨 둔다. 장소를 닫으면 게시글로 돌아간다
+            focusContentPlaceDetail(state: &state, id: id)
         }
     }
 
@@ -630,21 +629,6 @@ private extension MapFlowFeature {
             ?? state.map.bookmarkedPlaceIDs.contains(place.id)
         state.detail = detail
         state.topDetail = .place
-        state.map.selectedPlace = MapFeature.State.SelectedPlace(
-            id: place.id,
-            coordinate: place.coordinate
-        )
-    }
-
-    /// 핀 모드 지도 핀은 밖이라 게시글 시트를 지운다. 북마크는 지우기 전 목록에서 읽는다
-    func presentOutsideContentPlace(state: inout State, place: Place) {
-        let isBookmarked = state.postDetail?.savedPlaceIDs.contains(place.id)
-            ?? state.map.bookmarkedPlaceIDs.contains(place.id)
-        state.postDetail = nil
-        state.topDetail = .place
-        var detail = PlaceDetailFeature.State(contentPlace: place)
-        detail.isBookmarked = isBookmarked
-        state.detail = detail
         state.map.selectedPlace = MapFeature.State.SelectedPlace(
             id: place.id,
             coordinate: place.coordinate
