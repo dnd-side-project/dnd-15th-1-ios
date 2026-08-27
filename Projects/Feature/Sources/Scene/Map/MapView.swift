@@ -318,7 +318,7 @@ private extension MapView {
 
     /// 검색 결과 행. 사진을 안 넘기고 우측에 북마크를 둔다
     var searchResultList: some View {
-        VStack(spacing: 0) {
+        LazyVStack(spacing: 0) {
             ForEach(store.searchResults) { place in
                 PlaceListRow(
                     icon: place.category.icon,
@@ -389,7 +389,7 @@ private extension MapView {
     }
 
     var placeList: some View {
-        VStack(spacing: 0) {
+        LazyVStack(spacing: 0) {
             ForEach(store.filteredPlaces) { saved in
                 row(saved, showsDivider: saved.id != store.filteredPlaces.last?.id)
                     // 팝오버는 행 밖으로 나간다. 열린 행을 올려야 아래 행에 덮이지 않는다
