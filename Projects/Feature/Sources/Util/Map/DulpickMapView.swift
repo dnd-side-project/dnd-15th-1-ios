@@ -267,7 +267,13 @@ extension DulpickMapView {
 
         private func drawUserLocation(_ map: KakaoMap) {
             let manager = map.getLabelManager()
-            guard let layer = manager.getLabelLayer(layerID: Layout.userLocationLayerID) else { return }
+            guard let layer = manager.getLabelLayer(layerID: Layout.userLocationLayerID) else {
+                Logger.shared.error(
+                    "사용자 위치 레이어 조회 실패. layer=\(Layout.userLocationLayerID)",
+                    category: .feature
+                )
+                return
+            }
 
             layer.clearAllItems()
 
@@ -421,7 +427,13 @@ private extension DulpickMapView.Coordinator {
     /// 카메라가 움직이는 동안 핀이 사라진다
     func drawMarkers(_ map: KakaoMap) {
         let manager = map.getLabelManager()
-        guard let layer = manager.getLabelLayer(layerID: DulpickMapView.Layout.markerLayerID) else { return }
+        guard let layer = manager.getLabelLayer(layerID: DulpickMapView.Layout.markerLayerID) else {
+            Logger.shared.error(
+                "마커 레이어 조회 실패. layer=\(DulpickMapView.Layout.markerLayerID)",
+                category: .feature
+            )
+            return
+        }
 
         if appliedMarkers == nil {
             layer.clearAllItems()
