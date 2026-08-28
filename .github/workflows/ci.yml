@@ -38,16 +38,7 @@ jobs:
       - name: SwiftLint
         run: mise exec -- swiftlint lint --strict
 
-      - name: Build
-        run: |
-          xcodebuild \
-            -workspace Dulpick.xcworkspace \
-            -scheme Dulpick-Debug \
-            -destination 'generic/platform=iOS Simulator' \
-            -skipMacroValidation \
-            build
-
-      - name: Test Feature Reducers
+      - name: Select simulator
         run: |
           DESTINATION="$(
             python3 -c '
@@ -68,9 +59,24 @@ jobs:
           '
           )"
           echo "Using destination: $DESTINATION"
+          echo "DESTINATION=$DESTINATION" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -workspace Dulpick.xcworkspace \
+            -scheme Dulpick-Debug \
+            -destination "$DESTINATION" \
+            -derivedDataPath .derivedData \
+            -skipMacroValidation \
+            build
+
+      - name: Test Feature Reducers
+        run: |
           xcodebuild \
             -workspace Dulpick.xcworkspace \
             -scheme Feature \
             -destination "$DESTINATION" \
+            -derivedDataPath .derivedData \
             -skipMacroValidation \
             test
