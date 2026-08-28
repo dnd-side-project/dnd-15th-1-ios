@@ -25,6 +25,14 @@ jobs:
           install: true
           cache: true
 
+      - name: Cache Tuist
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/tuist
+          key: tuist-${{ runner.os }}-${{ hashFiles('.mise.toml', 'Tuist.swift', 'Workspace.swift', 'Tuist/Package.swift', 'Projects/**/Project.swift', 'Tuist/ProjectDescriptionHelpers/**') }}
+          restore-keys: |
+            tuist-${{ runner.os }}-
+
       - name: Prepare local config
         run: |
           cp Config/Example.xcconfig Config/Debug.xcconfig
@@ -60,6 +68,14 @@ jobs:
           )"
           echo "Using destination: $DESTINATION"
           echo "DESTINATION=$DESTINATION" >> "$GITHUB_ENV"
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .derivedData/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
 
       - name: Build
         run: |
