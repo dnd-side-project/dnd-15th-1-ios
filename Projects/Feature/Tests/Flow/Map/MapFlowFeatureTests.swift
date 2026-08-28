@@ -143,19 +143,6 @@ final class MapFlowFeatureTests: XCTestCase {
         XCTAssertEqual(store.state.path, [])
     }
 
-    func test_삭제는_화면_이동이_아니라_경로를_안_바꾼다() async {
-        let store = TestStore(
-            initialState: MapFlowFeature.State(map: MapFeature.State())
-        ) {
-            MapFlowFeature()
-        }
-
-        // PlaceClient 에 계약이 생기면 데이터 갱신으로 받는다. path 를 쓰지 않는다
-        await store.send(.map(.delegate(.deleteRequested("7"))))
-
-        XCTAssertEqual(store.state.path, [])
-    }
-
     func test_세션_만료는_경로를_안_쌓고_위로_올린다() async {
         let store = TestStore(initialState: MapFlowFeature.State()) {
             MapFlowFeature()

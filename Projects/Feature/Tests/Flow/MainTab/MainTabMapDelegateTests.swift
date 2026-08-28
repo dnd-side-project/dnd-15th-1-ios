@@ -23,7 +23,6 @@ final class MainTabMapDelegateTests: XCTestCase {
             $0.map.path = [.search, .course]
         }
         await store.send(.map(.map(.delegate(.aliasRequested("7")))))
-        await store.send(.map(.map(.delegate(.deleteRequested("7")))))
 
         XCTAssertEqual(store.state.selectedTab, .home)
     }

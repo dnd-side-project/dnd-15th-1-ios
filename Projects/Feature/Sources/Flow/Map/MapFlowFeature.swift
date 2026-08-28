@@ -305,9 +305,6 @@ private extension MapFlowFeature {
                 state.isAliasPresented = true
             }
             return .none
-        case .deleteRequested:
-            // PlaceClient 에 삭제 계약이 없다. 계약이 생겨도 데이터 갱신이라 path 를 안 쓴다
-            return .none
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
         }
