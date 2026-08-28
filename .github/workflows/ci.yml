@@ -5,6 +5,9 @@ on:
     branches: [main, dev]
   pull_request:
 
+permissions:
+  contents: read
+
 # Cancel overlapping PR runs; keep push runs on main/dev.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
