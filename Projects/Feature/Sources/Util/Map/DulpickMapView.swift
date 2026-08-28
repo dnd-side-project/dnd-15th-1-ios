@@ -216,28 +216,64 @@ extension DulpickMapView {
             _ = routeManager.addRouteLayer(layerID: Layout.routeLayerID, zOrder: 1_000)
         }
 
+        /// 같은 routeID 는 clear 뒤에도 SDK 가 다시 받지 않는다.
+        /// 그래서 안 쓸 경로는 지우지 않고 숨기고, 쓸 경로만 갱신하거나 새로 넣는다
         private func drawRoutes(_ map: KakaoMap) {
             let manager = map.getRouteManager()
-            guard let layer = manager.getRouteLayer(layerID: Layout.routeLayerID) else { return }
-
-            layer.clearAllRoutes()
-
-            for route in desiredRoutes where route.coordinates.count > 1 {
-                let options = RouteOptions(
-                    routeID: route.id,
-                    styleID: Layout.routeStyleID,
-                    zOrder: 0
+            guard let layer = manager.getRouteLayer(layerID: Layout.routeLayerID) else {
+                Logger.shared.error(
+                    "경로 레이어 조회 실패. layer=\(Layout.routeLayerID)",
+                    category: .feature
                 )
-                options.segments = [
+                return
+            }
+
+            let routesToDraw = desiredRoutes.filter { $0.coordinates.count > 1 }
+            let desiredIDs = Set(routesToDraw.map(\.id))
+
+            // 지우면 같은 id 를 다시 못 쓴다
+            let obsoleteIDs = (layer.getAllRoutes() ?? [])
+                .map(\.routeID)
+                .filter { !desiredIDs.contains($0) }
+            if obsoleteIDs.isEmpty == false {
+                layer.hideRoutes(routeIDs: obsoleteIDs)
+            }
+
+            for route in routesToDraw {
+                let segments = [
                     RouteSegment(points: route.coordinates.map(\.mapPoint), styleIndex: 0),
                 ]
-                layer.addRoute(option: options)?.show()
+                if let existing = layer.getRoute(routeID: route.id) {
+                    existing.changeStyleAndData(styleID: Layout.routeStyleID, segments: segments)
+                    existing.show()
+                } else {
+                    let options = RouteOptions(
+                        routeID: route.id,
+                        styleID: Layout.routeStyleID,
+                        zOrder: 0
+                    )
+                    options.segments = segments
+                    if let addedRoute = layer.addRoute(option: options) {
+                        addedRoute.show()
+                    } else {
+                        Logger.shared.error(
+                            "경로 추가 실패. route=\(route.id)",
+                            category: .feature
+                        )
+                    }
+                }
             }
         }
 
         private func drawUserLocation(_ map: KakaoMap) {
             let manager = map.getLabelManager()
-            guard let layer = manager.getLabelLayer(layerID: Layout.userLocationLayerID) else { return }
+            guard let layer = manager.getLabelLayer(layerID: Layout.userLocationLayerID) else {
+                Logger.shared.error(
+                    "사용자 위치 레이어 조회 실패. layer=\(Layout.userLocationLayerID)",
+                    category: .feature
+                )
+                return
+            }
 
             layer.clearAllItems()
 
@@ -391,7 +427,13 @@ private extension DulpickMapView.Coordinator {
     /// 카메라가 움직이는 동안 핀이 사라진다
     func drawMarkers(_ map: KakaoMap) {
         let manager = map.getLabelManager()
-        guard let layer = manager.getLabelLayer(layerID: DulpickMapView.Layout.markerLayerID) else { return }
+        guard let layer = manager.getLabelLayer(layerID: DulpickMapView.Layout.markerLayerID) else {
+            Logger.shared.error(
+                "마커 레이어 조회 실패. layer=\(DulpickMapView.Layout.markerLayerID)",
+                category: .feature
+            )
+            return
+        }
 
         if appliedMarkers == nil {
             layer.clearAllItems()
