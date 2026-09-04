@@ -96,6 +96,7 @@ private extension TermsType {
         switch self {
         case .service: "서비스 이용약관(필수)"
         case .privacy: "개인정보수집 및 이용(필수)"
+        case .marketing: "마케팅 수신 동의(선택)"
         }
     }
 }
