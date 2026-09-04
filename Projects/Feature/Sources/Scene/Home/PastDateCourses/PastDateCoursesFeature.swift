@@ -21,6 +21,8 @@ public struct PastDateCoursesFeature {
         public var hasNext: Bool
         public var hasLoaded: Bool
         public var isLoadingMore: Bool
+        // 현재(이번주) 데이트 일정이 이미 있는지. 있으면 빈 상태에서 만들기 버튼을 숨긴다
+        public var hasCurrentCourse: Bool
 
         public init(
             courses: [DateSchedule] = [],
@@ -28,7 +30,8 @@ public struct PastDateCoursesFeature {
             page: Int = 0,
             hasNext: Bool = true,
             hasLoaded: Bool = false,
-            isLoadingMore: Bool = false
+            isLoadingMore: Bool = false,
+            hasCurrentCourse: Bool = false
         ) {
             self.courses = courses
             self.totalCount = totalCount
@@ -36,6 +39,7 @@ public struct PastDateCoursesFeature {
             self.hasNext = hasNext
             self.hasLoaded = hasLoaded
             self.isLoadingMore = isLoadingMore
+            self.hasCurrentCourse = hasCurrentCourse
         }
     }
 

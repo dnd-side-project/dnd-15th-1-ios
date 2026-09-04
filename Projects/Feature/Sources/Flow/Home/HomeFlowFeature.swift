@@ -189,7 +189,9 @@ private extension HomeFlowFeature {
             return applyPath([.connect], state: &state)
 
         case .pastDateCoursesRequested:
-            state.pastDateCourses = PastDateCoursesFeature.State()
+            state.pastDateCourses = PastDateCoursesFeature.State(
+                hasCurrentCourse: state.home.upcomingSchedule != nil
+            )
             return applyPath(state.path + [.pastDateCourses], state: &state)
 
         case .courseFlowRequested:

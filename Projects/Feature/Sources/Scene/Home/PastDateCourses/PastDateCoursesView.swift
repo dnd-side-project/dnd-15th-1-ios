@@ -116,11 +116,14 @@ public struct PastDateCoursesView: View {
                 }
             }
 
-            AppButton("일정 만들러가기", style: .outlined, size: .lg) {
-                store.send(.createCourseTapped)
+            if !store.hasCurrentCourse {
+                AppButton("일정 만들러가기", style: .outlined, size: .lg) {
+                    store.send(.createCourseTapped)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
     }
 
     private var backToolbar: some ToolbarContent {
