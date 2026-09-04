@@ -1,6 +1,7 @@
 import CoreLocation
 import Domain
 import Foundation
+import SharedUtils
 
 /// `CLLocationManager` 를 한 번짜리 `async` 호출로 감싼다.
 ///

@@ -1,5 +1,6 @@
 import Domain
 import SharedDesignSystem
+import SharedUtils
 import SwiftUI
 
 /// 게시글에 딸린 장소 한 행. 시안 `353×56`, 배경 `#F5F5F5`, 반지름 12

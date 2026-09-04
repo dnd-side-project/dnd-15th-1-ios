@@ -1,5 +1,6 @@
 import Domain
 import Foundation
+import SharedUtils
 
 public struct MapMarker: Equatable, Identifiable, Sendable {
     public let id: String

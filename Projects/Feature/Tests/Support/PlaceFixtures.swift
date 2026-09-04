@@ -1,5 +1,6 @@
 import Domain
 import Foundation
+import SharedUtils
 
 extension Place {
     static func fixture(
