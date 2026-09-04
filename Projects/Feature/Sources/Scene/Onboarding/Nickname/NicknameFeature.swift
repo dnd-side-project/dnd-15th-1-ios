@@ -8,8 +8,8 @@ public struct NicknameFeature {
     /// 시안에 프로필 아이콘 선택이 없어 서버 계약상 필요한 값만 고정으로 보낸다
     static let iconID = 1
 
-    /// 시트가 그리는 필수 동의 항목과 그 표시 순서
-    static let requiredTerms: [TermsType] = [.service, .privacy]
+    /// 시트가 그리는 동의 항목과 그 표시 순서. 필수 둘과 선택 하나다
+    static let sheetTerms: [TermsType] = [.service, .privacy, .marketing]
 
     /// 통과 기준
     static let maxNicknameLength = 6
@@ -30,6 +30,8 @@ public struct NicknameFeature {
         public var toast: ToastState?
         public var isTermsSheetPresented: Bool
         public var presentedTerms: TermsType?
+        /// 사용자가 켜 둔 약관. 기본은 빈 집합이다
+        public var agreedTerms: Set<TermsType>
 
         public init(
             nickname: String = "",
@@ -37,7 +39,8 @@ public struct NicknameFeature {
             inlineError: String? = nil,
             toast: ToastState? = nil,
             isTermsSheetPresented: Bool = true,
-            presentedTerms: TermsType? = nil
+            presentedTerms: TermsType? = nil,
+            agreedTerms: Set<TermsType> = []
         ) {
             self.nickname = NicknameFeature.sanitizedNickname(nickname)
             self.isSubmitting = isSubmitting
@@ -45,6 +48,7 @@ public struct NicknameFeature {
             self.toast = toast
             self.isTermsSheetPresented = isTermsSheetPresented
             self.presentedTerms = presentedTerms
+            self.agreedTerms = agreedTerms
         }
 
         public var isNextEnabled: Bool {
@@ -54,6 +58,18 @@ public struct NicknameFeature {
         public var lengthError: String? {
             nickname.count > NicknameFeature.maxNicknameLength ? "최대 6글자 내로 입력해주세요" : nil
         }
+
+        /// 필수 약관 둘이 모두 켜져 있는지
+        public var isRequiredTermsAgreed: Bool {
+            NicknameFeature.sheetTerms
+                .filter(\.isRequired)
+                .allSatisfy { agreedTerms.contains($0) }
+        }
+
+        /// 필수가 다 켜지면 켜진 그대로 닫는 버튼이 되고, 아니면 셋을 한 번에 켜는 버튼이 된다
+        public var termsAgreeButtonTitle: String {
+            isRequiredTermsAgreed ? "완료" : "모두 동의하기"
+        }
     }
 
     public enum Action: Equatable, BindableAction {
@@ -62,6 +78,7 @@ public struct NicknameFeature {
         case updateNicknameResponse(Result<UserProfile, ProfileError>)
         case termsDetailTapped(TermsType)
         case dismissTermsDetail
+        case termsCheckTapped(TermsType)
         case termsAgreeButtonTapped
         case backButtonTapped
         case dismissToast
@@ -105,9 +122,10 @@ private extension NicknameFeature {
         case .dismissTermsDetail:
             state.presentedTerms = nil
             return .none
+        case let .termsCheckTapped(terms):
+            return termsCheckTapped(terms, state: &state)
         case .termsAgreeButtonTapped:
-            state.isTermsSheetPresented = false
-            return .none
+            return termsAgreeButtonTapped(state: &state)
         case .backButtonTapped:
             return backButtonTapped(state: &state)
         case .dismissToast:
@@ -116,6 +134,26 @@ private extension NicknameFeature {
         case .delegate:
             return .none
         }
+    }
+
+    func termsCheckTapped(
+        _ terms: TermsType,
+        state: inout State
+    ) -> Effect<Action> {
+        if state.agreedTerms.contains(terms) {
+            state.agreedTerms.remove(terms)
+        } else {
+            state.agreedTerms.insert(terms)
+        }
+        return .none
+    }
+
+    func termsAgreeButtonTapped(state: inout State) -> Effect<Action> {
+        if !state.isRequiredTermsAgreed {
+            state.agreedTerms = Set(Self.sheetTerms)
+        }
+        state.isTermsSheetPresented = false
+        return .none
     }
 
     /// 제출이 도는 중에는 물러나지 않는다. 응답이 화면 없는 곳으로 떨어진다
