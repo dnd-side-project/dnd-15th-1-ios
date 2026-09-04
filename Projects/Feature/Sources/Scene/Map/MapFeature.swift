@@ -1,6 +1,8 @@
+import CoreKakaoMap
 import Domain
 import Foundation
 import SharedDesignSystem
+import SharedUtils
 import ThirdParty
 
 @Reducer
@@ -427,7 +429,7 @@ private extension MapFeature {
             }
 
         case let .currentLocationResponse(.success(coordinate)):
-            // 오프셋은 안 건다. 화면 어디에 놓을지는 `DulpickMapView` 가 정한다
+            // 오프셋은 안 건다. 화면 어디에 놓을지는 `KakaoMapView` 가 정한다
             state.camera = .focusing(coordinate, zoomLevel: MapCamera.singlePlaceZoom)
             return .none
 

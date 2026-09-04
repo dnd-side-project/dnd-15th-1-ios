@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import CoreImageCache
+import CoreKakaoMap
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -79,13 +80,13 @@ private extension CoursePlacePickView {
     }
 
     var map: some View {
-        DulpickMapView(
+        KakaoMapView(
             camera: Binding(
                 get: { store.camera },
                 set: { store.send(.cameraChanged($0)) }
             ),
-            markers: store.markers,
-            onMarkerTap: { store.send(.markerTapped($0)) },
+            pins: store.markers.map(MapMarkerStyle.pin(for:)),
+            onPinTap: { store.send(.markerTapped($0)) },
             collapsedSheetTop: collapsedSheetTop
         )
         .ignoresSafeArea()
