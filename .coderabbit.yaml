@@ -40,7 +40,8 @@ reviews:
 
     - path: "Projects/Feature/**"
       instructions: |
-        Critical: Data / Core* / ThirdPartyCore import 금지.
+        Critical: Data / CoreNetwork / CoreStorage / CoreSocialAuth / CoreNotification / ThirdPartyCore / ThirdPartyUI import 금지.
+        CoreUI 계층(CoreImageCache, CoreKakaoMap)은 화면이 창구 없이 직접 import 한다. 금지 대상이 아니다.
         Critical: Scene 간 직접 참조/상태 수정 금지. 외부 요청은 delegate 로 상위 전달.
         Critical: phase / selectedTab / deep link 라우팅을 Scene 에서 직접 처리 금지.
         화면 상태는 TCA Feature reducer, View 는 렌더링 + store.send 중심.
