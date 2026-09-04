@@ -10,6 +10,7 @@ let project = ProjectFactory.app(
         .coreNetwork,
         .coreSocialAuth,
         .coreStorage,
+        .coreImageCache,
         .sharedLogger,
         .sharedUtils,
         .sharedDesignSystem,
