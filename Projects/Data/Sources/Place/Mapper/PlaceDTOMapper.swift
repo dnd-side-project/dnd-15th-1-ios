@@ -7,6 +7,7 @@
 
 import Domain
 import Foundation
+import SharedUtils
 
 enum PlaceDTOMapper {
     static func toDomain(_ dto: SavedPlaceResponseDTO) -> SavedPlace {

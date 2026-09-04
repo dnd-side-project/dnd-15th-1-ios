@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Domain
 import SharedDesignSystem
+import SharedUtils
 import SwiftUI
 
 // MARK: - CourseEditMetric

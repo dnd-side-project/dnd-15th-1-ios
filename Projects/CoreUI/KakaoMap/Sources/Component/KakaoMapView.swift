@@ -1,25 +1,87 @@
-import Domain
 import SharedDesignSystem
 import SharedLogger
+import SharedUtils
 import SwiftUI
 import ThirdPartyUI
 import UIKit
 
-/// 카카오 지도 선언형 래퍼.
-///
-/// `KakaoMap`, `MapPoint`, `Poi` 같은 SDK 타입은 이 파일 밖으로 나가지 않는다.
-/// 마커·경로선·현재위치는 값 배열로 넘기고, 카메라만 양방향으로 묶는다.
-struct DulpickMapView: UIViewRepresentable {
-    @Binding var camera: MapCamera
-    var markers: [MapMarker] = []
-    var routes: [MapRoute] = []
-    var userLocation: Coordinate?
-    var onMarkerTap: (String) -> Void = { _ in }
-    var onMapTap: () -> Void = {}
+/// 화면이 쓰는 카카오 지도 뷰.
+public struct KakaoMapView: View {
+    @Binding public var camera: MapCamera
+    public var pins: [MapPin]
+    public var routes: [MapRoute]
+    public var userLocation: Coordinate?
+    public var onPinTap: (String) -> Void
+    public var onMapTap: () -> Void
     /// 접힘 시트 윗면의 화면 전체(global) 좌표 y.
     /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 `focusRatio` 지점에 놓는다.
     /// `0` 이면 화면 한가운데에 그대로 둔다
-    var collapsedSheetTop: CGFloat = 0
+    public var collapsedSheetTop: CGFloat
+
+    public init(
+        camera: Binding<MapCamera>,
+        pins: [MapPin] = [],
+        routes: [MapRoute] = [],
+        userLocation: Coordinate? = nil,
+        onPinTap: @escaping (String) -> Void = { _ in },
+        onMapTap: @escaping () -> Void = {},
+        collapsedSheetTop: CGFloat = 0
+    ) {
+        _camera = camera
+        self.pins = pins
+        self.routes = routes
+        self.userLocation = userLocation
+        self.onPinTap = onPinTap
+        self.onMapTap = onMapTap
+        self.collapsedSheetTop = collapsedSheetTop
+    }
+
+    public var body: some View {
+        KakaoMapRepresentable(
+            camera: $camera,
+            pins: pins,
+            routes: routes,
+            userLocation: userLocation,
+            onPinTap: onPinTap,
+            onMapTap: onMapTap,
+            collapsedSheetTop: collapsedSheetTop
+        )
+    }
+}
+
+/// 카카오 지도 선언형 래퍼.
+///
+/// `KakaoMap`, `MapPoint`, `Poi` 같은 SDK 타입은 이 파일 밖으로 나가지 않는다.
+/// 핀·경로선·현재위치는 값 배열로 넘기고, 카메라만 양방향으로 묶는다.
+struct KakaoMapRepresentable: UIViewRepresentable {
+    @Binding var camera: MapCamera
+    var pins: [MapPin]
+    var routes: [MapRoute]
+    var userLocation: Coordinate?
+    var onPinTap: (String) -> Void
+    var onMapTap: () -> Void
+    /// 접힘 시트 윗면의 화면 전체(global) 좌표 y.
+    /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 `focusRatio` 지점에 놓는다.
+    /// `0` 이면 화면 한가운데에 그대로 둔다
+    var collapsedSheetTop: CGFloat
+
+    init(
+        camera: Binding<MapCamera>,
+        pins: [MapPin] = [],
+        routes: [MapRoute] = [],
+        userLocation: Coordinate? = nil,
+        onPinTap: @escaping (String) -> Void = { _ in },
+        onMapTap: @escaping () -> Void = {},
+        collapsedSheetTop: CGFloat = 0
+    ) {
+        _camera = camera
+        self.pins = pins
+        self.routes = routes
+        self.userLocation = userLocation
+        self.onPinTap = onPinTap
+        self.onMapTap = onMapTap
+        self.collapsedSheetTop = collapsedSheetTop
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(camera: camera)
@@ -35,12 +97,12 @@ struct DulpickMapView: UIViewRepresentable {
         let coordinator = context.coordinator
         let binding = $camera
 
-        coordinator.onMarkerTap = onMarkerTap
+        coordinator.onPinTap = onPinTap
         coordinator.onMapTap = onMapTap
         coordinator.onCameraChanged = { binding.wrappedValue = $0 }
         coordinator.apply(
             camera: camera,
-            markers: markers,
+            pins: pins,
             routes: routes,
             userLocation: userLocation,
             collapsedSheetTop: collapsedSheetTop
@@ -56,10 +118,10 @@ struct DulpickMapView: UIViewRepresentable {
 
 // MARK: - Coordinator
 
-extension DulpickMapView {
+extension KakaoMapRepresentable {
     @MainActor
     final class Coordinator: NSObject {
-        var onMarkerTap: (String) -> Void = { _ in }
+        var onPinTap: (String) -> Void = { _ in }
         var onMapTap: () -> Void = {}
         var onCameraChanged: (MapCamera) -> Void = { _ in }
 
@@ -73,13 +135,13 @@ extension DulpickMapView {
         private var containerSize: CGSize?
 
         private var desiredCamera: MapCamera
-        private var desiredMarkers: [MapMarker] = []
+        private var desiredPins: [MapPin] = []
         private var desiredRoutes: [MapRoute] = []
         private var desiredUserLocation: Coordinate?
         private var desiredCollapsedSheetTop: CGFloat = 0
 
         private var appliedCamera: MapCamera?
-        private var appliedMarkers: [MapMarker]?
+        private var appliedPins: [MapPin]?
         private var appliedRoutes: [MapRoute]?
         private var appliedUserLocation: Coordinate?
         private var appliedCollapsedSheetTop: CGFloat = 0
@@ -135,13 +197,13 @@ extension DulpickMapView {
 
         func apply(
             camera: MapCamera,
-            markers: [MapMarker],
+            pins: [MapPin],
             routes: [MapRoute],
             userLocation: Coordinate?,
             collapsedSheetTop: CGFloat
         ) {
             desiredCamera = camera
-            desiredMarkers = markers
+            desiredPins = pins
             desiredRoutes = routes
             desiredUserLocation = userLocation
             desiredCollapsedSheetTop = collapsedSheetTop
@@ -161,9 +223,9 @@ extension DulpickMapView {
                 appliedCollapsedSheetTop = desiredCollapsedSheetTop
             }
 
-            if desiredMarkers != appliedMarkers {
-                drawMarkers(map)
-                appliedMarkers = desiredMarkers
+            if desiredPins != appliedPins {
+                drawPins(map)
+                appliedPins = desiredPins
             }
 
             if desiredRoutes != appliedRoutes {
@@ -181,7 +243,7 @@ extension DulpickMapView {
         /// 호출 지점마다 나열하면 하나씩 빠뜨리게 돼서 여기 한곳에 모아 둔다
         private func invalidateAppliedState() {
             appliedCamera = nil
-            appliedMarkers = nil
+            appliedPins = nil
             appliedRoutes = nil
             appliedUserLocation = nil
             appliedCollapsedSheetTop = 0
@@ -212,7 +274,7 @@ extension DulpickMapView {
             )
 
             let routeManager = map.getRouteManager()
-            routeManager.addRouteStyleSet(DulpickMapView.makeRouteStyleSet())
+            routeManager.addRouteStyleSet(KakaoMapRepresentable.makeRouteStyleSet())
             _ = routeManager.addRouteLayer(layerID: Layout.routeLayerID, zOrder: 1_000)
         }
 
@@ -289,21 +351,22 @@ extension DulpickMapView {
             layer.addPoi(option: options, at: userLocation.mapPoint)?.show()
         }
 
-        private func registerMarkerStyleIfNeeded(
-            styleID: String,
-            kind: MapMarker.Kind,
+        private func registerPinStyleIfNeeded(
+            pin: MapPin,
             manager: LabelManager
         ) {
+            let styleID = pin.styleID
             guard !registeredPoiStyleIDs.contains(styleID) else { return }
 
+            let style = pin.makeStyle()
             manager.addPoiStyle(
                 PoiStyle(
                     styleID: styleID,
                     styles: [
                         PerLevelPoiStyle(
                             iconStyle: PoiIconStyle(
-                                symbol: MapMarkerSymbol.image(for: kind),
-                                anchorPoint: MapMarkerSymbol.anchorPoint(for: kind)
+                                symbol: style.image,
+                                anchorPoint: style.anchorPoint
                             ),
                             level: 0
                         ),
@@ -322,7 +385,7 @@ extension DulpickMapView {
                     styles: [
                         PerLevelPoiStyle(
                             iconStyle: PoiIconStyle(
-                                symbol: MapMarkerSymbol.userLocationImage(),
+                                symbol: userLocationImage(),
                                 anchorPoint: CGPoint(x: 0.5, y: 0.5)
                             ),
                             level: 0
@@ -381,7 +444,7 @@ extension DulpickMapView {
 ///
 /// 화면에서 `scenePhase` 를 받아 넘기는 대신 여기서 직접 듣는다.
 /// 이 래퍼를 쓰는 화면이 늘어도 화면마다 엔진 생명주기를 기억할 필요가 없게 하려는 것이다
-private extension DulpickMapView.Coordinator {
+private extension KakaoMapRepresentable.Coordinator {
     func observeAppLifecycle() {
         guard lifecycleObservers.isEmpty else { return }
 
@@ -419,73 +482,67 @@ private extension DulpickMapView.Coordinator {
     }
 }
 
-// MARK: - 마커
+// MARK: - 핀
 
-private extension DulpickMapView.Coordinator {
+private extension KakaoMapRepresentable.Coordinator {
     /// 엔진이 막 준비됐을 때만 레이어를 비운다.
     /// 그 다음부터는 바뀐 핀만 더하거나 지운다. 고를 때마다 전부 지워 다시 찍으면
     /// 카메라가 움직이는 동안 핀이 사라진다
-    func drawMarkers(_ map: KakaoMap) {
+    func drawPins(_ map: KakaoMap) {
         let manager = map.getLabelManager()
-        guard let layer = manager.getLabelLayer(layerID: DulpickMapView.Layout.markerLayerID) else {
+        guard let layer = manager.getLabelLayer(layerID: KakaoMapRepresentable.Layout.markerLayerID) else {
             Logger.shared.error(
-                "마커 레이어 조회 실패. layer=\(DulpickMapView.Layout.markerLayerID)",
+                "마커 레이어 조회 실패. layer=\(KakaoMapRepresentable.Layout.markerLayerID)",
                 category: .feature
             )
             return
         }
 
-        if appliedMarkers == nil {
+        if appliedPins == nil {
             layer.clearAllItems()
-            for marker in desiredMarkers {
-                addMarker(marker, on: layer, manager: manager)
+            for pin in desiredPins {
+                addPin(pin, on: layer, manager: manager)
             }
             layer.setClickable(true)
             return
         }
 
-        let change = MapMarkerDiff.change(from: appliedMarkers ?? [], to: desiredMarkers)
+        let change = MapPinDiff.change(from: appliedPins ?? [], to: desiredPins)
         for id in change.removedIDs {
             layer.removePoi(poiID: id)
         }
-        for marker in change.added {
-            addMarker(marker, on: layer, manager: manager)
+        for pin in change.added {
+            addPin(pin, on: layer, manager: manager)
         }
-        for marker in change.moved {
-            layer.getPoi(poiID: marker.id)?
-                .moveAt(marker.coordinate.mapPoint, duration: 0)
+        for pin in change.moved {
+            layer.getPoi(poiID: pin.id)?
+                .moveAt(pin.coordinate.mapPoint, duration: 0)
         }
-        for marker in change.restyled {
-            let styleID = MapMarkerSymbol.styleID(for: marker.kind)
-            registerMarkerStyleIfNeeded(
-                styleID: styleID,
-                kind: marker.kind,
-                manager: manager
-            )
-            guard let poi = layer.getPoi(poiID: marker.id) else { continue }
-            poi.changeStyle(styleID: styleID, enableTransition: false)
-            poi.rank = MapMarkerSymbol.rank(for: marker.kind)
+        for pin in change.restyled {
+            registerPinStyleIfNeeded(pin: pin, manager: manager)
+            guard let poi = layer.getPoi(poiID: pin.id) else { continue }
+            poi.changeStyle(styleID: pin.styleID, enableTransition: false)
+            poi.rank = pin.rank
         }
         layer.setClickable(true)
     }
 
-    func addMarker(
-        _ marker: MapMarker,
+    func addPin(
+        _ pin: MapPin,
         on layer: LabelLayer,
         manager: LabelManager
     ) {
-        let styleID = MapMarkerSymbol.styleID(for: marker.kind)
-        registerMarkerStyleIfNeeded(styleID: styleID, kind: marker.kind, manager: manager)
-        let options = PoiOptions(styleID: styleID, poiID: marker.id)
+        registerPinStyleIfNeeded(pin: pin, manager: manager)
+        let options = PoiOptions(styleID: pin.styleID, poiID: pin.id)
         options.clickable = true
-        options.rank = MapMarkerSymbol.rank(for: marker.kind)
-        layer.addPoi(option: options, at: marker.coordinate.mapPoint)?.show()
+        options.rank = pin.rank
+        layer.addPoi(option: options, at: pin.coordinate.mapPoint)?.show()
     }
 }
 
 // MARK: - 카메라
 
-private extension DulpickMapView.Coordinator {
+private extension KakaoMapRepresentable.Coordinator {
     func moveCamera(_ map: KakaoMap, to camera: MapCamera) {
         let update = CameraUpdate.make(
             target: focusedCenter(map, to: camera),
@@ -562,7 +619,7 @@ private extension DulpickMapView.Coordinator {
 
 // MARK: - SDK delegate
 
-extension DulpickMapView.Coordinator: @preconcurrency MapControllerDelegate {
+extension KakaoMapRepresentable.Coordinator: @preconcurrency MapControllerDelegate {
     func addViews() {
         addMapView()
     }
@@ -593,10 +650,10 @@ extension DulpickMapView.Coordinator: @preconcurrency MapControllerDelegate {
     }
 }
 
-extension DulpickMapView.Coordinator: @preconcurrency KakaoMapEventDelegate {
+extension KakaoMapRepresentable.Coordinator: @preconcurrency KakaoMapEventDelegate {
     func poiDidTapped(kakaoMap: KakaoMap, layerID: String, poiID: String, position: MapPoint) {
-        guard layerID == DulpickMapView.Layout.markerLayerID else { return }
-        onMarkerTap(poiID)
+        guard layerID == KakaoMapRepresentable.Layout.markerLayerID else { return }
+        onPinTap(poiID)
     }
 
     func terrainDidTapped(kakaoMap: KakaoMap, position: MapPoint) {
@@ -615,21 +672,7 @@ extension DulpickMapView.Coordinator: @preconcurrency KakaoMapEventDelegate {
 
 // MARK: - 내부 상수
 
-/// 카카오 지도 SDK 는 입력 px 에 `UIScreen.main.scale / 2` 를 곱한다.
-/// 2x 기준으로 넘기면 기기와 관계없이 의도한 pt 가 된다
-private enum KakaoMapMetrics {
-    static let imageScale: CGFloat = 2
-
-    static func pixels(_ points: UInt) -> UInt {
-        UInt(CGFloat(points) * imageScale)
-    }
-
-    static func pixels(_ points: CGFloat) -> Float {
-        Float(points * imageScale)
-    }
-}
-
-private extension DulpickMapView {
+private extension KakaoMapRepresentable {
     enum Layout {
         static let viewName = "dulpick.map"
         static let markerLayerID = "dulpick.map.marker"
@@ -652,9 +695,9 @@ private extension DulpickMapView {
             styles: [
                 RouteStyle(styles: [
                     PerLevelRouteStyle(
-                        width: KakaoMapMetrics.pixels(Layout.routeWidth),
-                        color: MapMarkerSymbol.routeColor,
-                        strokeWidth: KakaoMapMetrics.pixels(Layout.routeStrokeWidth),
+                        width: MapPinImage.pixels(Layout.routeWidth),
+                        color: routeColor,
+                        strokeWidth: MapPinImage.pixels(Layout.routeStrokeWidth),
                         strokeColor: .white,
                         level: 0,
                         patternIndex: 0
@@ -665,8 +708,8 @@ private extension DulpickMapView {
         // 시작·끝을 고정하면 번호 핀과 겹친다. 짧은 구간은 SDK 가 가운데에 하나 두는지 실기기에서 본다
         styleSet.addPattern(
             RoutePattern(
-                pattern: MapMarkerSymbol.routeDotImage(diameter: Layout.routeDotDiameter),
-                distance: KakaoMapMetrics.pixels(Layout.routeDotSpacing),
+                pattern: routeDotImage(diameter: Layout.routeDotDiameter),
+                distance: MapPinImage.pixels(Layout.routeDotSpacing),
                 symbol: nil,
                 pinStart: false,
                 pinEnd: false
@@ -676,142 +719,24 @@ private extension DulpickMapView {
     }
 }
 
-// MARK: - 기본 마커 심볼
+// MARK: - 경로·현재위치 심볼
 
-/// `place` 는 여기서 그린 최소 심볼을 쓴다.
-/// 고른 장소(`selected`)·코스 후보(`candidate`)·코스 번호(`numbered`)는 `MapPlacePin` 을 얹는다.
-/// 저장한 장소 핀(`category`)은 시안 에셋을 20 으로 줄여 쓴다.
-@MainActor
-enum MapMarkerSymbol {
-    static let routeColor = SharedDesignSystemAsset.brandPrimary.color
+private let routeColor = SharedDesignSystemAsset.brandPrimary.color
+let userLocationColor = UIColor(red: 0.16, green: 0.47, blue: 0.96, alpha: 1.0)
 
-    private static let placeColor = UIColor(red: 0.98, green: 0.31, blue: 0.44, alpha: 1.0)
-    private static let userLocationColor = UIColor(red: 0.16, green: 0.47, blue: 0.96, alpha: 1.0)
+func userLocationImage() -> UIImage {
+    MapPinImage.circle(diameter: 18, fill: userLocationColor)
+}
 
-    /// 그림자 radius 2 + offsetY 1 을 담는 여백
-    private static let pinShadowInset: CGFloat = 4
+// 경로선 위에 일정 간격으로 찍히는 점. SDK 가 선을 따라 반복해 그린다
+private func routeDotImage(diameter: CGFloat) -> UIImage {
+    let size = CGSize(width: diameter, height: diameter)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = MapPinImage.scale
 
-    /// 물방울 높이. `MapPlacePin` 의 피그마 Vector 28 × 31.86 에서 온 값이다
-    private static let pinHeight: CGFloat = 31.86
-
-    static func styleID(for kind: MapMarker.Kind) -> String {
-        switch kind {
-        case .place: "dulpick.map.style.place"
-        case .selected: "dulpick.map.style.selected"
-        case let .numbered(number): "dulpick.map.style.numbered.\(number)"
-        case let .category(category): "dulpick.map.style.category.\(category.rawValue)"
-        case .candidate: "dulpick.map.style.candidate"
-        }
-    }
-
-    static func image(for kind: MapMarker.Kind) -> UIImage {
-        switch kind {
-        case .place:
-            circle(diameter: 22, fill: placeColor, text: nil)
-        case .selected:
-            rendered(MapPlacePin(content: .selected))
-        case let .numbered(number):
-            rendered(MapPlacePin(content: .number(number)))
-        case let .category(category):
-            resized(category.pin, to: categoryPinSide)
-        case .candidate:
-            rendered(MapPlacePin(content: .candidate))
-        }
-    }
-
-    /// 저장한 장소 핀. 에셋 상자 24 안에 흰 원 20 · 컬러 원 16 이 들어 있고
-    /// 남는 자리는 SVG 에 구워진 그림자 몫이다. 상자를 줄이면 안쪽 원도 같이 줄어
-    /// 시안(컬러 원 16)과 어긋난다. 그래서 원본 크기 그대로 쓴다
-    private static let categoryPinSide: CGFloat = 24
-
-    private static func resized(_ image: UIImage, to side: CGFloat) -> UIImage {
-        let size = CGSize(width: side, height: side)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = KakaoMapMetrics.imageScale
-        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
-        }
-    }
-
-    /// 같은 자리의 카테고리·장소 배지 위에 고른 핀이 앉는다. rank 가 큰 쪽이 위다.
-    static func rank(for kind: MapMarker.Kind) -> Int {
-        switch kind {
-        case .place, .category:
-            0
-        case .numbered, .selected, .candidate:
-            1
-        }
-    }
-
-    /// 마커 이미지의 어느 점이 좌표에 놓이는지.
-    ///
-    /// 원형 마커는 중심이 좌표다. 물방울은 뾰족한 아래 끝이 좌표다.
-    static func anchorPoint(for kind: MapMarker.Kind) -> CGPoint {
-        switch kind {
-        case .selected, .candidate, .numbered:
-            // 그림자 여백만큼 이미지가 커졌다. 1.0 을 주면 끝이 좌표보다 그만큼 위에 앉는다
-            CGPoint(x: 0.5, y: (pinShadowInset + pinHeight) / (pinShadowInset * 2 + pinHeight))
-        // default 를 쓰지 않는다. 물방울 심볼이 늘면 여기서 컴파일이 막혀야 한다
-        case .place, .category:
-            CGPoint(x: 0.5, y: 0.5)
-        }
-    }
-
-    /// SwiftUI 부품을 지도가 받는 `UIImage` 로 굽는다.
-    ///
-    /// `MapPlacePin` 은 그림자를 달고 있어 프레임 밖으로 잉크가 번진다.
-    /// `ImageRenderer` 는 프레임까지만 그리므로 여백을 둘러 잘리지 않게 한다.
-    private static func rendered(_ view: some View) -> UIImage {
-        let renderer = ImageRenderer(content: view.padding(pinShadowInset))
-        renderer.scale = KakaoMapMetrics.imageScale
-        return renderer.uiImage ?? UIImage()
-    }
-
-    static func userLocationImage() -> UIImage {
-        circle(diameter: 18, fill: userLocationColor, text: nil)
-    }
-
-    // 경로선 위에 일정 간격으로 찍히는 점. SDK 가 선을 따라 반복해 그린다
-    static func routeDotImage(diameter: CGFloat) -> UIImage {
-        let size = CGSize(width: diameter, height: diameter)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = KakaoMapMetrics.imageScale
-
-        return UIGraphicsImageRenderer(size: size, format: format).image { context in
-            UIColor.white.setFill()
-            context.cgContext.fillEllipse(in: CGRect(origin: .zero, size: size))
-        }
-    }
-
-    private static func circle(diameter: CGFloat, fill: UIColor, text: String?) -> UIImage {
-        let ringWidth: CGFloat = 3
-        let size = CGSize(width: diameter + ringWidth * 2, height: diameter + ringWidth * 2)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = KakaoMapMetrics.imageScale
-
-        return UIGraphicsImageRenderer(size: size, format: format).image { context in
-            let outer = CGRect(origin: .zero, size: size)
-            UIColor.white.setFill()
-            context.cgContext.fillEllipse(in: outer)
-
-            fill.setFill()
-            context.cgContext.fillEllipse(in: outer.insetBy(dx: ringWidth, dy: ringWidth))
-
-            guard let text else { return }
-
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: diameter * 0.5, weight: .bold),
-                .foregroundColor: UIColor.white,
-            ]
-            let bounds = text.size(withAttributes: attributes)
-            text.draw(
-                at: CGPoint(
-                    x: outer.midX - bounds.width / 2,
-                    y: outer.midY - bounds.height / 2
-                ),
-                withAttributes: attributes
-            )
-        }
+    return UIGraphicsImageRenderer(size: size, format: format).image { context in
+        UIColor.white.setFill()
+        context.cgContext.fillEllipse(in: CGRect(origin: .zero, size: size))
     }
 }
 
@@ -822,32 +747,3 @@ private extension Coordinate {
         MapPoint(longitude: longitude, latitude: latitude)
     }
 }
-
-// MARK: - Preview
-
-#if DEBUG
-/// `MapView` 프리뷰가 안 쓰는 표면(번호 핀·선택 핀·경로선·현재위치)까지 한 번에 보여준다.
-#Preview("코스 마커 + 경로") {
-    @Previewable @State var camera: MapCamera = .seoulCityHall
-
-    let places = SavedPlace.mocks.prefix(4)
-
-    KakaoMapPreviewContainer {
-        DulpickMapView(
-            camera: $camera,
-            markers: places.enumerated().map { index, saved in
-                MapMarker(
-                    id: saved.id,
-                    coordinate: saved.place.coordinate,
-                    kind: index == 0 ? .selected : .numbered(index + 1)
-                )
-            },
-            routes: [
-                MapRoute(id: "preview.course", coordinates: places.map(\.place.coordinate)),
-            ],
-            userLocation: MapCamera.seoulCityHall.center
-        )
-        .ignoresSafeArea()
-    }
-}
-#endif

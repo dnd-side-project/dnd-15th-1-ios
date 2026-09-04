@@ -1,6 +1,8 @@
 import ComposableArchitecture
+import CoreKakaoMap
 import Domain
 import SharedDesignSystem
+import SharedUtils
 import SwiftUI
 
 // MARK: - CourseResultMetric
@@ -68,12 +70,12 @@ private extension CourseResultView {
     }
 
     var map: some View {
-        DulpickMapView(
+        KakaoMapView(
             camera: Binding(
                 get: { store.camera },
                 set: { store.send(.cameraChanged($0)) }
             ),
-            markers: store.markers,
+            pins: store.markers.map(MapMarkerStyle.pin(for:)),
             routes: store.routes,
             collapsedSheetTop: collapsedSheetTop
         )

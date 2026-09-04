@@ -5,9 +5,9 @@
 
 import ComposableArchitecture
 import Domain
-import XCTest
-
 @testable import Feature
+import SharedUtils
+import XCTest
 
 @MainActor
 final class PlaceDetailFeatureTests: XCTestCase {

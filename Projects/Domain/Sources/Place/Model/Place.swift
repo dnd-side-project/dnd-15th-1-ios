@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SharedUtils
 
 public struct Place: Equatable, Identifiable, Sendable {
     public let id: String

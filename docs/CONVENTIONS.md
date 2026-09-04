@@ -166,6 +166,8 @@ Feature 폴더 배치는 [ARCHITECTURE.md](ARCHITECTURE.md) §3 규칙을 본다
 
 하나라도 어기면 `Feature` 다. 단 외부 SDK 를 감싸면서 앱 고유 모델을 모르는 것은
 화면용 인프라이므로 `CoreUI` 계층에 둔다 — [ARCHITECTURE.md](ARCHITECTURE.md) §1 을 본다.
+업무 뜻이 없는 순수한 값(위도·경도만 든 좌표 등)은 `Domain` 이 아니라 `SharedUtils` 에 둔다.
+`Domain` 과 `CoreUI` 가 같은 타입을 써야 할 때 두 벌이 생기지 않는다.
 `Extension/` 은 타입 확장(`X+Y.swift`) 전용, 나머지 공용 코드는 `Util/<주제>/` 에 둔다.
 
 규칙:

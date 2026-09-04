@@ -1,5 +1,5 @@
-import Domain
 import Foundation
+import SharedUtils
 
 public struct MapRoute: Equatable, Identifiable, Sendable {
     public let id: String

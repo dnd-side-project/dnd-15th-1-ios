@@ -1,4 +1,4 @@
-@testable import Feature
+@testable import CoreKakaoMap
 import XCTest
 
 final class MapCameraAnimationTests: XCTestCase {

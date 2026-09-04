@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import CoreKakaoMap
 import Domain
 import Foundation
 import SharedDesignSystem

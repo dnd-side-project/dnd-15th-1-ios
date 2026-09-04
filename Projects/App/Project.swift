@@ -11,6 +11,7 @@ let project = ProjectFactory.app(
         .coreSocialAuth,
         .coreStorage,
         .coreImageCache,
+        .coreKakaoMap,
         .sharedLogger,
         .sharedUtils,
         .sharedDesignSystem,
