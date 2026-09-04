@@ -1,6 +1,6 @@
 import CoreGraphics
-import Domain
-@testable import Feature
+@testable import CoreKakaoMap
+import SharedUtils
 import XCTest
 
 final class MapZoomTests: XCTestCase {

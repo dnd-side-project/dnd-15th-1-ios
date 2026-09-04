@@ -1,7 +1,9 @@
 import ComposableArchitecture
+import CoreKakaoMap
 import Domain
 import Feature
 import SharedDesignSystem
+import SharedUtils
 import XCTest
 
 @MainActor
