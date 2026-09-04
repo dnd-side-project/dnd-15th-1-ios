@@ -5,11 +5,8 @@ import SwiftUI
 import ThirdPartyUI
 import UIKit
 
-/// 카카오 지도 선언형 래퍼.
-///
-/// `KakaoMap`, `MapPoint`, `Poi` 같은 SDK 타입은 이 파일 밖으로 나가지 않는다.
-/// 핀·경로선·현재위치는 값 배열로 넘기고, 카메라만 양방향으로 묶는다.
-public struct KakaoMapView: UIViewRepresentable {
+/// 화면이 쓰는 카카오 지도 뷰.
+public struct KakaoMapView: View {
     @Binding public var camera: MapCamera
     public var pins: [MapPin]
     public var routes: [MapRoute]
@@ -39,17 +36,64 @@ public struct KakaoMapView: UIViewRepresentable {
         self.collapsedSheetTop = collapsedSheetTop
     }
 
-    public func makeCoordinator() -> Coordinator {
+    public var body: some View {
+        KakaoMapRepresentable(
+            camera: $camera,
+            pins: pins,
+            routes: routes,
+            userLocation: userLocation,
+            onPinTap: onPinTap,
+            onMapTap: onMapTap,
+            collapsedSheetTop: collapsedSheetTop
+        )
+    }
+}
+
+/// 카카오 지도 선언형 래퍼.
+///
+/// `KakaoMap`, `MapPoint`, `Poi` 같은 SDK 타입은 이 파일 밖으로 나가지 않는다.
+/// 핀·경로선·현재위치는 값 배열로 넘기고, 카메라만 양방향으로 묶는다.
+struct KakaoMapRepresentable: UIViewRepresentable {
+    @Binding var camera: MapCamera
+    var pins: [MapPin]
+    var routes: [MapRoute]
+    var userLocation: Coordinate?
+    var onPinTap: (String) -> Void
+    var onMapTap: () -> Void
+    /// 접힘 시트 윗면의 화면 전체(global) 좌표 y.
+    /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 `focusRatio` 지점에 놓는다.
+    /// `0` 이면 화면 한가운데에 그대로 둔다
+    var collapsedSheetTop: CGFloat
+
+    init(
+        camera: Binding<MapCamera>,
+        pins: [MapPin] = [],
+        routes: [MapRoute] = [],
+        userLocation: Coordinate? = nil,
+        onPinTap: @escaping (String) -> Void = { _ in },
+        onMapTap: @escaping () -> Void = {},
+        collapsedSheetTop: CGFloat = 0
+    ) {
+        _camera = camera
+        self.pins = pins
+        self.routes = routes
+        self.userLocation = userLocation
+        self.onPinTap = onPinTap
+        self.onMapTap = onMapTap
+        self.collapsedSheetTop = collapsedSheetTop
+    }
+
+    func makeCoordinator() -> Coordinator {
         Coordinator(camera: camera)
     }
 
-    public func makeUIView(context: Context) -> KMViewContainer {
+    func makeUIView(context: Context) -> KMViewContainer {
         let container = KMViewContainer()
         context.coordinator.prepare(container: container)
         return container
     }
 
-    public func updateUIView(_ uiView: KMViewContainer, context: Context) {
+    func updateUIView(_ uiView: KMViewContainer, context: Context) {
         let coordinator = context.coordinator
         let binding = $camera
 
@@ -65,7 +109,7 @@ public struct KakaoMapView: UIViewRepresentable {
         )
     }
 
-    public static func dismantleUIView(_ uiView: KMViewContainer, coordinator: Coordinator) {
+    static func dismantleUIView(_ uiView: KMViewContainer, coordinator: Coordinator) {
         MainActor.assumeIsolated {
             coordinator.teardown()
         }
@@ -74,9 +118,9 @@ public struct KakaoMapView: UIViewRepresentable {
 
 // MARK: - Coordinator
 
-extension KakaoMapView {
+extension KakaoMapRepresentable {
     @MainActor
-    public final class Coordinator: NSObject {
+    final class Coordinator: NSObject {
         var onPinTap: (String) -> Void = { _ in }
         var onMapTap: () -> Void = {}
         var onCameraChanged: (MapCamera) -> Void = { _ in }
@@ -107,7 +151,7 @@ extension KakaoMapView {
         /// 앱 생명주기 알림 토큰. `teardown()` 에서 반드시 해제한다
         private var lifecycleObservers: [NSObjectProtocol] = []
 
-        public init(camera: MapCamera) {
+        init(camera: MapCamera) {
             desiredCamera = camera
             super.init()
         }
@@ -230,7 +274,7 @@ extension KakaoMapView {
             )
 
             let routeManager = map.getRouteManager()
-            routeManager.addRouteStyleSet(KakaoMapView.makeRouteStyleSet())
+            routeManager.addRouteStyleSet(KakaoMapRepresentable.makeRouteStyleSet())
             _ = routeManager.addRouteLayer(layerID: Layout.routeLayerID, zOrder: 1_000)
         }
 
@@ -400,7 +444,7 @@ extension KakaoMapView {
 ///
 /// 화면에서 `scenePhase` 를 받아 넘기는 대신 여기서 직접 듣는다.
 /// 이 래퍼를 쓰는 화면이 늘어도 화면마다 엔진 생명주기를 기억할 필요가 없게 하려는 것이다
-private extension KakaoMapView.Coordinator {
+private extension KakaoMapRepresentable.Coordinator {
     func observeAppLifecycle() {
         guard lifecycleObservers.isEmpty else { return }
 
@@ -440,15 +484,15 @@ private extension KakaoMapView.Coordinator {
 
 // MARK: - 핀
 
-private extension KakaoMapView.Coordinator {
+private extension KakaoMapRepresentable.Coordinator {
     /// 엔진이 막 준비됐을 때만 레이어를 비운다.
     /// 그 다음부터는 바뀐 핀만 더하거나 지운다. 고를 때마다 전부 지워 다시 찍으면
     /// 카메라가 움직이는 동안 핀이 사라진다
     func drawPins(_ map: KakaoMap) {
         let manager = map.getLabelManager()
-        guard let layer = manager.getLabelLayer(layerID: KakaoMapView.Layout.markerLayerID) else {
+        guard let layer = manager.getLabelLayer(layerID: KakaoMapRepresentable.Layout.markerLayerID) else {
             Logger.shared.error(
-                "마커 레이어 조회 실패. layer=\(KakaoMapView.Layout.markerLayerID)",
+                "마커 레이어 조회 실패. layer=\(KakaoMapRepresentable.Layout.markerLayerID)",
                 category: .feature
             )
             return
@@ -498,7 +542,7 @@ private extension KakaoMapView.Coordinator {
 
 // MARK: - 카메라
 
-private extension KakaoMapView.Coordinator {
+private extension KakaoMapRepresentable.Coordinator {
     func moveCamera(_ map: KakaoMap, to camera: MapCamera) {
         let update = CameraUpdate.make(
             target: focusedCenter(map, to: camera),
@@ -575,17 +619,17 @@ private extension KakaoMapView.Coordinator {
 
 // MARK: - SDK delegate
 
-extension KakaoMapView.Coordinator: @preconcurrency MapControllerDelegate {
-    public func addViews() {
+extension KakaoMapRepresentable.Coordinator: @preconcurrency MapControllerDelegate {
+    func addViews() {
         addMapView()
     }
 
-    public func addViewSucceeded(_ viewName: String, viewInfoName: String) {
+    func addViewSucceeded(_ viewName: String, viewInfoName: String) {
         mapDidBecomeReady()
     }
 
     /// 여기서 실패하면 화면은 그냥 빈 채로 남는다. 원인을 남길 곳이 로그뿐이다
-    public func addViewFailed(_ viewName: String, viewInfoName: String) {
+    func addViewFailed(_ viewName: String, viewInfoName: String) {
         Logger.shared.error(
             "지도 뷰 추가 실패. view=\(viewName) info=\(viewInfoName)",
             category: .feature
@@ -594,29 +638,29 @@ extension KakaoMapView.Coordinator: @preconcurrency MapControllerDelegate {
 
     /// 앱키가 틀리거나 만료되거나 할당량을 넘기면 여기로 온다.
     /// 앱키 값은 남기지 않는다
-    public func authenticationFailed(_ errorCode: Int, desc: String) {
+    func authenticationFailed(_ errorCode: Int, desc: String) {
         Logger.shared.error(
             "카카오 지도 인증 실패. code=\(errorCode) desc=\(desc)",
             category: .feature
         )
     }
 
-    public func containerDidResized(_ size: CGSize) {
+    func containerDidResized(_ size: CGSize) {
         resizeMapView(to: size)
     }
 }
 
-extension KakaoMapView.Coordinator: @preconcurrency KakaoMapEventDelegate {
-    public func poiDidTapped(kakaoMap: KakaoMap, layerID: String, poiID: String, position: MapPoint) {
-        guard layerID == KakaoMapView.Layout.markerLayerID else { return }
+extension KakaoMapRepresentable.Coordinator: @preconcurrency KakaoMapEventDelegate {
+    func poiDidTapped(kakaoMap: KakaoMap, layerID: String, poiID: String, position: MapPoint) {
+        guard layerID == KakaoMapRepresentable.Layout.markerLayerID else { return }
         onPinTap(poiID)
     }
 
-    public func terrainDidTapped(kakaoMap: KakaoMap, position: MapPoint) {
+    func terrainDidTapped(kakaoMap: KakaoMap, position: MapPoint) {
         onMapTap()
     }
 
-    public func cameraDidStopped(kakaoMap: KakaoMap, by: MoveBy) {
+    func cameraDidStopped(kakaoMap: KakaoMap, by: MoveBy) {
         // `.notUserAction` 은 우리가 `moveCamera` 로 옮긴 결과다.
         // 그대로 받으면 화면 중심을 역산한 값이 State 를 덮고 `.cameraChanged` 가 한 번 더 돈다.
         // 사용자가 손으로 민 경우만 되돌려준다
@@ -628,7 +672,7 @@ extension KakaoMapView.Coordinator: @preconcurrency KakaoMapEventDelegate {
 
 // MARK: - 내부 상수
 
-private extension KakaoMapView {
+private extension KakaoMapRepresentable {
     enum Layout {
         static let viewName = "dulpick.map"
         static let markerLayerID = "dulpick.map.marker"
