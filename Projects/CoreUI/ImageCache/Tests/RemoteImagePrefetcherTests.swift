@@ -1,4 +1,4 @@
-import Feature
+import CoreImageCache
 import Foundation
 import ThirdPartyUI
 import XCTest

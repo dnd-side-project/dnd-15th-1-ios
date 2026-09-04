@@ -9,6 +9,7 @@ let project = ProjectFactory.feature(
         .sharedLogger,
         .thirdParty,
         .thirdPartyUI,
+        .coreImageCache,
     ],
     testsDependencies: [
         .domain,

@@ -164,8 +164,9 @@ Feature 폴더 배치는 [ARCHITECTURE.md](ARCHITECTURE.md) §3 규칙을 본다
 | 의존 | Domain·TCA·ThirdParty SDK 를 모르는가 |
 | 결합 | 앱 고유 모델·문구·URL 을 모르는가 (호출자가 넘기는가) |
 
-하나라도 어기면 `Feature` 다. `Extension/` 은 타입 확장(`X+Y.swift`) 전용,
-나머지 공용 코드는 `Util/<주제>/` 에 둔다.
+하나라도 어기면 `Feature` 다. 단 외부 SDK 를 감싸면서 앱 고유 모델을 모르는 것은
+화면용 인프라이므로 `CoreUI` 계층에 둔다 — [ARCHITECTURE.md](ARCHITECTURE.md) §1 을 본다.
+`Extension/` 은 타입 확장(`X+Y.swift`) 전용, 나머지 공용 코드는 `Util/<주제>/` 에 둔다.
 
 규칙:
 
@@ -189,6 +190,10 @@ DI:
 6. Data `*ClientFactory.make(...)` 가 Domain client 반환 (App 진입). 내부 조립은 private `make*`
 7. `InfraContainer.make()` 로 live 인프라 조립
 8. Repository 는 DataSource 를 기본으로 주입하고, SDK credential provider 등 필요 시 Service collaborator 를 함께 주입할 수 있다
+9. 화면 모듈이 import 하는 모듈은 동적 프레임워크(`product: .framework`)로 둔다.
+   SwiftUI preview 가 화면 모듈에서 돌기 때문이다. 화면이 안 쓰는 모듈은 팩토리
+   기본값인 정적 라이브러리를 그대로 받는다.
+   예외 하나: `ThirdPartyCore` 는 화면이 안 쓰는데 동적이다. 이유가 기록에 없다.
 
 ### 8. Scene 통신
 
@@ -249,7 +254,7 @@ test_로그인성공_델리게이트_전달
 
 규칙:
 
-1. Feature 테스트에 Data/Core 구현을 끌어오지 않는다
+1. Feature 테스트에 Data/`Core/*` 구현을 끌어오지 않는다
 2. Domain/Data 단위 테스트는 기본 강제 없음
 3. 고위험 도메인만 보완 테스트 가능
 
@@ -266,7 +271,8 @@ test_로그인성공_델리게이트_전달
 화면? Feature
 계약? Domain
 구현? Data
-인프라? Core
+인프라(데이터가 쓴다)? Core
+인프라(화면이 직접 쓴다)? CoreUI
 외부 SDK? ThirdParty*
 조립? App
 ```

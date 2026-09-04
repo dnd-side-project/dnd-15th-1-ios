@@ -1,3 +1,4 @@
+import CoreImageCache
 import CoreNotification
 import CoreSocialAuth
 import Feature

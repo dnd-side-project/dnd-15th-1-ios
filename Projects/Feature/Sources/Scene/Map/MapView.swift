@@ -1,3 +1,4 @@
+import CoreImageCache
 import Domain
 import SharedDesignSystem
 import SwiftUI

@@ -6,6 +6,8 @@ public enum ImageCacheBootstrap {
     private static let memoryLimit = 100 * 1024 * 1024
     private static let diskLimit = 500 * 1024 * 1024
 
+    /// 이미지 파이프라인을 전역 자리에 꽂는다. 앱 시작에서 한 번만 부른다.
+    /// - Parameter namespace: 디스크 캐시 폴더 이름의 앞자리. 앱 번들 ID 를 넘긴다
     @MainActor
     public static func run(namespace: String) {
         ImageCache.shared.costLimit = memoryLimit
