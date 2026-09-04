@@ -1,5 +1,5 @@
-import Domain
 import Foundation
+import SharedUtils
 
 public struct MapCamera: Equatable, Sendable {
     public var center: Coordinate
@@ -28,7 +28,7 @@ public extension MapCamera {
 
     /// 이 좌표를 보여 달라는 뜻이다.
     ///
-    /// 화면 어디에 놓을지는 `DulpickMapView` 가 정한다. 여기서 오프셋을 걸지 않는다
+    /// 화면 어디에 놓을지는 `KakaoMapView` 가 정한다. 여기서 오프셋을 걸지 않는다
     static func focusing(_ coordinate: Coordinate, zoomLevel: Int) -> MapCamera {
         MapCamera(center: coordinate, zoomLevel: zoomLevel)
     }

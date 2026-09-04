@@ -50,10 +50,14 @@ enum KakaoMapPreviewSupport {
 
 /// 지도 뷰를 만들어도 안전할 때만 만들고, 아니면 placeholder 를 그리는 프리뷰 전용 래퍼.
 @MainActor
-struct KakaoMapPreviewContainer<Content: View>: View {
+public struct KakaoMapPreviewContainer<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
-    var body: some View {
+    public init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
+
+    public var body: some View {
         if KakaoMapPreviewSupport.prepareIfPossible() {
             content()
         } else {
