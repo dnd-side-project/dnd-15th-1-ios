@@ -248,7 +248,8 @@ private func mapProfileError(_ error: Error) -> ProfileError {
 }
 
 /// 조회로 나머지 두 값과 동의 버전을 받고, 마케팅만 켜서 통째로 되돌려 보낸다.
-/// 변경이 전체 교체라 세 값을 다 실어야 한다. 어느 쪽이 실패해도 화면은 다음으로 가고 콘솔만 남긴다
+/// 변경이 전체 교체라 세 값을 다 실어야 한다. 조회 실패·동의 버전 없음·변경 실패 셋 중
+/// 무엇이든 화면은 다음으로 가고 콘솔에만 남긴다
 private func enableMarketingNotification(_ profileClient: ProfileClient) async {
     let current: NotificationSettings
     do {
