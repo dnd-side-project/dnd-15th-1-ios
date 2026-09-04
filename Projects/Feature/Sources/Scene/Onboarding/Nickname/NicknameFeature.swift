@@ -76,6 +76,7 @@ public struct NicknameFeature {
         case binding(BindingAction<State>)
         case nextButtonTapped
         case updateNicknameResponse(Result<UserProfile, ProfileError>)
+        case nicknameSubmitFinished(UserProfile)
         case termsDetailTapped(TermsType)
         case dismissTermsDetail
         case termsCheckTapped(TermsType)
@@ -117,6 +118,8 @@ private extension NicknameFeature {
             return nextButtonTapped(state: &state)
         case let .updateNicknameResponse(result):
             return updateNicknameResponse(result, state: &state)
+        case let .nicknameSubmitFinished(profile):
+            return nicknameSubmitFinished(profile, state: &state)
         case let .termsDetailTapped(terms):
             return termsDetailTapped(terms, state: &state)
         case .dismissTermsDetail:
@@ -184,13 +187,29 @@ private extension NicknameFeature {
         _ result: Result<UserProfile, ProfileError>,
         state: inout State
     ) -> Effect<Action> {
-        state.isSubmitting = false
         switch result {
         case let .success(profile):
-            return .send(.delegate(.nicknameConfirmed(profile)))
+            // 마케팅을 켠 채 제출했을 때만 알림 설정을 건드린다. 실패해도 화면은 다음으로 간다
+            // 알림 설정이 끝날 때까지 isSubmitting 을 켠 채로 둔다
+            let enablesMarketing = state.agreedTerms.contains(.marketing)
+            return .run { [profileClient] send in
+                if enablesMarketing {
+                    await enableMarketingNotification(profileClient)
+                }
+                await send(.nicknameSubmitFinished(profile))
+            }
         case let .failure(error):
+            state.isSubmitting = false
             return handleUpdateNicknameFailure(error, state: &state)
         }
+    }
+
+    func nicknameSubmitFinished(
+        _ profile: UserProfile,
+        state: inout State
+    ) -> Effect<Action> {
+        state.isSubmitting = false
+        return .send(.delegate(.nicknameConfirmed(profile)))
     }
 
     func handleUpdateNicknameFailure(
@@ -226,4 +245,47 @@ private extension NicknameFeature {
 
 private func mapProfileError(_ error: Error) -> ProfileError {
     error as? ProfileError ?? .unknown
+}
+
+/// 조회로 나머지 두 값과 동의 버전을 받고, 마케팅만 켜서 통째로 되돌려 보낸다.
+/// 변경이 전체 교체라 세 값을 다 실어야 한다. 어느 쪽이 실패해도 화면은 다음으로 가고 콘솔만 남긴다
+private func enableMarketingNotification(_ profileClient: ProfileClient) async {
+    let current: NotificationSettings
+    do {
+        current = try await profileClient.notificationSettings()
+    } catch {
+        FeatureLog.error(
+            scene: "Nickname",
+            operation: "loadNotificationSettings",
+            error: String(describing: error),
+            userVisible: false
+        )
+        return
+    }
+    guard let consentVersion = current.availableMarketingConsentVersion else {
+        FeatureLog.error(
+            scene: "Nickname",
+            operation: "missingMarketingConsentVersion",
+            error: "availableMarketingConsentVersion is nil",
+            userVisible: false
+        )
+        return
+    }
+    let outgoing = NotificationSettings(
+        contentSavedEnabled: current.contentSavedEnabled,
+        dateScheduleEnabled: current.dateScheduleEnabled,
+        marketingEnabled: true,
+        marketingConsentVersion: consentVersion,
+        availableMarketingConsentVersion: consentVersion
+    )
+    do {
+        _ = try await profileClient.updateNotificationSettings(outgoing)
+    } catch {
+        FeatureLog.error(
+            scene: "Nickname",
+            operation: "updateNotificationSettings",
+            error: String(describing: error),
+            userVisible: false
+        )
+    }
 }
