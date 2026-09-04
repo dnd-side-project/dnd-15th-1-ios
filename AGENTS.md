@@ -23,13 +23,14 @@ Dulpick 작업 시 에이전트 진입점.
 4. Domain `*Client` live 등록은 App 만 한다. 외부 SDK 초기화는 SDK 를 소유한 모듈이 Bootstrap 타입으로 갖고, App 은 호출만 한다
 5. Core/인프라 에러는 Data 에서 Domain 에러로 매핑한다
 6. 전역 에러(`sessionExpired` 등)만 RootFlow 로 승격한다
+7. 외부 SDK 를 감싸 화면이 직접 쓰는 인프라는 `CoreUI` 계층에 둔다. 외부 패키지 진입점(`ThirdParty*`)과 디자인 토큰(`SharedDesignSystem`)은 지금 자리를 지킨다
 
 ---
 
 ## 먼저 물을 것
 
 - Feature 모듈 분리
-- Feature → Data/Core 직접 참조
+- Feature → Data/Core 직접 참조 (`CoreUI` 는 예외다 — ARCHITECTURE.md §1 의 의존 절을 본다)
 - scheme/환경 이름 변경
 - 문서 추가·분리
 
