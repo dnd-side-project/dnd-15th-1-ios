@@ -291,6 +291,8 @@ private extension HomeFlowFeature {
             }
             return .send(.pathChanged(next))
         case let .buildRequested(course):
+            // 코스가 생겼으니, 지난 데이트 화면이 스택에 남아 있으면 만들기 버튼을 숨긴다
+            state.pastDateCourses?.hasCurrentCourse = true
             state.courseResult = CourseResultFeature.State(
                 course: course,
                 dateCourseID: course.id,
