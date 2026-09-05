@@ -101,6 +101,7 @@ public struct NicknameFeature {
     public var body: some ReducerOf<Self> {
         BindingReducer()
         Reduce(core)
+            .logged(as: Self.self)
     }
 }
 
