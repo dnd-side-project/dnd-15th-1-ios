@@ -24,7 +24,7 @@ public struct PlaceAliasView: View {
                 .foregroundStyle(Color.textPrimary)
                 .padding(.bottom, Spacing.s16)
 
-            MaskedTextField(
+            AppTextField(
                 text: $store.alias,
                 placeholder: store.placeName,
                 size: .large,
@@ -35,6 +35,7 @@ public struct PlaceAliasView: View {
                 isFocused: $isAliasFocused,
                 onSubmit: { isAliasFocused = false }
             )
+            .analyticsMasked()
             .padding(.bottom, Spacing.s8)
 
             Text(store.address)

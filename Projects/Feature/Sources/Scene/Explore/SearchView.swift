@@ -58,13 +58,14 @@ public struct SearchView: View {
     }
 
     private var searchField: some View {
-        MaskedTextField(
+        AppTextField(
             text: $store.query,
             placeholder: "원하는 장소를 검색해보세요",
             accessory: .search,
             submitLabel: .search,
             onSubmit: { store.send(.searchSubmitted) }
         )
+        .analyticsMasked()
         .padding(.bottom, 20)
     }
 

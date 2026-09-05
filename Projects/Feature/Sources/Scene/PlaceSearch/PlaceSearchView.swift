@@ -64,7 +64,7 @@ public struct PlaceSearchView: View {
         HStack(alignment: .top, spacing: Spacing.s12) {
             BackButton { store.send(.backTapped) }
 
-            MaskedTextField(
+            AppTextField(
                 text: $store.query,
                 placeholder: "원하는 장소를 검색하세요",
                 size: .medium,
@@ -74,6 +74,7 @@ public struct PlaceSearchView: View {
                 isFocused: $isSearchFieldFocused,
                 onSubmit: { store.send(.submitted) }
             )
+            .analyticsMasked()
         }
         .padding(.leading, BackButtonMetric.leadingInset)
         .padding(.trailing, Spacing.s20)

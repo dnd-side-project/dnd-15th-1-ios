@@ -112,7 +112,7 @@ public struct ProfileEditView: View {
                 .typography(.body1M)
                 .foregroundStyle(.textPrimary)
 
-            MaskedTextField(
+            AppTextField(
                 text: $store.nickname,
                 placeholder: "최대 6글자",
                 size: .large,
@@ -122,6 +122,7 @@ public struct ProfileEditView: View {
                 isFocused: $isNicknameFocused,
                 onSubmit: { isNicknameFocused = false }
             )
+            .analyticsMasked()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

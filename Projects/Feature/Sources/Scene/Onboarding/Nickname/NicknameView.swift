@@ -68,7 +68,7 @@ public struct NicknameView: View {
             Spacer(minLength: 0)
                 .frame(maxHeight: NicknameFieldMetric.topSpacing)
 
-            MaskedTextField(
+            AppTextField(
                 text: $store.nickname,
                 placeholder: "최대 6글자",
                 size: .large,
@@ -79,6 +79,7 @@ public struct NicknameView: View {
                 isFocused: $isNicknameFocused,
                 onSubmit: { isNicknameFocused = false }
             )
+            .analyticsMasked()
             .padding(.horizontal, NicknameFieldMetric.horizontalPadding)
 
             Spacer(minLength: 0)
