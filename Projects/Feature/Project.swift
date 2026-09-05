@@ -10,6 +10,7 @@ let project = ProjectFactory.feature(
         .thirdParty,
         .coreImageCache,
         .coreKakaoMap,
+        .coreUserAnalytics,
     ],
     testsDependencies: [
         .domain,
