@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SharedUtils
@@ -187,6 +188,7 @@ private extension CourseEditView {
             size: .medium,
             style: .filled
         )
+        .analyticsMasked()
     }
 
     var dateTimeRow: some View {
