@@ -41,6 +41,10 @@ public enum AppInfo {
         requiredString(.firebaseOptionsResource)
     }
 
+    public static var clarityProjectID: String {
+        string(.clarityProjectID) ?? ""
+    }
+
     public static var googleReversedClientID: String? {
         string(.googleReversedClientID)
     }

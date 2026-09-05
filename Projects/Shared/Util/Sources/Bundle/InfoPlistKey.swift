@@ -6,4 +6,5 @@ public enum InfoPlistKey: String, Sendable {
     case googleClientID = "GOOGLE_CLIENT_ID"
     case googleReversedClientID = "GOOGLE_REVERSED_CLIENT_ID"
     case firebaseOptionsResource = "FIREBASE_OPTIONS_RESOURCE"
+    case clarityProjectID = "CLARITY_PROJECT_ID"
 }
