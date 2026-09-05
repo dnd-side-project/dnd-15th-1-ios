@@ -41,7 +41,8 @@ final class OnboardingFlowFeatureTests: XCTestCase {
         await store.send(.nickname(.nextButtonTapped)) {
             $0.nickname.isSubmitting = true
         }
-        await store.receive(\.nickname.updateNicknameResponse.success) {
+        await store.receive(\.nickname.updateNicknameResponse.success)
+        await store.receive(\.nickname.nicknameSubmitFinished) {
             $0.nickname.isSubmitting = false
         }
         await store.receive(\.nickname.delegate.nicknameConfirmed) {

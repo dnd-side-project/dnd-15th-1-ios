@@ -8,8 +8,8 @@ public struct NicknameFeature {
     /// 시안에 프로필 아이콘 선택이 없어 서버 계약상 필요한 값만 고정으로 보낸다
     static let iconID = 1
 
-    /// 시트가 그리는 필수 동의 항목과 그 표시 순서
-    static let requiredTerms: [TermsType] = [.service, .privacy]
+    /// 시트가 그리는 동의 항목과 그 표시 순서. 필수 둘과 선택 하나다
+    static let sheetTerms: [TermsType] = [.service, .privacy, .marketing]
 
     /// 통과 기준
     static let maxNicknameLength = 6
@@ -30,6 +30,8 @@ public struct NicknameFeature {
         public var toast: ToastState?
         public var isTermsSheetPresented: Bool
         public var presentedTerms: TermsType?
+        /// 사용자가 켜 둔 약관. 기본은 빈 집합이다
+        public var agreedTerms: Set<TermsType>
 
         public init(
             nickname: String = "",
@@ -37,7 +39,8 @@ public struct NicknameFeature {
             inlineError: String? = nil,
             toast: ToastState? = nil,
             isTermsSheetPresented: Bool = true,
-            presentedTerms: TermsType? = nil
+            presentedTerms: TermsType? = nil,
+            agreedTerms: Set<TermsType> = []
         ) {
             self.nickname = NicknameFeature.sanitizedNickname(nickname)
             self.isSubmitting = isSubmitting
@@ -45,6 +48,7 @@ public struct NicknameFeature {
             self.toast = toast
             self.isTermsSheetPresented = isTermsSheetPresented
             self.presentedTerms = presentedTerms
+            self.agreedTerms = agreedTerms
         }
 
         public var isNextEnabled: Bool {
@@ -54,14 +58,28 @@ public struct NicknameFeature {
         public var lengthError: String? {
             nickname.count > NicknameFeature.maxNicknameLength ? "최대 6글자 내로 입력해주세요" : nil
         }
+
+        /// 필수 약관 둘이 모두 켜져 있는지
+        public var isRequiredTermsAgreed: Bool {
+            NicknameFeature.sheetTerms
+                .filter(\.isRequired)
+                .allSatisfy { agreedTerms.contains($0) }
+        }
+
+        /// 필수가 다 켜지면 켜진 그대로 닫는 버튼이 되고, 아니면 셋을 한 번에 켜는 버튼이 된다
+        public var termsAgreeButtonTitle: String {
+            isRequiredTermsAgreed ? "완료" : "모두 동의하기"
+        }
     }
 
     public enum Action: Equatable, BindableAction {
         case binding(BindingAction<State>)
         case nextButtonTapped
         case updateNicknameResponse(Result<UserProfile, ProfileError>)
+        case nicknameSubmitFinished(UserProfile)
         case termsDetailTapped(TermsType)
         case dismissTermsDetail
+        case termsCheckTapped(TermsType)
         case termsAgreeButtonTapped
         case backButtonTapped
         case dismissToast
@@ -83,6 +101,7 @@ public struct NicknameFeature {
     public var body: some ReducerOf<Self> {
         BindingReducer()
         Reduce(core)
+            .logged(as: Self.self)
     }
 }
 
@@ -100,14 +119,17 @@ private extension NicknameFeature {
             return nextButtonTapped(state: &state)
         case let .updateNicknameResponse(result):
             return updateNicknameResponse(result, state: &state)
+        case let .nicknameSubmitFinished(profile):
+            return nicknameSubmitFinished(profile, state: &state)
         case let .termsDetailTapped(terms):
             return termsDetailTapped(terms, state: &state)
         case .dismissTermsDetail:
             state.presentedTerms = nil
             return .none
+        case let .termsCheckTapped(terms):
+            return termsCheckTapped(terms, state: &state)
         case .termsAgreeButtonTapped:
-            state.isTermsSheetPresented = false
-            return .none
+            return termsAgreeButtonTapped(state: &state)
         case .backButtonTapped:
             return backButtonTapped(state: &state)
         case .dismissToast:
@@ -116,6 +138,26 @@ private extension NicknameFeature {
         case .delegate:
             return .none
         }
+    }
+
+    func termsCheckTapped(
+        _ terms: TermsType,
+        state: inout State
+    ) -> Effect<Action> {
+        if state.agreedTerms.contains(terms) {
+            state.agreedTerms.remove(terms)
+        } else {
+            state.agreedTerms.insert(terms)
+        }
+        return .none
+    }
+
+    func termsAgreeButtonTapped(state: inout State) -> Effect<Action> {
+        if !state.isRequiredTermsAgreed {
+            state.agreedTerms = Set(Self.sheetTerms)
+        }
+        state.isTermsSheetPresented = false
+        return .none
     }
 
     /// 제출이 도는 중에는 물러나지 않는다. 응답이 화면 없는 곳으로 떨어진다
@@ -146,13 +188,29 @@ private extension NicknameFeature {
         _ result: Result<UserProfile, ProfileError>,
         state: inout State
     ) -> Effect<Action> {
-        state.isSubmitting = false
         switch result {
         case let .success(profile):
-            return .send(.delegate(.nicknameConfirmed(profile)))
+            // 마케팅을 켠 채 제출했을 때만 알림 설정을 건드린다. 실패해도 화면은 다음으로 간다
+            // 알림 설정이 끝날 때까지 isSubmitting 을 켠 채로 둔다
+            let enablesMarketing = state.agreedTerms.contains(.marketing)
+            return .run { [profileClient] send in
+                if enablesMarketing {
+                    await enableMarketingNotification(profileClient)
+                }
+                await send(.nicknameSubmitFinished(profile))
+            }
         case let .failure(error):
+            state.isSubmitting = false
             return handleUpdateNicknameFailure(error, state: &state)
         }
+    }
+
+    func nicknameSubmitFinished(
+        _ profile: UserProfile,
+        state: inout State
+    ) -> Effect<Action> {
+        state.isSubmitting = false
+        return .send(.delegate(.nicknameConfirmed(profile)))
     }
 
     func handleUpdateNicknameFailure(
@@ -188,4 +246,48 @@ private extension NicknameFeature {
 
 private func mapProfileError(_ error: Error) -> ProfileError {
     error as? ProfileError ?? .unknown
+}
+
+/// 조회로 나머지 두 값과 동의 버전을 받고, 마케팅만 켜서 통째로 되돌려 보낸다.
+/// 변경이 전체 교체라 세 값을 다 실어야 한다. 조회 실패·동의 버전 없음·변경 실패 셋 중
+/// 무엇이든 화면은 다음으로 가고 콘솔에만 남긴다
+private func enableMarketingNotification(_ profileClient: ProfileClient) async {
+    let current: NotificationSettings
+    do {
+        current = try await profileClient.notificationSettings()
+    } catch {
+        FeatureLog.error(
+            scene: "Nickname",
+            operation: "loadNotificationSettings",
+            error: String(describing: error),
+            userVisible: false
+        )
+        return
+    }
+    guard let consentVersion = current.availableMarketingConsentVersion else {
+        FeatureLog.error(
+            scene: "Nickname",
+            operation: "missingMarketingConsentVersion",
+            error: "availableMarketingConsentVersion is nil",
+            userVisible: false
+        )
+        return
+    }
+    let outgoing = NotificationSettings(
+        contentSavedEnabled: current.contentSavedEnabled,
+        dateScheduleEnabled: current.dateScheduleEnabled,
+        marketingEnabled: true,
+        marketingConsentVersion: consentVersion,
+        availableMarketingConsentVersion: consentVersion
+    )
+    do {
+        _ = try await profileClient.updateNotificationSettings(outgoing)
+    } catch {
+        FeatureLog.error(
+            scene: "Nickname",
+            operation: "updateNotificationSettings",
+            error: String(describing: error),
+            userVisible: false
+        )
+    }
 }

@@ -22,7 +22,7 @@ struct TermsAgreementSheet: View {
                 .frame(height: TermsRowMetric.bottomMargin)
 
             CTAContainer {
-                AppButton("모두 동의하기", style: .dark, size: .xl, fullWidth: true) {
+                AppButton(store.termsAgreeButtonTitle, style: .dark, size: .xl, fullWidth: true) {
                     store.send(.termsAgreeButtonTapped)
                 }
             }
@@ -44,35 +44,41 @@ struct TermsAgreementSheet: View {
 
     private var termsRows: some View {
         VStack(spacing: 0) {
-            ForEach(NicknameFeature.requiredTerms) { terms in
+            ForEach(NicknameFeature.sheetTerms) { terms in
                 termsRow(terms)
             }
         }
     }
 
-    // 체크 아이콘을 뺀 나머지 전부가 약관 내용 보기
+    // 체크 슬롯과 라벨이 동의를 켜고 끈다. 오른쪽 화살표만 약관 내용을 연다
     private func termsRow(_ terms: TermsType) -> some View {
         HStack(spacing: 0) {
-            checkIcon
-
             Button {
-                store.send(.termsDetailTapped(terms))
+                store.send(.termsCheckTapped(terms))
             } label: {
                 HStack(spacing: 0) {
+                    checkIcon(isOn: store.agreedTerms.contains(terms))
+
                     Text(terms.agreementTitle)
                         .typography(.body1M)
                         .foregroundStyle(Color.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Image.arrowRight
-                        .renderingMode(.template)
-                        .resizable()
-                        .frame(width: TermsRowMetric.arrowIconSize, height: TermsRowMetric.arrowIconSize)
-                        .foregroundStyle(Color.textSecondary)
-                        .frame(width: TermsRowMetric.arrowHitArea, height: TermsRowMetric.arrowHitArea)
                 }
                 .frame(height: TermsRowMetric.height)
                 .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                store.send(.termsDetailTapped(terms))
+            } label: {
+                Image.arrowRight
+                    .renderingMode(.template)
+                    .resizable()
+                    .frame(width: TermsRowMetric.arrowIconSize, height: TermsRowMetric.arrowIconSize)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: TermsRowMetric.arrowHitArea, height: TermsRowMetric.arrowHitArea)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
@@ -80,9 +86,8 @@ struct TermsAgreementSheet: View {
         .padding(.horizontal, TermsRowMetric.horizontalPadding)
     }
 
-    // 필수 약관이라 동의는 "모두 동의하기" 하나로 끝난다. 아이콘은 항상 동의 상태를 보여준다
-    private var checkIcon: some View {
-        Image.checkTrue
+    private func checkIcon(isOn: Bool) -> some View {
+        (isOn ? Image.checkTrue : Image.checkFalse)
             .renderingMode(.original)
             .resizable()
             .frame(width: CheckIconMetric.iconSize, height: CheckIconMetric.iconSize)
@@ -96,6 +101,7 @@ private extension TermsType {
         switch self {
         case .service: "서비스 이용약관(필수)"
         case .privacy: "개인정보수집 및 이용(필수)"
+        case .marketing: "마케팅 수신 동의(선택)"
         }
     }
 }
