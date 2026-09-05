@@ -2,6 +2,7 @@ import CoreImageCache
 import CoreKakaoMap
 import CoreNotification
 import CoreSocialAuth
+import CoreUserAnalytics
 import Feature
 import Foundation
 import SharedLogger
@@ -14,6 +15,7 @@ enum AppBootstrap {
         NotificationBootstrap.run(infra.notificationConfig, client: infra.remoteNotificationClient)
         ImageCacheBootstrap.run(namespace: infra.appConfig.bundleID)
         KakaoMapBootstrap.run(appKey: infra.appConfig.kakaoNativeAppKey)
+        AnalyticsBootstrap.run(projectID: infra.appConfig.clarityProjectID)
 
         prepareDependencies {
             Dependencies.register(&$0, infra: infra)
