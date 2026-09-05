@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -111,7 +112,7 @@ public struct ProfileEditView: View {
                 .typography(.body1M)
                 .foregroundStyle(.textPrimary)
 
-            AppTextField(
+            MaskedTextField(
                 text: $store.nickname,
                 placeholder: "최대 6글자",
                 size: .large,

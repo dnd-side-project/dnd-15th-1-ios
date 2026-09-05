@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -63,7 +64,7 @@ public struct PlaceSearchView: View {
         HStack(alignment: .top, spacing: Spacing.s12) {
             BackButton { store.send(.backTapped) }
 
-            AppTextField(
+            MaskedTextField(
                 text: $store.query,
                 placeholder: "원하는 장소를 검색하세요",
                 size: .medium,
@@ -187,6 +188,7 @@ public struct PlaceSearchView: View {
                 .typography(.body1M)
                 .foregroundStyle(Color.textPrimary)
                 .lineLimit(1)
+                .analyticsMasked()
 
             Spacer(minLength: Spacing.s8)
 

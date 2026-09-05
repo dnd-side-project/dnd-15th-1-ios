@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -57,6 +58,7 @@ struct CoupleCompleteView: View {
         HStack(spacing: NicknamePillMetric.contentSpacing) {
             Text(store.myNickname)
                 .typography(.body1SB)
+                .analyticsMasked()
 
             Image.heart
                 .renderingMode(.template)
@@ -65,6 +67,7 @@ struct CoupleCompleteView: View {
 
             Text(store.partnerNickname)
                 .typography(.body1SB)
+                .analyticsMasked()
         }
         .foregroundStyle(Color.commonWhite)
         .padding(.horizontal, NicknamePillMetric.horizontalPadding)

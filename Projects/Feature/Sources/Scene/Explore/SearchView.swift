@@ -5,6 +5,7 @@
 //  Created by 이인호 on 8/7/26.
 //
 
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -57,7 +58,7 @@ public struct SearchView: View {
     }
 
     private var searchField: some View {
-        AppTextField(
+        MaskedTextField(
             text: $store.query,
             placeholder: "원하는 장소를 검색해보세요",
             accessory: .search,
@@ -239,6 +240,7 @@ public struct SearchView: View {
                 Text(term)
                     .typography(.body1M)
                     .foregroundStyle(Color.textTertiary)
+                    .analyticsMasked()
             }
             .buttonStyle(.plain)
 

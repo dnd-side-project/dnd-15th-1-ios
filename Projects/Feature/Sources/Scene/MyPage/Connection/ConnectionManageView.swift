@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -139,10 +140,12 @@ public struct ConnectionManageView: View {
             Text(store.me?.nickname ?? "")
                 .frame(width: Self.profileSize)
                 .padding(.trailing, Self.profileGap)
+                .analyticsMasked()
             Spacer().frame(width: Self.heartSize)
             Text(store.partner?.nickname ?? "")
                 .frame(width: Self.profileSize)
                 .padding(.leading, Self.profileGap)
+                .analyticsMasked()
             Spacer()
         }
         .typography(.headline)

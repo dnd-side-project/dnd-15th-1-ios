@@ -5,6 +5,7 @@
 //  Created by 이인호 on 8/10/26.
 //
 
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 
@@ -23,6 +24,7 @@ struct HomeHeader: View {
                 Text(nickname)
                     .typography(.body2M)
                     .foregroundStyle(Color.textInverse)
+                    .analyticsMasked()
 
                 if let partnerName {
                     Image.heart
@@ -34,6 +36,7 @@ struct HomeHeader: View {
                     Text(partnerName)
                         .typography(.body2M)
                         .foregroundStyle(Color.textInverse)
+                        .analyticsMasked()
                 }
             }
             .padding(.trailing, 8)

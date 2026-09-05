@@ -3,6 +3,7 @@
 //  Dulpick
 //
 
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -23,7 +24,7 @@ public struct PlaceAliasView: View {
                 .foregroundStyle(Color.textPrimary)
                 .padding(.bottom, Spacing.s16)
 
-            AppTextField(
+            MaskedTextField(
                 text: $store.alias,
                 placeholder: store.placeName,
                 size: .large,

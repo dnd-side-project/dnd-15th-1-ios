@@ -409,7 +409,8 @@ private extension MapView {
             name: saved.alias ?? saved.place.name,
             address: saved.place.address,
             showsDivider: showsDivider,
-            thumbnailURLs: saved.place.thumbnailURLs
+            thumbnailURLs: saved.place.thumbnailURLs,
+            isNameSensitive: saved.alias != nil
         ) { url in
             RemoteImage(url: url, cornerRadius: MapViewMetric.cornerRadius)
         } trailing: {

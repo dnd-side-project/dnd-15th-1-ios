@@ -198,7 +198,8 @@ private extension CoursePlacePickView {
             name: candidate.alias ?? candidate.name,
             address: candidate.address,
             showsDivider: showsDivider,
-            thumbnailURLs: candidate.thumbnailURLs
+            thumbnailURLs: candidate.thumbnailURLs,
+            isNameSensitive: candidate.alias != nil
         ) { url in
             RemoteImage(url: url, cornerRadius: CoursePlacePickMetric.cornerRadius)
         } trailing: {

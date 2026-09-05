@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -67,7 +68,7 @@ public struct NicknameView: View {
             Spacer(minLength: 0)
                 .frame(maxHeight: NicknameFieldMetric.topSpacing)
 
-            AppTextField(
+            MaskedTextField(
                 text: $store.nickname,
                 placeholder: "최대 6글자",
                 size: .large,
