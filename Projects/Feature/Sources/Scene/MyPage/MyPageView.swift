@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -176,6 +177,7 @@ public struct MyPageView: View {
                 Text(store.nickname)
                     .typography(.headline)
                     .foregroundStyle(.textPrimary)
+                    .analyticsMasked()
 
                 AppButton("프로필 수정", style: .outlined, size: .sm) {
                     store.send(.profileEditTapped)

@@ -20,7 +20,7 @@ Projects/
   ThirdParty/{ThirdParty,ThirdPartyUI,ThirdPartyCore}
   Domain/
   Core/{Network,Storage,SocialAuth,Notification}   # 데이터 계층이 쓰는 인프라
-  CoreUI/{ImageCache,KakaoMap}        # CoreImageCache, CoreKakaoMap — 화면이 직접 쓰는 인프라
+  CoreUI/{ImageCache,KakaoMap,UserAnalytics}   # CoreImageCache, CoreKakaoMap, CoreUserAnalytics — 화면이 직접 쓰는 인프라
   Data/
   Feature/
   App/
@@ -34,7 +34,7 @@ Projects/
 | ThirdParty* | 외부 패키지 진입점. ThirdPartyCore = Alamofire + 소셜 SDK 입구 |
 | Domain | Entity, `*Client`, Error |
 | Core/* | 데이터 계층이 쓰는 인프라. Network / Storage / SocialAuth / Notification |
-| CoreUI/* | 화면 층이 직접 쓰는 인프라. 화면이 창구 없이 직접 import 한다. ImageCache, KakaoMap |
+| CoreUI/* | 화면 층이 직접 쓰는 인프라. 화면이 창구 없이 직접 import 한다. ImageCache, KakaoMap, UserAnalytics |
 | Data | DTO, DataSource, `*Repository`, `*ClientFactory` |
 | Feature | Flow(Root/Onboarding/MainTab), Scene |
 | App | bootstrap, live 주입, root store |
@@ -42,7 +42,7 @@ Projects/
 ### 의존
 
 ```text
-Feature  → Domain, SharedUtils, SharedDesignSystem, SharedLogger, ThirdParty, CoreImageCache, CoreKakaoMap
+Feature  → Domain, SharedUtils, SharedDesignSystem, SharedLogger, ThirdParty, CoreImageCache, CoreKakaoMap, CoreUserAnalytics
 Data     → Domain, Core/*, SharedLogger, SharedUtils
 Domain   → SharedUtils, ThirdParty
 Core/*   → SharedUtils, SharedLogger, ThirdPartyCore
@@ -51,6 +51,7 @@ App      → 조립
 ```
 
 App 은 지도 SDK 를 코드로 쓰지 않지만 `KakaoMapsSDK-SPM` 패키지를 직접 물고 있다. 그 프레임워크를 앱 번들에 싣는 통로가 그것뿐이기 때문이다.
+클라리티 SDK(`Clarity`)도 동적 프레임워크라 같은 이유로 App 이 패키지를 한 번 더 문다.
 
 ### 금지
 

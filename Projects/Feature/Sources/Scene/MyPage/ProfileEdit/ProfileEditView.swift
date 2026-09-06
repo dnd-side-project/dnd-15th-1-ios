@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -121,6 +122,7 @@ public struct ProfileEditView: View {
                 isFocused: $isNicknameFocused,
                 onSubmit: { isNicknameFocused = false }
             )
+            .analyticsMasked()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

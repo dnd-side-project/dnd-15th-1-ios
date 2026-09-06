@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -73,6 +74,7 @@ public struct PlaceSearchView: View {
                 isFocused: $isSearchFieldFocused,
                 onSubmit: { store.send(.submitted) }
             )
+            .analyticsMasked()
         }
         .padding(.leading, BackButtonMetric.leadingInset)
         .padding(.trailing, Spacing.s20)
@@ -187,6 +189,7 @@ public struct PlaceSearchView: View {
                 .typography(.body1M)
                 .foregroundStyle(Color.textPrimary)
                 .lineLimit(1)
+                .analyticsMasked()
 
             Spacer(minLength: Spacing.s8)
 

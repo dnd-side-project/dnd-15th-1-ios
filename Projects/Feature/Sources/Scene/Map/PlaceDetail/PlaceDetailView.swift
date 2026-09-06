@@ -4,6 +4,7 @@
 //
 
 import ComposableArchitecture
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -53,6 +54,7 @@ private extension PlaceDetailView {
                     Text(store.title)
                         .typography(.title3SB)
                         .foregroundStyle(Color.textPrimary)
+                        .analyticsMasked(store.alias != nil)
 
                     subtitle
                 }

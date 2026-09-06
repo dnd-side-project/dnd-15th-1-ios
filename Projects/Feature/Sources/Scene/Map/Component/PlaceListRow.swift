@@ -1,4 +1,5 @@
 import CoreImageCache
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 
@@ -61,6 +62,8 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     private let trailing: Trailing
     /// 우측 슬롯을 둘지. `false` 면 24 칸도 그 앞 여백도 만들지 않아 장소명이 남는 폭을 다 쓴다.
     private let hasTrailing: Bool
+    /// 별칭처럼 개인정보인 이름만 녹화에서 가린다. 일반 장소 이름은 가리지 않는다.
+    private let isNameSensitive: Bool
     @Environment(\.isSheetDragging) private var isSheetDragging
 
     init(
@@ -69,6 +72,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         address: String,
         showsDivider: Bool = true,
         thumbnailURLs: [URL] = [],
+        isNameSensitive: Bool = false,
         @ViewBuilder thumbnail: @escaping (URL) -> Thumbnail,
         @ViewBuilder trailing: () -> Trailing
     ) {
@@ -78,6 +82,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
             address: address,
             showsDivider: showsDivider,
             thumbnailURLs: thumbnailURLs,
+            isNameSensitive: isNameSensitive,
             thumbnail: thumbnail,
             trailing: trailing(),
             hasTrailing: true
@@ -90,6 +95,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         address: String,
         showsDivider: Bool,
         thumbnailURLs: [URL],
+        isNameSensitive: Bool,
         thumbnail: @escaping (URL) -> Thumbnail,
         trailing: Trailing,
         hasTrailing: Bool
@@ -99,6 +105,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         self.address = address
         self.showsDivider = showsDivider
         self.thumbnailURLs = thumbnailURLs
+        self.isNameSensitive = isNameSensitive
         self.thumbnail = thumbnail
         self.trailing = trailing
         self.hasTrailing = hasTrailing
@@ -137,6 +144,7 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
                     .typography(.body1SB)
                     .foregroundStyle(Color.textPrimary)
                     .lineLimit(1)
+                    .analyticsMasked(isNameSensitive)
 
                 Text(address)
                     .typography(.caption1R)
@@ -198,6 +206,7 @@ extension PlaceListRow where Thumbnail == EmptyView {
         name: String,
         address: String,
         showsDivider: Bool = true,
+        isNameSensitive: Bool = false,
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.init(
@@ -206,6 +215,7 @@ extension PlaceListRow where Thumbnail == EmptyView {
             address: address,
             showsDivider: showsDivider,
             thumbnailURLs: [],
+            isNameSensitive: isNameSensitive,
             thumbnail: { _ in EmptyView() },
             trailing: trailing
         )
@@ -222,6 +232,7 @@ extension PlaceListRow where Trailing == EmptyView {
         address: String,
         showsDivider: Bool = true,
         thumbnailURLs: [URL] = [],
+        isNameSensitive: Bool = false,
         @ViewBuilder thumbnail: @escaping (URL) -> Thumbnail
     ) {
         self.init(
@@ -230,6 +241,7 @@ extension PlaceListRow where Trailing == EmptyView {
             address: address,
             showsDivider: showsDivider,
             thumbnailURLs: thumbnailURLs,
+            isNameSensitive: isNameSensitive,
             thumbnail: thumbnail,
             trailing: EmptyView(),
             hasTrailing: false
@@ -241,13 +253,20 @@ extension PlaceListRow where Trailing == EmptyView {
 
 extension PlaceListRow where Thumbnail == EmptyView, Trailing == EmptyView {
     /// 아이콘 · 장소명 · 주소만 있는 가장 짧은 행.
-    init(icon: Image, name: String, address: String, showsDivider: Bool = true) {
+    init(
+        icon: Image,
+        name: String,
+        address: String,
+        showsDivider: Bool = true,
+        isNameSensitive: Bool = false
+    ) {
         self.init(
             icon: icon,
             name: name,
             address: address,
             showsDivider: showsDivider,
             thumbnailURLs: [],
+            isNameSensitive: isNameSensitive,
             thumbnail: { _ in EmptyView() },
             trailing: EmptyView(),
             hasTrailing: false

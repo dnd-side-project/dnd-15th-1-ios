@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -109,6 +110,7 @@ public struct CoupleConnectView: View {
                 .typography(.largeTitleB)
                 .foregroundStyle(Color.textPrimary)
                 .multilineTextAlignment(.center)
+                .analyticsMasked()
         } else if let inviteCodeError = store.inviteCodeError {
             inviteCodeFailure(inviteCodeError)
             // 아직 요청 전이면 .task 가 도는 첫 프레임에 실패 UI 가 번쩍이므로 시머로 덮는다

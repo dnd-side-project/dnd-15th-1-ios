@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import UIKit
@@ -20,6 +21,7 @@ struct CodeInputField: View {
         .onTapGesture {
             isFocused = true
         }
+        .analyticsMasked()
     }
 
     private var hiddenField: some View {

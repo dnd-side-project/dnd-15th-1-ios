@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -129,6 +130,8 @@ public struct HomeView: View {
         // 닉네임 로드 전 빈 값이 그려졌다 리플로우되는 걸 막고, 자리만 잡아둔다
         .opacity(store.didLoadSummary ? 1 : 0)
         .padding(.horizontal, 20)
+        // 닉네임이 문장에 섞여 있다. 떼어내면 줄바꿈을 잃어 제목 줄째로 가린다
+        .analyticsMasked()
     }
 
     private var recommendationScroll: some View {

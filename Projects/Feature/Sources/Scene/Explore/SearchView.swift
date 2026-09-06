@@ -5,6 +5,7 @@
 //  Created by 이인호 on 8/7/26.
 //
 
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -64,6 +65,7 @@ public struct SearchView: View {
             submitLabel: .search,
             onSubmit: { store.send(.searchSubmitted) }
         )
+        .analyticsMasked()
         .padding(.bottom, 20)
     }
 
@@ -239,6 +241,7 @@ public struct SearchView: View {
                 Text(term)
                     .typography(.body1M)
                     .foregroundStyle(Color.textTertiary)
+                    .analyticsMasked()
             }
             .buttonStyle(.plain)
 

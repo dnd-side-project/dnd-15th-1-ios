@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 
@@ -64,6 +65,7 @@ struct MapSearchBar: View {
             Text(text ?? placeholder)
                 .typography(.body1M)
                 .foregroundStyle(text == nil ? Color.gray400 : Color.textPrimary)
+                .analyticsMasked(text != nil)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .padding(.leading, Spacing.s20)

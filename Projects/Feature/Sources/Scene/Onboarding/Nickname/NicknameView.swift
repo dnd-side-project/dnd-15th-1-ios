@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -78,6 +79,7 @@ public struct NicknameView: View {
                 isFocused: $isNicknameFocused,
                 onSubmit: { isNicknameFocused = false }
             )
+            .analyticsMasked()
             .padding(.horizontal, NicknameFieldMetric.horizontalPadding)
 
             Spacer(minLength: 0)

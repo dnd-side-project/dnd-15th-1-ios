@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 
@@ -85,9 +86,11 @@ private extension CourseDateView {
     @ViewBuilder
     var title: some View {
         if let nickname = store.partnerNickname {
+            // 닉네임이 문장에 섞여 있다. 떼어내면 줄바꿈을 잃어 제목 줄째로 가린다
             Text("\(nickname)님과의 데이트\n언제 만날까요?")
                 .typography(.title2B)
                 .foregroundStyle(Color.textPrimary)
+                .analyticsMasked()
         } else {
             Text("언제 만날까요?")
                 .typography(.title2B)

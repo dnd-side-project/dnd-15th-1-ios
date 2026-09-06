@@ -19,6 +19,7 @@ public enum Module: String, CaseIterable {
     case coreNotification
     case coreImageCache
     case coreKakaoMap
+    case coreUserAnalytics
 
     public var targetName: String {
         switch self {
@@ -38,6 +39,7 @@ public enum Module: String, CaseIterable {
         case .coreNotification: return "CoreNotification"
         case .coreImageCache: return "CoreImageCache"
         case .coreKakaoMap: return "CoreKakaoMap"
+        case .coreUserAnalytics: return "CoreUserAnalytics"
         }
     }
 
@@ -59,6 +61,7 @@ public enum Module: String, CaseIterable {
         case .coreNotification: return "Projects/Core/Notification"
         case .coreImageCache: return "Projects/CoreUI/ImageCache"
         case .coreKakaoMap: return "Projects/CoreUI/KakaoMap"
+        case .coreUserAnalytics: return "Projects/CoreUI/UserAnalytics"
         }
     }
 
@@ -84,6 +87,7 @@ public enum Module: String, CaseIterable {
         case .coreNotification: return "core.notification"
         case .coreImageCache: return "coreui.imagecache"
         case .coreKakaoMap: return "coreui.kakaomap"
+        case .coreUserAnalytics: return "coreui.useranalytics"
         }
     }
 
@@ -113,4 +117,5 @@ public extension TargetDependency {
     static var coreNotification: TargetDependency { Module.coreNotification.dependency }
     static var coreImageCache: TargetDependency { Module.coreImageCache.dependency }
     static var coreKakaoMap: TargetDependency { Module.coreKakaoMap.dependency }
+    static var coreUserAnalytics: TargetDependency { Module.coreUserAnalytics.dependency }
 }
