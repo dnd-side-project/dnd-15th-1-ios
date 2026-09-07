@@ -38,6 +38,13 @@ public struct PlaceImportFeature {
             !candidates.isEmpty && selectedIDs.count == candidates.count
         }
 
+        public var saveButtonTitle: String {
+            if selectedIDs.isEmpty {
+                return "닫기"
+            }
+            return isAllSelected ? "모두 저장" : "\(selectedIDs.count)곳만 저장"
+        }
+
         public init(link: URL, phase: Phase = .loading, selectedIDs: Set<Int> = []) {
             self.link = link
             self.phase = phase
@@ -97,8 +104,7 @@ public struct PlaceImportFeature {
             return .none
 
         case .saveTapped:
-            guard let importId = state.importId else { return .none }
-            return confirm(importId: importId, candidateIDs: Array(state.selectedIDs))
+            return confirmOrDismiss(state: state)
 
         case .confirmed(.success):
             // 저장 완료를 상위에 먼저 알리고 시트를 닫는다
@@ -116,6 +122,15 @@ public struct PlaceImportFeature {
         case .closeTapped:
             return .run { [dismiss] _ in await dismiss() }
         }
+    }
+
+    private func confirmOrDismiss(state: State) -> Effect<Action> {
+        // 저장할 것이 없으면 이 버튼은 닫기로 동작한다
+        guard !state.selectedIDs.isEmpty else {
+            return .run { [dismiss] _ in await dismiss() }
+        }
+        guard let importId = state.importId else { return .none }
+        return confirm(importId: importId, candidateIDs: Array(state.selectedIDs))
     }
 
     private func applyImport(state: inout State, placeImport: PlaceImport) -> Effect<Action> {
