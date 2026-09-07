@@ -522,7 +522,7 @@ private extension MapFeature {
             state.savedServerIDs[id] = saved.place.id
             state.applySavedPlace(saved)
             return .run { [analyticsClient, authClient] _ in
-                let userID = (try? await authClient.currentSession())?.userID ?? ""
+                let userID = (try? await authClient.currentSession())?.userID
                 await analyticsClient.track(.placeSaveCompleted(saveSource: .inApp, userID: userID))
             }
         case let .bookmarkRemoved(id):

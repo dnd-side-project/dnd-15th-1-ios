@@ -111,7 +111,7 @@ public struct PlaceImportFeature {
         case .confirmed(.success):
             // 시트를 닫으면 남은 효과가 취소되므로 이벤트를 먼저 보낸다
             return .run { [analyticsClient, authClient, dismiss] send in
-                let userID = (try? await authClient.currentSession())?.userID ?? ""
+                let userID = (try? await authClient.currentSession())?.userID
                 await analyticsClient.track(.placeSaveCompleted(saveSource: .share, userID: userID))
                 await send(.delegate(.placesSaved))
                 await dismiss()

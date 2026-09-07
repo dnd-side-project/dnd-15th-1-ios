@@ -209,7 +209,7 @@ private extension CourseResultFeature {
             let id = state.dateCourseID
             return .merge(
                 .run { [analyticsClient, authClient] _ in
-                    let userID = (try? await authClient.currentSession())?.userID ?? ""
+                    let userID = (try? await authClient.currentSession())?.userID
                     await analyticsClient.track(.courseAlarmStarted(userID: userID))
                 },
                 .run { [courseClient] send in

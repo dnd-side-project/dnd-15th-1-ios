@@ -112,7 +112,7 @@ public struct PostDetailFeature {
 
         case .placeSaved:
             return .run { [analyticsClient, authClient] _ in
-                let userID = (try? await authClient.currentSession())?.userID ?? ""
+                let userID = (try? await authClient.currentSession())?.userID
                 await analyticsClient.track(.placeSaveCompleted(saveSource: .inApp, userID: userID))
             }
 

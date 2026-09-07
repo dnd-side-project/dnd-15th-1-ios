@@ -31,12 +31,12 @@ enum AnalyticsEvent: Equatable {
     case courseCreated
     case courseEditStarted
     case courseEdited
-    case courseAlarmStarted(userID: String)
+    case courseAlarmStarted(userID: String?)
     case myPageViewed
     case preferenceSaved
     case placeSaveModalViewed
     case placeSaveStarted(saveSource: AnalyticsSaveSource)
-    case placeSaveCompleted(saveSource: AnalyticsSaveSource, userID: String)
+    case placeSaveCompleted(saveSource: AnalyticsSaveSource, userID: String?)
     case courseScheduleCompleted
     case preferenceSetupStarted
 
@@ -70,18 +70,22 @@ enum AnalyticsEvent: Equatable {
     var properties: [String: AnalyticsValue] {
         switch self {
         case let .courseCreateStarted(entryPoint), let .courseViewed(entryPoint):
-            ["entry_point": .string(entryPoint.rawValue)]
+            return ["entry_point": .string(entryPoint.rawValue)]
         case let .courseAlarmStarted(userID):
-            ["user_id": .string(userID)]
+            guard let userID else { return [:] }
+            return ["user_id": .string(userID)]
         case let .placeSaveStarted(saveSource):
-            ["save_source": .string(saveSource.rawValue)]
+            return ["save_source": .string(saveSource.rawValue)]
         case let .placeSaveCompleted(saveSource, userID):
-            [
-                "save_source": .string(saveSource.rawValue),
-                "user_id": .string(userID)
+            var properties: [String: AnalyticsValue] = [
+                "save_source": .string(saveSource.rawValue)
             ]
+            if let userID {
+                properties["user_id"] = .string(userID)
+            }
+            return properties
         default:
-            [:]
+            return [:]
         }
     }
 }
