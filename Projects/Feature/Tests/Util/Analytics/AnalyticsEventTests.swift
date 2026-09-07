@@ -69,4 +69,19 @@ final class AnalyticsEventTests: XCTestCase {
         XCTAssertTrue(AnalyticsEvent.courseScheduleCompleted.properties.isEmpty)
         XCTAssertTrue(AnalyticsEvent.preferenceSetupStarted.properties.isEmpty)
     }
+
+    func test_세션이_없을_때_user_id_속성을_싣지_않는다() {
+        XCTAssertEqual(
+            AnalyticsEvent.courseAlarmStarted(userID: nil).properties,
+            [:]
+        )
+        XCTAssertEqual(
+            AnalyticsEvent.placeSaveCompleted(saveSource: .share, userID: nil).properties,
+            ["save_source": .string("share")]
+        )
+        XCTAssertEqual(
+            AnalyticsEvent.placeSaveCompleted(saveSource: .inApp, userID: nil).properties,
+            ["save_source": .string("in_app")]
+        )
+    }
 }
