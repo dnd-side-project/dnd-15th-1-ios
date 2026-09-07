@@ -41,6 +41,7 @@ public struct PostDetailFeature {
         case closeTapped
         case placeTapped(String)
         case placeBookmarkTapped(String)
+        case placeSaved(id: String)
         case placeSaveFailed(id: String, wasSaved: Bool)
         case delegate(Delegate)
 
@@ -64,6 +65,8 @@ public struct PostDetailFeature {
 
     @Dependency(\.postDetailContentClient) var postDetailContentClient
     @Dependency(\.placeClient) var placeClient
+    @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.authClient) var authClient
 
     public init() {}
 
@@ -107,6 +110,12 @@ public struct PostDetailFeature {
         case let .placeBookmarkTapped(id):
             return toggleSave(state: &state, id: id)
 
+        case .placeSaved:
+            return .run { [analyticsClient, authClient] _ in
+                let userID = (try? await authClient.currentSession())?.userID ?? ""
+                await analyticsClient.track(.placeSaveCompleted(saveSource: .inApp, userID: userID))
+            }
+
         case let .placeSaveFailed(id, wasSaved):
             // 서버 실패 → 미리 뒤집었던 표시를 되돌린다
             if wasSaved {
@@ -136,12 +145,13 @@ public struct PostDetailFeature {
     }
 
     private func runSave(_ place: PostDetailPlace, wasSaved: Bool) -> Effect<Action> {
-        .run { [placeClient] send in
+        let request = Effect<Action>.run { [placeClient] send in
             do {
                 if wasSaved {
                     try await placeClient.removePlace(place.id)
                 } else if let kakaoID = place.kakaoPlaceID {
                     _ = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
+                    await send(.placeSaved(id: place.id))
                 }
             } catch {
                 await send(.placeSaveFailed(id: place.id, wasSaved: wasSaved))
@@ -149,6 +159,13 @@ public struct PostDetailFeature {
         }
         // 같은 장소를 연달아 누르면 앞 요청은 버린다
         .cancellable(id: CancelID.save(place.id), cancelInFlight: true)
+        guard !wasSaved else { return request }
+        return .merge(
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.placeSaveStarted(saveSource: .inApp))
+            },
+            request
+        )
     }
 
     /// 흐름과 화면이 각자 `onAppear` 를 보낸다. 두 번째는 버린다.
