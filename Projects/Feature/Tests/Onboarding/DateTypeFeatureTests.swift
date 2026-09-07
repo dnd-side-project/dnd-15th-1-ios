@@ -1,5 +1,5 @@
 import Domain
-import Feature
+@testable import Feature
 import ThirdParty
 import XCTest
 
@@ -299,5 +299,83 @@ final class DateTypeFeatureTests: XCTestCase {
             $0.isSubmitting = false
             $0.toast = .error("잠시 후 다시 시도해 주세요.")
         }
+    }
+}
+
+@MainActor
+final class DateTypeFeatureAnalyticsTests: XCTestCase {
+    private let preference = DatePreference(
+        indoorOutdoor: .indoor,
+        activityLevel: .active,
+        dateTime: .day,
+        dateFocus: .food
+    )
+
+    private var profile: UserProfile {
+        UserProfile(
+            nickname: "둘픽",
+            iconID: 1,
+            datePreference: preference
+        )
+    }
+
+    private var allSelectedState: DateTypeFeature.State {
+        DateTypeFeature.State(
+            indoorOutdoor: .indoor,
+            activityLevel: .active,
+            dateTime: .day,
+            dateFocus: .food
+        )
+    }
+
+    func test_저장_버튼을_누르면_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let profile = self.profile
+        let store = TestStore(initialState: allSelectedState) {
+            DateTypeFeature()
+        } withDependencies: {
+            $0.profileClient.updateDatePreference = { _ in profile }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.saveButtonTapped) {
+            $0.isSubmitting = true
+        }
+        await store.receive(\.updateDatePreferenceResponse.success) {
+            $0.isSubmitting = false
+        }
+        await store.receive(\.delegate.saved)
+        await store.finish()
+        XCTAssertEqual(sent.value, [.preferenceSaved])
+    }
+
+    func test_취향의_첫_축을_고르면_시작_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(initialState: DateTypeFeature.State()) {
+            DateTypeFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.indoorOutdoorSelected(.indoor)) {
+            $0.indoorOutdoor = .indoor
+        }
+        await store.finish()
+        XCTAssertEqual(sent.value, [.preferenceSetupStarted])
+    }
+
+    func test_두_번째_축을_고를_때는_시작_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(initialState: DateTypeFeature.State(indoorOutdoor: .indoor)) {
+            DateTypeFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.activityLevelSelected(.active)) {
+            $0.activityLevel = .active
+        }
+        await store.finish()
+        XCTAssertEqual(sent.value, [])
     }
 }
