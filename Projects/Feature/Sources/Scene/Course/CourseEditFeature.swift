@@ -154,6 +154,7 @@ public struct CourseEditFeature {
     }
 
     @Dependency(\.courseClient) var courseClient
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public init() {}
 
@@ -307,12 +308,14 @@ private extension CourseEditFeature {
 
         case let .placesAdded(candidates):
             let existing = Set(state.places.map(\.id))
-            state.places.append(
-                contentsOf: candidates
-                    .filter { !existing.contains($0.id) }
-                    .map(EditablePlace.init(candidate:))
-            )
-            return .none
+            let added = candidates
+                .filter { !existing.contains($0.id) }
+                .map(EditablePlace.init(candidate:))
+            state.places.append(contentsOf: added)
+            guard !added.isEmpty else { return .none }
+            return .run { [analyticsClient] _ in
+                await analyticsClient.track(.placeAddedToCourse)
+            }
 
         default:
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
@@ -326,7 +329,12 @@ private extension CourseEditFeature {
             guard state.canSave else { return .none }
             state.isBackModalPresented = false
             state.isSaving = true
-            return updateCourse(state: state)
+            return .merge(
+                .run { [analyticsClient] _ in
+                    await analyticsClient.track(.courseEdited)
+                },
+                updateCourse(state: state)
+            )
 
         case let .saveResponse(.success(course)):
             state.isSaving = false

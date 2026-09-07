@@ -1,6 +1,6 @@
 import CoreKakaoMap
 import Domain
-import Feature
+@testable import Feature
 import SharedDesignSystem
 import SharedUtils
 import ThirdParty
@@ -663,7 +663,11 @@ final class MapFeatureDelegateTests: XCTestCase {
     }
 
     func test_검색바와_코스버튼도_상위로_올린다() async {
-        let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { _ in }
+        }
 
         await store.send(.searchBarTapped)
         await store.receive(\.delegate.searchRequested)
@@ -675,10 +679,46 @@ final class MapFeatureDelegateTests: XCTestCase {
     func test_예정코스가_있으면_코스버튼은_결과화면을_올린다() async {
         var state = MapFeature.State()
         state.currentCourse = mapCurrentCourse
-        let store = TestStore(initialState: state) { MapFeature() }
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { _ in }
+        }
 
         await store.send(.courseButtonTapped)
         await store.receive(.delegate(.courseResultRequested(dateCourseID: mapCurrentCourse.id)))
+    }
+
+    func test_코스없이_플로팅버튼을_누르면_만들기_시작_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.courseButtonTapped)
+        await store.receive(\.delegate.courseRequested)
+        await store.finish()
+
+        XCTAssertEqual(sent.value, [.courseCreateStarted(entryPoint: .mapFloatingButton)])
+    }
+
+    func test_예정코스가_있을_때_플로팅버튼은_코스보기_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        var state = MapFeature.State()
+        state.currentCourse = mapCurrentCourse
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.courseButtonTapped)
+        await store.receive(.delegate(.courseResultRequested(dateCourseID: mapCurrentCourse.id)))
+        await store.finish()
+
+        XCTAssertEqual(sent.value, [.courseViewed(entryPoint: .mapFloatingButton)])
     }
 }
 

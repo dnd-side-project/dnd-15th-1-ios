@@ -96,6 +96,7 @@ public struct CoupleConnectFeature {
     }
 
     @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public init() {}
 
@@ -127,7 +128,10 @@ private extension CoupleConnectFeature {
     func onAppear(state: inout State) -> Effect<Action> {
         .merge(
             loadInviteCodeIfNeeded(state: &state),
-            checkConnectionIfNeeded(state: &state)
+            checkConnectionIfNeeded(state: &state),
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.coupleConnectStarted)
+            }
         )
     }
 
@@ -266,7 +270,12 @@ private extension CoupleConnectFeature {
         case let .success(couple):
             guard state.connectedCouple == nil else { return .none }
             state.connectedCouple = couple
-            return .send(.delegate(.showComplete))
+            return .merge(
+                .run { [analyticsClient] _ in
+                    await analyticsClient.track(.coupleConnected)
+                },
+                .send(.delegate(.showComplete))
+            )
         case let .failure(error):
             return handleConnectFailure(error, state: &state)
         }

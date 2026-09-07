@@ -1,5 +1,5 @@
 import Domain
-import Feature
+@testable import Feature
 import ThirdParty
 import XCTest
 
@@ -527,5 +527,65 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
             $0.isCheckingConnection = false
         }
         await store.receive(\.delegate.sessionExpired)
+    }
+}
+
+@MainActor
+final class CoupleConnectAnalyticsTests: XCTestCase {
+    private let inviteCode = InviteCode(value: "AB12C", shareURL: nil)
+    private let couple = Couple(partnerNickname: "픽둘", partnerIconID: 2)
+
+    func test_커플_연결_화면에_들어가면_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let inviteCode = self.inviteCode
+        let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽")) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.inviteCode = { inviteCode }
+            $0.coupleClient.current = { nil }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.onAppear) {
+            $0.isLoadingInviteCode = true
+            $0.hasAttemptedInviteCode = true
+            $0.isCheckingConnection = true
+        }
+        await store.receive(\.connectionStatusResponse.success) {
+            $0.isCheckingConnection = false
+        }
+        await store.receive(\.inviteCodeResponse.success) {
+            $0.isLoadingInviteCode = false
+            $0.inviteCode = inviteCode
+        }
+        await store.finish()
+        XCTAssertTrue(sent.value.contains(.coupleConnectStarted))
+    }
+
+    func test_연결_성공하면_이벤트를_보낸다() async {
+        let couple = self.couple
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(
+            initialState: CoupleConnectFeature.State(
+                myNickname: "둘픽",
+                code: "AB12C"
+            )
+        ) {
+            CoupleConnectFeature()
+        } withDependencies: {
+            $0.coupleClient.connect = { _ in couple }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.connectButtonTapped) {
+            $0.isConnecting = true
+        }
+        await store.receive(\.connectResponse.success) {
+            $0.isConnecting = false
+            $0.connectedCouple = couple
+        }
+        await store.receive(\.delegate.showComplete)
+        await store.finish()
+        XCTAssertEqual(sent.value, [.coupleConnected])
     }
 }

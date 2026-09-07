@@ -43,56 +43,6 @@ final class PlaceDetailFeatureTests: XCTestCase {
         XCTAssertEqual(state.place.address, place.address)
     }
 
-    func test_북마크를_켜고_끄면_카운트가_오르내린다() async {
-        let store = TestStore(
-            initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 124))
-        ) {
-            PlaceDetailFeature()
-        } withDependencies: {
-            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
-            $0.placeClient.removePlace = { _ in }
-        }
-
-        await store.send(.bookmarkTapped) {
-            $0.didToggleBookmark = true
-            $0.isBookmarked = false
-            $0.bookmarkCount = 123
-        }
-        await store.receive(\.delegate.bookmarkToggled)
-        await store.receive(\.bookmarkRemoved)
-        await store.receive(\.delegate.bookmarkRemoved)
-
-        await store.send(.bookmarkTapped) {
-            $0.isBookmarked = true
-            $0.bookmarkCount = 124
-        }
-        await store.receive(\.delegate.bookmarkToggled)
-        await store.receive(\.bookmarkSaved) {
-            $0.savedServerID = SavedPlace.mocks[0].place.id
-        }
-        await store.receive(.delegate(.bookmarkSaved("7", SavedPlace.mocks[0])))
-    }
-
-    func test_카운트는_0_아래로_내려가지_않는다() async {
-        let store = TestStore(
-            initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 0))
-        ) {
-            PlaceDetailFeature()
-        } withDependencies: {
-            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
-            $0.placeClient.removePlace = { _ in }
-        }
-
-        await store.send(.bookmarkTapped) {
-            $0.didToggleBookmark = true
-            $0.isBookmarked = false
-            $0.bookmarkCount = 0
-        }
-        await store.receive(\.delegate.bookmarkToggled)
-        await store.receive(\.bookmarkRemoved)
-        await store.receive(\.delegate.bookmarkRemoved)
-    }
-
     func test_주소_펼침이_켜졌다_꺼진다() async {
         let store = TestStore(
             initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 1))
@@ -280,6 +230,66 @@ final class PlaceDetailFeatureTests: XCTestCase {
             $0.contentsLoadState = .loaded
         }
         XCTAssertEqual(store.state.id, originalID)
+    }
+}
+
+// 북마크 켜고 끄기는 케이스가 많아 별도 클래스로 둔다. type_body_length 한계 때문이다
+@MainActor
+final class PlaceDetailFeatureBookmarkTests: XCTestCase {
+    func test_북마크를_켜고_끄면_카운트가_오르내린다() async {
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 124))
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user")
+            }
+        }
+
+        await store.send(.bookmarkTapped) {
+            $0.didToggleBookmark = true
+            $0.isBookmarked = false
+            $0.bookmarkCount = 123
+        }
+        await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkRemoved)
+        await store.receive(\.delegate.bookmarkRemoved)
+
+        await store.send(.bookmarkTapped) {
+            $0.isBookmarked = true
+            $0.bookmarkCount = 124
+        }
+        await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkSaved) {
+            $0.savedServerID = SavedPlace.mocks[0].place.id
+        }
+        await store.receive(.delegate(.bookmarkSaved("7", SavedPlace.mocks[0])))
+    }
+
+    func test_카운트는_0_아래로_내려가지_않는다() async {
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 0))
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user")
+            }
+        }
+
+        await store.send(.bookmarkTapped) {
+            $0.didToggleBookmark = true
+            $0.isBookmarked = false
+            $0.bookmarkCount = 0
+        }
+        await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkRemoved)
+        await store.receive(\.delegate.bookmarkRemoved)
     }
 }
 
@@ -667,5 +677,195 @@ final class PlaceDetailFeatureContentsTests: XCTestCase {
         let store = TestStore(initialState: state) { PlaceDetailFeature() }
 
         await store.send(.moreTapped)
+    }
+}
+
+@MainActor
+final class PlaceDetailFeatureAnalyticsTests: XCTestCase {
+    func test_내가_저장한_장소의_상세를_받으면_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let place = Place.fixture(id: "s1")
+        let detail = PlaceDetail(
+            place: place,
+            savedByMe: true,
+            savedMemberCount: 3,
+            ownership: .mine
+        )
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(place: place, query: "검색어")
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.detailLoaded(detail)) {
+            $0.place = Place(
+                id: $0.id,
+                kakaoPlaceID: place.kakaoPlaceID,
+                name: place.name,
+                category: place.category,
+                address: place.address,
+                roadAddress: place.roadAddress,
+                coordinate: place.coordinate,
+                bookmarkCount: 3,
+                thumbnailURLs: place.thumbnailURLs
+            )
+            $0.bookmarkCount = 3
+            $0.isBookmarked = true
+            $0.savedServerID = place.id
+        }
+        await store.finish()
+        XCTAssertEqual(sent.value, [.savedPlaceDetailViewed])
+    }
+
+    func test_저장_안_한_장소의_상세에는_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let place = Place.fixture(id: "s1")
+        let detail = PlaceDetail(
+            place: place,
+            savedByMe: false,
+            savedMemberCount: 3,
+            ownership: nil
+        )
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(place: place, query: "검색어")
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.detailLoaded(detail)) {
+            $0.place = Place(
+                id: $0.id,
+                kakaoPlaceID: place.kakaoPlaceID,
+                name: place.name,
+                category: place.category,
+                address: place.address,
+                roadAddress: place.roadAddress,
+                coordinate: place.coordinate,
+                bookmarkCount: 3,
+                thumbnailURLs: place.thumbnailURLs
+            )
+            $0.bookmarkCount = 3
+        }
+        await store.finish()
+        XCTAssertTrue(sent.value.isEmpty)
+    }
+}
+
+@MainActor
+final class PlaceDetailFeatureSaveAnalyticsTests: XCTestCase {
+    func test_북마크_저장_성공이면_앱안_저장완료_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let place = Place(
+            id: "s1",
+            kakaoPlaceID: "kakao-s1",
+            name: "검색 장소",
+            category: .cafe,
+            address: "주소",
+            roadAddress: "도로명",
+            coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
+            bookmarkCount: 0,
+            thumbnailURLs: []
+        )
+        let saved = SavedPlace.mocks[0]
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(place: place, query: "검색어")
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in saved }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+            }
+        }
+
+        await store.send(.bookmarkTapped) {
+            $0.didToggleBookmark = true
+            $0.isBookmarked = true
+            $0.bookmarkCount = 1
+        }
+        await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkSaved) {
+            $0.savedServerID = saved.place.id
+        }
+        await store.receive(.delegate(.bookmarkSaved("s1", saved)))
+        await store.finish()
+        XCTAssertEqual(
+            sent.value,
+            [
+                .placeSaveStarted(saveSource: .inApp),
+                .placeSaveCompleted(saveSource: .inApp, userID: "user-42"),
+            ]
+        )
+    }
+
+    func test_북마크_저장이_실패해도_앱안_저장시작_이벤트는_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let place = Place(
+            id: "s1",
+            kakaoPlaceID: "kakao-s1",
+            name: "검색 장소",
+            category: .cafe,
+            address: "주소",
+            roadAddress: "도로명",
+            coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
+            bookmarkCount: 0,
+            thumbnailURLs: []
+        )
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(place: place, query: "검색어")
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in throw PlaceError.network }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+            }
+        }
+
+        await store.send(.bookmarkTapped) {
+            $0.didToggleBookmark = true
+            $0.isBookmarked = true
+            $0.bookmarkCount = 1
+        }
+        await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(.bookmarkFailed(wasBookmarked: false)) {
+            $0.isBookmarked = false
+            $0.bookmarkCount = 0
+        }
+        await store.receive(\.delegate.bookmarkToggled)
+        await store.finish()
+        XCTAssertEqual(sent.value, [.placeSaveStarted(saveSource: .inApp)])
+    }
+
+    func test_북마크를_끄면_저장완료_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(
+            initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7", bookmarkCount: 124))
+        ) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.removePlace = { _ in }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+            }
+        }
+
+        await store.send(.bookmarkTapped) {
+            $0.didToggleBookmark = true
+            $0.isBookmarked = false
+            $0.bookmarkCount = 123
+        }
+        await store.receive(\.delegate.bookmarkToggled)
+        await store.receive(\.bookmarkRemoved)
+        await store.receive(\.delegate.bookmarkRemoved)
+        await store.finish()
+        XCTAssertTrue(sent.value.isEmpty)
     }
 }

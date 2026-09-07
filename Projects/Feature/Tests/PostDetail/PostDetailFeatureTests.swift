@@ -1,3 +1,4 @@
+import ComposableArchitecture
 import Domain
 @testable import Feature
 import SharedUtils
@@ -38,6 +39,9 @@ final class PostDetailFeatureTests: XCTestCase {
             }
             $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
             $0.placeClient.removePlace = { _ in }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user")
+            }
         }
     }
 
@@ -120,6 +124,7 @@ final class PostDetailFeatureTests: XCTestCase {
         await sut.send(.placeBookmarkTapped("102")) {
             $0.savedPlaceIDs = ["101", "102"]
         }
+        await sut.receive(.placeSaved(id: "102"))
         await sut.send(.placeBookmarkTapped("101")) {
             $0.savedPlaceIDs = ["102"]
         }
@@ -168,5 +173,100 @@ final class PostDetailFeatureTests: XCTestCase {
         let sut = store(state: state, detail: detail)
 
         await sut.send(.onAppear)
+    }
+}
+
+@MainActor
+final class PostDetailFeatureSaveAnalyticsTests: XCTestCase {
+    private let detail = PostDetailContent(
+        id: "1",
+        title: "제목",
+        caption: "본문",
+        canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
+        places: [
+            PostDetailPlace(id: "101", kakaoPlaceID: "k101", name: "가게 하나", category: .cafe,
+                            isSaved: true, coordinate: Coordinate(latitude: 37.5, longitude: 127.0)),
+            PostDetailPlace(id: "102", kakaoPlaceID: "k102", name: "가게 둘", category: .food,
+                            isSaved: false, coordinate: Coordinate(latitude: 37.6, longitude: 127.1)),
+        ]
+    )
+
+    func test_행_북마크_저장_성공이면_앱안_저장완료_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        var state = PostDetailFeature.State(contentID: "1")
+        state.detail = detail
+        state.savedPlaceIDs = ["101"]
+        let store = TestStore(initialState: state) {
+            PostDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+            }
+        }
+
+        await store.send(.placeBookmarkTapped("102")) {
+            $0.savedPlaceIDs = ["101", "102"]
+        }
+        await store.receive(.placeSaved(id: "102"))
+        await store.finish()
+        XCTAssertEqual(
+            sent.value,
+            [
+                .placeSaveStarted(saveSource: .inApp),
+                .placeSaveCompleted(saveSource: .inApp, userID: "user-42"),
+            ]
+        )
+    }
+
+    func test_행_북마크_저장이_실패해도_앱안_저장시작_이벤트는_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        var state = PostDetailFeature.State(contentID: "1")
+        state.detail = detail
+        state.savedPlaceIDs = ["101"]
+        let store = TestStore(initialState: state) {
+            PostDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in throw PlaceError.network }
+            $0.placeClient.removePlace = { _ in }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+            }
+        }
+
+        await store.send(.placeBookmarkTapped("102")) {
+            $0.savedPlaceIDs = ["101", "102"]
+        }
+        await store.receive(.placeSaveFailed(id: "102", wasSaved: false)) {
+            $0.savedPlaceIDs = ["101"]
+        }
+        await store.finish()
+        XCTAssertEqual(sent.value, [.placeSaveStarted(saveSource: .inApp)])
+    }
+
+    func test_행_북마크를_끄면_저장완료_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        var state = PostDetailFeature.State(contentID: "1")
+        state.detail = detail
+        state.savedPlaceIDs = ["101"]
+        let store = TestStore(initialState: state) {
+            PostDetailFeature()
+        } withDependencies: {
+            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
+            $0.placeClient.removePlace = { _ in }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+            }
+        }
+
+        await store.send(.placeBookmarkTapped("101")) {
+            $0.savedPlaceIDs = []
+        }
+        await store.finish()
+        XCTAssertTrue(sent.value.isEmpty)
     }
 }

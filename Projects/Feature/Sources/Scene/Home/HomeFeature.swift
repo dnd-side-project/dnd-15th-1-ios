@@ -114,6 +114,7 @@ public struct HomeFeature {
     @Dependency(\.homeClient) var homeClient
     @Dependency(\.exploreClient) var exploreClient
     @Dependency(\.profileClient) var profileClient
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public init() {}
 
@@ -255,11 +256,21 @@ public struct HomeFeature {
             return .send(.delegate(.connectFlowRequested))
 
         case .courseFlowRequested:
-            return .send(.delegate(.courseFlowRequested))
+            return .merge(
+                .run { [analyticsClient] _ in
+                    await analyticsClient.track(.courseCreateStarted(entryPoint: .homeBanner))
+                },
+                .send(.delegate(.courseFlowRequested))
+            )
 
         case .bannerTapped:
             guard let id = state.upcomingSchedule?.id else { return .none }
-            return .send(.delegate(.showCourseResult(dateCourseID: id, origin: .courseBuilt)))
+            return .merge(
+                .run { [analyticsClient] _ in
+                    await analyticsClient.track(.courseViewed(entryPoint: .homeBanner))
+                },
+                .send(.delegate(.showCourseResult(dateCourseID: id, origin: .courseBuilt)))
+            )
 
         default:
             return .none

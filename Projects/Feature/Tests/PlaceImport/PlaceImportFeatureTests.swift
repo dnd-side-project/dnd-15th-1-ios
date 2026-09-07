@@ -166,3 +166,190 @@ final class PlaceImportFeatureTests: XCTestCase {
         return store
     }
 }
+
+@MainActor
+final class PlaceImportAnalyticsTests: XCTestCase {
+    private var link: URL {
+        guard let url = URL(string: "https://www.instagram.com/reel/example/") else {
+            XCTFail("링크 URL 이 잘못됐다")
+            return URL(fileURLWithPath: "/")
+        }
+        return url
+    }
+
+    func test_장소_후보가_나오면_모달_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
+        let store = TestStore(
+            initialState: PlaceImportFeature.State(link: link)
+        ) {
+            PlaceImportFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.importUpdated(.success(placeImport))) {
+            $0.importId = placeImport.importId
+            $0.phase = .loaded(placeImport)
+            $0.selectedIDs = [1]
+        }
+        await store.finish()
+        XCTAssertEqual(sent.value, [.placeSaveModalViewed])
+    }
+
+    func test_분석_실패_갈래에서는_모달_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let placeImport = makeImport(nextAction: .retry)
+        let store = TestStore(
+            initialState: PlaceImportFeature.State(link: link)
+        ) {
+            PlaceImportFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.importUpdated(.success(placeImport))) {
+            $0.importId = placeImport.importId
+            $0.phase = .failed
+        }
+        await store.finish()
+        XCTAssertTrue(sent.value.isEmpty)
+    }
+
+    func test_분석_대기_갈래에서는_모달_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        var state = PlaceImportFeature.State(link: link)
+        state.pollCount = 7
+        let placeImport = makeImport(nextAction: .wait)
+        let store = TestStore(initialState: state) {
+            PlaceImportFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.importUpdated(.success(placeImport))) {
+            $0.importId = placeImport.importId
+            $0.phase = .failed
+        }
+        await store.finish()
+        XCTAssertTrue(sent.value.isEmpty)
+    }
+
+    func test_저장_버튼을_누르면_공유_경로로_시작_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
+        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: [1])
+        state.importId = placeImport.importId
+        let store = TestStore(initialState: state) {
+            PlaceImportFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+            }
+            $0.placeImportClient.confirm = { _, _ in }
+            $0.dismiss = DismissEffect { }
+        }
+
+        await store.send(.saveTapped)
+        await store.receive(.confirmed(.success(true)))
+        await store.receive(.delegate(.placesSaved))
+        await store.finish()
+        XCTAssertEqual(
+            sent.value,
+            [
+                .placeSaveStarted(saveSource: .share),
+                .placeSaveCompleted(saveSource: .share, userID: "user-42"),
+            ]
+        )
+    }
+
+    func test_공유_저장이_성공하면_완료_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
+        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: [1])
+        state.importId = placeImport.importId
+        let store = TestStore(initialState: state) {
+            PlaceImportFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.authClient.currentSession = {
+                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+            }
+            $0.dismiss = DismissEffect { }
+        }
+
+        await store.send(.confirmed(.success(true)))
+        await store.receive(.delegate(.placesSaved))
+        await store.finish()
+        XCTAssertEqual(sent.value, [.placeSaveCompleted(saveSource: .share, userID: "user-42")])
+    }
+
+    func test_저장이_서버에서_실패하면_완료_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
+        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: [1])
+        state.importId = placeImport.importId
+        let store = TestStore(initialState: state) {
+            PlaceImportFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.placeImportClient.confirm = { _, _ in throw PlaceImportError.network }
+        }
+
+        await store.send(.saveTapped)
+        await store.receive(.confirmed(.failure(.network)))
+        await store.finish()
+        XCTAssertEqual(sent.value, [.placeSaveStarted(saveSource: .share)])
+    }
+
+    func test_가져오기_번호가_없으면_시작_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
+        let state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: [1])
+        let store = TestStore(initialState: state) {
+            PlaceImportFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.saveTapped)
+        await store.finish()
+        XCTAssertTrue(sent.value.isEmpty)
+    }
+}
+
+private func makeCandidate(id: Int) -> ImportCandidate {
+    ImportCandidate(
+        candidateId: id,
+        verificationStatus: .verified,
+        extractedName: "후보 \(id)",
+        extractedAddressHint: nil,
+        place: nil,
+        evidence: nil
+    )
+}
+
+private func makeImport(
+    nextAction: ImportNextAction,
+    candidates: [ImportCandidate] = []
+) -> PlaceImport {
+    PlaceImport(
+        importId: 9,
+        contentId: 1,
+        canonicalUrl: "https://www.instagram.com/reel/example/",
+        sourceType: .instagramReel,
+        status: nextAction == .selectPlaces ? .reviewRequired : .processing,
+        nextAction: nextAction,
+        retryAfterSeconds: 1,
+        failure: nil,
+        content: ImportContent(
+            title: "제목",
+            caption: nil,
+            thumbnailUrl: nil,
+            author: nil,
+            publishedOn: nil
+        ),
+        candidates: candidates
+    )
+}

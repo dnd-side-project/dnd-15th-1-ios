@@ -82,6 +82,7 @@ public struct DateTypeFeature {
     }
 
     @Dependency(\.profileClient) var profileClient
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public init() {}
 
@@ -112,9 +113,10 @@ private extension DateTypeFeature {
         state: inout State
     ) -> Effect<Action> {
         guard !state.isSubmitting else { return .none }
+        let shouldTrackSetupStarted = isPreferenceSetupEmpty(state)
         state.indoorOutdoor = value
         state.isTooltipPresented = false
-        return .none
+        return preferenceSetupStartedIfNeeded(shouldTrackSetupStarted)
     }
 
     func activityLevelSelected(
@@ -122,9 +124,10 @@ private extension DateTypeFeature {
         state: inout State
     ) -> Effect<Action> {
         guard !state.isSubmitting else { return .none }
+        let shouldTrackSetupStarted = isPreferenceSetupEmpty(state)
         state.activityLevel = value
         state.isTooltipPresented = false
-        return .none
+        return preferenceSetupStartedIfNeeded(shouldTrackSetupStarted)
     }
 
     func dateTimeSelected(
@@ -132,9 +135,10 @@ private extension DateTypeFeature {
         state: inout State
     ) -> Effect<Action> {
         guard !state.isSubmitting else { return .none }
+        let shouldTrackSetupStarted = isPreferenceSetupEmpty(state)
         state.dateTime = value
         state.isTooltipPresented = false
-        return .none
+        return preferenceSetupStartedIfNeeded(shouldTrackSetupStarted)
     }
 
     func dateFocusSelected(
@@ -142,9 +146,24 @@ private extension DateTypeFeature {
         state: inout State
     ) -> Effect<Action> {
         guard !state.isSubmitting else { return .none }
+        let shouldTrackSetupStarted = isPreferenceSetupEmpty(state)
         state.dateFocus = value
         state.isTooltipPresented = false
-        return .none
+        return preferenceSetupStartedIfNeeded(shouldTrackSetupStarted)
+    }
+
+    func isPreferenceSetupEmpty(_ state: State) -> Bool {
+        state.indoorOutdoor == nil
+            && state.activityLevel == nil
+            && state.dateTime == nil
+            && state.dateFocus == nil
+    }
+
+    func preferenceSetupStartedIfNeeded(_ shouldTrack: Bool) -> Effect<Action> {
+        guard shouldTrack else { return .none }
+        return .run { [analyticsClient] _ in
+            await analyticsClient.track(.preferenceSetupStarted)
+        }
     }
 
     func skipButtonTapped(state: inout State) -> Effect<Action> {
@@ -173,14 +192,19 @@ private extension DateTypeFeature {
         state.isSubmitting = true
         state.isTooltipPresented = false
         state.toast = nil
-        return .run { [profileClient] send in
-            do {
-                let profile = try await profileClient.updateDatePreference(preference)
-                await send(.updateDatePreferenceResponse(.success(profile)))
-            } catch {
-                await send(.updateDatePreferenceResponse(.failure(mapProfileError(error))))
+        return .merge(
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.preferenceSaved)
+            },
+            .run { [profileClient] send in
+                do {
+                    let profile = try await profileClient.updateDatePreference(preference)
+                    await send(.updateDatePreferenceResponse(.success(profile)))
+                } catch {
+                    await send(.updateDatePreferenceResponse(.failure(mapProfileError(error))))
+                }
             }
-        }
+        )
     }
 
     func updateDatePreferenceResponse(

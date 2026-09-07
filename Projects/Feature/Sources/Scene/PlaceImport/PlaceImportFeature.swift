@@ -73,6 +73,8 @@ public struct PlaceImportFeature {
     private let maxPollCount = 7
 
     @Dependency(\.placeImportClient) var placeImportClient
+    @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.authClient) var authClient
     @Dependency(\.dismiss) var dismiss
 
     public init() {}
@@ -107,8 +109,10 @@ public struct PlaceImportFeature {
             return confirmOrDismiss(state: state)
 
         case .confirmed(.success):
-            // 저장 완료를 상위에 먼저 알리고 시트를 닫는다
-            return .run { [dismiss] send in
+            // 시트를 닫으면 남은 효과가 취소되므로 이벤트를 먼저 보낸다
+            return .run { [analyticsClient, authClient, dismiss] send in
+                let userID = (try? await authClient.currentSession())?.userID
+                await analyticsClient.track(.placeSaveCompleted(saveSource: .share, userID: userID))
                 await send(.delegate(.placesSaved))
                 await dismiss()
             }
@@ -130,7 +134,12 @@ public struct PlaceImportFeature {
             return .run { [dismiss] _ in await dismiss() }
         }
         guard let importId = state.importId else { return .none }
-        return confirm(importId: importId, candidateIDs: Array(state.selectedIDs))
+        return .merge(
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.placeSaveStarted(saveSource: .share))
+            },
+            confirm(importId: importId, candidateIDs: Array(state.selectedIDs))
+        )
     }
 
     private func applyImport(state: inout State, placeImport: PlaceImport) -> Effect<Action> {
@@ -189,7 +198,9 @@ public struct PlaceImportFeature {
         }
         state.phase = .loaded(placeImport)
         state.selectedIDs = Set(placeImport.candidates.map(\.candidateId))
-        return .none
+        return .run { [analyticsClient] _ in
+            await analyticsClient.track(.placeSaveModalViewed)
+        }
     }
 
     private func start(link: URL) -> Effect<Action> {

@@ -17,6 +17,7 @@ public enum DefaultInfoPlist {
         "GOOGLE_REVERSED_CLIENT_ID": "$(GOOGLE_REVERSED_CLIENT_ID)",
         "FIREBASE_OPTIONS_RESOURCE": "$(FIREBASE_OPTIONS_RESOURCE)",
         "CLARITY_PROJECT_ID": "$(CLARITY_PROJECT_ID)",
+        "MIXPANEL_PROJECT_TOKEN": "$(MIXPANEL_PROJECT_TOKEN)",
 
         "UILaunchStoryboardName": "LaunchScreen",
         "UISupportedInterfaceOrientations": [

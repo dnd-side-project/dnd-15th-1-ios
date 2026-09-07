@@ -147,8 +147,9 @@ final class OnboardingFlowSignInTests: XCTestCase {
         let store = TestStore(initialState: OnboardingFlowFeature.State()) {
             OnboardingFlowFeature()
         } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
             $0.authClient.login = { _ in
-                AuthBootstrap(session: session, isOnboardingCompleted: false)
+                AuthBootstrap(session: session, isOnboardingCompleted: false, isNewMember: false)
             }
         }
 
@@ -164,6 +165,7 @@ final class OnboardingFlowSignInTests: XCTestCase {
             $0.path = [.nickname]
         }
         await store.receive(\.delegate.authenticated)
+        await store.finish()
     }
 
     func test_로그인성공_온보딩완료_스택은_로그인그대로() async {
