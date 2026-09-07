@@ -48,5 +48,6 @@ xcodebuild -workspace Dulpick.xcworkspace -scheme Feature \
   -destination 'platform=iOS Simulator,name=iPhone 14' test
 # 이름이 없으면: xcrun simctl list devices available | grep iPhone
 
-xcrun simctl openurl booted "dulpick://home"
+xcrun simctl openurl booted "dulpickdebug://home"
+# 배포 빌드(Dulpick) 는 dulpick://home
 ```
