@@ -1,12 +1,18 @@
 import SharedLogger
 import ThirdPartyUI
 
-/// 클라리티 세션 녹화 초기화.
+/// 클라리티 세션 녹화와 믹스패널 이벤트 초기화.
 ///
 /// App 이 앱 시작 때 한 번 부른다. SDK 를 아는 것은 이 모듈뿐이다
 public enum AnalyticsBootstrap {
     @MainActor
-    public static func run(projectID: String) {
+    public static func run(_ configuration: AnalyticsConfiguration) {
+        startClarity(projectID: configuration.clarityProjectID)
+        startMixpanel(token: configuration.mixpanelToken)
+    }
+
+    @MainActor
+    private static func startClarity(projectID: String) {
         guard isEnabled(projectID: projectID) else {
             Logger.shared.info("클라리티 프로젝트 ID 가 비어 초기화를 건너뛴다", category: .app)
             return
@@ -17,6 +23,17 @@ public enum AnalyticsBootstrap {
         if !didStart {
             Logger.shared.error("클라리티 초기화에 실패했다", category: .app)
         }
+    }
+
+    @MainActor
+    private static func startMixpanel(token: String) {
+        guard isEnabled(projectID: token) else {
+            Logger.shared.info("믹스패널 토큰이 비어 초기화를 건너뛴다", category: .app)
+            return
+        }
+
+        Mixpanel.initialize(token: token, trackAutomaticEvents: true)
+        AnalyticsRuntime.enable()
     }
 
     /// 프로젝트 ID 가 실제 값인지 가른다. 공백만 있는 값은 빈 값으로 본다
