@@ -41,7 +41,7 @@ public enum DefaultInfoPlist {
             [
                 "CFBundleTypeRole": "Editor",
                 "CFBundleURLName": "$(PRODUCT_BUNDLE_IDENTIFIER)",
-                "CFBundleURLSchemes": ["dulpick"],
+                "CFBundleURLSchemes": ["$(APP_URL_SCHEME)"],
             ],
             [
                 "CFBundleTypeRole": "Editor",

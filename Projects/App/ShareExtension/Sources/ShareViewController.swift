@@ -68,10 +68,26 @@ final class ShareViewController: UIViewController {
         close()
     }
 
+    // 개발 앱과 배포 앱이 같이 깔려도 자기 앱을 열도록, 구성별 주소를 자기 번들에서 읽는다.
+    // 값은 빌드 설정 APP_URL_SCHEME 이 확장 Info.plist 로 넣어 준다.
+    private static let urlSchemeInfoKey = "APP_URL_SCHEME"
+
+    private func urlScheme() -> String? {
+        guard
+            let scheme = Bundle.main.object(forInfoDictionaryKey: Self.urlSchemeInfoKey) as? String,
+            !scheme.isEmpty
+        else {
+            assertionFailure("확장 Info.plist 의 APP_URL_SCHEME 이 없거나 비어 있다")
+            return nil
+        }
+        return scheme
+    }
+
     private func deepLink(for sharedURL: URL?) -> URL? {
         guard
             let sharedURL,
-            var components = URLComponents(string: "dulpick://import")
+            let scheme = urlScheme(),
+            var components = URLComponents(string: "\(scheme)://import")
         else {
             return nil
         }

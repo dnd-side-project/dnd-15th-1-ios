@@ -57,12 +57,16 @@ public enum ProjectSettings {
     public static func shareExtension() -> Settings {
         let debugSettings = debug.merging([
             "PRODUCT_BUNDLE_IDENTIFIER": .string(ProjectEnvironment.AppBundle.debug + ".ShareExtension"),
+            "APP_DISPLAY_NAME": .string(ProjectEnvironment.displayName + " Dev"),
+            "APP_URL_SCHEME": .string(ProjectEnvironment.URLScheme.debug),
             "GENERATE_INFOPLIST_FILE": "NO",
             "TARGETED_DEVICE_FAMILY": "1",
         ]) { _, new in new }
 
         let releaseSettings = release.merging([
             "PRODUCT_BUNDLE_IDENTIFIER": .string(ProjectEnvironment.AppBundle.release + ".ShareExtension"),
+            "APP_DISPLAY_NAME": .string(ProjectEnvironment.displayName),
+            "APP_URL_SCHEME": .string(ProjectEnvironment.URLScheme.release),
             "GENERATE_INFOPLIST_FILE": "NO",
             "TARGETED_DEVICE_FAMILY": "1",
         ]) { _, new in new }
@@ -88,6 +92,7 @@ public enum ProjectSettings {
         let debugSettings = debug.merging([
             "PRODUCT_BUNDLE_IDENTIFIER": .string(ProjectEnvironment.AppBundle.debug),
             "APP_DISPLAY_NAME": .string(ProjectEnvironment.displayName + " Dev"),
+            "APP_URL_SCHEME": .string(ProjectEnvironment.URLScheme.debug),
             "PRODUCT_NAME": .string(ProjectEnvironment.productName),
             "GENERATE_INFOPLIST_FILE": "NO",
             "TARGETED_DEVICE_FAMILY": "1",
@@ -99,6 +104,7 @@ public enum ProjectSettings {
         let releaseSettings = release.merging([
             "PRODUCT_BUNDLE_IDENTIFIER": .string(ProjectEnvironment.AppBundle.release),
             "APP_DISPLAY_NAME": .string(ProjectEnvironment.displayName),
+            "APP_URL_SCHEME": .string(ProjectEnvironment.URLScheme.release),
             "PRODUCT_NAME": .string(ProjectEnvironment.productName),
             "GENERATE_INFOPLIST_FILE": "NO",
             "TARGETED_DEVICE_FAMILY": "1",

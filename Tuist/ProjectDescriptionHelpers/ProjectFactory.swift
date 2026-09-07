@@ -217,7 +217,8 @@ public enum ProjectFactory {
     /// 공유시트에 노출되는 Share Extension 타겟.
     private static func shareExtensionTarget() -> Target {
         let infoPlist: InfoPlist = .extendingDefault(with: [
-            "CFBundleDisplayName": .string(ProjectEnvironment.displayName),
+            "CFBundleDisplayName": "$(APP_DISPLAY_NAME)",
+            "APP_URL_SCHEME": "$(APP_URL_SCHEME)",
             "CFBundleShortVersionString": .string(ProjectEnvironment.appVersion),
             "CFBundleVersion": .string(ProjectEnvironment.appBuildNumber),
             "NSExtension": [
