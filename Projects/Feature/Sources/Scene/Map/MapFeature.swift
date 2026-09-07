@@ -176,6 +176,8 @@ public struct MapFeature {
     @Dependency(\.coupleClient) var coupleClient
     @Dependency(\.courseClient) var courseClient
     @Dependency(\.locationClient) var locationClient
+    @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.authClient) var authClient
 
     public init() {}
 
@@ -345,10 +347,19 @@ private extension MapFeature {
             return .send(.delegate(.searchRequested))
 
         case .courseButtonTapped:
+            let event: AnalyticsEvent = state.currentCourse == nil
+                ? .courseCreateStarted(entryPoint: .mapFloatingButton)
+                : .courseViewed(entryPoint: .mapFloatingButton)
             if let id = state.currentCourse?.id {
-                return .send(.delegate(.courseResultRequested(dateCourseID: id)))
+                return .merge(
+                    .run { [analyticsClient] _ in await analyticsClient.track(event) },
+                    .send(.delegate(.courseResultRequested(dateCourseID: id)))
+                )
             }
-            return .send(.delegate(.courseRequested))
+            return .merge(
+                .run { [analyticsClient] _ in await analyticsClient.track(event) },
+                .send(.delegate(.courseRequested))
+            )
 
         default:
             // core 가 이 묶음으로 안 보내는 액션이라 도달하지 않는다.
@@ -510,7 +521,10 @@ private extension MapFeature {
         case let .bookmarkSaved(id, saved):
             state.savedServerIDs[id] = saved.place.id
             state.applySavedPlace(saved)
-            return .none
+            return .run { [analyticsClient, authClient] _ in
+                let userID = (try? await authClient.currentSession())?.userID ?? ""
+                await analyticsClient.track(.placeSaveCompleted(saveSource: .inApp, userID: userID))
+            }
         case let .bookmarkRemoved(id):
             let serverID = state.savedServerIDs[id] ?? id
             state.places.removeAll { $0.id == serverID }
@@ -551,7 +565,7 @@ private extension MapFeature {
         serverID: String?,
         wasBookmarked: Bool
     ) -> Effect<Action> {
-        .run { [placeClient] send in
+        let request = Effect<Action>.run { [placeClient] send in
             do {
                 if wasBookmarked {
                     try await placeClient.removePlace(serverID ?? place.id)
@@ -565,6 +579,13 @@ private extension MapFeature {
             }
         }
         .cancellable(id: CancelID.bookmark(id), cancelInFlight: true)
+        guard !wasBookmarked else { return request }
+        return .merge(
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.placeSaveStarted(saveSource: .inApp))
+            },
+            request
+        )
     }
 
     func updateDelete(state: inout State, action: Action) -> Effect<Action> {
