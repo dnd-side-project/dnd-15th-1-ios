@@ -97,10 +97,11 @@ public struct HomeView: View {
         .padding(.top, 40)
         .padding(.bottom, 40)
         .frame(maxWidth: .infinity)
-        .background(Color.bgDefault)
-        .clipShape(
+        // 내용을 자르면 그 안에서 세션 녹화 마스킹이 안 걸린다. 바탕만 둥근 모양으로 그린다
+        .background {
             UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24)
-        )
+                .fill(Color.bgDefault)
+        }
         .background(alignment: .top) {
             Color.gray900
                 .frame(height: 24)
