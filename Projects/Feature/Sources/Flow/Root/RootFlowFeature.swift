@@ -11,6 +11,8 @@ public struct RootFlowFeature {
         public var pendingDeepLink: DeepLinkRoute?
         public var overlay = OverlayFeature.State()
         @Presents public var placeImport: PlaceImportFeature.State?
+        /// 앱 실행 이벤트를 이미 보냈는지. 화면이 다시 나타나도 두 번 보내지 않으려고 둔다.
+        /// 앱이 살아 있는 동안 유지되고 되돌아가지 않는다
         public var didTrackAppOpened = false
 
         public init(

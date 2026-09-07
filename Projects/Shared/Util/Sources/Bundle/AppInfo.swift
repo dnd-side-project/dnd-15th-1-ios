@@ -45,6 +45,7 @@ public enum AppInfo {
         string(.clarityProjectID) ?? ""
     }
 
+    /// 믹스패널 프로젝트 토큰. 비어 있으면 초기화를 건너뛴다
     public static var mixpanelProjectToken: String {
         string(.mixpanelProjectToken) ?? ""
     }
