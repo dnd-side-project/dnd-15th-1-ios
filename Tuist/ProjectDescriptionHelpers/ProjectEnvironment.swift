@@ -23,6 +23,13 @@ public enum ProjectEnvironment {
         public static let release = "\(ProjectEnvironment.bundlePrefix).app"
     }
 
+    /// 딥링크 주소. 개발 앱과 배포 앱이 한 기기에 같이 깔려도 서로를 열지 않게 가른다.
+    /// 배포 값 `dulpick` 은 출시된 앱이 쓰는 값이라 바꾸면 밖에 나간 링크가 깨진다.
+    public enum URLScheme {
+        public static let debug = "dulpickdebug"
+        public static let release = "dulpick"
+    }
+
     public static func moduleBundleId(_ suffix: String) -> String {
         "\(bundlePrefix).\(suffix)"
     }
