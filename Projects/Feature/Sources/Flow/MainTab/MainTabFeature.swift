@@ -55,6 +55,8 @@ public struct MainTabFeature {
         }
     }
 
+    @Dependency(\.analyticsClient) var analyticsClient
+
     public init() {}
 
     public var body: some ReducerOf<Self> {
@@ -78,7 +80,16 @@ public struct MainTabFeature {
         switch action {
         case let .tabSelected(tab):
             state.selectedTab = tab
-            return .none
+            let event: AnalyticsEvent? = switch tab {
+            case .explore: .exploreViewed
+            case .map: .mapViewed
+            case .myPage: .myPageViewed
+            case .home: nil
+            }
+            guard let event else { return .none }
+            return .run { [analyticsClient] _ in
+                await analyticsClient.track(event)
+            }
         case let .myPage(.delegate(delegate)):
             return handleMyPage(delegate)
         case let .home(.delegate(delegate)):
