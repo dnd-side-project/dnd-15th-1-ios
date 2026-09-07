@@ -45,6 +45,10 @@ public enum AppInfo {
         string(.clarityProjectID) ?? ""
     }
 
+    public static var mixpanelProjectToken: String {
+        string(.mixpanelProjectToken) ?? ""
+    }
+
     public static var googleReversedClientID: String? {
         string(.googleReversedClientID)
     }
