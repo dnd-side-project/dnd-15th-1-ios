@@ -1,5 +1,5 @@
 import Domain
-import Feature
+@testable import Feature
 import SharedDesignSystem
 import ThirdParty
 import XCTest
@@ -26,7 +26,9 @@ final class RootFlowFeatureTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
         await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.success)
         await store.receive(\.bootstrapRoute) {
@@ -45,7 +47,9 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.onboardingClient.hasSeenAppIntro = { true }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
         await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.success)
         await store.receive(\.bootstrapRoute) {
@@ -67,7 +71,9 @@ final class RootFlowFeatureTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
         await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.failure)
         await store.receive(\.bootstrapRoute) {
@@ -84,7 +90,7 @@ final class RootFlowFeatureTests: XCTestCase {
         } withDependencies: {
             $0.continuousClock = clock
             $0.authClient.restoreSession = {
-                AuthBootstrap(session: session, isOnboardingCompleted: true)
+                AuthBootstrap(session: session, isOnboardingCompleted: true, isNewMember: false)
             }
             $0.onboardingClient.hasSeenAppIntro = {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
@@ -93,7 +99,9 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
         await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.success) {
             $0.phase = .mainTab(
@@ -114,7 +122,7 @@ final class RootFlowFeatureTests: XCTestCase {
         } withDependencies: {
             $0.continuousClock = clock
             $0.authClient.restoreSession = {
-                AuthBootstrap(session: session, isOnboardingCompleted: false)
+                AuthBootstrap(session: session, isOnboardingCompleted: false, isNewMember: false)
             }
             $0.onboardingClient.hasSeenAppIntro = {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
@@ -123,7 +131,9 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
         await clock.advance(by: .seconds(1))
         await store.receive(\.sessionRestored.success) {
             $0.phase = .onboardingFlow(.resumingOnboarding)
@@ -148,6 +158,16 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
         }
     }
+}
+
+// 앱인트로·로그아웃 중 딥링크와 세션 만료만 따로 본다
+@MainActor
+final class RootFlowTransitionTests: XCTestCase {
+    private let sampleSession = AuthSession(
+        accessToken: "access",
+        refreshToken: "refresh",
+        userID: "1"
+    )
 
     func test_앱인트로중_홈딥링크_대기유지() async {
         let store = TestStore(
@@ -289,7 +309,9 @@ final class RootFlowSplashTests: XCTestCase {
             $0.onboardingClient.hasSeenAppIntro = { true }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
         await clock.advance(by: .milliseconds(999))
 
         // 아직 1초가 안 됐다. 세션 복원이 끝났어도 최소 노출은 잠들어 있어야 한다.
@@ -608,7 +630,15 @@ final class RootFlowPushTests: XCTestCase {
         store.exhaustivity = .off
 
         await store.send(
-            .sessionRestored(.success(AuthBootstrap(session: session, isOnboardingCompleted: true)))
+            .sessionRestored(
+                .success(
+                    AuthBootstrap(
+                        session: session,
+                        isOnboardingCompleted: true,
+                        isNewMember: false
+                    )
+                )
+            )
         )
         await store.finish()
 
@@ -675,7 +705,15 @@ final class RootFlowPushTests: XCTestCase {
         store.exhaustivity = .off
 
         await store.send(
-            .sessionRestored(.success(AuthBootstrap(session: session, isOnboardingCompleted: false)))
+            .sessionRestored(
+                .success(
+                    AuthBootstrap(
+                        session: session,
+                        isOnboardingCompleted: false,
+                        isNewMember: false
+                    )
+                )
+            )
         )
         continuation.yield("fcm-token")
         await fulfillment(of: [firstRegistered], timeout: 1)
@@ -687,5 +725,226 @@ final class RootFlowPushTests: XCTestCase {
         await store.finish()
 
         XCTAssertEqual(registered.value, ["fcm-token"])
+    }
+}
+
+@MainActor
+final class RootFlowAppOpenedAnalyticsTests: XCTestCase {
+    func test_시작_액션이_오면_앱_실행_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let clock = TestClock()
+        let store = TestStore(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.authClient.restoreSession = { nil }
+            $0.onboardingClient.hasSeenAppIntro = { true }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.sessionRestored.success)
+        await store.receive(\.bootstrapRoute) {
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
+        }
+        await store.finish()
+
+        XCTAssertEqual(sent.value, [.appOpened])
+    }
+
+    func test_시작_액션을_두_번_보내도_앱_실행_이벤트는_한_번만_나간다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let clock = TestClock()
+        let store = TestStore(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.authClient.restoreSession = { nil }
+            $0.onboardingClient.hasSeenAppIntro = { true }
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.sessionRestored.success)
+        await store.receive(\.bootstrapRoute) {
+            $0.phase = .onboardingFlow(OnboardingFlowFeature.State())
+        }
+
+        await store.send(.onAppear)
+        await store.finish()
+
+        XCTAssertEqual(sent.value, [.appOpened])
+    }
+}
+
+@MainActor
+final class RootFlowAnalyticsTests: XCTestCase {
+    func test_딥링크를_받으면_공유_진입_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        guard let url = URL(string: "dulpick://import?url=https://blog.example.com/post") else {
+            return XCTFail("유효한 URL을 만들지 못했습니다.")
+        }
+        guard let importURL = URL(string: "https://blog.example.com/post") else {
+            return XCTFail("유효한 URL을 만들지 못했습니다.")
+        }
+        let store = TestStore(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.deepLinkReceived(url))
+        await store.receive(\.routeDeepLink) {
+            $0.pendingDeepLink = .placeImport(url: importURL)
+        }
+        await store.finish()
+        XCTAssertEqual(sent.value, [.shareImportStarted])
+    }
+}
+
+@MainActor
+final class RootFlowFeatureIdentityTests: XCTestCase {
+    private let sampleSession = AuthSession(
+        accessToken: "access",
+        refreshToken: "refresh",
+        userID: "1"
+    )
+
+    func test_세션이_복구되면_사람을_묶는다() async {
+        let identified = LockIsolated<[String]>([])
+        let session = sampleSession
+        let clock = TestClock()
+        let store = TestStore(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.authClient.restoreSession = {
+                AuthBootstrap(session: session, isOnboardingCompleted: true, isNewMember: false)
+            }
+            $0.onboardingClient.hasSeenAppIntro = {
+                XCTFail("hasSeenAppIntro must not be called when session exists")
+                return false
+            }
+            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.analyticsClient.identify = { userID in
+                identified.withValue { $0.append(userID) }
+            }
+        }
+
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.sessionRestored.success) {
+            $0.phase = .mainTab(
+                MainTabFeature.State(
+                    selectedTab: .home,
+                    myPage: MyPageFeature.State()
+                )
+            )
+        }
+        await store.receive(\.flushPendingDeepLink)
+        await store.finish()
+
+        XCTAssertEqual(identified.value, ["1"])
+    }
+
+    func test_로그아웃하면_묶음을_끊는다() async {
+        let didReset = LockIsolated(false)
+        let store = TestStore(
+            initialState: RootFlowFeature.State(
+                phase: .mainTab(
+                    MainTabFeature.State(
+                        myPage: MyPageFeature.State()
+                    )
+                )
+            )
+        ) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.onboardingClient.hasSeenAppIntro = {
+                XCTFail("hasSeenAppIntro must not be consulted on logout")
+                return false
+            }
+            $0.analyticsClient.reset = {
+                didReset.setValue(true)
+            }
+        }
+
+        await store.send(.mainTab(.delegate(.logoutSucceeded))) {
+            $0.phase = .onboardingFlow(
+                OnboardingFlowFeature.State(
+                    auth: AuthFeature.State(toast: ToastState(message: "로그아웃 되었습니다."))
+                )
+            )
+        }
+        await store.finish()
+
+        XCTAssertTrue(didReset.value)
+    }
+
+    func test_온보딩_중_로그아웃하면_묶음을_끊는다() async {
+        let didReset = LockIsolated(false)
+        let store = TestStore(
+            initialState: RootFlowFeature.State(
+                phase: .onboardingFlow(
+                    OnboardingFlowFeature.State(
+                        nickname: NicknameFeature.State(),
+                        path: [.nickname]
+                    )
+                )
+            )
+        ) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.analyticsClient.reset = {
+                didReset.setValue(true)
+            }
+        }
+
+        // 스택은 이미 로그인 root 로 물러난 뒤 signedOut 만 올라온다
+        await store.send(.onboardingFlow(.delegate(.signedOut)))
+        await store.finish()
+
+        XCTAssertTrue(didReset.value)
+    }
+
+    func test_온보딩_미완료_세션이_복구되면_사람을_묶는다() async {
+        let identified = LockIsolated<[String]>([])
+        let session = sampleSession
+        let clock = TestClock()
+        let store = TestStore(initialState: RootFlowFeature.State()) {
+            RootFlowFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.authClient.restoreSession = {
+                AuthBootstrap(session: session, isOnboardingCompleted: false, isNewMember: false)
+            }
+            $0.onboardingClient.hasSeenAppIntro = {
+                XCTFail("hasSeenAppIntro must not be called when session exists")
+                return false
+            }
+            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.analyticsClient.identify = { userID in
+                identified.withValue { $0.append(userID) }
+            }
+        }
+
+        await store.send(.onAppear) {
+            $0.didTrackAppOpened = true
+        }
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.sessionRestored.success) {
+            $0.phase = .onboardingFlow(.resumingOnboarding)
+        }
+        await store.finish()
+
+        XCTAssertEqual(identified.value, ["1"])
     }
 }

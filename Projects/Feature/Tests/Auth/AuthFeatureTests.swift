@@ -1,5 +1,5 @@
 import Domain
-import Feature
+@testable import Feature
 import SharedDesignSystem
 import ThirdParty
 import XCTest
@@ -78,6 +78,50 @@ final class AuthFeatureTests: XCTestCase {
         XCTAssertEqual(loginCount.value, 1)
     }
 
+    func test_신규_회원의_로그인_성공에만_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(initialState: AuthFeature.State()) {
+            AuthFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.loginResponse(.success(AuthBootstrapFixtures.fixtureNewMember(session: session))))
+        await store.receive(
+            .delegate(
+                .loginSucceeded(
+                    userID: session.userID,
+                    isOnboardingCompleted: true
+                )
+            )
+        )
+        await store.finish()
+        XCTAssertEqual(sent.value, [.loginStarted])
+    }
+
+    func test_기존_회원의_로그인에는_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(initialState: AuthFeature.State()) {
+            AuthFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.loginResponse(.success(AuthBootstrapFixtures.fixtureExistingMember(session: session))))
+        await store.receive(
+            .delegate(
+                .loginSucceeded(
+                    userID: session.userID,
+                    isOnboardingCompleted: true
+                )
+            )
+        )
+        await store.finish()
+        XCTAssertTrue(sent.value.isEmpty)
+    }
+
     func test_로딩중_재탭_무시() async {
         let loginCount = LockIsolated(0)
         let session = self.session
@@ -88,7 +132,7 @@ final class AuthFeatureTests: XCTestCase {
         } withDependencies: {
             $0.authClient.login = { _ in
                 loginCount.withValue { $0 += 1 }
-                return AuthBootstrap(session: session, isOnboardingCompleted: true)
+                return AuthBootstrap(session: session, isOnboardingCompleted: true, isNewMember: false)
             }
         }
 
@@ -112,6 +156,24 @@ final class AuthFeatureTests: XCTestCase {
         }
     }
 
+    private enum AuthBootstrapFixtures {
+        static func fixtureNewMember(session: AuthSession) -> AuthBootstrap {
+            AuthBootstrap(
+                session: session,
+                isOnboardingCompleted: true,
+                isNewMember: true
+            )
+        }
+
+        static func fixtureExistingMember(session: AuthSession) -> AuthBootstrap {
+            AuthBootstrap(
+                session: session,
+                isOnboardingCompleted: true,
+                isNewMember: false
+            )
+        }
+    }
+
     private func assertLoginSuccess(
         provider: AuthProvider,
         isOnboardingCompleted: Bool = true
@@ -121,11 +183,13 @@ final class AuthFeatureTests: XCTestCase {
         let store = TestStore(initialState: AuthFeature.State()) {
             AuthFeature()
         } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
             $0.authClient.login = { value in
                 requested.setValue(value)
                 return AuthBootstrap(
                     session: session,
-                    isOnboardingCompleted: isOnboardingCompleted
+                    isOnboardingCompleted: isOnboardingCompleted,
+                    isNewMember: false
                 )
             }
         }
@@ -147,6 +211,7 @@ final class AuthFeatureTests: XCTestCase {
                 )
             )
         )
+        await store.finish()
         XCTAssertEqual(requested.value, provider)
     }
 
@@ -170,5 +235,106 @@ final class AuthFeatureTests: XCTestCase {
             $0.loadingProvider = nil
             $0.toast = .error(expectedMessage)
         }
+    }
+}
+
+private enum AnalyticsCall: Equatable {
+    case identify(String)
+    case markSignedUp
+    case track(AnalyticsEvent)
+    case reset
+}
+
+@MainActor
+final class AuthFeatureIdentityTests: XCTestCase {
+    private let session = AuthSession(
+        accessToken: "access",
+        refreshToken: "refresh",
+        userID: "1"
+    )
+
+    func test_신규_회원으로_로그인하면_사람을_먼저_묶고_가입일과_첫로그인이_뒤따른다() async {
+        let calls = LockIsolated<[AnalyticsCall]>([])
+        let store = TestStore(initialState: AuthFeature.State()) {
+            AuthFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
+            $0.analyticsClient.identify = { userID in
+                calls.withValue { $0.append(.identify(userID)) }
+            }
+            $0.analyticsClient.markSignedUp = { _ in
+                calls.withValue { $0.append(.markSignedUp) }
+            }
+            $0.analyticsClient.track = { event in
+                calls.withValue { $0.append(.track(event)) }
+            }
+        }
+
+        await store.send(
+            .loginResponse(
+                .success(
+                    AuthBootstrap(
+                        session: session,
+                        isOnboardingCompleted: true,
+                        isNewMember: true
+                    )
+                )
+            )
+        )
+        await store.receive(
+            .delegate(
+                .loginSucceeded(
+                    userID: session.userID,
+                    isOnboardingCompleted: true
+                )
+            )
+        )
+        await store.finish()
+
+        XCTAssertEqual(
+            calls.value,
+            [.identify("1"), .markSignedUp, .track(.loginStarted)]
+        )
+    }
+
+    func test_기존_회원으로_로그인하면_사람만_묶고_가입일은_안_적는다() async {
+        let calls = LockIsolated<[AnalyticsCall]>([])
+        let store = TestStore(initialState: AuthFeature.State()) {
+            AuthFeature()
+        } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
+            $0.analyticsClient.identify = { userID in
+                calls.withValue { $0.append(.identify(userID)) }
+            }
+            $0.analyticsClient.markSignedUp = { _ in
+                calls.withValue { $0.append(.markSignedUp) }
+            }
+            $0.analyticsClient.track = { event in
+                calls.withValue { $0.append(.track(event)) }
+            }
+        }
+
+        await store.send(
+            .loginResponse(
+                .success(
+                    AuthBootstrap(
+                        session: session,
+                        isOnboardingCompleted: true,
+                        isNewMember: false
+                    )
+                )
+            )
+        )
+        await store.receive(
+            .delegate(
+                .loginSucceeded(
+                    userID: session.userID,
+                    isOnboardingCompleted: true
+                )
+            )
+        )
+        await store.finish()
+
+        XCTAssertEqual(calls.value, [.identify("1")])
     }
 }
