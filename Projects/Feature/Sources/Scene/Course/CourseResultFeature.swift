@@ -89,6 +89,8 @@ public struct CourseResultFeature {
     }
 
     @Dependency(\.courseClient) var courseClient
+    @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.authClient) var authClient
 
     public init() {}
 
@@ -205,17 +207,23 @@ private extension CourseResultFeature {
             guard !state.isNotifyingPartner else { return .none }
             state.isNotifyingPartner = true
             let id = state.dateCourseID
-            return .run { [courseClient] send in
-                do {
-                    try await courseClient.notifyPartner(id)
-                    await send(.partnerNotified(nil))
-                } catch let error as CourseError {
-                    await send(.partnerNotified(error))
-                } catch {
-                    await send(.partnerNotified(.unknown))
+            return .merge(
+                .run { [analyticsClient, authClient] _ in
+                    let userID = (try? await authClient.currentSession())?.userID ?? ""
+                    await analyticsClient.track(.courseAlarmStarted(userID: userID))
+                },
+                .run { [courseClient] send in
+                    do {
+                        try await courseClient.notifyPartner(id)
+                        await send(.partnerNotified(nil))
+                    } catch let error as CourseError {
+                        await send(.partnerNotified(error))
+                    } catch {
+                        await send(.partnerNotified(.unknown))
+                    }
                 }
-            }
-            .cancellable(id: CancelID.notify, cancelInFlight: true)
+                .cancellable(id: CancelID.notify, cancelInFlight: true)
+            )
 
         case .partnerNotified(nil):
             state.isNotifyingPartner = false
@@ -244,7 +252,12 @@ private extension CourseResultFeature {
         switch action {
         case .editTapped:
             guard let course = state.course else { return .none }
-            return .send(.delegate(.editRequested(course)))
+            return .merge(
+                .run { [analyticsClient] _ in
+                    await analyticsClient.track(.courseEditStarted)
+                },
+                .send(.delegate(.editRequested(course)))
+            )
 
         case .backTapped:
             return .send(.delegate(.dismissed))

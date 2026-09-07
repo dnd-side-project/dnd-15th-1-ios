@@ -131,6 +131,7 @@ public struct CourseFeature {
 
     @Dependency(\.courseClient) var courseClient
     @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public init() {}
 
@@ -266,17 +267,22 @@ private extension CourseFeature {
 
         let title = DateCourseTitle.make(date: date)
 
-        return .run { [courseClient] send in
-            do {
-                let course = try await courseClient.createCourse(title, date, time)
-                await send(.courseCreated(.success(course)))
-            } catch let error as CourseError {
-                await send(.courseCreated(.failure(error)))
-            } catch {
-                await send(.courseCreated(.failure(.unknown)))
+        return .merge(
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.courseScheduleCompleted)
+            },
+            .run { [courseClient] send in
+                do {
+                    let course = try await courseClient.createCourse(title, date, time)
+                    await send(.courseCreated(.success(course)))
+                } catch let error as CourseError {
+                    await send(.courseCreated(.failure(error)))
+                } catch {
+                    await send(.courseCreated(.failure(.unknown)))
+                }
             }
-        }
-        .cancellable(id: CancelID.createCourse, cancelInFlight: true)
+            .cancellable(id: CancelID.createCourse, cancelInFlight: true)
+        )
     }
 
     func updatePlace(state: inout State, action: Action) -> Effect<Action> {
@@ -291,8 +297,13 @@ private extension CourseFeature {
             return .none
 
         case .rowTapped(let id), .markerTapped(let id):
+            let placeID = CourseMarkerID.placeID(from: id)
+            let wasSelected = state.selectedPlaceIDs.contains(placeID)
             toggle(&state, id: id)
-            return .none
+            guard !wasSelected else { return .none }
+            return .run { [analyticsClient] _ in
+                await analyticsClient.track(.placeAddedToCourse)
+            }
 
         case let .cameraChanged(camera):
             state.camera = camera
@@ -398,21 +409,26 @@ private extension CourseFeature {
             placeIDs: state.selectedPlaceIDs
         )
 
-        return .run { [courseClient] send in
-            do {
-                let course = try await courseClient.updateCourse(
-                    dateCourseID,
-                    content,
-                    version
-                )
-                await send(.courseSaved(.success(course)))
-            } catch let error as CourseError {
-                await send(.courseSaved(.failure(error)))
-            } catch {
-                await send(.courseSaved(.failure(.unknown)))
+        return .merge(
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.courseCreated)
+            },
+            .run { [courseClient] send in
+                do {
+                    let course = try await courseClient.updateCourse(
+                        dateCourseID,
+                        content,
+                        version
+                    )
+                    await send(.courseSaved(.success(course)))
+                } catch let error as CourseError {
+                    await send(.courseSaved(.failure(error)))
+                } catch {
+                    await send(.courseSaved(.failure(.unknown)))
+                }
             }
-        }
-        .cancellable(id: CancelID.saveCourse, cancelInFlight: true)
+            .cancellable(id: CancelID.saveCourse, cancelInFlight: true)
+        )
     }
 
     func reloadCourse(id: String) -> Effect<Action> {
