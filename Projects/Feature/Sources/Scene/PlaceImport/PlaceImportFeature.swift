@@ -123,25 +123,58 @@ public struct PlaceImportFeature {
 
         switch placeImport.nextAction {
         case .wait:
-            guard state.pollCount < maxPollCount else {
-                state.phase = .failed
-                return .none
-            }
-            state.pollCount += 1
-            let delay = placeImport.retryAfterSeconds
-                .flatMap { $0 > 0 ? $0 : nil }
-                ?? fallbackDelay
-            return poll(importId: placeImport.importId, after: delay)
+            return waitAndPoll(state: &state, placeImport: placeImport)
 
         case .selectPlaces:
-            state.phase = .loaded(placeImport)
-            state.selectedIDs = Set(placeImport.candidates.map(\.candidateId))
-            return .none
+            return showCandidates(state: &state, placeImport: placeImport, failWhenEmpty: false)
+
+        case .completed:
+            return showCandidates(state: &state, placeImport: placeImport, failWhenEmpty: true)
+
+        case .noAction:
+            // 서버가 이 값을 언제 주는지 명세에 없다. 작업 상태를 보고 정한다
+            switch placeImport.status {
+            case .completed:
+                return showCandidates(state: &state, placeImport: placeImport, failWhenEmpty: true)
+            case .reviewRequired:
+                return showCandidates(state: &state, placeImport: placeImport, failWhenEmpty: false)
+            case .failed:
+                state.phase = .failed
+                return .none
+            case .received, .processing:
+                return waitAndPoll(state: &state, placeImport: placeImport)
+            }
 
         case .retry:
             state.phase = .failed
             return .none
         }
+    }
+
+    private func waitAndPoll(state: inout State, placeImport: PlaceImport) -> Effect<Action> {
+        guard state.pollCount < maxPollCount else {
+            state.phase = .failed
+            return .none
+        }
+        state.pollCount += 1
+        let delay = placeImport.retryAfterSeconds
+            .flatMap { $0 > 0 ? $0 : nil }
+            ?? fallbackDelay
+        return poll(importId: placeImport.importId, after: delay)
+    }
+
+    private func showCandidates(
+        state: inout State,
+        placeImport: PlaceImport,
+        failWhenEmpty: Bool
+    ) -> Effect<Action> {
+        if failWhenEmpty, placeImport.candidates.isEmpty {
+            state.phase = .failed
+            return .none
+        }
+        state.phase = .loaded(placeImport)
+        state.selectedIDs = Set(placeImport.candidates.map(\.candidateId))
+        return .none
     }
 
     private func start(link: URL) -> Effect<Action> {
