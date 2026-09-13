@@ -41,7 +41,8 @@ final class OnboardingFlowFeatureTests: XCTestCase {
         await store.send(.nickname(.nextButtonTapped)) {
             $0.nickname.isSubmitting = true
         }
-        await store.receive(\.nickname.updateNicknameResponse.success) {
+        await store.receive(\.nickname.updateNicknameResponse.success)
+        await store.receive(\.nickname.nicknameSubmitFinished) {
             $0.nickname.isSubmitting = false
         }
         await store.receive(\.nickname.delegate.nicknameConfirmed) {
@@ -146,8 +147,9 @@ final class OnboardingFlowSignInTests: XCTestCase {
         let store = TestStore(initialState: OnboardingFlowFeature.State()) {
             OnboardingFlowFeature()
         } withDependencies: {
+            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
             $0.authClient.login = { _ in
-                AuthBootstrap(session: session, isOnboardingCompleted: false)
+                AuthBootstrap(session: session, isOnboardingCompleted: false, isNewMember: false)
             }
         }
 
@@ -163,6 +165,7 @@ final class OnboardingFlowSignInTests: XCTestCase {
             $0.path = [.nickname]
         }
         await store.receive(\.delegate.authenticated)
+        await store.finish()
     }
 
     func test_로그인성공_온보딩완료_스택은_로그인그대로() async {
@@ -440,11 +443,16 @@ final class OnboardingFlowSessionExpiredTests: XCTestCase {
             OnboardingFlowFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unauthorized }
+            $0.coupleClient.current = { nil }
         }
 
         await store.send(.couple(.onAppear)) {
             $0.couple?.isLoadingInviteCode = true
             $0.couple?.hasAttemptedInviteCode = true
+            $0.couple?.isCheckingConnection = true
+        }
+        await store.receive(\.couple.connectionStatusResponse.success) {
+            $0.couple?.isCheckingConnection = false
         }
         await store.receive(\.couple.inviteCodeResponse.failure) {
             $0.couple?.isLoadingInviteCode = false

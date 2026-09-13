@@ -8,12 +8,15 @@ let project = ProjectFactory.feature(
         .sharedDesignSystem,
         .sharedLogger,
         .thirdParty,
-        .thirdPartyUI,
+        .coreImageCache,
+        .coreKakaoMap,
+        .coreUserAnalytics,
     ],
     testsDependencies: [
         .domain,
         .sharedDesignSystem,
+        .sharedUtils,
         .thirdParty,
-        .thirdPartyUI,
+        .coreKakaoMap,
     ]
 )

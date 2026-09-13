@@ -1,10 +1,12 @@
+import CoreImageCache
+import CoreKakaoMap
 import CoreNotification
 import CoreSocialAuth
-import Feature
+import CoreUserAnalytics
+import Dependencies
 import Foundation
 import SharedLogger
 import ThirdParty
-import ThirdPartyUI
 
 enum AppBootstrap {
     @MainActor
@@ -12,7 +14,8 @@ enum AppBootstrap {
         SocialAuthBootstrap.run(infra.socialAuthConfig)
         NotificationBootstrap.run(infra.notificationConfig, client: infra.remoteNotificationClient)
         ImageCacheBootstrap.run(namespace: infra.appConfig.bundleID)
-        SDKInitializer.InitSDK(appKey: infra.appConfig.kakaoNativeAppKey)
+        KakaoMapBootstrap.run(appKey: infra.appConfig.kakaoNativeAppKey)
+        AnalyticsBootstrap.run(infra.analyticsConfig)
 
         prepareDependencies {
             Dependencies.register(&$0, infra: infra)

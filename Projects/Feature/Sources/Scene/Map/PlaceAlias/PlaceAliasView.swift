@@ -3,6 +3,7 @@
 //  Dulpick
 //
 
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -34,6 +35,7 @@ public struct PlaceAliasView: View {
                 isFocused: $isAliasFocused,
                 onSubmit: { isAliasFocused = false }
             )
+            .analyticsMasked()
             .padding(.bottom, Spacing.s8)
 
             Text(store.address)

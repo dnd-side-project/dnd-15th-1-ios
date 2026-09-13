@@ -32,7 +32,8 @@ public struct AuthRepository: Sendable {
             }
             return AuthBootstrap(
                 session: AuthDTOMapper.toDomain(session),
-                isOnboardingCompleted: try await resolveOnboardingCompleted(stored: session)
+                isOnboardingCompleted: try await resolveOnboardingCompleted(stored: session),
+                isNewMember: false
             )
         } catch {
             throw AuthErrorMapper.map(error)
@@ -84,7 +85,8 @@ public struct AuthRepository: Sendable {
             // 다시 뜰 뿐 되돌릴 수 있지만, 미완료 사용자를 메인에 넣으면 닉네임 없이 앱이 깨진다.
             return AuthBootstrap(
                 session: AuthDTOMapper.toDomain(session),
-                isOnboardingCompleted: session.isOnboardingCompleted ?? false
+                isOnboardingCompleted: session.isOnboardingCompleted ?? false,
+                isNewMember: response.newMember
             )
         } catch {
             throw AuthErrorMapper.map(error, isLoginPath: true)

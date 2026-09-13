@@ -19,7 +19,8 @@ Projects/
   Shared/{Util,DesignSystem,Logger}   # SharedUtils, SharedDesignSystem, SharedLogger
   ThirdParty/{ThirdParty,ThirdPartyUI,ThirdPartyCore}
   Domain/
-  Core/{Network,Storage}              # CoreNetwork, CoreStorage
+  Core/{Network,Storage,SocialAuth,Notification}   # 데이터 계층이 쓰는 인프라
+  CoreUI/{ImageCache,KakaoMap,UserAnalytics}   # CoreImageCache, CoreKakaoMap, CoreUserAnalytics — 화면이 직접 쓰는 인프라
   Data/
   Feature/
   App/
@@ -27,12 +28,13 @@ Projects/
 
 | 모듈 | 책임 |
 |---|---|
-| SharedUtils | `AppInfo` 등 순수 공통 코드 |
+| SharedUtils | `AppInfo` 등 순수 공통 코드. 위도·경도만 든 `Coordinate` 도 여기 있다 |
 | SharedDesignSystem | UI 토큰/컴포넌트 |
-| SharedLogger | 전 계층 공통 OSLog facade. Feature 는 `Reducer.logged(as:)` 로 Action/State/Navigation/Error 자동 로그 |
+| SharedLogger | 전 계층 공통 OSLog facade. `Reducer.logged(as:)` 자체는 Feature 의 `Sources/Common/Log/FeatureLogReducer.swift` 에 있다 |
 | ThirdParty* | 외부 패키지 진입점. ThirdPartyCore = Alamofire + 소셜 SDK 입구 |
 | Domain | Entity, `*Client`, Error |
-| Core/* | Network/Storage |
+| Core/* | 데이터 계층이 쓰는 인프라. Network / Storage / SocialAuth / Notification |
+| CoreUI/* | 화면 층이 직접 쓰는 인프라. 화면이 창구 없이 직접 import 한다. ImageCache, KakaoMap, UserAnalytics |
 | Data | DTO, DataSource, `*Repository`, `*ClientFactory` |
 | Feature | Flow(Root/Onboarding/MainTab), Scene |
 | App | bootstrap, live 주입, root store |
@@ -40,20 +42,26 @@ Projects/
 ### 의존
 
 ```text
-Feature → Domain, SharedUtils, SharedDesignSystem, SharedLogger, ThirdParty, ThirdPartyUI
-Data    → Domain, Core/*, SharedLogger, SharedUtils
-Domain  → SharedUtils, ThirdParty
-Core/*  → SharedUtils, SharedLogger, ThirdPartyCore
-App     → 조립
+Feature  → Domain, SharedUtils, SharedDesignSystem, SharedLogger, ThirdParty, CoreImageCache, CoreKakaoMap, CoreUserAnalytics
+Data     → Domain, Core/*, SharedLogger, SharedUtils
+Domain   → SharedUtils, ThirdParty
+Core/*   → SharedUtils, SharedLogger, ThirdPartyCore
+CoreUI/* → SharedDesignSystem, SharedUtils, SharedLogger, ThirdPartyUI
+App      → 조립
 ```
+
+App 은 지도 SDK 를 코드로 쓰지 않지만 `KakaoMapsSDK-SPM` 패키지를 직접 물고 있다. 그 프레임워크를 앱 번들에 싣는 통로가 그것뿐이기 때문이다.
+클라리티 SDK(`Clarity`)도 동적 프레임워크라 같은 이유로 App 이 패키지를 한 번 더 문다.
 
 ### 금지
 
 ```text
-Feature → Data / Core* / ThirdPartyCore
-Domain  → Data / Core* / Feature
-Data    → Feature
+Feature → Data / CoreNetwork / CoreStorage / CoreSocialAuth / CoreNotification / ThirdPartyCore / ThirdPartyUI
+Domain  → Data / Core/* / CoreUI/* / Feature
+Data    → Feature / CoreUI/*
 ```
+
+`Core/*` 는 위 코어 네 모듈을 가리킨다. `CoreUI/*` 는 그 별표에 들어가지 않는다.
 
 ---
 

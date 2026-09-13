@@ -97,6 +97,12 @@ public struct AppTextField: View {
                     .strokeBorder(Color.borderDefault, lineWidth: 1)
             }
         }
+        // 입력칸 밖 여백·검색 아이콘을 눌러도 포커스가 잡히게 필드 전체를 탭 대상으로 둔다
+        .contentShape(Rectangle())
+        .onTapGesture {
+            fieldFocus = true
+            isFocused?.wrappedValue = true
+        }
     }
 
     @ViewBuilder

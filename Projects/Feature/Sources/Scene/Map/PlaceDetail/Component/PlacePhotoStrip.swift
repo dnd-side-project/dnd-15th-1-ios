@@ -3,6 +3,7 @@
 //  Dulpick
 //
 
+import CoreImageCache
 import SharedDesignSystem
 import SwiftUI
 

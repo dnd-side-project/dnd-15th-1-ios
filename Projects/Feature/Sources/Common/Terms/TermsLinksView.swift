@@ -6,12 +6,13 @@ struct TermsLinksView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Button(TermsType.service.title) {
-                onSelect(.service)
-            }
-            Text("|")
-            Button(TermsType.privacy.title) {
-                onSelect(.privacy)
+            ForEach(Array(TermsType.allCases.enumerated()), id: \.element.id) { index, terms in
+                if index > 0 {
+                    Text("|")
+                }
+                Button(terms.title) {
+                    onSelect(terms)
+                }
             }
         }
         .buttonStyle(.plain)

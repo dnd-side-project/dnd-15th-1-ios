@@ -5,6 +5,7 @@
 //  Created by 이인호 on 8/7/26.
 //
 
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -39,22 +40,15 @@ public struct SearchView: View {
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.top, Spacing.s20)
+        // 입력칸·버튼 밖 빈 곳을 누르면 키보드를 내린다
+        .contentShape(Rectangle())
+        .onTapGesture { dismissKeyboard() }
         .task { store.send(.onAppear) }
         .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image.arrowLeft
-                        .renderingMode(.template)
-                        .resizable()
-                        .frame(width: 24, height: 24)
-                        .foregroundStyle(Color.textSecondary)
-                }
-            }
+            BackToolbarItem { dismiss() }
             ToolbarItem(placement: .principal) {
                 Text("검색")
                     .typography(.body1SB)
@@ -71,6 +65,7 @@ public struct SearchView: View {
             submitLabel: .search,
             onSubmit: { store.send(.searchSubmitted) }
         )
+        .analyticsMasked()
         .padding(.bottom, 20)
     }
 
@@ -246,6 +241,7 @@ public struct SearchView: View {
                 Text(term)
                     .typography(.body1M)
                     .foregroundStyle(Color.textTertiary)
+                    .analyticsMasked()
             }
             .buttonStyle(.plain)
 

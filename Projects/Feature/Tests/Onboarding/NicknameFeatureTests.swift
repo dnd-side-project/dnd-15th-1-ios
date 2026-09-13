@@ -147,7 +147,8 @@ final class NicknameFeatureTests: XCTestCase {
         await store.send(.nextButtonTapped) {
             $0.isSubmitting = true
         }
-        await store.receive(\.updateNicknameResponse.success) {
+        await store.receive(\.updateNicknameResponse.success)
+        await store.receive(\.nicknameSubmitFinished) {
             $0.isSubmitting = false
         }
         await store.receive(\.delegate.nicknameConfirmed)
@@ -203,18 +204,6 @@ final class NicknameFeatureTests: XCTestCase {
         await store.receive(\.delegate.sessionExpired)
     }
 
-    func test_모두동의_시트_닫힘() async {
-        let store = TestStore(initialState: NicknameFeature.State()) {
-            NicknameFeature()
-        }
-
-        XCTAssertTrue(store.state.isTermsSheetPresented)
-
-        await store.send(.termsAgreeButtonTapped) {
-            $0.isTermsSheetPresented = false
-        }
-    }
-
     func test_뒤로가기_델리게이트_전달_토스트정리() async {
         let store = TestStore(
             initialState: NicknameFeature.State(
@@ -255,5 +244,342 @@ final class NicknameFeatureTests: XCTestCase {
         }
 
         await store.send(.backButtonTapped)
+    }
+}
+
+// 약관 개별 동의는 케이스가 많아 별도 클래스로 둔다. type_body_length 한계 때문이다
+@MainActor
+final class NicknameTermsAgreementTests: XCTestCase {
+    // MARK: - 약관 개별 동의
+
+    func test_체크누르기_켜짐_다시누르면_꺼짐() async {
+        let store = TestStore(initialState: NicknameFeature.State()) {
+            NicknameFeature()
+        }
+
+        await store.send(.termsCheckTapped(.service)) {
+            $0.agreedTerms = [.service]
+        }
+        await store.send(.termsCheckTapped(.service)) {
+            $0.agreedTerms = []
+        }
+    }
+
+    func test_전부꺼짐_버튼문구_모두동의하기() {
+        let state = NicknameFeature.State()
+
+        XCTAssertEqual(state.termsAgreeButtonTitle, "모두 동의하기")
+    }
+
+    func test_필수둘켜짐_버튼문구_완료() {
+        let state = NicknameFeature.State(agreedTerms: [.service, .privacy])
+
+        XCTAssertEqual(state.termsAgreeButtonTitle, "완료")
+    }
+
+    func test_필수하나만켜짐_버튼문구_모두동의하기() {
+        let state = NicknameFeature.State(agreedTerms: [.service])
+
+        XCTAssertEqual(state.termsAgreeButtonTitle, "모두 동의하기")
+    }
+
+    func test_마케팅만켜짐_버튼문구_모두동의하기() {
+        let state = NicknameFeature.State(agreedTerms: [.marketing])
+
+        XCTAssertEqual(state.termsAgreeButtonTitle, "모두 동의하기")
+    }
+
+    func test_전부꺼짐_버튼누름_셋다켜지고_시트닫힘() async {
+        let store = TestStore(initialState: NicknameFeature.State()) {
+            NicknameFeature()
+        }
+
+        XCTAssertTrue(store.state.isTermsSheetPresented)
+
+        await store.send(.termsAgreeButtonTapped) {
+            $0.agreedTerms = [.service, .privacy, .marketing]
+            $0.isTermsSheetPresented = false
+        }
+    }
+
+    func test_필수둘만켜짐_버튼누름_마케팅꺼진채_시트닫힘() async {
+        let store = TestStore(
+            initialState: NicknameFeature.State(agreedTerms: [.service, .privacy])
+        ) {
+            NicknameFeature()
+        }
+
+        await store.send(.termsAgreeButtonTapped) {
+            $0.isTermsSheetPresented = false
+        }
+
+        XCTAssertFalse(store.state.agreedTerms.contains(.marketing))
+    }
+}
+
+// 위 클래스가 type_body_length 한계라 마케팅 알림 케이스는 따로 둔다
+@MainActor
+final class NicknameMarketingNotificationTests: XCTestCase {
+    private let profile = UserProfile(
+        nickname: "둘픽",
+        iconID: 1,
+        datePreference: nil
+    )
+
+    /// 온보딩 시점의 서버 값. 마케팅은 꺼져 있고 동의한 버전이 없다
+    private static let loadedSettings = NotificationSettings(
+        contentSavedEnabled: true,
+        dateScheduleEnabled: false,
+        marketingEnabled: false,
+        marketingConsentVersion: nil,
+        availableMarketingConsentVersion: "v1"
+    )
+
+    // MARK: - 마케팅 동의와 알림 설정
+
+    func test_마케팅동의_닉네임제출_조회후변경_순서대로호출() async {
+        let calls = LockIsolated<[String]>([])
+        let sent = LockIsolated<NotificationSettings?>(nil)
+        let profile = self.profile
+        let loaded = Self.loadedSettings
+        let store = TestStore(
+            initialState: NicknameFeature.State(
+                nickname: "둘픽",
+                isTermsSheetPresented: false,
+                agreedTerms: [.service, .privacy, .marketing]
+            )
+        ) {
+            NicknameFeature()
+        } withDependencies: {
+            $0.profileClient.updateNickname = { _, _ in profile }
+            $0.profileClient.notificationSettings = {
+                calls.withValue { $0.append("load") }
+                return loaded
+            }
+            $0.profileClient.updateNotificationSettings = { settings in
+                calls.withValue { $0.append("update") }
+                sent.setValue(settings)
+                return settings
+            }
+        }
+
+        await store.send(.nextButtonTapped) {
+            $0.isSubmitting = true
+        }
+        await store.receive(\.updateNicknameResponse.success)
+        await store.receive(\.nicknameSubmitFinished) {
+            $0.isSubmitting = false
+        }
+        await store.receive(\.delegate.nicknameConfirmed)
+
+        XCTAssertEqual(calls.value, ["load", "update"])
+    }
+
+    func test_마케팅동의_변경요청_마케팅켜짐_동의버전_조회값() async {
+        let sent = LockIsolated<NotificationSettings?>(nil)
+        let profile = self.profile
+        let loaded = Self.loadedSettings
+        let store = TestStore(
+            initialState: NicknameFeature.State(
+                nickname: "둘픽",
+                isTermsSheetPresented: false,
+                agreedTerms: [.service, .privacy, .marketing]
+            )
+        ) {
+            NicknameFeature()
+        } withDependencies: {
+            $0.profileClient.updateNickname = { _, _ in profile }
+            $0.profileClient.notificationSettings = { loaded }
+            $0.profileClient.updateNotificationSettings = { settings in
+                sent.setValue(settings)
+                return settings
+            }
+        }
+
+        await store.send(.nextButtonTapped) {
+            $0.isSubmitting = true
+        }
+        await store.receive(\.updateNicknameResponse.success)
+        await store.receive(\.nicknameSubmitFinished) {
+            $0.isSubmitting = false
+        }
+        await store.receive(\.delegate.nicknameConfirmed)
+
+        XCTAssertEqual(sent.value?.marketingEnabled, true)
+        XCTAssertEqual(sent.value?.marketingConsentVersion, "v1")
+        // 나머지 두 값은 조회 응답 그대로 되돌려 보낸다
+        XCTAssertEqual(sent.value?.contentSavedEnabled, true)
+        XCTAssertEqual(sent.value?.dateScheduleEnabled, false)
+    }
+
+    func test_마케팅미동의_닉네임제출_알림설정_호출없음() async {
+        let calls = LockIsolated<[String]>([])
+        let profile = self.profile
+        let loaded = Self.loadedSettings
+        let store = TestStore(
+            initialState: NicknameFeature.State(
+                nickname: "둘픽",
+                isTermsSheetPresented: false,
+                agreedTerms: [.service, .privacy]
+            )
+        ) {
+            NicknameFeature()
+        } withDependencies: {
+            $0.profileClient.updateNickname = { _, _ in profile }
+            $0.profileClient.notificationSettings = {
+                calls.withValue { $0.append("load") }
+                return loaded
+            }
+            $0.profileClient.updateNotificationSettings = { settings in
+                calls.withValue { $0.append("update") }
+                return settings
+            }
+        }
+
+        await store.send(.nextButtonTapped) {
+            $0.isSubmitting = true
+        }
+        await store.receive(\.updateNicknameResponse.success)
+        await store.receive(\.nicknameSubmitFinished) {
+            $0.isSubmitting = false
+        }
+        await store.receive(\.delegate.nicknameConfirmed)
+
+        XCTAssertEqual(calls.value, [])
+    }
+
+    func test_알림설정조회실패_다음화면으로_진행() async {
+        let profile = self.profile
+        let store = TestStore(
+            initialState: NicknameFeature.State(
+                nickname: "둘픽",
+                isTermsSheetPresented: false,
+                agreedTerms: [.service, .privacy, .marketing]
+            )
+        ) {
+            NicknameFeature()
+        } withDependencies: {
+            $0.profileClient.updateNickname = { _, _ in profile }
+            $0.profileClient.notificationSettings = { throw ProfileError.unknown }
+            $0.profileClient.updateNotificationSettings = { settings in
+                XCTFail("조회가 실패하면 변경을 부르지 않는다")
+                return settings
+            }
+        }
+
+        await store.send(.nextButtonTapped) {
+            $0.isSubmitting = true
+        }
+        await store.receive(\.updateNicknameResponse.success)
+        await store.receive(\.nicknameSubmitFinished) {
+            $0.isSubmitting = false
+        }
+        await store.receive(\.delegate.nicknameConfirmed)
+
+        XCTAssertNil(store.state.toast)
+    }
+
+    func test_알림설정변경실패_다음화면으로_진행() async {
+        let profile = self.profile
+        let loaded = Self.loadedSettings
+        let store = TestStore(
+            initialState: NicknameFeature.State(
+                nickname: "둘픽",
+                isTermsSheetPresented: false,
+                agreedTerms: [.service, .privacy, .marketing]
+            )
+        ) {
+            NicknameFeature()
+        } withDependencies: {
+            $0.profileClient.updateNickname = { _, _ in profile }
+            $0.profileClient.notificationSettings = { loaded }
+            $0.profileClient.updateNotificationSettings = { _ in throw ProfileError.unknown }
+        }
+
+        await store.send(.nextButtonTapped) {
+            $0.isSubmitting = true
+        }
+        await store.receive(\.updateNicknameResponse.success)
+        await store.receive(\.nicknameSubmitFinished) {
+            $0.isSubmitting = false
+        }
+        await store.receive(\.delegate.nicknameConfirmed)
+
+        XCTAssertNil(store.state.toast)
+    }
+
+    func test_알림설정_도는동안_제출중_유지() async {
+        let profile = self.profile
+        let loaded = Self.loadedSettings
+        let gate = AsyncStream.makeStream(of: Void.self)
+        let store = TestStore(
+            initialState: NicknameFeature.State(
+                nickname: "둘픽",
+                isTermsSheetPresented: false,
+                agreedTerms: [.service, .privacy, .marketing]
+            )
+        ) {
+            NicknameFeature()
+        } withDependencies: {
+            $0.profileClient.updateNickname = { _, _ in profile }
+            $0.profileClient.notificationSettings = {
+                for await _ in gate.stream { break }
+                return loaded
+            }
+            $0.profileClient.updateNotificationSettings = { settings in settings }
+        }
+
+        await store.send(.nextButtonTapped) {
+            $0.isSubmitting = true
+        }
+        await store.receive(\.updateNicknameResponse.success)
+        XCTAssertTrue(store.state.isSubmitting)
+
+        await store.send(.backButtonTapped)
+        await store.send(.nextButtonTapped)
+
+        gate.continuation.finish()
+        await store.receive(\.nicknameSubmitFinished) {
+            $0.isSubmitting = false
+        }
+        await store.receive(\.delegate.nicknameConfirmed)
+    }
+
+    func test_동의버전없음_변경요청_호출없음() async {
+        let profile = self.profile
+        let loaded = NotificationSettings(
+            contentSavedEnabled: true,
+            dateScheduleEnabled: false,
+            marketingEnabled: false,
+            marketingConsentVersion: nil,
+            availableMarketingConsentVersion: nil
+        )
+        let store = TestStore(
+            initialState: NicknameFeature.State(
+                nickname: "둘픽",
+                isTermsSheetPresented: false,
+                agreedTerms: [.service, .privacy, .marketing]
+            )
+        ) {
+            NicknameFeature()
+        } withDependencies: {
+            $0.profileClient.updateNickname = { _, _ in profile }
+            $0.profileClient.notificationSettings = { loaded }
+            $0.profileClient.updateNotificationSettings = { settings in
+                XCTFail("동의 버전이 없으면 변경을 부르지 않는다")
+                return settings
+            }
+        }
+
+        await store.send(.nextButtonTapped) {
+            $0.isSubmitting = true
+        }
+        await store.receive(\.updateNicknameResponse.success)
+        await store.receive(\.nicknameSubmitFinished) {
+            $0.isSubmitting = false
+        }
+        await store.receive(\.delegate.nicknameConfirmed)
+
+        XCTAssertNil(store.state.toast)
     }
 }

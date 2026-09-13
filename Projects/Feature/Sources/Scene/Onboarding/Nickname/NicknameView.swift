@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -78,6 +79,7 @@ public struct NicknameView: View {
                 isFocused: $isNicknameFocused,
                 onSubmit: { isNicknameFocused = false }
             )
+            .analyticsMasked()
             .padding(.horizontal, NicknameFieldMetric.horizontalPadding)
 
             Spacer(minLength: 0)
@@ -100,18 +102,8 @@ public struct NicknameView: View {
         }
     }
 
-    @ToolbarContentBuilder
     private var backToolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button {
-                store.send(.backButtonTapped)
-            } label: {
-                Image.arrowLeft
-                    .renderingMode(.original)
-                    .resizable()
-                    .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
-            }
-        }
+        BackToolbarItem { store.send(.backButtonTapped) }
     }
 
     private var toastBinding: Binding<ToastState?> {
@@ -143,10 +135,6 @@ public struct NicknameView: View {
             set: { _ in }
         )
     }
-}
-
-private enum BackButtonMetric {
-    static let iconSize: CGFloat = 24
 }
 
 private enum TitleMetric {

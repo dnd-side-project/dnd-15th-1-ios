@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 
@@ -9,7 +10,6 @@ private enum CourseDateViewMetric {
     static let titleTopPadding: CGFloat = 28
     static let subtitleTopPadding: CGFloat = Spacing.s8
     static let fieldsTopPadding: CGFloat = Spacing.s32
-    static let backButtonSize: CGFloat = 24
     static let sheetAnimationDuration: Duration = .seconds(Motion.sheetDuration)
 }
 
@@ -43,9 +43,7 @@ public struct CourseDateView: View {
                         .typography(.body1SB)
                         .foregroundStyle(Color.gray900)
                 }
-                ToolbarItem(placement: .topBarLeading) {
-                    backButton
-                }
+                BackToolbarItem { store.send(.backTapped) }
             }
             .toast(item: toastBinding)
             .task { store.send(.onAppear) }
@@ -88,9 +86,11 @@ private extension CourseDateView {
     @ViewBuilder
     var title: some View {
         if let nickname = store.partnerNickname {
+            // 닉네임이 문장에 섞여 있다. 떼어내면 줄바꿈을 잃어 제목 줄째로 가린다
             Text("\(nickname)님과의 데이트\n언제 만날까요?")
                 .typography(.title2B)
                 .foregroundStyle(Color.textPrimary)
+                .analyticsMasked()
         } else {
             Text("언제 만날까요?")
                 .typography(.title2B)
@@ -116,21 +116,6 @@ private extension CourseDateView {
             ) {
                 store.send(.timeFieldTapped)
             }
-        }
-    }
-
-    var backButton: some View {
-        Button {
-            store.send(.backTapped)
-        } label: {
-            Image.arrowLeft
-                .renderingMode(.template)
-                .resizable()
-                .frame(
-                    width: CourseDateViewMetric.backButtonSize,
-                    height: CourseDateViewMetric.backButtonSize
-                )
-                .foregroundStyle(Color.textSecondary)
         }
     }
 

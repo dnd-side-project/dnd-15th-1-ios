@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -124,16 +125,8 @@ public struct MyPageView: View {
         }
     }
 
-    @ToolbarContentBuilder
     private var backToolbarItem: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button { store.send(.pathChanged([])) } label: {
-                Image.arrowLeft
-                    .renderingMode(.original)
-                    .resizable()
-                    .frame(width: 24, height: 24)
-            }
-        }
+        BackToolbarItem { store.send(.pathChanged([])) }
     }
 
     private var profileEditBinding: Binding<Bool> {
@@ -184,6 +177,7 @@ public struct MyPageView: View {
                 Text(store.nickname)
                     .typography(.headline)
                     .foregroundStyle(.textPrimary)
+                    .analyticsMasked()
 
                 AppButton("프로필 수정", style: .outlined, size: .sm) {
                     store.send(.profileEditTapped)

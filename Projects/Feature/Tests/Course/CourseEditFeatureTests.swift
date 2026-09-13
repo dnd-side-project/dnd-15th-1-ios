@@ -271,6 +271,45 @@ final class CourseEditFeatureTests: XCTestCase {
 }
 
 @MainActor
+final class CourseEditAnalyticsTests: XCTestCase {
+
+    func test_장소를_더하면_담기_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = await loadedStore()
+        store.dependencies.analyticsClient.track = { event in
+            sent.withValue { $0.append(event) }
+        }
+        await store.send(.placesAdded([CoursePlaceCandidate.fixture(id: "p9")]))
+        await store.finish()
+        XCTAssertEqual(sent.value, [.placeAddedToCourse])
+    }
+
+    func test_이미_담긴_장소만_더하면_담기_이벤트를_안_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = await loadedStore()
+        store.dependencies.analyticsClient.track = { event in
+            sent.withValue { $0.append(event) }
+        }
+        await store.send(.placesAdded([CoursePlaceCandidate.fixture(id: "p0")]))
+        await store.finish()
+        XCTAssertEqual(sent.value, [])
+    }
+
+    func test_저장을_누르면_수정_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = await loadedStore { _, _, _ in threeStopCourse }
+        store.dependencies.analyticsClient.track = { event in
+            sent.withValue { $0.append(event) }
+        }
+        await store.send(.saveTapped)
+        await store.receive(\.saveResponse)
+        await store.receive(.delegate(.saved(threeStopCourse)))
+        await store.finish()
+        XCTAssertEqual(sent.value, [.courseEdited])
+    }
+}
+
+@MainActor
 final class CourseEditWheelTests: XCTestCase {
     func test_이미_고른_시간이_있으면_휠을_열어도_그_값이다() async {
         let calendar = Calendar.current

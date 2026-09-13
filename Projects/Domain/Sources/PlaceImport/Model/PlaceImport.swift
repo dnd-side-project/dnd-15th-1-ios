@@ -49,6 +49,7 @@ public enum ImportStatus: String, Equatable, Sendable {
     case received = "RECEIVED"
     case processing = "PROCESSING"
     case reviewRequired = "REVIEW_REQUIRED"
+    case completed = "COMPLETED"
     case failed = "FAILED"
 }
 
@@ -56,6 +57,8 @@ public enum ImportNextAction: String, Equatable, Sendable {
     case wait = "WAIT"
     case selectPlaces = "SELECT_PLACES"
     case retry = "RETRY"
+    case completed = "COMPLETED"
+    case noAction = "NONE"
 }
 
 public enum ImportSourceType: String, Equatable, Sendable {

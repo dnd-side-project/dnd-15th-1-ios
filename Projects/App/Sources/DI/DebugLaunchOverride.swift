@@ -37,7 +37,8 @@ enum DebugLaunchOverride {
     private static func incompleteOnboarding(_ bootstrap: AuthBootstrap) -> AuthBootstrap {
         AuthBootstrap(
             session: bootstrap.session,
-            isOnboardingCompleted: false
+            isOnboardingCompleted: false,
+            isNewMember: false
         )
     }
 }

@@ -139,6 +139,8 @@ public struct PlaceDetailFeature {
 
     @Dependency(\.placeClient) var placeClient
     @Dependency(\.exploreClient) var exploreClient
+    @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.authClient) var authClient
 
     public init() {}
 
@@ -209,7 +211,14 @@ public struct PlaceDetailFeature {
             if detail.savedByMe, detail.place.id != detail.place.kakaoPlaceID {
                 state.savedServerID = detail.place.id
             }
-            return loadContents(state: &state)
+            let contentsEffect = loadContents(state: &state)
+            guard detail.savedByMe else { return contentsEffect }
+            return .merge(
+                .run { [analyticsClient] _ in
+                    await analyticsClient.track(.savedPlaceDetailViewed)
+                },
+                contentsEffect
+            )
 
         case .detailLoadFailed:
             return loadContents(state: &state)
@@ -270,7 +279,13 @@ public struct PlaceDetailFeature {
 
         case let .bookmarkSaved(saved):
             state.savedServerID = saved.place.id
-            return .send(.delegate(.bookmarkSaved(state.id, saved)))
+            return .merge(
+                .run { [analyticsClient, authClient] _ in
+                    let userID = (try? await authClient.currentSession())?.userID
+                    await analyticsClient.track(.placeSaveCompleted(saveSource: .inApp, userID: userID))
+                },
+                .send(.delegate(.bookmarkSaved(state.id, saved)))
+            )
 
         case let .bookmarkRemoved(serverID):
             return .send(.delegate(.bookmarkRemoved(serverID)))
@@ -332,7 +347,7 @@ private extension PlaceDetailFeature {
     }
 
     func runBookmark(place: Place, serverID: String?, wasBookmarked: Bool) -> Effect<Action> {
-        .run { [placeClient] send in
+        let request = Effect<Action>.run { [placeClient] send in
             do {
                 if wasBookmarked {
                     // 삭제엔 서버 placeId 를 쓴다. 검색 장소는 place.id 가 kakaoId 일 수 있다
@@ -349,5 +364,12 @@ private extension PlaceDetailFeature {
         }
         // 같은 장소를 연달아 누르면 앞 요청은 버린다
         .cancellable(id: CancelID.bookmark, cancelInFlight: true)
+        guard !wasBookmarked else { return request }
+        return .merge(
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.placeSaveStarted(saveSource: .inApp))
+            },
+            request
+        )
     }
 }

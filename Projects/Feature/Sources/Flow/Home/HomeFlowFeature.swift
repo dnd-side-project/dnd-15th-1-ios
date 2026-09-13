@@ -189,7 +189,9 @@ private extension HomeFlowFeature {
             return applyPath([.connect], state: &state)
 
         case .pastDateCoursesRequested:
-            state.pastDateCourses = PastDateCoursesFeature.State()
+            state.pastDateCourses = PastDateCoursesFeature.State(
+                hasCurrentCourse: state.home.upcomingSchedule != nil
+            )
             return applyPath(state.path + [.pastDateCourses], state: &state)
 
         case .courseFlowRequested:
@@ -289,6 +291,8 @@ private extension HomeFlowFeature {
             }
             return .send(.pathChanged(next))
         case let .buildRequested(course):
+            // 코스가 생겼으니, 지난 데이트 화면이 스택에 남아 있으면 만들기 버튼을 숨긴다
+            state.pastDateCourses?.hasCurrentCourse = true
             state.courseResult = CourseResultFeature.State(
                 course: course,
                 dateCourseID: course.id,

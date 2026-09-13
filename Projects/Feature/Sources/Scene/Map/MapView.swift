@@ -1,3 +1,5 @@
+import CoreImageCache
+import CoreKakaoMap
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -126,13 +128,13 @@ private extension MapView {
 
 private extension MapView {
     var map: some View {
-        DulpickMapView(
+        KakaoMapView(
             camera: Binding(
                 get: { store.camera },
                 set: { store.send(.cameraChanged($0)) }
             ),
-            markers: store.markers,
-            onMarkerTap: { store.send(.markerTapped($0)) },
+            pins: store.markers.map(MapMarkerStyle.pin(for:)),
+            onPinTap: { store.send(.markerTapped($0)) },
             onMapTap: { store.send(.rowMenuDismissed) },
             collapsedSheetTop: collapsedSheetTop
         )
@@ -186,7 +188,6 @@ private extension MapView {
             onClear: { store.send(.searchClearTapped) },
             onBack: store.isSearching ? { store.send(.searchBackTapped) } : nil
         )
-        .padding(.horizontal, Spacing.s20)
         .shadow(
             color: Color.commonBlack.opacity(MapViewMetric.topControlsShadowOpacity),
             radius: MapViewMetric.topControlsShadowRadius,
@@ -319,7 +320,7 @@ private extension MapView {
 
     /// 검색 결과 행. 사진을 안 넘기고 우측에 북마크를 둔다
     var searchResultList: some View {
-        VStack(spacing: 0) {
+        LazyVStack(spacing: 0) {
             ForEach(store.searchResults) { place in
                 PlaceListRow(
                     icon: place.category.icon,
@@ -390,7 +391,7 @@ private extension MapView {
     }
 
     var placeList: some View {
-        VStack(spacing: 0) {
+        LazyVStack(spacing: 0) {
             ForEach(store.filteredPlaces) { saved in
                 row(saved, showsDivider: saved.id != store.filteredPlaces.last?.id)
                     // 팝오버는 행 밖으로 나간다. 열린 행을 올려야 아래 행에 덮이지 않는다
@@ -408,7 +409,8 @@ private extension MapView {
             name: saved.alias ?? saved.place.name,
             address: saved.place.address,
             showsDivider: showsDivider,
-            thumbnailURLs: saved.place.thumbnailURLs
+            thumbnailURLs: saved.place.thumbnailURLs,
+            isNameSensitive: saved.alias != nil
         ) { url in
             RemoteImage(url: url, cornerRadius: MapViewMetric.cornerRadius)
         } trailing: {

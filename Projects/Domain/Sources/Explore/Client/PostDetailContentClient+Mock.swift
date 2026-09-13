@@ -1,4 +1,5 @@
 import Foundation
+import SharedUtils
 import ThirdParty
 
 public extension PostDetailContentClient {

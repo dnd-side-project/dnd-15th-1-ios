@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import SharedDesignSystem
 import SwiftUI
 import ThirdParty
@@ -38,6 +39,9 @@ public struct RootFlowView: View {
         // 덮개는 phase 스위치 바깥에 둔다. 아래가 mainTab 으로 바뀐 뒤 그 위에서 내려가야 한다
         .fullScreenCover(isPresented: dateTypeBinding) {
             dateTypeCover
+        }
+        .onChange(of: store.currentScreenName, initial: true) { _, name in
+            AnalyticsScreen.set(name.rawValue)
         }
         .task {
             store.send(.onAppear)

@@ -40,6 +40,8 @@ public struct AuthFeature {
     }
 
     @Dependency(\.authClient) var authClient
+    @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.date) var date
 
     public init() {}
 
@@ -93,13 +95,26 @@ private extension AuthFeature {
         state.loadingProvider = nil
         switch result {
         case let .success(bootstrap):
-            return .send(
+            let userID = bootstrap.session.userID
+            let isNewMember = bootstrap.isNewMember
+            let signedUpAt = date.now
+            let loginSucceeded = Effect<Action>.send(
                 .delegate(
                     .loginSucceeded(
-                        userID: bootstrap.session.userID,
+                        userID: userID,
                         isOnboardingCompleted: bootstrap.isOnboardingCompleted
                     )
                 )
+            )
+            return .merge(
+                .run { [analyticsClient] _ in
+                    // 사람을 먼저 묶어야 뒤따르는 가입일과 이벤트가 그 사람에게 붙는다
+                    await analyticsClient.identify(userID)
+                    guard isNewMember else { return }
+                    await analyticsClient.markSignedUp(signedUpAt)
+                    await analyticsClient.track(.loginStarted)
+                },
+                loginSucceeded
             )
         case let .failure(error):
             state.toast = toastState(for: error)

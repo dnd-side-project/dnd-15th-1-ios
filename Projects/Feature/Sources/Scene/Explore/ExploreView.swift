@@ -5,6 +5,7 @@
 //  Created by 이인호 on 8/7/26.
 //
 
+import CoreImageCache
 import Domain
 import SharedDesignSystem
 import SwiftUI

@@ -7,6 +7,7 @@
 
 import Domain
 import Foundation
+import SharedUtils
 
 enum ContentDTOMapper {
     static func toDomain(_ dto: ContentPageResponseDTO) -> ContentPage {

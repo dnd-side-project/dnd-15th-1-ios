@@ -1,8 +1,10 @@
 import ComposableArchitecture
+import CoreKakaoMap
 import Domain
 @testable import Feature
 import Foundation
 import SharedDesignSystem
+import SharedUtils
 import XCTest
 
 @MainActor
@@ -166,6 +168,9 @@ final class CourseResultDelegateTests: XCTestCase {
 
     func test_코스_알리기를_누르면_토스트가_뜬다() async {
         let store = resultStore(course: threeStopCourse)
+        store.dependencies.authClient.currentSession = {
+            AuthSession(accessToken: "a", refreshToken: "r", userID: "user")
+        }
         store.dependencies.courseClient.notifyPartner = { id in
             XCTAssertEqual(id, "1")
         }
@@ -180,6 +185,9 @@ final class CourseResultDelegateTests: XCTestCase {
 
     func test_코스_알리기가_실패하면_토스트가_뜬다() async {
         let store = resultStore(course: threeStopCourse)
+        store.dependencies.authClient.currentSession = {
+            AuthSession(accessToken: "a", refreshToken: "r", userID: "user")
+        }
         store.dependencies.courseClient.notifyPartner = { _ in throw CourseError.network }
         await store.send(.notifyTapped) {
             $0.isNotifyingPartner = true
@@ -192,6 +200,9 @@ final class CourseResultDelegateTests: XCTestCase {
 
     func test_코스_알리기가_만료면_sessionExpired가_올라간다() async {
         let store = resultStore(course: threeStopCourse)
+        store.dependencies.authClient.currentSession = {
+            AuthSession(accessToken: "a", refreshToken: "r", userID: "user")
+        }
         store.dependencies.courseClient.notifyPartner = { _ in throw CourseError.unauthorized }
         await store.send(.notifyTapped) {
             $0.isNotifyingPartner = true
@@ -222,6 +233,39 @@ final class CourseResultDelegateTests: XCTestCase {
         let store = resultStore(course: threeStopCourse)
         await store.send(.editTapped)
         await store.receive(.delegate(.editRequested(threeStopCourse)))
+    }
+
+    func test_수정을_누르면_수정시작_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = resultStore(course: threeStopCourse)
+        store.dependencies.analyticsClient.track = { event in
+            sent.withValue { $0.append(event) }
+        }
+        await store.send(.editTapped)
+        await store.receive(.delegate(.editRequested(threeStopCourse)))
+        await store.finish()
+        XCTAssertEqual(sent.value, [.courseEditStarted])
+    }
+
+    func test_알리기를_누르면_알람_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = resultStore(course: threeStopCourse)
+        store.dependencies.analyticsClient.track = { event in
+            sent.withValue { $0.append(event) }
+        }
+        store.dependencies.authClient.currentSession = {
+            AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
+        }
+        store.dependencies.courseClient.notifyPartner = { _ in }
+        await store.send(.notifyTapped) {
+            $0.isNotifyingPartner = true
+        }
+        await store.receive(.partnerNotified(nil)) {
+            $0.isNotifyingPartner = false
+            $0.toast = ToastState(message: "상대에게 코스를 알렸어요")
+        }
+        await store.finish()
+        XCTAssertEqual(sent.value, [.courseAlarmStarted(userID: "user-42")])
     }
 
     func test_뒤로가기를_누르면_dismissed가_올라간다() async {

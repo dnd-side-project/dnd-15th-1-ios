@@ -1,4 +1,5 @@
 import Foundation
+import SharedUtils
 
 /// 코스에 담을 후보 장소. `GET /api/v1/date-courses/places` 가 준다.
 /// 저장 장소 `SavedPlace` 와 응답이 거의 같지만 재사용하지 않는다 —

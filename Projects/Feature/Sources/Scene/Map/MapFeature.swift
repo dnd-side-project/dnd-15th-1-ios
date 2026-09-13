@@ -1,6 +1,8 @@
+import CoreKakaoMap
 import Domain
 import Foundation
 import SharedDesignSystem
+import SharedUtils
 import ThirdParty
 
 @Reducer
@@ -32,6 +34,20 @@ public struct MapFeature {
             }
         }
 
+        /// 낙관적으로 뺀 행. 서버가 실패하면 이걸로 되돌린다
+        public struct PendingDelete: Equatable, Sendable {
+            public let place: SavedPlace
+            public let index: Int
+            /// 이 장소를 가리키던 `savedServerIDs` 의 키들
+            public let serverIDKeys: [String]
+
+            public init(place: SavedPlace, index: Int, serverIDKeys: [String]) {
+                self.place = place
+                self.index = index
+                self.serverIDKeys = serverIDKeys
+            }
+        }
+
         public var camera: MapCamera = .seoulCityHall
         public var mode: Mode = .saved
 
@@ -59,6 +75,9 @@ public struct MapFeature {
         public var menuTargetPlaceID: String?
 
         public var toast: ToastState?
+
+        /// 서버 응답을 기다리는 저장 취소. 키는 뺀 행의 id 다
+        public var pendingDeletes: [String: PendingDelete] = [:]
 
         /// 지금 열린 상세. `nil` 이면 선택 핀을 안 그린다
         public var selectedPlace: SelectedPlace?
@@ -100,6 +119,8 @@ public struct MapFeature {
         case rowMenuDismissed
         case editTapped(String)
         case deleteTapped(String)
+        case deleteSucceeded(id: String)
+        case deleteFailed(id: String)
         case markerTapped(String)
         case rowTapped(String)
         case searchBarTapped
@@ -112,6 +133,8 @@ public struct MapFeature {
         case dismissToast
         case searchResultsApplied(query: String, places: [Place])
         case contentPlacesApplied(places: [Place])
+        /// 상세를 닫고 이전 지도 상태로 되돌린다. 선택 핀이 있으면 그 장소를 가운데 잡는다
+        case modeRestored(State.Mode)
         case searchClearTapped
         case searchBackTapped
         case bookmarkTapped(String)
@@ -135,7 +158,6 @@ public struct MapFeature {
             case courseResultRequested(dateCourseID: String)
             /// 행 메뉴 수정. 흐름이 별칭 시트를 연다
             case aliasRequested(String)
-            case deleteRequested(String)
             /// 세션 만료. RootFlow 까지 올라가 로그인으로 되돌린다
             case sessionExpired
         }
@@ -147,12 +169,15 @@ public struct MapFeature {
         case currentCourse
         case location
         case bookmark(String)
+        case delete(String)
     }
 
     @Dependency(\.placeClient) var placeClient
     @Dependency(\.coupleClient) var coupleClient
     @Dependency(\.courseClient) var courseClient
     @Dependency(\.locationClient) var locationClient
+    @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.authClient) var authClient
 
     public init() {}
 
@@ -171,9 +196,11 @@ public struct MapFeature {
             return updateMap(state: &state, action: action)
         case .categoryTapped, .ownershipSelected, .filtersReset, .rowMenuTapped, .rowMenuDismissed, .dismissToast:
             return updateFilter(state: &state, action: action)
-        case .editTapped, .deleteTapped, .markerTapped, .rowTapped, .searchBarTapped, .courseButtonTapped:
+        case .editTapped, .markerTapped, .rowTapped, .searchBarTapped, .courseButtonTapped:
             return raise(state: &state, action: action)
-        case .searchResultsApplied, .contentPlacesApplied, .searchClearTapped, .searchBackTapped,
+        case .deleteTapped, .deleteSucceeded, .deleteFailed:
+            return updateDelete(state: &state, action: action)
+        case .searchResultsApplied, .contentPlacesApplied, .modeRestored, .searchClearTapped, .searchBackTapped,
              .bookmarkTapped, .bookmarkSaved, .bookmarkRemoved, .bookmarkFailed:
             return updateSearch(state: &state, action: action)
         case .aliasSaved:
@@ -286,17 +313,15 @@ public struct MapFeature {
             return .none
         }
     }
+}
 
+private extension MapFeature {
     /// 이 Scene 밖이 받는 신호는 `delegate` 로 올린다
-    private func raise(state: inout State, action: Action) -> Effect<Action> {
+    func raise(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case let .editTapped(id):
             state.menuTargetPlaceID = nil
             return .send(.delegate(.aliasRequested(id)))
-
-        case let .deleteTapped(id):
-            state.menuTargetPlaceID = nil
-            return .send(.delegate(.deleteRequested(id)))
 
         case let .markerTapped(id):
             // 상세로 넘어가는 길이다. 열린 팝오버를 두면 상세 시트 뒤에 남는다
@@ -322,10 +347,19 @@ public struct MapFeature {
             return .send(.delegate(.searchRequested))
 
         case .courseButtonTapped:
+            let event: AnalyticsEvent = state.currentCourse == nil
+                ? .courseCreateStarted(entryPoint: .mapFloatingButton)
+                : .courseViewed(entryPoint: .mapFloatingButton)
             if let id = state.currentCourse?.id {
-                return .send(.delegate(.courseResultRequested(dateCourseID: id)))
+                return .merge(
+                    .run { [analyticsClient] _ in await analyticsClient.track(event) },
+                    .send(.delegate(.courseResultRequested(dateCourseID: id)))
+                )
             }
-            return .send(.delegate(.courseRequested))
+            return .merge(
+                .run { [analyticsClient] _ in await analyticsClient.track(event) },
+                .send(.delegate(.courseRequested))
+            )
 
         default:
             // core 가 이 묶음으로 안 보내는 액션이라 도달하지 않는다.
@@ -334,9 +368,6 @@ public struct MapFeature {
             return .none
         }
     }
-}
-
-private extension MapFeature {
     func loadPlaces() -> Effect<Action> {
         .run { [placeClient] send in
             do {
@@ -409,7 +440,7 @@ private extension MapFeature {
             }
 
         case let .currentLocationResponse(.success(coordinate)):
-            // 오프셋은 안 건다. 화면 어디에 놓을지는 `DulpickMapView` 가 정한다
+            // 오프셋은 안 건다. 화면 어디에 놓을지는 `KakaoMapView` 가 정한다
             state.camera = .focusing(coordinate, zoomLevel: MapCamera.singlePlaceZoom)
             return .none
 
@@ -461,6 +492,14 @@ private extension MapFeature {
                 state.camera = .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
             }
             return .none
+        case let .modeRestored(mode):
+            state.mode = mode
+            state.menuTargetPlaceID = nil
+            // 되돌린 뒤 보여줄 곳은 지금 열린 상세의 장소다. 저장 목록 첫 행 규칙과 같은 배율을 쓴다
+            if let selected = state.selectedPlace {
+                state.camera = .focusing(selected.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+            }
+            return .none
         case .searchClearTapped:
             state.mode = .saved
             return .none
@@ -482,7 +521,10 @@ private extension MapFeature {
         case let .bookmarkSaved(id, saved):
             state.savedServerIDs[id] = saved.place.id
             state.applySavedPlace(saved)
-            return .none
+            return .run { [analyticsClient, authClient] _ in
+                let userID = (try? await authClient.currentSession())?.userID
+                await analyticsClient.track(.placeSaveCompleted(saveSource: .inApp, userID: userID))
+            }
         case let .bookmarkRemoved(id):
             let serverID = state.savedServerIDs[id] ?? id
             state.places.removeAll { $0.id == serverID }
@@ -523,7 +565,7 @@ private extension MapFeature {
         serverID: String?,
         wasBookmarked: Bool
     ) -> Effect<Action> {
-        .run { [placeClient] send in
+        let request = Effect<Action>.run { [placeClient] send in
             do {
                 if wasBookmarked {
                     try await placeClient.removePlace(serverID ?? place.id)
@@ -537,6 +579,75 @@ private extension MapFeature {
             }
         }
         .cancellable(id: CancelID.bookmark(id), cancelInFlight: true)
+        guard !wasBookmarked else { return request }
+        return .merge(
+            .run { [analyticsClient] _ in
+                await analyticsClient.track(.placeSaveStarted(saveSource: .inApp))
+            },
+            request
+        )
+    }
+
+    func updateDelete(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .deleteTapped(id):
+            state.menuTargetPlaceID = nil
+            return removeSavedPlace(state: &state, id: id)
+
+        case let .deleteSucceeded(id):
+            state.pendingDeletes[id] = nil
+            return .none
+
+        case let .deleteFailed(id):
+            guard let pending = state.pendingDeletes.removeValue(forKey: id) else { return .none }
+            // 취소하는 사이 목록을 다시 받았으면 그 장소가 이미 있다. 그때 끼워넣으면 같은 행이 둘 된다
+            if !state.places.contains(where: { $0.id == id }) {
+                state.places.insert(pending.place, at: min(pending.index, state.places.count))
+            }
+            state.bookmarkedPlaceIDs.insert(id)
+            for key in pending.serverIDKeys {
+                state.bookmarkedPlaceIDs.insert(key)
+                state.savedServerIDs[key] = id
+            }
+            state.toast = ToastState.error("저장을 취소하지 못했어요")
+            return .none
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    /// 저장 목록에서 한 행을 먼저 빼고 서버를 부른다. 실패하면 `deleteFailed` 가 되돌린다
+    func removeSavedPlace(state: inout State, id: String) -> Effect<Action> {
+        guard let index = state.places.firstIndex(where: { $0.id == id }) else { return .none }
+        let removed = state.places.remove(at: index)
+        // 검색 행은 카카오 id 로 이 장소를 가리킨다. 저장 표시와 서버 id 매핑을 같이 빼야 검색이 저장됨으로 안 보인다
+        let serverIDKeys = state.savedServerIDs.filter { $0.value == id }.map(\.key)
+        state.pendingDeletes[id] = State.PendingDelete(
+            place: removed,
+            index: index,
+            serverIDKeys: serverIDKeys
+        )
+        state.bookmarkedPlaceIDs.remove(id)
+        for key in serverIDKeys {
+            state.bookmarkedPlaceIDs.remove(key)
+            state.savedServerIDs.removeValue(forKey: key)
+        }
+        return runDelete(id: id)
+    }
+
+    func runDelete(id: String) -> Effect<Action> {
+        .run { [placeClient] send in
+            do {
+                try await placeClient.removePlace(id)
+                await send(.deleteSucceeded(id: id))
+            } catch {
+                await send(.deleteFailed(id: id))
+            }
+        }
+        // 저장 토글과 이름을 나눈다. 한쪽이 다른 쪽을 끊으면 완료 액션이 안 와 상태가 반쯤 남는다
+        .cancellable(id: CancelID.delete(id), cancelInFlight: true)
     }
 
     func applyAlias(state: inout State, action: Action) -> Effect<Action> {

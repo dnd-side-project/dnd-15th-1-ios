@@ -1,3 +1,4 @@
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -5,6 +6,8 @@ import ThirdParty
 
 public struct CoupleConnectView: View {
     @Bindable public var store: StoreOf<CoupleConnectFeature>
+
+    @Environment(\.scenePhase) private var scenePhase
 
     private let shareButtonStyle = AppButtonStyle(variant: .outlined, size: .xl, fullWidth: true)
 
@@ -26,6 +29,11 @@ public struct CoupleConnectView: View {
             }
             .onAppear {
                 store.send(.onAppear)
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                // 앱이 뒤에 있는 동안 상대가 연결했을 수 있다. 돌아온 순간 한 번 묻는다
+                guard newPhase == .active else { return }
+                store.send(.sceneBecameActive)
             }
             .modal(isPresented: skipConfirmBinding) {
                 ModalContent(
@@ -81,18 +89,8 @@ public struct CoupleConnectView: View {
         .background(Color.bgDefault)
     }
 
-    @ToolbarContentBuilder
     private var backToolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button {
-                store.send(.backButtonTapped)
-            } label: {
-                Image.arrowLeft
-                    .renderingMode(.original)
-                    .resizable()
-                    .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
-            }
-        }
+        BackToolbarItem { store.send(.backButtonTapped) }
     }
 
     private var codeChip: some View {
@@ -112,6 +110,7 @@ public struct CoupleConnectView: View {
                 .typography(.largeTitleB)
                 .foregroundStyle(Color.textPrimary)
                 .multilineTextAlignment(.center)
+                .analyticsMasked()
         } else if let inviteCodeError = store.inviteCodeError {
             inviteCodeFailure(inviteCodeError)
             // 아직 요청 전이면 .task 가 도는 첫 프레임에 실패 UI 가 번쩍이므로 시머로 덮는다
@@ -208,10 +207,6 @@ public struct CoupleConnectView: View {
             }
         )
     }
-}
-
-private enum BackButtonMetric {
-    static let iconSize: CGFloat = 24
 }
 
 private enum TitleMetric {

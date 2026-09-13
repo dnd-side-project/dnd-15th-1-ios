@@ -174,10 +174,9 @@ public struct PlaceImportView: View {
     }
 
     private var saveButton: some View {
-        AppButton(saveTitle, style: .dark, size: .xl, fullWidth: true) {
+        AppButton(store.saveButtonTitle, style: .dark, size: .xl, fullWidth: true) {
             store.send(.saveTapped)
         }
-        .disabled(store.selectedIDs.isEmpty)
     }
 
     // MARK: - Derived
@@ -201,9 +200,5 @@ public struct PlaceImportView: View {
         return stride(from: 0, to: candidates.count, by: 4).map { start in
             Array(candidates[start..<min(start + 4, candidates.count)])
         }
-    }
-
-    private var saveTitle: String {
-        store.isAllSelected ? "모두 저장" : "\(store.selectedIDs.count)곳만 저장"
     }
 }

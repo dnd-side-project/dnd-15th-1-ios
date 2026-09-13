@@ -16,6 +16,9 @@ public struct HomeFlowView: View {
                     destination(route)
                 }
         }
+        // 전환 중 밀려나는 홈 뒤로 흰 컨테이너가 상단 모서리에 비치는 걸 막는다.
+        // 컨테이너 자체 상단을 검정으로 깔아 둔다(밀려나지 않는 레이어)
+        .background(Color.gray900.ignoresSafeArea(edges: .top))
     }
 
     @ViewBuilder

@@ -1,4 +1,5 @@
 import Foundation
+import SharedUtils
 
 /// 게시글 상세가 그리는 값.
 public struct PostDetailContent: Equatable, Identifiable, Sendable {

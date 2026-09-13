@@ -1,6 +1,8 @@
 import ComposableArchitecture
+import CoreKakaoMap
 import Domain
 import SharedDesignSystem
+import SharedUtils
 import SwiftUI
 
 // MARK: - CourseResultMetric
@@ -9,8 +11,6 @@ private enum CourseResultMetric {
     static let skeletonRowCount = 3
     static let skeletonRowHeight: CGFloat = 64
     static let cornerRadius: CGFloat = 12
-    static let backButtonSize: CGFloat = 44
-    static let backButtonIconSide: CGFloat = 24
     static let ctaButtonHeight: CGFloat = 56
     /// 타임라인 마지막 행과 CTA 버튼 윗면 사이
     static let listGapAboveCTA: CGFloat = 20
@@ -70,12 +70,12 @@ private extension CourseResultView {
     }
 
     var map: some View {
-        DulpickMapView(
+        KakaoMapView(
             camera: Binding(
                 get: { store.camera },
                 set: { store.send(.cameraChanged($0)) }
             ),
-            markers: store.markers,
+            pins: store.markers.map(MapMarkerStyle.pin(for:)),
             routes: store.routes,
             collapsedSheetTop: collapsedSheetTop
         )
@@ -84,8 +84,8 @@ private extension CourseResultView {
 
     /// 뒤로가기가 서치바 자리에 선다. 시트 펼침 한계가 그 자리를 기준으로 잡혀 있다
     var backButtonLayer: some View {
-        backButton
-            .padding(.horizontal, Spacing.s20)
+        BackButton { store.send(.backTapped) }
+            .padding(.leading, BackButtonMetric.leadingInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -186,27 +186,6 @@ private extension CourseResultView {
         )
         .frame(maxWidth: .infinity)
         .padding(.top, Spacing.s32)
-    }
-
-    var backButton: some View {
-        Button {
-            store.send(.backTapped)
-        } label: {
-            Image.arrowLeft
-                .renderingMode(.template)
-                .resizable()
-                .frame(
-                    width: CourseResultMetric.backButtonIconSide,
-                    height: CourseResultMetric.backButtonIconSide
-                )
-                .foregroundStyle(Color.textSecondary)
-                .frame(
-                    width: CourseResultMetric.backButtonSize,
-                    height: CourseResultMetric.backButtonSize
-                )
-                .glassCircleBackground()
-        }
-        .buttonStyle(.plain)
     }
 
     var toastBinding: Binding<ToastState?> {

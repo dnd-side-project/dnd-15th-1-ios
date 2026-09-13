@@ -41,6 +41,15 @@ public enum AppInfo {
         requiredString(.firebaseOptionsResource)
     }
 
+    public static var clarityProjectID: String {
+        string(.clarityProjectID) ?? ""
+    }
+
+    /// 믹스패널 프로젝트 토큰. 비어 있으면 초기화를 건너뛴다
+    public static var mixpanelProjectToken: String {
+        string(.mixpanelProjectToken) ?? ""
+    }
+
     public static var googleReversedClientID: String? {
         string(.googleReversedClientID)
     }

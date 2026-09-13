@@ -7,6 +7,7 @@
 
 import Domain
 import Foundation
+import SharedUtils
 
 enum CourseDTOMapper {
     static func toDomain(_ dto: DateCourseResponseDTO) throws -> DateCourse {

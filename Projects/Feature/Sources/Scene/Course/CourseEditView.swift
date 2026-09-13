@@ -1,6 +1,8 @@
 import ComposableArchitecture
+import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
+import SharedUtils
 import SwiftUI
 
 // MARK: - CourseEditMetric
@@ -10,7 +12,6 @@ private enum CourseEditMetric {
     static let titleFieldHeight: CGFloat = 48
     static let titleFieldCornerRadius: CGFloat = 12
     static let trashIconSide: CGFloat = 24
-    static let backButtonIconSide: CGFloat = 24
     static let toastInset = CTALayout.toastInset(buttonHeights: [CTALayout.xlButtonHeight])
     static let sheetAnimationDuration: Duration = .seconds(Motion.sheetDuration)
     static let skeletonSectionTitleWidth: CGFloat = 100
@@ -39,9 +40,7 @@ public struct CourseEditView: View {
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .tabBar)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    backButton
-                }
+                BackToolbarItem { store.send(.backTapped) }
             }
             .toast(
                 item: toastBinding,
@@ -189,6 +188,7 @@ private extension CourseEditView {
             size: .medium,
             style: .filled
         )
+        .analyticsMasked()
     }
 
     var dateTimeRow: some View {
@@ -273,21 +273,6 @@ private extension CourseEditView {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    var backButton: some View {
-        Button {
-            store.send(.backTapped)
-        } label: {
-            Image.arrowLeft
-                .renderingMode(.template)
-                .resizable()
-                .frame(
-                    width: CourseEditMetric.backButtonIconSide,
-                    height: CourseEditMetric.backButtonIconSide
-                )
-                .foregroundStyle(Color.textSecondary)
-        }
     }
 
     var isWheelPresented: Binding<Bool> {

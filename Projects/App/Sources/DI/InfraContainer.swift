@@ -2,6 +2,7 @@ import CoreNetwork
 import CoreNotification
 import CoreSocialAuth
 import CoreStorage
+import CoreUserAnalytics
 import Foundation
 
 struct InfraContainer: Sendable {
@@ -14,6 +15,8 @@ struct InfraContainer: Sendable {
 
     let notificationConfig: NotificationConfiguration
     let remoteNotificationClient: RemoteNotificationClient
+
+    let analyticsConfig: AnalyticsConfiguration
 
     let userDefaults: any UserDefaultsStorage
     let keychain: any KeychainStorage
@@ -37,6 +40,11 @@ extension InfraContainer {
         )
         let remoteNotificationClient = RemoteNotificationClientFactory().make()
 
+        let analyticsConfig = AnalyticsConfiguration(
+            clarityProjectID: appConfig.clarityProjectID,
+            mixpanelToken: appConfig.mixpanelProjectToken
+        )
+
         let bundleID = appConfig.bundleID
         let userDefaults = DefaultUserDefaultsStorage()
         let keychain = DefaultKeychainStorage(service: bundleID)
@@ -48,6 +56,7 @@ extension InfraContainer {
             socialAuthClients: socialAuthClients,
             notificationConfig: notificationConfig,
             remoteNotificationClient: remoteNotificationClient,
+            analyticsConfig: analyticsConfig,
             userDefaults: userDefaults,
             keychain: keychain
         )

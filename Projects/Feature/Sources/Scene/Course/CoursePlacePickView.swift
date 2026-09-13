@@ -1,4 +1,6 @@
 import ComposableArchitecture
+import CoreImageCache
+import CoreKakaoMap
 import Domain
 import SharedDesignSystem
 import SwiftUI
@@ -9,8 +11,6 @@ private enum CoursePlacePickMetric {
     static let cornerRadius: CGFloat = 12
     static let skeletonRowCount = 3
     static let skeletonRowHeight: CGFloat = 64
-    static let backButtonSize: CGFloat = 44
-    static let backButtonIconSide: CGFloat = 24
     static let ctaButtonHeight: CGFloat = 56
     /// 목록 마지막 행과 CTA 버튼 윗면 사이
     static let listGapAboveCTA: CGFloat = 20
@@ -80,13 +80,13 @@ private extension CoursePlacePickView {
     }
 
     var map: some View {
-        DulpickMapView(
+        KakaoMapView(
             camera: Binding(
                 get: { store.camera },
                 set: { store.send(.cameraChanged($0)) }
             ),
-            markers: store.markers,
-            onMarkerTap: { store.send(.markerTapped($0)) },
+            pins: store.markers.map(MapMarkerStyle.pin(for:)),
+            onPinTap: { store.send(.markerTapped($0)) },
             collapsedSheetTop: collapsedSheetTop
         )
         .ignoresSafeArea()
@@ -94,8 +94,8 @@ private extension CoursePlacePickView {
 
     /// 뒤로가기가 서치바 자리에 선다. 시트 펼침 한계가 그 자리를 기준으로 잡혀 있다
     var backButtonLayer: some View {
-        backButton
-            .padding(.horizontal, Spacing.s20)
+        BackButton { store.send(.backTapped) }
+            .padding(.leading, BackButtonMetric.leadingInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -198,7 +198,8 @@ private extension CoursePlacePickView {
             name: candidate.alias ?? candidate.name,
             address: candidate.address,
             showsDivider: showsDivider,
-            thumbnailURLs: candidate.thumbnailURLs
+            thumbnailURLs: candidate.thumbnailURLs,
+            isNameSensitive: candidate.alias != nil
         ) { url in
             RemoteImage(url: url, cornerRadius: CoursePlacePickMetric.cornerRadius)
         } trailing: {
@@ -247,27 +248,6 @@ private extension CoursePlacePickView {
         .frame(maxWidth: .infinity)
         .padding(.top, Spacing.s32)
         .padding(.bottom, ctaCoverPadding)
-    }
-
-    var backButton: some View {
-        Button {
-            store.send(.backTapped)
-        } label: {
-            Image.arrowLeft
-                .renderingMode(.template)
-                .resizable()
-                .frame(
-                    width: CoursePlacePickMetric.backButtonIconSide,
-                    height: CoursePlacePickMetric.backButtonIconSide
-                )
-                .foregroundStyle(Color.textSecondary)
-                .frame(
-                    width: CoursePlacePickMetric.backButtonSize,
-                    height: CoursePlacePickMetric.backButtonSize
-                )
-                .glassCircleBackground()
-        }
-        .buttonStyle(.plain)
     }
 
     /// 메뉴 하나의 열림 바인딩. 하나를 열면 다른 하나가 저절로 닫힌다

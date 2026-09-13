@@ -1,6 +1,6 @@
 import ComposableArchitecture
 import Domain
-import Feature
+@testable import Feature
 import Foundation
 import SharedDesignSystem
 import XCTest
@@ -181,6 +181,8 @@ final class HomeFeatureTests: XCTestCase {
             )
         ) {
             HomeFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { _ in }
         }
 
         await store.send(.bannerTapped)
@@ -211,6 +213,42 @@ final class HomeFeatureTests: XCTestCase {
         }
 
         await store.send(.bannerTapped)
+    }
+
+    func test_코스짜기_요청은_홈배너_진입_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(initialState: HomeFeature.State()) {
+            HomeFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.courseFlowRequested)
+        await store.receive(.delegate(.courseFlowRequested))
+        await store.finish()
+
+        XCTAssertEqual(sent.value, [.courseCreateStarted(entryPoint: .homeBanner)])
+    }
+
+    func test_배너를_누르면_홈배너_코스보기_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(
+            initialState: HomeFeature.State(
+                nickname: "나",
+                partnerName: "짝",
+                upcomingSchedule: bannerCourse
+            )
+        ) {
+            HomeFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.bannerTapped)
+        await store.receive(.delegate(.showCourseResult(dateCourseID: bannerCourse.id, origin: .courseBuilt)))
+        await store.finish()
+
+        XCTAssertEqual(sent.value, [.courseViewed(entryPoint: .homeBanner)])
     }
 }
 

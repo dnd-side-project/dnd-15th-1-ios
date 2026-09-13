@@ -11,17 +11,22 @@ public struct RootFlowFeature {
         public var pendingDeepLink: DeepLinkRoute?
         public var overlay = OverlayFeature.State()
         @Presents public var placeImport: PlaceImportFeature.State?
+        /// 앱 실행 이벤트를 이미 보냈는지. 화면이 다시 나타나도 두 번 보내지 않으려고 둔다.
+        /// 앱이 살아 있는 동안 유지되고 되돌아가지 않는다
+        public var didTrackAppOpened = false
 
         public init(
             phase: Phase = .bootstrapping,
             pendingDeepLink: DeepLinkRoute? = nil,
             overlay: OverlayFeature.State = OverlayFeature.State(),
-            placeImport: PlaceImportFeature.State? = nil
+            placeImport: PlaceImportFeature.State? = nil,
+            didTrackAppOpened: Bool = false
         ) {
             self.phase = phase
             self.pendingDeepLink = pendingDeepLink
             self.overlay = overlay
             self.placeImport = placeImport
+            self.didTrackAppOpened = didTrackAppOpened
         }
 
         /// `onboardingFlow` 는 로그인 root 위에 온보딩이 쌓이는 한 스택이다. 둘은 같은 phase 를 쓴다.
@@ -96,6 +101,7 @@ public struct RootFlowFeature {
     @Dependency(\.onboardingClient) var onboardingClient
     @Dependency(\.notificationClient) var notificationClient
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public init() {}
 
@@ -146,7 +152,10 @@ public struct RootFlowFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
-            return restoreSessionIfNeeded(state: &state)
+            return .merge(
+                trackAppOpenedIfNeeded(state: &state),
+                restoreSessionIfNeeded(state: &state)
+            )
         case let .sessionRestored(result):
             return applySessionRestored(state: &state, result: result)
         case let .bootstrapRoute(route):
@@ -189,6 +198,14 @@ public struct RootFlowFeature {
 }
 
 private extension RootFlowFeature {
+    func trackAppOpenedIfNeeded(state: inout State) -> Effect<Action> {
+        guard !state.didTrackAppOpened else { return .none }
+        state.didTrackAppOpened = true
+        return .run { [analyticsClient] _ in
+            await analyticsClient.track(.appOpened)
+        }
+    }
+
     func restoreSessionIfNeeded(state: inout State) -> Effect<Action> {
         guard case .bootstrapping = state.phase else {
             return .none
@@ -262,7 +279,19 @@ private extension RootFlowFeature {
         guard let route = DeepLinkRouter.parse(url) else {
             return .none
         }
-        return .send(.routeDeepLink(route))
+        // 공유로 들어올 때만 센다. 홈·지도 같은 다른 딥링크는 같은 액션을 타도 이벤트가 아니다
+        let trackShareImport: Effect<Action> =
+            if case .placeImport = route {
+                .run { [analyticsClient] _ in
+                    await analyticsClient.track(.shareImportStarted)
+                }
+            } else {
+                .none
+            }
+        return .merge(
+            trackShareImport,
+            .send(.routeDeepLink(route))
+        )
     }
 
     func routeDeepLink(
@@ -315,8 +344,8 @@ private extension RootFlowFeature {
         case .onboardingCompleted:
             return resolveOnboardingSession()
         case .signedOut:
-            // 스택은 이미 로그인 root 로 물러났다. 구독만 끊는다
-            return .cancel(id: CancelID.pushRegistration)
+            // 스택은 이미 로그인 root 로 물러났다. 구독과 믹스패널 묶음만 끊는다
+            return disconnectAnalyticsSession()
         case .sessionExpired:
             return .send(.sessionExpired)
         }
@@ -344,11 +373,14 @@ private extension RootFlowFeature {
         userID: String,
         isOnboardingCompleted: Bool
     ) -> Effect<Action> {
+        let identify = Effect<Action>.run { [analyticsClient] _ in
+            await analyticsClient.identify(userID)
+        }
         guard isOnboardingCompleted else {
             state.phase = .onboardingFlow(.resumingOnboarding)
-            return registerPushDevice
+            return .merge(identify, registerPushDevice)
         }
-        return .merge(registerPushDevice, moveToMain(state: &state, userID: userID))
+        return .merge(identify, registerPushDevice, moveToMain(state: &state, userID: userID))
     }
 
     func moveToMain(state: inout State, userID: String) -> Effect<Action> {
@@ -372,11 +404,19 @@ private extension RootFlowFeature {
     }
 
     func moveToSignIn(state: inout State, toast: ToastState? = nil) -> Effect<Action> {
-        // 이 경로로 로그인 화면에 돌아오면 푸시 등록 구독을 끊는다
+        // 이 경로로 로그인 화면에 돌아오면 푸시 등록 구독과 믹스패널 묶음을 끊는다
         state.phase = .onboardingFlow(
             OnboardingFlowFeature.State(auth: AuthFeature.State(toast: toast))
         )
-        return .cancel(id: CancelID.pushRegistration)
+        return disconnectAnalyticsSession()
+    }
+
+    /// 푸시 등록 구독과 믹스패널 묶음을 끊는다. 화면은 건드리지 않는다
+    func disconnectAnalyticsSession() -> Effect<Action> {
+        .merge(
+            .cancel(id: CancelID.pushRegistration),
+            .run { [analyticsClient] _ in await analyticsClient.reset() }
+        )
     }
 
     func makeMainState(userID: String) -> MainTabFeature.State {

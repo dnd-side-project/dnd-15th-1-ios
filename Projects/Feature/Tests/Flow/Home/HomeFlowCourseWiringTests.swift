@@ -183,6 +183,64 @@ final class HomeFlowCourseWiringTests: XCTestCase {
 }
 
 @MainActor
+final class HomeFlowPastDateCreateButtonTests: XCTestCase {
+
+    func test_지난데이트_진입시_이번주일정이_있으면_만들기버튼_숨김플래그가_참() async {
+        let store = TestStore(
+            initialState: HomeFlowFeature.State(
+                home: HomeFeature.State(
+                    nickname: "나",
+                    partnerName: "짝",
+                    upcomingSchedule: bannerCourse
+                )
+            )
+        ) {
+            HomeFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.home(.delegate(.pastDateCoursesRequested)))
+
+        XCTAssertEqual(store.state.pastDateCourses?.hasCurrentCourse, true)
+    }
+
+    func test_지난데이트_진입시_이번주일정이_없으면_만들기버튼_숨김플래그가_거짓() async {
+        let store = TestStore(
+            initialState: HomeFlowFeature.State(
+                home: HomeFeature.State(nickname: "나", partnerName: "짝")
+            )
+        ) {
+            HomeFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.home(.delegate(.pastDateCoursesRequested)))
+
+        XCTAssertEqual(store.state.pastDateCourses?.hasCurrentCourse, false)
+    }
+
+    func test_지난데이트에서_코스를_만들면_만들기버튼_숨김플래그가_참으로_갱신() async {
+        var course = CourseFeature.State()
+        course.partnerNickname = "짝"
+        let store = TestStore(
+            initialState: HomeFlowFeature.State(
+                home: HomeFeature.State(nickname: "나", partnerName: "짝"),
+                pastDateCourses: PastDateCoursesFeature.State(hasCurrentCourse: false),
+                course: course,
+                path: [.pastDateCourses, .course, .coursePlacePick]
+            )
+        ) {
+            HomeFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.course(.delegate(.buildRequested(wiringCourse))))
+
+        XCTAssertEqual(store.state.pastDateCourses?.hasCurrentCourse, true)
+    }
+}
+
+@MainActor
 final class HomeFlowCourseEditWiringTests: XCTestCase {
 
     func test_수정을_누르면_경로에_수정_화면이_쌓인다() async {

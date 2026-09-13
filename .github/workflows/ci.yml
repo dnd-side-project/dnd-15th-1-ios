@@ -5,6 +5,14 @@ on:
     branches: [main, dev]
   pull_request:
 
+permissions:
+  contents: read
+
+# Cancel overlapping PR runs; keep push runs on main/dev.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   quality:
     runs-on: macos-15
@@ -33,16 +41,7 @@ jobs:
       - name: SwiftLint
         run: mise exec -- swiftlint lint --strict
 
-      - name: Build
-        run: |
-          xcodebuild \
-            -workspace Dulpick.xcworkspace \
-            -scheme Dulpick-Debug \
-            -destination 'generic/platform=iOS Simulator' \
-            -skipMacroValidation \
-            build
-
-      - name: Test Feature Reducers
+      - name: Select simulator
         run: |
           DESTINATION="$(
             python3 -c '
@@ -63,9 +62,32 @@ jobs:
           '
           )"
           echo "Using destination: $DESTINATION"
+          echo "DESTINATION=$DESTINATION" >> "$GITHUB_ENV"
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .derivedData/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -workspace Dulpick.xcworkspace \
+            -scheme Dulpick-Debug \
+            -destination "$DESTINATION" \
+            -derivedDataPath .derivedData \
+            -skipMacroValidation \
+            build
+
+      - name: Test Feature Reducers
+        run: |
           xcodebuild \
             -workspace Dulpick.xcworkspace \
             -scheme Feature \
             -destination "$DESTINATION" \
+            -derivedDataPath .derivedData \
             -skipMacroValidation \
             test

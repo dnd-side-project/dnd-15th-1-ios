@@ -1,6 +1,8 @@
+import CoreKakaoMap
 import Domain
-import Feature
+@testable import Feature
 import SharedDesignSystem
+import SharedUtils
 import ThirdParty
 import XCTest
 
@@ -575,15 +577,78 @@ final class MapFeatureDelegateTests: XCTestCase {
         await store.receive(\.delegate.aliasRequested)
     }
 
-    func test_삭제를_고르면_팝오버가_닫히고_상위로_올린다() async {
+    func test_저장취소하면_행을_먼저_빼고_서버를_부른다() async {
+        let removedIDs = LockIsolated<[String]>([])
         var state = MapFeature.State()
+        state.places = [.fixture(id: "7"), .fixture(id: "8")]
+        state.bookmarkedPlaceIDs = ["7", "8"]
         state.menuTargetPlaceID = "7"
-        let store = TestStore(initialState: state) { MapFeature() }
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.placeClient.removePlace = { id in
+                removedIDs.withValue { $0.append(id) }
+            }
+        }
 
         await store.send(.deleteTapped("7")) {
             $0.menuTargetPlaceID = nil
+            $0.places = [.fixture(id: "8")]
+            $0.bookmarkedPlaceIDs = ["8"]
+            $0.pendingDeletes = [
+                "7": MapFeature.State.PendingDelete(
+                    place: .fixture(id: "7"),
+                    index: 0,
+                    serverIDKeys: []
+                )
+            ]
         }
-        await store.receive(\.delegate.deleteRequested)
+        await store.receive(\.deleteSucceeded) {
+            $0.pendingDeletes = [:]
+        }
+        XCTAssertEqual(removedIDs.value, ["7"])
+    }
+
+    func test_저장취소가_실패하면_행을_되돌리고_토스트를_띄운다() async {
+        var state = MapFeature.State()
+        state.places = [.fixture(id: "7"), .fixture(id: "8")]
+        state.bookmarkedPlaceIDs = ["7", "8"]
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.placeClient.removePlace = { _ in throw PlaceError.network }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.deleteTapped("7"))
+        await store.receive(\.deleteFailed) {
+            $0.places = [.fixture(id: "7"), .fixture(id: "8")]
+            $0.bookmarkedPlaceIDs = ["7", "8"]
+            $0.pendingDeletes = [:]
+            $0.toast = ToastState.error("저장을 취소하지 못했어요")
+        }
+    }
+
+    func test_저장취소하면_카카오_식별자_저장표시도_같이_빠진다() async {
+        var state = MapFeature.State()
+        state.places = [.fixture(id: "7")]
+        state.bookmarkedPlaceIDs = ["7", "kakao-7"]
+        state.savedServerIDs = ["kakao-7": "7"]
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.placeClient.removePlace = { _ in throw PlaceError.network }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.deleteTapped("7")) {
+            $0.bookmarkedPlaceIDs = []
+            $0.savedServerIDs = [:]
+        }
+        await store.receive(\.deleteFailed) {
+            $0.bookmarkedPlaceIDs = ["7", "kakao-7"]
+            $0.savedServerIDs = ["kakao-7": "7"]
+        }
     }
 
     func test_점세개를_다시_누르면_팝오버가_닫힌다() async {
@@ -598,7 +663,11 @@ final class MapFeatureDelegateTests: XCTestCase {
     }
 
     func test_검색바와_코스버튼도_상위로_올린다() async {
-        let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { _ in }
+        }
 
         await store.send(.searchBarTapped)
         await store.receive(\.delegate.searchRequested)
@@ -610,10 +679,46 @@ final class MapFeatureDelegateTests: XCTestCase {
     func test_예정코스가_있으면_코스버튼은_결과화면을_올린다() async {
         var state = MapFeature.State()
         state.currentCourse = mapCurrentCourse
-        let store = TestStore(initialState: state) { MapFeature() }
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { _ in }
+        }
 
         await store.send(.courseButtonTapped)
         await store.receive(.delegate(.courseResultRequested(dateCourseID: mapCurrentCourse.id)))
+    }
+
+    func test_코스없이_플로팅버튼을_누르면_만들기_시작_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.courseButtonTapped)
+        await store.receive(\.delegate.courseRequested)
+        await store.finish()
+
+        XCTAssertEqual(sent.value, [.courseCreateStarted(entryPoint: .mapFloatingButton)])
+    }
+
+    func test_예정코스가_있을_때_플로팅버튼은_코스보기_이벤트를_보낸다() async {
+        let sent = LockIsolated<[AnalyticsEvent]>([])
+        var state = MapFeature.State()
+        state.currentCourse = mapCurrentCourse
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+        }
+
+        await store.send(.courseButtonTapped)
+        await store.receive(.delegate(.courseResultRequested(dateCourseID: mapCurrentCourse.id)))
+        await store.finish()
+
+        XCTAssertEqual(sent.value, [.courseViewed(entryPoint: .mapFloatingButton)])
     }
 }
 
