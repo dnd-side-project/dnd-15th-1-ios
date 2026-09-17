@@ -52,7 +52,7 @@ public struct CourseEditView: View {
                 ModalContent(
                     title: "변경사항을 저장할까요?",
                     content: "작성중인 내용이 있어요",
-                    image: .saveModal,
+                    image: .modalSave,
                     primaryTitle: "네, 저장할래요",
                     primaryAction: { store.send(.backModalSaveTapped) },
                     secondaryTitle: "아니요",
@@ -263,7 +263,7 @@ private extension CourseEditView {
     var failureState: some View {
         VStack(spacing: Spacing.s16) {
             EmptyStateView(
-                image: .placeEmpty,
+                image: .emptyResult,
                 title: "코스를 불러오지 못했어요",
                 message: "잠시 뒤 다시 시도해주세요"
             )

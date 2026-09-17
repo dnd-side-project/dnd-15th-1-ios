@@ -77,7 +77,7 @@ public struct PlaceImportView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Image.placeEmpty
+            Image.emptyResult
                 .padding(.top, 33)
                 .padding(.bottom, 40)
 

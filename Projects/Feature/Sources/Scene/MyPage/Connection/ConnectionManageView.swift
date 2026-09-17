@@ -47,7 +47,7 @@ public struct ConnectionManageView: View {
             ModalContent(
                 title: "잠깐!\n정말 커플 연결을 끊으시겠어요?",
                 content: "지금까지 저장된 데이터가 모두 날아가요",
-                image: .disconnect,
+                image: .modalWarning,
                 primaryTitle: "연결 끊기",
                 primaryAction: { store.send(.disconnectConfirmed) },
                 secondaryTitle: "취소",
@@ -80,7 +80,7 @@ public struct ConnectionManageView: View {
     }
 
     private var coupleCard: some View {
-        Image.connectionManage
+        Image.illustrationTogether
             .resizable()
             .scaledToFit()
             .overlay(alignment: .topLeading) { badge }
@@ -114,7 +114,7 @@ public struct ConnectionManageView: View {
     }
 
     private var heart: some View {
-        Image.heartWithStroke
+        Image.heartBordered
             .resizable()
             .scaledToFit()
             .frame(width: Self.heartSize, height: Self.heartSize)
@@ -157,11 +157,11 @@ public struct ConnectionManageView: View {
     // 아이콘 ID 를 프로필 이미지로. 미매핑 값은 기본 프로필로
     private func profileImage(for id: Int) -> Image {
         switch id {
-        case 2: .profile2
-        case 3: .profile3
-        case 4: .profile4
-        case 5: .profile5
-        default: .profile1
+        case 2: .profileYellow
+        case 3: .profileGreen
+        case 4: .profileMint
+        case 5: .profilePink
+        default: .profileWhite
         }
     }
 }

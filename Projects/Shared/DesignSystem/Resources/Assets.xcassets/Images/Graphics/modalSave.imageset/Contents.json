@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "modalSave.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

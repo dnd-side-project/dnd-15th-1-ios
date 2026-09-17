@@ -45,7 +45,7 @@ struct CoupleCompleteView: View {
 
     private var artwork: some View {
         VStack(spacing: ArtworkMetric.pillSpacing) {
-            Image.coupleConnectComplete
+            Image.illustrationConnected
                 .resizable()
                 .scaledToFit()
 

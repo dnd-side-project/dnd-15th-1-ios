@@ -24,7 +24,7 @@ struct PostPlaceRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Button(action: onBookmarkTap) {
-                (isSavedLocally ? Image.bookmarkFillColor : Image.bookmarkStroke)
+                (isSavedLocally ? Image.bookmarkFilled : Image.bookmarkEmpty)
                     .resizable()
                     .frame(width: PostDetailMetric.iconSize, height: PostDetailMetric.iconSize)
             }

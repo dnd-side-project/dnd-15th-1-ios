@@ -72,7 +72,7 @@ struct TermsAgreementSheet: View {
             Button {
                 store.send(.termsDetailTapped(terms))
             } label: {
-                Image.arrowRight
+                Image.chevronRight
                     .renderingMode(.template)
                     .resizable()
                     .frame(width: TermsRowMetric.arrowIconSize, height: TermsRowMetric.arrowIconSize)
@@ -87,7 +87,7 @@ struct TermsAgreementSheet: View {
     }
 
     private func checkIcon(isOn: Bool) -> some View {
-        (isOn ? Image.checkTrue : Image.checkFalse)
+        (isOn ? Image.checkFilled : Image.checkEmpty)
             .renderingMode(.original)
             .resizable()
             .frame(width: CheckIconMetric.iconSize, height: CheckIconMetric.iconSize)

@@ -4,11 +4,11 @@ import SwiftUI
 struct SplashView: View {
     var body: some View {
         ZStack {
-            Image.splashBackground
+            Image.backgroundLaunch
                 .resizable()
                 .scaledToFill()
 
-            Image.splashBundle
+            Image.brandLockup
                 .resizable()
                 .scaledToFit()
                 .frame(width: SplashMetric.bundleWidth, height: SplashMetric.bundleHeight)
