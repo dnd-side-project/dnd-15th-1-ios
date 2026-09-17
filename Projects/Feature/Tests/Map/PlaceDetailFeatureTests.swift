@@ -86,7 +86,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(.detailLoaded(updated)) {
             $0.place = Place(
                 id: $0.id,
@@ -135,7 +135,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoaded) {
             $0.place = Place(
                 id: $0.id,
@@ -171,7 +171,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoadFailed) {
             $0.contentsLoadState = .loading
         }
@@ -207,7 +207,7 @@ final class PlaceDetailFeatureTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoaded) {
             $0.place = Place(
                 id: $0.id,
@@ -326,7 +326,7 @@ final class PlaceDetailFeatureSavedServerIDTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoaded) {
             $0.place = Place(
                 id: $0.id,
@@ -391,7 +391,7 @@ final class PlaceDetailFeatureMapTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoaded) {
             $0.place = Place(
                 id: $0.id,
@@ -440,7 +440,7 @@ final class PlaceDetailFeatureMapTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoadFailed) {
             $0.contentsLoadState = .loading
         }
@@ -495,7 +495,7 @@ final class PlaceDetailFeatureContentsTests: XCTestCase {
             }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoaded) {
             $0.place = Place(
                 id: $0.id,
@@ -567,7 +567,7 @@ final class PlaceDetailFeatureContentsTests: XCTestCase {
             $0.exploreClient.placeContents = { _, _, _ in throw ExploreError.network }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoaded) {
             $0.place = Place(
                 id: $0.id,
@@ -629,7 +629,7 @@ final class PlaceDetailFeatureContentsTests: XCTestCase {
             $0.exploreClient.placeContents = { _, _, _ in loaded }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoadFailed) {
             $0.contentsLoadState = .loading
         }
@@ -664,7 +664,7 @@ final class PlaceDetailFeatureContentsTests: XCTestCase {
             $0.placeClient.kakaoPlaceDetail = { _, _ in detail }
         }
 
-        await store.send(.onAppear)
+        await store.send(.onAppear) { $0.didStartLoad = true }
         await store.receive(\.detailLoaded)
 
         XCTAssertNil(store.state.serverPlaceID)

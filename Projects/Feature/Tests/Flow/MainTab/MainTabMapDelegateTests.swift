@@ -45,6 +45,10 @@ final class MainTabContentReturnTests: XCTestCase {
         let place = SavedPlace.fixture(id: "7")
         let store = TestStore(initialState: MainTabFeature.State()) {
             MainTabFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 이 테스트는 조회 결과를 안 본다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
