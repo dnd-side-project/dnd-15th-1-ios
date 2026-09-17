@@ -680,6 +680,45 @@ final class PlaceDetailFeatureContentsTests: XCTestCase {
     }
 }
 
+// 위 클래스가 type_body_length 한계에 가까워 등장 신호 중복은 따로 둔다
+@MainActor
+final class PlaceDetailFeatureAppearTests: XCTestCase {
+    func test_첫_로드가_끝난_뒤_등장이_한_번_더_와도_게시물을_더_부르지_않는다() async {
+        let saved = SavedPlace.fixture(id: "7")
+        let detail = PlaceDetail(
+            place: saved.place, savedByMe: false, savedMemberCount: 1, ownership: nil
+        )
+        let item = { (id: String) in
+            Content(id: id, title: "게시물 \(id)", thumbnailURLs: [], placeCount: 1)
+        }
+        let first = ContentPage(items: ["1", "2", "3", "4"].map(item), hasNext: true, popularTags: [])
+        let second = ContentPage(items: ["5"].map(item), hasNext: false, popularTags: [])
+        let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: saved)) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.placeDetail = { _ in detail }
+            $0.exploreClient.placeContents = { _, page, _ in page == 0 ? first : second }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        // 흐름이 보낸 등장으로 첫 장까지 다 받는다
+        await store.send(.onAppear)
+        await store.receive(\.contentsResponse)
+        await store.finish()
+        XCTAssertEqual(store.state.contents, first.items)
+        XCTAssertEqual(store.state.contentsPage, 1)
+
+        // 새로 그려진 화면이 등장을 한 번 더 보낸다. 누르지 않은 다음 장이 붙으면 안 된다
+        await store.send(.onAppear)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        XCTAssertEqual(store.state.contents, first.items)
+        XCTAssertEqual(store.state.contentsPage, 1)
+        XCTAssertTrue(store.state.hasNextContents)
+    }
+}
+
 @MainActor
 final class PlaceDetailFeatureAnalyticsTests: XCTestCase {
     func test_내가_저장한_장소의_상세를_받으면_이벤트를_보낸다() async {
