@@ -49,7 +49,7 @@ public struct DateTypeView: View {
 
             // 세로가 모자라면 scaledToFit 이 비율을 지키며 이미지를 줄인다.
             // 그때 남는 분홍이 왼쪽에만 생기도록 오른쪽 끝에 붙인다
-            Image.dateTypeGraphic
+            Image.illustrationPreference
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity, alignment: .trailing)

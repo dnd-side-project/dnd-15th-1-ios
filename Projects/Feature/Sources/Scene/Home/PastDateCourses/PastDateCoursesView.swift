@@ -90,7 +90,7 @@ public struct PastDateCoursesView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             // 이미지는 배너 하단에 붙인다
-            Image.bannerTogether
+            Image.bannerCount
                 .resizable()
                 .scaledToFit()
                 .frame(height: 100)
@@ -103,7 +103,7 @@ public struct PastDateCoursesView: View {
     private var emptyState: some View {
         VStack(spacing: 24) {
             VStack(spacing: 16) {
-                Image.dateScheduleEmpty
+                Image.emptySchedule
 
                 VStack(spacing: 4) {
                     Text("지난 데이트 일정이 없어요")
@@ -143,7 +143,7 @@ private struct PastDateCourseRow: View {
 
             HStack {
                 HStack(spacing: 2) {
-                    Image.mappin
+                    Image.mapPin
                         .renderingMode(.template)
                         .resizable()
                         .frame(width: 16, height: 16)

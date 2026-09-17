@@ -26,11 +26,11 @@ public extension AppIntroStep {
     var image: Image {
         switch self {
         case .share:
-            .appIntroShare
+            .illustrationShare
         case .save:
-            .appIntroSave
+            .illustrationSave
         case .plan:
-            .appIntroPlan
+            .illustrationPlan
         }
     }
 

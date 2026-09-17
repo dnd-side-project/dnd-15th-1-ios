@@ -20,7 +20,7 @@ struct DateScheduleCard: View {
 
             HStack {
                 HStack(spacing: 2) {
-                    Image.mappin
+                    Image.mapPin
                         .renderingMode(.template)
                         .resizable()
                         .frame(width: 16, height: 16)

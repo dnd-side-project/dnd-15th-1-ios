@@ -41,7 +41,7 @@ struct PlaceRow: View {
 
     private var bookmarkBadge: some View {
         HStack(spacing: 2) {
-            Image.bookmarkFillColor
+            Image.bookmarkFilled
                 .resizable()
                 .frame(width: 14, height: 14)
             Text("\(place.bookmarkCount)")

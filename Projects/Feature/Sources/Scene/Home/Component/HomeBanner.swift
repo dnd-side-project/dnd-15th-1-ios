@@ -40,7 +40,7 @@ struct HomeBanner: View {
                     .padding(.top, 36)
                     .hidden()
 
-                Image.bannerCoupleConnect
+                Image.bannerConnect
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity)
@@ -101,7 +101,7 @@ struct HomeBanner: View {
 
                 Spacer()
 
-                Image.bannerPeek
+                Image.bannerCourse
             }
             .padding(.leading, 24)
             .frame(maxWidth: .infinity)
@@ -130,7 +130,7 @@ struct HomeBanner: View {
 
                 Spacer()
 
-                Image.bannerCalendar
+                Image.bannerUpcoming
             }
             .padding(.leading, 24)
             .frame(maxWidth: .infinity)

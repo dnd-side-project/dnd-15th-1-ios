@@ -15,29 +15,30 @@ private typealias Asset = SharedDesignSystemAsset
 public extension Image {
     static var alarm: Image { Asset.alarm.swiftUIImage }
     static var arrow2: Image { Asset.arrow2.swiftUIImage }
-    static var arrowDown: Image { Asset.arrowDown.swiftUIImage }
-    static var arrowLeft: Image { Asset.arrowLeft.swiftUIImage }
-    static var arrowRight: Image { Asset.arrowRight.swiftUIImage }
-    static var arrowUp: Image { Asset.arrowUp.swiftUIImage }
-    static var bookmarkFill: Image { Asset.bookmarkFill.swiftUIImage }
-    static var bookmarkFillColor: Image { Asset.bookmarkFillColor.swiftUIImage }
-    static var bookmarkStroke: Image { Asset.bookmarkStroke.swiftUIImage }
+    static var bookmarkEmpty: Image { Asset.bookmarkEmpty.swiftUIImage }
+    static var bookmarkFilled: Image { Asset.bookmarkFilled.swiftUIImage }
+    static var bookmarkFilledBlack: Image { Asset.bookmarkFilledBlack.swiftUIImage }
     static var calendar: Image { Asset.calendar.swiftUIImage }
+    static var calendarHeart: Image { Asset.calendarHeart.swiftUIImage }
     static var cancel: Image { Asset.cancel.swiftUIImage }
     static var check: Image { Asset.check.swiftUIImage }
-    static var checkFalse: Image { Asset.checkFalse.swiftUIImage }
-    static var checkTrue: Image { Asset.checkTrue.swiftUIImage }
+    static var checkEmpty: Image { Asset.checkEmpty.swiftUIImage }
+    static var checkFilled: Image { Asset.checkFilled.swiftUIImage }
+    static var chevronDown: Image { Asset.chevronDown.swiftUIImage }
+    static var chevronLeft: Image { Asset.chevronLeft.swiftUIImage }
+    static var chevronRight: Image { Asset.chevronRight.swiftUIImage }
+    static var chevronUp: Image { Asset.chevronUp.swiftUIImage }
     static var clock: Image { Asset.clock.swiftUIImage }
-    static var dateCalendar: Image { Asset.dateCalendar.swiftUIImage }
     static var edit: Image { Asset.edit.swiftUIImage }
     static var error: Image { Asset.error.swiftUIImage }
     static var explore: Image { Asset.explore.swiftUIImage }
     static var heart: Image { Asset.heart.swiftUIImage }
+    static var heartBordered: Image { Asset.heartBordered.swiftUIImage }
     static var home: Image { Asset.home.swiftUIImage }
     static var insta: Image { Asset.insta.swiftUIImage }
     static var locate: Image { Asset.locate.swiftUIImage }
     static var map: Image { Asset.map.swiftUIImage }
-    static var mappin: Image { Asset.mappin.swiftUIImage }
+    static var mapPin: Image { Asset.mapPin.swiftUIImage }
     static var menu: Image { Asset.menu.swiftUIImage }
     static var move: Image { Asset.move.swiftUIImage }
     static var my: Image { Asset.my.swiftUIImage }
@@ -49,14 +50,6 @@ public extension Image {
     static var trash: Image { Asset.trash.swiftUIImage }
     static var walk: Image { Asset.walk.swiftUIImage }
     static var x: Image { Asset.x.swiftUIImage }
-}
-
-// MARK: - Social
-
-public extension Image {
-    static var socialApple: Image { Asset.Social.apple.swiftUIImage }
-    static var socialKakao: Image { Asset.Social.kakao.swiftUIImage }
-    static var socialGoogle: Image { Asset.Social.google.swiftUIImage }
 }
 
 // MARK: - Category
@@ -71,6 +64,19 @@ public extension Image {
     static var categoryTourism: Image { Asset.Category.tourism.swiftUIImage }
 }
 
+// MARK: - DateType
+
+public extension Image {
+    static var dateTypeActive: Image { Asset.DateType.active.swiftUIImage }
+    static var dateTypeDay: Image { Asset.DateType.day.swiftUIImage }
+    static var dateTypeFood: Image { Asset.DateType.food.swiftUIImage }
+    static var dateTypeIndoor: Image { Asset.DateType.indoor.swiftUIImage }
+    static var dateTypeNight: Image { Asset.DateType.night.swiftUIImage }
+    static var dateTypeOutdoor: Image { Asset.DateType.outdoor.swiftUIImage }
+    static var dateTypeSightseeing: Image { Asset.DateType.sightseeing.swiftUIImage }
+    static var dateTypeStatic: Image { Asset.DateType.`static`.swiftUIImage }
+}
+
 // MARK: - Pin
 
 public extension Image {
@@ -83,82 +89,71 @@ public extension Image {
     static var pinTourism: Image { Asset.Pin.tourism.swiftUIImage }
 }
 
-// MARK: - App Intro
+// MARK: - Social
 
 public extension Image {
-    static var appIntroShare: Image { Asset.appIntroShare.swiftUIImage }
-    static var appIntroSave: Image { Asset.appIntroSave.swiftUIImage }
-    static var appIntroPlan: Image { Asset.appIntroPlan.swiftUIImage }
+    static var socialApple: Image { Asset.Social.apple.swiftUIImage }
+    static var socialGoogle: Image { Asset.Social.google.swiftUIImage }
+    static var socialKakao: Image { Asset.Social.kakao.swiftUIImage }
 }
 
-// MARK: - Splash
+// MARK: - Illustration
 
 public extension Image {
-    static var splashBackground: Image { Asset.splashBackground.swiftUIImage }
-    static var splashBundle: Image { Asset.splashBundle.swiftUIImage }
+    static var illustrationConnect: Image { Asset.illustrationConnect.swiftUIImage }
+    static var illustrationConnected: Image { Asset.illustrationConnected.swiftUIImage }
+    static var illustrationPlan: Image { Asset.illustrationPlan.swiftUIImage }
+    static var illustrationPreference: Image { Asset.illustrationPreference.swiftUIImage }
+    static var illustrationSave: Image { Asset.illustrationSave.swiftUIImage }
+    static var illustrationShare: Image { Asset.illustrationShare.swiftUIImage }
+    static var illustrationTogether: Image { Asset.illustrationTogether.swiftUIImage }
+    static var illustrationWelcome: Image { Asset.illustrationWelcome.swiftUIImage }
 }
 
-// MARK: - Auth
+// MARK: - Modal
 
 public extension Image {
-    static var authIllustration: Image { Asset.authIllustration.swiftUIImage }
+    static var modalSave: Image { Asset.modalSave.swiftUIImage }
+    static var modalSkip: Image { Asset.modalSkip.swiftUIImage }
+    static var modalWarning: Image { Asset.modalWarning.swiftUIImage }
 }
 
-// MARK: - Brand
+// MARK: - Empty
 
 public extension Image {
+    static var emptyResult: Image { Asset.emptyResult.swiftUIImage }
+    static var emptySchedule: Image { Asset.emptySchedule.swiftUIImage }
+}
+
+// MARK: - Banner
+
+public extension Image {
+    static var bannerConnect: Image { Asset.bannerConnect.swiftUIImage }
+    static var bannerCount: Image { Asset.bannerCount.swiftUIImage }
+    static var bannerCourse: Image { Asset.bannerCourse.swiftUIImage }
+    static var bannerUpcoming: Image { Asset.bannerUpcoming.swiftUIImage }
+}
+
+// MARK: - Background
+
+public extension Image {
+    static var backgroundLaunch: Image { Asset.backgroundLaunch.swiftUIImage }
+}
+
+// MARK: - Profile
+
+public extension Image {
+    static var profileGreen: Image { Asset.profileGreen.swiftUIImage }
+    static var profileMint: Image { Asset.profileMint.swiftUIImage }
+    static var profilePink: Image { Asset.profilePink.swiftUIImage }
+    static var profileWhite: Image { Asset.profileWhite.swiftUIImage }
+    static var profileYellow: Image { Asset.profileYellow.swiftUIImage }
+}
+
+// MARK: - Logos
+
+public extension Image {
+    static var brandLockup: Image { Asset.brandLockup.swiftUIImage }
     static var brandMark: Image { Asset.brandMark.swiftUIImage }
     static var brandWordmark: Image { Asset.brandWordmark.swiftUIImage }
-}
-
-// MARK: - Home
-
-public extension Image {
-    static var bannerCoupleConnect: Image { Asset.bannerCoupleConnect.swiftUIImage }
-    static var bannerPeek: Image { Asset.bannerPeek.swiftUIImage }
-    static var bannerCalendar: Image { Asset.bannerCalendar.swiftUIImage }
-    static var bannerTogether: Image { Asset.bannerTogether.swiftUIImage }
-    static var placeEmpty: Image { Asset.placeEmpty.swiftUIImage }
-    static var dateScheduleEmpty: Image { Asset.dateScheduleEmpty.swiftUIImage }
-}
-
-// MARK: - Couple Connect
-
-public extension Image {
-    static var coupleConnectBefore: Image { Asset.coupleConnectBefore.swiftUIImage }
-    static var coupleConnectComplete: Image { Asset.coupleConnectComplete.swiftUIImage }
-    static var coupleConnectModal: Image { Asset.coupleConnectModal.swiftUIImage }
-}
-
-// MARK: - Course
-
-public extension Image {
-    static var saveModal: Image { Asset.saveModal.swiftUIImage }
-}
-
-// MARK: - DateType
-
-public extension Image {
-    static var dateTypeActive: Image { Asset.DateType.active.swiftUIImage }
-    static var dateTypeDay: Image { Asset.DateType.day.swiftUIImage }
-    static var dateTypeFood: Image { Asset.DateType.food.swiftUIImage }
-    static var dateTypeIndoor: Image { Asset.DateType.indoor.swiftUIImage }
-    static var dateTypeNight: Image { Asset.DateType.night.swiftUIImage }
-    static var dateTypeOutdoor: Image { Asset.DateType.outdoor.swiftUIImage }
-    static var dateTypeSightseeing: Image { Asset.DateType.sightseeing.swiftUIImage }
-    static var dateTypeStatic: Image { Asset.DateType.`static`.swiftUIImage }
-    static var dateTypeGraphic: Image { Asset.dateTypeGraphic.swiftUIImage }
-}
-
-// MARK: - MyPage
-
-public extension Image {
-    static var profile1: Image { Asset.profile1.swiftUIImage }
-    static var profile2: Image { Asset.profile2.swiftUIImage }
-    static var profile3: Image { Asset.profile3.swiftUIImage }
-    static var profile4: Image { Asset.profile4.swiftUIImage }
-    static var profile5: Image { Asset.profile5.swiftUIImage }
-    static var disconnect: Image { Asset.disconnect.swiftUIImage }
-    static var connectionManage: Image { Asset.connectionManage.swiftUIImage }
-    static var heartWithStroke: Image { Asset.heartWithStroke.swiftUIImage }
 }

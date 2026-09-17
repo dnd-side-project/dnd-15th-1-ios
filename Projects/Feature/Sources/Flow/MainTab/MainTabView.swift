@@ -35,7 +35,7 @@ public struct MainTabView: View {
             ModalContent(
                 title: "정말 탈퇴하시나요?",
                 content: "지금까지 저장된 데이터가 모두 날아가요",
-                image: .disconnect,
+                image: .modalWarning,
                 primaryTitle: "탈퇴하기",
                 primaryAction: { myPageStore.send(.withdrawConfirmed) },
                 secondaryTitle: "취소",

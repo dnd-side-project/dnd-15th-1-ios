@@ -180,7 +180,7 @@ private extension CourseResultView {
 
     var failureState: some View {
         EmptyStateView(
-            image: .placeEmpty,
+            image: .emptyResult,
             title: "코스를 불러오지 못했어요",
             message: "잠시 뒤 다시 시도해주세요"
         )

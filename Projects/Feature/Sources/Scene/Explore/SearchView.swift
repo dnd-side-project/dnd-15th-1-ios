@@ -137,7 +137,7 @@ public struct SearchView: View {
             .transition(.opacity)
         } else {
             EmptyStateView(
-                image: .placeEmpty,
+                image: .emptyResult,
                 title: "검색 결과가 없어요",
                 message: "다른 검색어를 입력해주세요"
             )

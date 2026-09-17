@@ -18,7 +18,7 @@ struct ContentCard: View {
             Color.clear
                 .aspectRatio(170.0 / 227.0, contentMode: .fit)
                 .overlay {
-                    RemoteImage(url: content.thumbnailURLs.first, placeholderImage: .placeEmpty)
+                    RemoteImage(url: content.thumbnailURLs.first, placeholderImage: .emptyResult)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(alignment: .bottomLeading) {
@@ -36,7 +36,7 @@ struct ContentCard: View {
 
     private var placeCountBadge: some View {
         HStack(spacing: 2) {
-            Image.mappin
+            Image.mapPin
                 .renderingMode(.template)
                 .resizable()
                 .frame(width: 16, height: 16)
