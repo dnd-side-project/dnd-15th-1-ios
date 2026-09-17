@@ -16,6 +16,10 @@ final class MapFlowFeatureTests: XCTestCase {
         map.bookmarkedPlaceIDs = [saved.id]
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
 
         await store.send(.map(.markerTapped("7"))) {
@@ -29,6 +33,17 @@ final class MapFlowFeatureTests: XCTestCase {
             )
             $0.topDetail = .place
         }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
+        }
         XCTAssertEqual(store.state.path, [])
     }
 
@@ -40,6 +55,10 @@ final class MapFlowFeatureTests: XCTestCase {
         map.bookmarkedPlaceIDs = [saved.id]
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
 
         await store.send(.map(.rowTapped("7"))) {
@@ -52,6 +71,17 @@ final class MapFlowFeatureTests: XCTestCase {
                 coordinate: saved.place.coordinate
             )
             $0.topDetail = .place
+        }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
         }
         XCTAssertEqual(store.state.path, [])
     }
@@ -91,6 +121,8 @@ final class MapFlowFeatureTests: XCTestCase {
             )
             $0.topDetail = .place
         }
+        // 카카오 ID 가 없는 검색 장소라 조회할 곳이 없다. 등장 신호만 온다
+        await store.receive(\.detail.presented.onAppear)
         XCTAssertNil(store.state.detail?.alias)
         XCTAssertEqual(store.state.path, [])
     }
@@ -321,6 +353,8 @@ final class MapFlowSearchServerIDTests: XCTestCase {
             )
             $0.topDetail = .place
         }
+        // 카카오 ID 가 없는 검색 장소라 조회할 곳이 없다. 등장 신호만 온다
+        await store.receive(\.detail.presented.onAppear)
     }
 
     func test_장소상세_저장성공은_지도_서버id맵에_넣는다() async {
@@ -468,6 +502,10 @@ final class MapFlowPostDetailTests: XCTestCase {
         state.postDetail = PostDetailFeature.State(contentID: "1")
         let store = TestStore(initialState: state) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
 
         await store.send(.map(.markerTapped("7"))) {
@@ -481,6 +519,17 @@ final class MapFlowPostDetailTests: XCTestCase {
             )
             $0.postDetail = nil
             $0.topDetail = .place
+        }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
         }
     }
 
@@ -506,6 +555,8 @@ final class MapFlowPostDetailTests: XCTestCase {
             $0.postDetail = nil
             $0.topDetail = .place
         }
+        // 카카오 ID 가 없는 검색 장소라 조회할 곳이 없다. 등장 신호만 온다
+        await store.receive(\.detail.presented.onAppear)
     }
 
     func test_게시글핀으로_연_저장된_장소는_북마크가_켜진다() async {
@@ -517,6 +568,10 @@ final class MapFlowPostDetailTests: XCTestCase {
         state.postDetail?.savedPlaceIDs = ["101"]
         let store = TestStore(initialState: state) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
 
         await store.send(.map(.markerTapped("101"))) {
@@ -531,6 +586,17 @@ final class MapFlowPostDetailTests: XCTestCase {
                 coordinate: place.coordinate
             )
             $0.topDetail = .place
+        }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
         }
         XCTAssertEqual(store.state.detail?.isBookmarked, true)
         XCTAssertNotNil(store.state.postDetail)
@@ -682,6 +748,10 @@ final class MapFlowContentPinLeakTests: XCTestCase {
         state.modeBeforeContentDetail = .saved
         let store = TestStore(initialState: state) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
 
         await store.send(.map(.markerTapped("101"))) {
@@ -694,6 +764,17 @@ final class MapFlowContentPinLeakTests: XCTestCase {
                 coordinate: place.coordinate
             )
             $0.topDetail = .place
+        }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
         }
         XCTAssertNotNil(store.state.postDetail)
         XCTAssertEqual(store.state.topDetail, .place)
@@ -873,6 +954,10 @@ final class MapFlowDetailStackTests: XCTestCase {
         state.topDetail = .post
         let store = TestStore(initialState: state) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
         let expectedPlace = Place(
             id: row.id,
@@ -894,6 +979,17 @@ final class MapFlowDetailStackTests: XCTestCase {
                 coordinate: row.coordinate
             )
             $0.topDetail = .place
+        }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
         }
         XCTAssertNotNil(store.state.postDetail)
         XCTAssertEqual(store.state.detail?.id, "201")
@@ -922,6 +1018,10 @@ final class MapFlowDetailStackTests: XCTestCase {
         state.topDetail = .post
         let store = TestStore(initialState: state) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
         let expectedPlace = Place(
             id: rowB.id,
@@ -944,6 +1044,17 @@ final class MapFlowDetailStackTests: XCTestCase {
             )
             $0.topDetail = .place
         }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
+        }
         XCTAssertEqual(store.state.detail?.id, "202")
         XCTAssertNotEqual(store.state.detail?.id, savedA.place.id)
         XCTAssertEqual(store.state.postDetail?.contentID, "P")
@@ -964,6 +1075,10 @@ final class MapFlowSelectedPinTests: XCTestCase {
         map.loadState = .loaded
         return TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 이 테스트는 조회 결과를 안 본다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
     }
 
@@ -1019,6 +1134,10 @@ final class MapFlowContentReturnTests: XCTestCase {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         let store = TestStore(initialState: MapFlowFeature.State()) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
         let zoom = store.state.map.camera.zoomLevel
 
@@ -1032,6 +1151,39 @@ final class MapFlowContentReturnTests: XCTestCase {
             $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: zoom)
             $0.topDetail = .place
         }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
+        }
+    }
+
+    func test_검색장소상세는_닫으면_원래탭으로_되돌리고_흐름이_조회를_시작한다() async {
+        let place = Place.fixture(id: "s1", name: "검색 장소")
+        let store = TestStore(initialState: MapFlowFeature.State()) {
+            MapFlowFeature()
+        }
+        let zoom = store.state.map.camera.zoomLevel
+
+        await store.send(.presentSearchPlaceDetail(place, query: "카페")) {
+            $0.returnsAfterDetailClose = true
+            $0.map.mode = .content(places: [place])
+            $0.detail = PlaceDetailFeature.State(place: place, query: "카페")
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: place.id,
+                coordinate: place.coordinate
+            )
+            $0.map.camera = .focusing(place.coordinate, zoomLevel: zoom)
+            $0.topDetail = .place
+        }
+        // 카카오 ID 가 없는 검색 장소라 조회할 곳이 없다. 등장 신호만 온다
+        await store.receive(\.detail.presented.onAppear)
     }
 
     func test_홈저장장소상세를_닫으면_시트는_남기고_닫힘을_올린다() async {
@@ -1101,6 +1253,10 @@ final class MapFlowContentReturnTests: XCTestCase {
         state.postDetail = PostDetailFeature.State(contentID: "1")
         let store = TestStore(initialState: state) {
             MapFlowFeature()
+        } withDependencies: {
+            // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
         }
         let zoom = store.state.map.camera.zoomLevel
 
@@ -1114,6 +1270,17 @@ final class MapFlowContentReturnTests: XCTestCase {
             $0.map.camera = .focusing(saved.place.coordinate, zoomLevel: zoom)
             $0.postDetail = nil
             $0.topDetail = .place
+        }
+        await store.receive(\.detail.presented.onAppear) {
+            $0.detail?.didStartLoad = true
+        }
+        await store.receive(\.detail.presented.detailLoadFailed) {
+            $0.detail?.contentsLoadState = .loading
+        }
+        await store.receive(\.detail.presented.contentsResponse) {
+            $0.detail?.contentsPage = 1
+            $0.detail?.hasNextContents = false
+            $0.detail?.contentsLoadState = .loaded
         }
         XCTAssertNil(store.state.postDetail)
     }
@@ -1182,5 +1349,152 @@ final class MapFlowContentReturnTests: XCTestCase {
         XCTAssertNotNil(store.state.postDetail)
         XCTAssertTrue(store.state.returnsAfterDetailClose)
         XCTAssertEqual(store.state.topDetail, .post)
+    }
+}
+
+@MainActor
+final class MapFlowSamePlaceReopenTests: XCTestCase {
+    func test_게시글에서_같은_장소를_다시_열면_관련_게시글을_다시_부른다() async {
+        // 장소 A 는 서버 placeId 가 있고, 게시글 P 의 장소 목록에도 A 가 들어 있다
+        let savedA = SavedPlace.fixture(id: "101", latitude: 37.5299, longitude: 126.9648)
+        let post = PostDetailContent.fixture(id: "1")
+        let related = ContentPage(
+            items: [Content(id: "c1", title: "관련 게시글", thumbnailURLs: [], placeCount: 1)],
+            hasNext: false,
+            popularTags: []
+        )
+        var map = MapFeature.State()
+        map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: savedA.id,
+            coordinate: savedA.place.coordinate
+        )
+        var state = MapFlowFeature.State(map: map)
+        state.detail = PlaceDetailFeature.State(savedPlace: savedA)
+        state.topDetail = .place
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        } withDependencies: {
+            $0.placeClient.placeDetail = { _ in throw PlaceError.network }
+            $0.exploreClient.placeContents = { _, _, _ in related }
+            $0.postDetailContentClient.contentDetail = { _ in post }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        // 1. A 상세가 뜬다. 뷰의 onAppear 는 이때 한 번만 온다
+        await store.send(.detail(.presented(.onAppear)))
+        await store.receive(\.detail.presented.contentsResponse)
+        // 첫 로드를 다 끝낸 뒤 넘어간다. 진행 중 응답이 새 상태에 들어와 우연히 통과하지 않게 한다
+        await store.finish()
+        XCTAssertEqual(store.state.detail?.contents, related.items)
+
+        // 2. A 상세에서 관련 게시글을 누른다. A 상세는 그대로 남는다
+        await store.send(.detail(.presented(.delegate(.contentSelected("1")))))
+        await store.receive(\.postDetail.presented.delegate.detailLoaded)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+        XCTAssertNotNil(store.state.detail)
+
+        // 3. 게시글 상세의 장소 목록에서 같은 장소 A 를 누른다. 이 뒤로 onAppear 는 안 온다
+        await store.send(.postDetail(.presented(.delegate(.placeSelected("101")))))
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        XCTAssertEqual(store.state.detail?.id, "101")
+        XCTAssertEqual(store.state.topDetail, .place)
+        XCTAssertEqual(store.state.detail?.contents, related.items)
+    }
+
+    func test_같은_장소로_바꿔_끼우면_이전_더보기_응답이_새_상세에_안_붙는다() async {
+        let savedA = SavedPlace.fixture(id: "101", latitude: 37.5299, longitude: 126.9648)
+        let post = PostDetailContent.fixture(id: "1")
+        // 장마다 다른 게시글을 준다. 어느 장이 붙었는지 목록으로 가린다
+        let firstPage = [Content(id: "c1", title: "첫 장", thumbnailURLs: [], placeCount: 1)]
+        let secondPage = [Content(id: "c2", title: "둘째 장", thumbnailURLs: [], placeCount: 1)]
+        // 이전 상세의 둘째 장 요청은 멈추기 직전에 시작을 알리고, 테스트가 풀 때까지 멈춘다. 풀린 뒤 끊겼는지를 알린다
+        let secondPageStarted = AsyncStream.makeStream(of: Void.self)
+        let secondPageGate = AsyncStream.makeStream(of: Void.self)
+        let secondPageCancelled = AsyncStream.makeStream(of: Bool.self)
+        let secondPageCalls = LockIsolated(0)
+        // 새 상세의 조회는 테스트가 풀 때까지 멈춘다. 이전 요청의 결말이 먼저 나게 한다
+        let detailGate = AsyncStream.makeStream(of: Void.self)
+        let detailCalls = LockIsolated(0)
+
+        var state = MapFlowFeature.State()
+        state.detail = PlaceDetailFeature.State(savedPlace: savedA)
+        state.map.selectedPlace = MapFeature.State.SelectedPlace(
+            id: savedA.id,
+            coordinate: savedA.place.coordinate
+        )
+        state.topDetail = .place
+        let store = TestStore(initialState: state) {
+            MapFlowFeature()
+        } withDependencies: {
+            $0.placeClient.placeDetail = { _ in
+                let call = detailCalls.withValue { count in
+                    count += 1
+                    return count
+                }
+                if call > 1 {
+                    for await _ in detailGate.stream { break }
+                }
+                throw PlaceError.network
+            }
+            $0.exploreClient.placeContents = { _, page, _ in
+                guard page > 0 else {
+                    return ContentPage(items: firstPage, hasNext: true, popularTags: [])
+                }
+                let call = secondPageCalls.withValue { count in
+                    count += 1
+                    return count
+                }
+                if call == 1 {
+                    secondPageStarted.continuation.yield(())
+                    for await _ in secondPageGate.stream { break }
+                    let cancelled = Task.isCancelled
+                    secondPageCancelled.continuation.yield(cancelled)
+                    if cancelled { throw CancellationError() }
+                }
+                return ContentPage(items: secondPage, hasNext: false, popularTags: [])
+            }
+            $0.postDetailContentClient.contentDetail = { _ in post }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        // 1. A 상세가 뜨고 첫 장을 받는다
+        await store.send(.detail(.presented(.onAppear)))
+        await store.receive(\.detail.presented.contentsResponse)
+        XCTAssertEqual(store.state.detail?.contents, firstPage)
+
+        // 2. 더보기로 둘째 장을 부른다. 응답은 멈춰 둔다.
+        // send 는 요청이 목업에 닿을 때까지 안 기다린다. 닿기 전에 바꿔 끼우면 끊을 요청이 아직 등록되지 않았다
+        await store.send(.detail(.presented(.moreTapped)))
+        for await _ in secondPageStarted.stream { break }
+
+        // 3. 관련 게시글을 열고 그 장소 목록에서 같은 A 를 누른다. id 가 같은 새 상태로 바뀌어 끼워진다
+        await store.send(.detail(.presented(.delegate(.contentSelected("1")))))
+        await store.receive(\.postDetail.presented.delegate.detailLoaded)
+        await store.send(.postDetail(.presented(.delegate(.placeSelected("101")))))
+        await store.receive(\.detail.presented.onAppear)
+        XCTAssertEqual(store.state.detail?.contents, [])
+
+        // 4. 새 조회가 끝나기 전에 이전 둘째 장 요청을 푼다. 안 끊겼으면 그 응답이 새 상태에 들어올 때까지 기다린다
+        secondPageGate.continuation.finish()
+        var wasCancelled = false
+        for await cancelled in secondPageCancelled.stream {
+            wasCancelled = cancelled
+            break
+        }
+        if !wasCancelled {
+            await store.receive(\.detail.presented.contentsResponse)
+        }
+
+        // 5. 새 조회를 끝낸다. 실패 신호가 게시물을 부른다
+        detailGate.continuation.finish()
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        XCTAssertEqual(store.state.detail?.contents, firstPage)
+        XCTAssertEqual(store.state.detail?.contentsPage, 1)
+        XCTAssertEqual(store.state.detail?.contentsLoadState, .loaded)
     }
 }

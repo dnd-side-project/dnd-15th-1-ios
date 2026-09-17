@@ -58,6 +58,9 @@ public struct PlaceDetailFeature {
 
         public var isAddressExpanded = false
 
+        /// 상세 조회를 이미 시작했는지. 흐름과 화면이 각자 `onAppear` 를 보내 두 번 오는 걸 여기서 막는다
+        var didStartLoad = false
+
         public var title: String { alias ?? place.name }
 
         public var kakaoMapAppURL: URL? {
@@ -165,24 +168,7 @@ public struct PlaceDetailFeature {
     private func loadDetail(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
-            guard let source = state.source else { return .none }
-            return .run { [placeClient] send in
-                do {
-                    let detail: PlaceDetail
-                    switch source {
-                    case let .server(placeID):
-                        detail = try await placeClient.placeDetail(placeID)
-                    case let .kakao(kakaoPlaceID, query):
-                        detail = try await placeClient.kakaoPlaceDetail(kakaoPlaceID, query)
-                    }
-                    await send(.detailLoaded(detail))
-                } catch {
-                    // 넘겨받은 값을 그대로 둔다. 사용자에게 알리지 않는다.
-                    // 다만 게시물은 아는 서버 ID 로 부를 수 있어 신호를 보낸다
-                    await send(.detailLoadFailed)
-                }
-            }
-            .cancellable(id: CancelID.detail, cancelInFlight: true)
+            return startLoad(state: &state)
 
         case let .detailLoaded(detail):
             // id 는 안 바꾼다. 화면 식별자가 흔들리면 시트가 다시 그려진다
@@ -329,6 +315,36 @@ private extension PlaceDetailFeature {
         case bookmark
         case detail
         case contents
+    }
+
+    /// 흐름과 화면이 각자 `onAppear` 를 보낸다. 두 번째는 버린다.
+    /// 조회 중에 온 것도, 다 받은 뒤에 온 것도 버린다. 받은 뒤에 통과시키면 누르지 않은 다음 장을 부른다.
+    /// 등장으로 다시 부를 일은 없다. 조회가 실패해도 게시물은 `detailLoadFailed` 가 부르고, 게시물 실패는 다시 시도 버튼이 맡는다
+    /// 게시물 요청도 끊는다. 흐름이 같은 id 로 바꿔 끼우면 이전 상태의 요청이 살아 있다가 새 상태에 붙는다
+    func startLoad(state: inout State) -> Effect<Action> {
+        guard !state.didStartLoad, let source = state.source else { return .none }
+        state.didStartLoad = true
+        return .merge(.cancel(id: CancelID.contents), fetchDetail(source: source))
+    }
+
+    func fetchDetail(source: State.Source) -> Effect<Action> {
+        .run { [placeClient] send in
+            do {
+                let detail: PlaceDetail
+                switch source {
+                case let .server(placeID):
+                    detail = try await placeClient.placeDetail(placeID)
+                case let .kakao(kakaoPlaceID, query):
+                    detail = try await placeClient.kakaoPlaceDetail(kakaoPlaceID, query)
+                }
+                await send(.detailLoaded(detail))
+            } catch {
+                // 넘겨받은 값을 그대로 둔다. 사용자에게 알리지 않는다.
+                // 다만 게시물은 아는 서버 ID 로 부를 수 있어 신호를 보낸다
+                await send(.detailLoadFailed)
+            }
+        }
+        .cancellable(id: CancelID.detail, cancelInFlight: true)
     }
 
     /// 저장 버튼. 저장 안 된 상태면 저장, 저장된 상태면 삭제.
