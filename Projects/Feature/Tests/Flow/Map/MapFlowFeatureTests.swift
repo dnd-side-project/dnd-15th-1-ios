@@ -1410,7 +1410,8 @@ final class MapFlowSamePlaceReopenTests: XCTestCase {
         // 장마다 다른 게시글을 준다. 어느 장이 붙었는지 목록으로 가린다
         let firstPage = [Content(id: "c1", title: "첫 장", thumbnailURLs: [], placeCount: 1)]
         let secondPage = [Content(id: "c2", title: "둘째 장", thumbnailURLs: [], placeCount: 1)]
-        // 이전 상세의 둘째 장 요청은 테스트가 풀 때까지 멈춘다. 풀린 뒤 끊겼는지를 알린다
+        // 이전 상세의 둘째 장 요청은 멈추기 직전에 시작을 알리고, 테스트가 풀 때까지 멈춘다. 풀린 뒤 끊겼는지를 알린다
+        let secondPageStarted = AsyncStream.makeStream(of: Void.self)
         let secondPageGate = AsyncStream.makeStream(of: Void.self)
         let secondPageCancelled = AsyncStream.makeStream(of: Bool.self)
         let secondPageCalls = LockIsolated(0)
@@ -1447,6 +1448,7 @@ final class MapFlowSamePlaceReopenTests: XCTestCase {
                     return count
                 }
                 if call == 1 {
+                    secondPageStarted.continuation.yield(())
                     for await _ in secondPageGate.stream { break }
                     let cancelled = Task.isCancelled
                     secondPageCancelled.continuation.yield(cancelled)
@@ -1463,8 +1465,10 @@ final class MapFlowSamePlaceReopenTests: XCTestCase {
         await store.receive(\.detail.presented.contentsResponse)
         XCTAssertEqual(store.state.detail?.contents, firstPage)
 
-        // 2. 더보기로 둘째 장을 부른다. 응답은 멈춰 둔다
+        // 2. 더보기로 둘째 장을 부른다. 응답은 멈춰 둔다.
+        // send 는 요청이 목업에 닿을 때까지 안 기다린다. 닿기 전에 바꿔 끼우면 끊을 요청이 아직 등록되지 않았다
         await store.send(.detail(.presented(.moreTapped)))
+        for await _ in secondPageStarted.stream { break }
 
         // 3. 관련 게시글을 열고 그 장소 목록에서 같은 A 를 누른다. id 가 같은 새 상태로 바뀌어 끼워진다
         await store.send(.detail(.presented(.delegate(.contentSelected("1")))))
