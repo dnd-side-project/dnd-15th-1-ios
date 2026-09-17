@@ -320,10 +320,11 @@ private extension PlaceDetailFeature {
     /// 흐름과 화면이 각자 `onAppear` 를 보낸다. 두 번째는 버린다.
     /// 조회 중에 온 것도, 다 받은 뒤에 온 것도 버린다. 받은 뒤에 통과시키면 누르지 않은 다음 장을 부른다.
     /// 등장으로 다시 부를 일은 없다. 조회가 실패해도 게시물은 `detailLoadFailed` 가 부르고, 게시물 실패는 다시 시도 버튼이 맡는다
+    /// 게시물 요청도 끊는다. 흐름이 같은 id 로 바꿔 끼우면 이전 상태의 요청이 살아 있다가 새 상태에 붙는다
     func startLoad(state: inout State) -> Effect<Action> {
         guard !state.didStartLoad, let source = state.source else { return .none }
         state.didStartLoad = true
-        return fetchDetail(source: source)
+        return .merge(.cancel(id: CancelID.contents), fetchDetail(source: source))
     }
 
     func fetchDetail(source: State.Source) -> Effect<Action> {
