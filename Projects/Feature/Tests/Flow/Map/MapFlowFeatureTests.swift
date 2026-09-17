@@ -1164,6 +1164,28 @@ final class MapFlowContentReturnTests: XCTestCase {
         }
     }
 
+    func test_검색장소상세는_닫으면_원래탭으로_되돌리고_흐름이_조회를_시작한다() async {
+        let place = Place.fixture(id: "s1", name: "검색 장소")
+        let store = TestStore(initialState: MapFlowFeature.State()) {
+            MapFlowFeature()
+        }
+        let zoom = store.state.map.camera.zoomLevel
+
+        await store.send(.presentSearchPlaceDetail(place, query: "카페")) {
+            $0.returnsAfterDetailClose = true
+            $0.map.mode = .content(places: [place])
+            $0.detail = PlaceDetailFeature.State(place: place, query: "카페")
+            $0.map.selectedPlace = MapFeature.State.SelectedPlace(
+                id: place.id,
+                coordinate: place.coordinate
+            )
+            $0.map.camera = .focusing(place.coordinate, zoomLevel: zoom)
+            $0.topDetail = .place
+        }
+        // 카카오 ID 가 없는 검색 장소라 조회할 곳이 없다. 등장 신호만 온다
+        await store.receive(\.detail.presented.onAppear)
+    }
+
     func test_홈저장장소상세를_닫으면_시트는_남기고_닫힘을_올린다() async {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
         var state = MapFlowFeature.State()
