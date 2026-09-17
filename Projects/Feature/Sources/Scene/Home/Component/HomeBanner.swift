@@ -91,7 +91,7 @@ struct HomeBanner: View {
                             .typography(.title3SB)
                             .foregroundStyle(Color.commonWhite)
 
-                        Image.arrow2
+                        Image.arrowRight
                             .renderingMode(.template)
                             .resizable()
                             .frame(width: 24, height: 24)

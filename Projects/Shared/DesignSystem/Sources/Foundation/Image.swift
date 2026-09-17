@@ -14,7 +14,7 @@ private typealias Asset = SharedDesignSystemAsset
 // 사용법: Image.heart.resizable().frame(width: 24, height: 24)
 public extension Image {
     static var alarm: Image { Asset.alarm.swiftUIImage }
-    static var arrow2: Image { Asset.arrow2.swiftUIImage }
+    static var arrowRight: Image { Asset.arrowRight.swiftUIImage }
     static var bookmarkEmpty: Image { Asset.bookmarkEmpty.swiftUIImage }
     static var bookmarkFilled: Image { Asset.bookmarkFilled.swiftUIImage }
     static var bookmarkFilledBlack: Image { Asset.bookmarkFilledBlack.swiftUIImage }
