@@ -38,7 +38,7 @@ public struct MapFeature {
         public struct PendingDelete: Equatable, Sendable {
             public let place: SavedPlace
             public let index: Int
-            /// 이 장소를 가리키던 `savedServerIDs` 의 키들
+            /// 이 장소를 가리키던 `savedPlaceIDs` 의 키들
             public let serverIDKeys: [String]
 
             public init(place: SavedPlace, index: Int, serverIDKeys: [String]) {
@@ -53,8 +53,8 @@ public struct MapFeature {
 
         /// 저장 여부 표시. 탭하면 먼저 뒤집고, 서버 실패 시 되돌린다
         public var bookmarkedPlaceIDs: Set<String> = []
-        /// 저장 응답이 준 서버 placeId. 검색 행 id 는 kakaoId 일 수 있어 삭제엔 이걸 쓴다
-        public var savedServerIDs: [String: String] = [:]
+        /// 저장 응답이 준 장소 번호. 검색 행 id 는 카카오 번호일 수 있어 삭제엔 이걸 쓴다
+        public var savedPlaceIDs: [String: String] = [:]
         public var places: [SavedPlace] = []
         public var loadState: LoadState = .loading
 
@@ -249,8 +249,14 @@ public struct MapFeature {
             return .none
 
         case let .coupleResponse(status):
-            state.partnerNickname = status?.partner?.nickname
-            state.isCoupleConnected = status?.connected ?? false
+            // nil 은 조회 실패다. 연결 안 됨과 같게 칩을 숨긴다
+            if case let .connected(_, partner, _)? = status {
+                state.partnerNickname = partner.nickname
+                state.isCoupleConnected = true
+            } else {
+                state.partnerNickname = nil
+                state.isCoupleConnected = false
+            }
             // 연동이 풀린 채로 저장자 필터가 남아 있으면 목록이 이유 없이 좁아진다
             if !state.isCoupleConnected {
                 state.selectedOwnership = .together
@@ -519,14 +525,14 @@ private extension MapFeature {
         case let .bookmarkTapped(id):
             return toggleBookmark(state: &state, id: id)
         case let .bookmarkSaved(id, saved):
-            state.savedServerIDs[id] = saved.place.id
+            state.savedPlaceIDs[id] = saved.place.id
             state.applySavedPlace(saved)
             return .run { [analyticsClient, authClient] _ in
                 let userID = (try? await authClient.currentSession())?.userID
                 await analyticsClient.track(.placeSaveCompleted(saveSource: .inApp, userID: userID))
             }
         case let .bookmarkRemoved(id):
-            let serverID = state.savedServerIDs[id] ?? id
+            let serverID = state.savedPlaceIDs[id] ?? id
             state.places.removeAll { $0.id == serverID }
             return .none
         case let .bookmarkFailed(id, wasBookmarked):
@@ -554,7 +560,7 @@ private extension MapFeature {
         return runBookmark(
             id: id,
             place: place,
-            serverID: state.savedServerIDs[id],
+            serverID: state.savedPlaceIDs[id],
             wasBookmarked: wasBookmarked
         )
     }
@@ -568,7 +574,12 @@ private extension MapFeature {
         let request = Effect<Action>.run { [placeClient] send in
             do {
                 if wasBookmarked {
-                    try await placeClient.removePlace(serverID ?? place.id)
+                    // 삭제는 장소 번호로 한다. 둘 다 없으면 저장이 끝나기 전에 다시 누른 경우라 부르지 않고 되돌린다
+                    guard let placeID = serverID ?? place.placeID else {
+                        await send(.bookmarkFailed(id: id, wasBookmarked: wasBookmarked))
+                        return
+                    }
+                    try await placeClient.removePlace(placeID)
                     await send(.bookmarkRemoved(id: id))
                 } else if let kakaoID = place.kakaoPlaceID {
                     let saved = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
@@ -607,7 +618,7 @@ private extension MapFeature {
             state.bookmarkedPlaceIDs.insert(id)
             for key in pending.serverIDKeys {
                 state.bookmarkedPlaceIDs.insert(key)
-                state.savedServerIDs[key] = id
+                state.savedPlaceIDs[key] = id
             }
             state.toast = ToastState.error("저장을 취소하지 못했어요")
             return .none
@@ -623,7 +634,7 @@ private extension MapFeature {
         guard let index = state.places.firstIndex(where: { $0.id == id }) else { return .none }
         let removed = state.places.remove(at: index)
         // 검색 행은 카카오 id 로 이 장소를 가리킨다. 저장 표시와 서버 id 매핑을 같이 빼야 검색이 저장됨으로 안 보인다
-        let serverIDKeys = state.savedServerIDs.filter { $0.value == id }.map(\.key)
+        let serverIDKeys = state.savedPlaceIDs.filter { $0.value == id }.map(\.key)
         state.pendingDeletes[id] = State.PendingDelete(
             place: removed,
             index: index,
@@ -632,7 +643,7 @@ private extension MapFeature {
         state.bookmarkedPlaceIDs.remove(id)
         for key in serverIDKeys {
             state.bookmarkedPlaceIDs.remove(key)
-            state.savedServerIDs.removeValue(forKey: key)
+            state.savedPlaceIDs.removeValue(forKey: key)
         }
         return runDelete(id: id)
     }

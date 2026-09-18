@@ -39,14 +39,15 @@ final class PlaceDTOMapperTests: XCTestCase {
         placeId: Int? = 42,
         kakaoPlaceId: String? = "998877",
         categoryCode: String? = "CAFE",
-        categoryName: String = "카페"
+        categoryName: String = "카페",
+        roadAddress: String? = "서울 성동구 아차산로 1"
     ) -> PlaceSearchItemDTO {
         PlaceSearchItemDTO(
             placeId: placeId,
             kakaoPlaceId: kakaoPlaceId,
             name: "성수 카페",
             address: "서울 성동구 성수동",
-            roadAddress: "서울 성동구 아차산로 1",
+            roadAddress: roadAddress,
             latitude: 37.5,
             longitude: 127.0,
             categoryCode: categoryCode,
@@ -74,13 +75,13 @@ final class PlaceDTOMapperTests: XCTestCase {
             alias: nil,
             savedAt: "2026-08-17T01:27:55.129814",
             thumbnailUrl: nil,
-            imageUrls: ["https://example.com/a.jpg"]
+            imageUrls: ["https://example.com/a.jpg"],
+            savedMemberCount: 3
         )
     }
 
-    func test_savedMemberCount가_bookmarkCount로_간다() {
+    func test_상세의_savedMemberCount가_bookmarkCount로_간다() {
         let detail = PlaceDTOMapper.toDomain(detailDTO(savedMemberCount: 12))
-        XCTAssertEqual(detail.savedMemberCount, 12)
         XCTAssertEqual(detail.place.bookmarkCount, 12)
     }
 
@@ -180,5 +181,38 @@ final class PlaceDTOMapperTests: XCTestCase {
             page: 0
         )
         XCTAssertFalse(page.hasNext)
+    }
+
+    func test_상세의_savedByMe가_isSaved로_간다() {
+        XCTAssertTrue(PlaceDTOMapper.toDomain(detailDTO(savedByMe: true)).isSaved)
+    }
+
+    func test_상세의_장소_번호를_placeID로_옮긴다() {
+        XCTAssertEqual(PlaceDTOMapper.toDomain(detailDTO(placeId: 42)).place.placeID, "42")
+        XCTAssertNil(PlaceDTOMapper.toDomain(detailDTO(placeId: nil)).place.placeID)
+    }
+
+    func test_검색_항목은_저장_수를_모른다() {
+        let page = PlaceDTOMapper.toSearchPage(
+            PlaceSearchResponseDTO(places: [searchItemDTO()], hasNext: false),
+            page: 0
+        )
+        XCTAssertNil(page.items.first?.bookmarkCount)
+    }
+
+    func test_검색_항목의_도로명이_없으면_nil로_둔다() {
+        let page = PlaceDTOMapper.toSearchPage(
+            PlaceSearchResponseDTO(places: [searchItemDTO(roadAddress: nil)], hasNext: false),
+            page: 0
+        )
+        XCTAssertNil(page.items.first?.roadAddress)
+    }
+
+    func test_검색_항목에_두_번호가_없으면_이름과_좌표로_id를_만든다() {
+        let page = PlaceDTOMapper.toSearchPage(
+            PlaceSearchResponseDTO(places: [searchItemDTO(placeId: nil, kakaoPlaceId: nil)], hasNext: false),
+            page: 0
+        )
+        XCTAssertEqual(page.items.first?.id, "성수 카페|37.5|127.0")
     }
 }

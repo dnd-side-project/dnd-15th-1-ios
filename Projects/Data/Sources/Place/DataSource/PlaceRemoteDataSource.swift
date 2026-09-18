@@ -19,6 +19,11 @@ public struct PlaceRemoteDataSource: Sendable {
         try await networkClient.request(PlaceEndpoint.savedPlaces)
     }
 
+    // 응답 항목이 저장 장소 목록과 같아 SavedPlaceResponseDTO 를 쓴다
+    func recentSavedPlaces(size: Int) async throws -> [SavedPlaceResponseDTO] {
+        try await networkClient.request(PlaceEndpoint.recentSavedPlaces(size: size))
+    }
+
     func searchPlaces(query: String, page: Int, size: Int) async throws -> PlaceSearchResponseDTO {
         try await networkClient.request(PlaceEndpoint.search(query: query, page: page, size: size))
     }
@@ -33,7 +38,7 @@ public struct PlaceRemoteDataSource: Sendable {
         try await networkClient.request(PlaceEndpoint.remove(placeID: placeID))
     }
 
-    func detail(placeID: Int) async throws -> PlaceDetailResponseDTO {
+    func detail(placeID: String) async throws -> PlaceDetailResponseDTO {
         try await networkClient.request(PlaceEndpoint.detail(placeID: placeID))
     }
 
@@ -43,7 +48,7 @@ public struct PlaceRemoteDataSource: Sendable {
         )
     }
 
-    func updateAlias(placeID: Int, alias: String?) async throws -> SavedPlaceResponseDTO {
+    func updateAlias(placeID: String, alias: String?) async throws -> SavedPlaceResponseDTO {
         try await networkClient.request(
             PlaceEndpoint.updateAlias(placeID: placeID, alias: alias)
         )
