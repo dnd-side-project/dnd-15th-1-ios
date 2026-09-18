@@ -2,10 +2,10 @@ import CoreNetwork
 import Domain
 import Foundation
 
-enum PushErrorMapper {
-    static func map(_ error: Error) -> PushError {
-        if let pushError = error as? PushError {
-            return pushError
+enum NotificationErrorMapper {
+    static func map(_ error: Error) -> NotificationError {
+        if let notificationError = error as? NotificationError {
+            return notificationError
         }
         if let networkError = error as? NetworkError {
             return mapNetworkError(networkError)
@@ -13,7 +13,7 @@ enum PushErrorMapper {
         return .unknown
     }
 
-    static func mapNetworkError(_ error: NetworkError) -> PushError {
+    static func mapNetworkError(_ error: NetworkError) -> NotificationError {
         switch error {
         case .transport:
             return .network

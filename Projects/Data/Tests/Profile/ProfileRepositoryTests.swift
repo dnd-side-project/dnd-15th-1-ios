@@ -30,7 +30,7 @@ final class ProfileRepositoryTests: XCTestCase {
             profileRemote: ProfileRemoteDataSource(networkClient: network)
         )
 
-        let profile = try await repository.updateNickname(nickname: "둘픽이", iconID: 2)
+        let profile = try await repository.setUpProfile(nickname: "둘픽이", iconID: 2)
 
         XCTAssertEqual(profile.nickname, "둘픽이")
         XCTAssertEqual(profile.iconID, 2)
@@ -69,7 +69,7 @@ final class ProfileRepositoryTests: XCTestCase {
             profileRemote: ProfileRemoteDataSource(networkClient: network)
         )
 
-        let profile = try await repository.updateNickname(nickname: "새닉", iconID: 3)
+        let profile = try await repository.setUpProfile(nickname: "새닉", iconID: 3)
 
         XCTAssertEqual(profile.nickname, "새닉")
         XCTAssertEqual(profile.iconID, 3)
@@ -111,7 +111,7 @@ final class ProfileRepositoryTests: XCTestCase {
             profileRemote: ProfileRemoteDataSource(networkClient: network)
         )
 
-        let profile = try await repository.updateNickname(nickname: "새닉", iconID: 3)
+        let profile = try await repository.setUpProfile(nickname: "새닉", iconID: 3)
 
         XCTAssertEqual(
             profile.datePreference,
@@ -179,7 +179,7 @@ final class ProfileRepositoryTests: XCTestCase {
         )
 
         do {
-            _ = try await repository.updateNickname(nickname: "둘픽이", iconID: 1)
+            _ = try await repository.setUpProfile(nickname: "둘픽이", iconID: 1)
             XCTFail("Expected unauthorized")
         } catch let error as ProfileError {
             XCTAssertEqual(error, .unauthorized)
@@ -202,7 +202,7 @@ final class ProfileRepositoryTests: XCTestCase {
         )
 
         do {
-            _ = try await repository.updateNickname(nickname: "둘픽이", iconID: 1)
+            _ = try await repository.setUpProfile(nickname: "둘픽이", iconID: 1)
             XCTFail("Expected invalidNickname")
         } catch let error as ProfileError {
             XCTAssertEqual(error, .invalidNickname)

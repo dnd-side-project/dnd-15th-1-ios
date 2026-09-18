@@ -178,8 +178,8 @@ final class AuthRepositoryTests: XCTestCase {
             plainClient: network,
             authLocal: local,
             notificationRepository: NotificationRepository(
-                pushRemote: PushRemoteDataSource(networkClient: network),
-                pushLocal: PushLocalDataSource(storage: keychain),
+                notificationRemote: NotificationRemoteDataSource(networkClient: network),
+                notificationLocal: NotificationLocalDataSource(storage: keychain),
                 appVersion: nil
             )
         )

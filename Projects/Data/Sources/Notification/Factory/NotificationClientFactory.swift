@@ -10,15 +10,17 @@ public enum NotificationClientFactory {
         let repository = makeRepository(session: session)
         return NotificationClient(
             requestAuthorization: { await client.requestAuthorization() },
-            fcmTokenStream: { await client.fcmTokenStream() },
-            registerDevice: { try await repository.registerDevice(token: $0) }
+            pushTokenStream: { await client.fcmTokenStream() },
+            registerDevice: { try await repository.registerDevice(token: $0) },
+            notificationSettings: { try await repository.notificationSettings() },
+            updateNotificationSettings: { try await repository.updateNotificationSettings($0) }
         )
     }
 
     static func makeRepository(session: AuthSessionAssembly) -> NotificationRepository {
         NotificationRepository(
-            pushRemote: PushRemoteDataSource(networkClient: session.authedClient),
-            pushLocal: session.pushLocal,
+            notificationRemote: NotificationRemoteDataSource(networkClient: session.authedClient),
+            notificationLocal: session.notificationLocal,
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         )
     }

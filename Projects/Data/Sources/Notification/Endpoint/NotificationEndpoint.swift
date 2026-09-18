@@ -1,9 +1,11 @@
 import CoreNetwork
 import Foundation
 
-enum PushEndpoint: APIEndpoint {
-    case register(deviceID: String, body: PushDeviceRequestDTO)
+enum NotificationEndpoint: APIEndpoint {
+    case register(deviceID: String, body: NotificationDeviceRequestDTO)
     case unregister(deviceID: String)
+    case settings
+    case updateSettings(NotificationSettingsRequestDTO)
 
     var path: String {
         switch self {
@@ -11,15 +13,19 @@ enum PushEndpoint: APIEndpoint {
             return "/api/v1/push-devices/\(deviceID)"
         case let .unregister(deviceID):
             return "/api/v1/push-devices/\(deviceID)"
+        case .settings, .updateSettings:
+            return "/api/v1/members/me/notification-settings"
         }
     }
 
     var method: HTTPMethod {
         switch self {
-        case .register:
+        case .register, .updateSettings:
             return .put
         case .unregister:
             return .delete
+        case .settings:
+            return .get
         }
     }
 
@@ -28,7 +34,9 @@ enum PushEndpoint: APIEndpoint {
         switch self {
         case let .register(_, request):
             return try? encoder.encode(request)
-        case .unregister:
+        case let .updateSettings(request):
+            return try? encoder.encode(request)
+        case .unregister, .settings:
             return nil
         }
     }

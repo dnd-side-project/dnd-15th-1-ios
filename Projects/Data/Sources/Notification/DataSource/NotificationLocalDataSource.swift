@@ -3,7 +3,7 @@ import Foundation
 
 /// `deviceId` 는 서버가 발급하지 않는다. 앱이 만들어 Keychain 에 유지한다.
 /// 세션 키(`auth-session`)와 다른 키라 로그아웃해도 남는다.
-public struct PushLocalDataSource: Sendable {
+public struct NotificationLocalDataSource: Sendable {
     private let storage: any KeychainStorage
     private let key = "push-device-id"
 

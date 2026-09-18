@@ -1,6 +1,6 @@
 import Foundation
 
-public enum PushError: Error, Equatable, Sendable {
+public enum NotificationError: Error, Equatable, Sendable {
     /// 연결 실패·타임아웃
     case network
     /// 401. 세션이 없거나 만료됐다
