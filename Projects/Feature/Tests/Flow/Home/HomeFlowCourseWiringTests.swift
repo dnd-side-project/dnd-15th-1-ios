@@ -26,8 +26,10 @@ final class HomeFlowCourseWiringTests: XCTestCase {
         let store = TestStore(initialState: builtCourseResultState()) {
             HomeFlowFeature()
         } withDependencies: {
-            $0.homeClient.home = { wiringHomeSummary }
-            $0.homeClient.pastDates = { _ in [] }
+            $0.coupleClient.current = { wiringCoupleStatus }
+            $0.profileClient.member = { wiringProfile }
+            $0.courseClient.currentCourse = { bannerCourse }
+            $0.courseClient.latestPastCourses = { _ in [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -66,8 +68,10 @@ final class HomeFlowCourseWiringTests: XCTestCase {
         let store = TestStore(initialState: pastDateCourseResultState()) {
             HomeFlowFeature()
         } withDependencies: {
-            $0.homeClient.home = { wiringHomeSummary }
-            $0.homeClient.pastDates = { _ in [] }
+            $0.coupleClient.current = { wiringCoupleStatus }
+            $0.profileClient.member = { wiringProfile }
+            $0.courseClient.currentCourse = { bannerCourse }
+            $0.courseClient.latestPastCourses = { _ in [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -83,8 +87,10 @@ final class HomeFlowCourseWiringTests: XCTestCase {
         let store = TestStore(initialState: pastDateBuiltCourseResultState()) {
             HomeFlowFeature()
         } withDependencies: {
-            $0.homeClient.home = { wiringHomeSummary }
-            $0.homeClient.pastDates = { _ in [] }
+            $0.coupleClient.current = { wiringCoupleStatus }
+            $0.profileClient.member = { wiringProfile }
+            $0.courseClient.currentCourse = { bannerCourse }
+            $0.courseClient.latestPastCourses = { _ in [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -123,7 +129,13 @@ final class HomeFlowCourseWiringTests: XCTestCase {
     }
 
     func test_홈_지난일정을_누르면_지난데이트_결과_화면이_열린다() async {
-        let schedule = DateSchedule(id: "77", title: "성수역 데이트", placeCount: 5, date: "26.08.06")
+        let schedule = DateCourseSummary(
+            id: "77",
+            title: "성수역 데이트",
+            scheduledAt: Date(timeIntervalSince1970: 1_785_942_000),
+            status: nil,
+            totalPlaceCount: 5
+        )
         let store = TestStore(
             initialState: HomeFlowFeature.State(
                 home: HomeFeature.State(
@@ -150,8 +162,10 @@ final class HomeFlowCourseWiringTests: XCTestCase {
         let store = TestStore(initialState: homeBannerCourseResultState()) {
             HomeFlowFeature()
         } withDependencies: {
-            $0.homeClient.home = { wiringHomeSummary }
-            $0.homeClient.pastDates = { _ in [] }
+            $0.coupleClient.current = { wiringCoupleStatus }
+            $0.profileClient.member = { wiringProfile }
+            $0.courseClient.currentCourse = { bannerCourse }
+            $0.courseClient.latestPastCourses = { _ in [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -167,8 +181,10 @@ final class HomeFlowCourseWiringTests: XCTestCase {
         let store = TestStore(initialState: builtCourseResultState()) {
             HomeFlowFeature()
         } withDependencies: {
-            $0.homeClient.home = { wiringHomeSummary }
-            $0.homeClient.pastDates = { _ in [] }
+            $0.coupleClient.current = { wiringCoupleStatus }
+            $0.profileClient.member = { wiringProfile }
+            $0.courseClient.currentCourse = { bannerCourse }
+            $0.courseClient.latestPastCourses = { _ in [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -307,7 +323,7 @@ final class HomeFlowCourseEditWiringTests: XCTestCase {
     }
 
     func test_고른_장소는_수정_화면으로_돌아간다() async {
-        let picked = [CoursePlaceCandidate.fixture(id: "102")]
+        let picked = [SavedPlace.candidateFixture(id: "102")]
         var state = editingCourseResultState()
         state.coursePlaceAdd = CourseFeature.State(mode: .pick(excluding: ["101"]))
         state.path.append(.coursePlaceAdd)
@@ -331,7 +347,7 @@ final class HomeFlowCourseEditWiringTests: XCTestCase {
         store.exhaustivity = .off
 
         await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["p0"]))))
-        await store.send(.coursePlaceAdd(.delegate(.placesPicked([CoursePlaceCandidate.fixture(id: "102")]))))
+        await store.send(.coursePlaceAdd(.delegate(.placesPicked([SavedPlace.candidateFixture(id: "102")]))))
         await store.receive(\.pathChanged)
         await store.receive(\.courseEdit.placesAdded)
 
@@ -358,16 +374,16 @@ private let bannerCourse = DateCourseSummary(
     title: "성수동 데이트",
     scheduledAt: Date(timeIntervalSince1970: 0),
     status: .confirmed,
-    version: 1,
     totalPlaceCount: 5
 )
 
-private let wiringHomeSummary = HomeSummary(
-    connected: true,
-    myNickname: "나",
-    partnerNickname: "짝",
-    currentDateCourse: bannerCourse
+private let wiringCoupleStatus = CoupleStatus.connected(
+    me: CoupleMember(nickname: "나", iconID: 0),
+    partner: CoupleMember(nickname: "짝", iconID: 1),
+    daysTogether: nil
 )
+
+private let wiringProfile = UserProfile(nickname: "나", iconID: 0, datePreference: nil)
 
 private let wiringCourse = DateCourse(
     id: "42",

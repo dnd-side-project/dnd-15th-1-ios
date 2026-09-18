@@ -37,65 +37,70 @@ enum CourseDTOMapper {
             id: String(dto.dateCourseId),
             title: dto.title,
             scheduledAt: try scheduledAt(date: dto.date, time: dto.time),
-            status: status(dto.status),
-            version: dto.version,
+            // 지난 데이트 목록에는 상태가 없다
+            status: dto.status.map { status($0) },
             totalPlaceCount: dto.totalPlaceCount
         )
     }
 
-    static func toDomain(_ dto: DateCoursePlaceCandidateResponseDTO) -> CoursePlaceCandidate {
-        CoursePlaceCandidate(
-            id: String(dto.placeId),
-            name: dto.name,
-            address: dto.address,
-            category: category(dto.categoryName),
-            coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
-            ownership: ownership(dto.ownershipStatus),
+    /// 지난 데이트 한 페이지. 날짜를 못 읽는 코스가 하나라도 있으면 틀린 날짜를 보이지 않고 실패로 끝낸다
+    static func toPage(_ dto: PastDateCoursesResponseDTO) throws -> PastDateCoursePage {
+        PastDateCoursePage(
+            courses: try dto.dateCourses.map(toDomain),
+            totalCount: dto.totalCount,
+            hasNext: dto.hasNext
+        )
+    }
+
+    /// 코스에 담을 후보. 저장 장소 응답과 거의 같아 SavedPlace 로 옮긴다.
+    /// 이 응답에 없는 카카오 번호·저장 수·저장 시각은 비워 둔다
+    static func toDomain(_ dto: DateCoursePlaceCandidateResponseDTO) -> SavedPlace {
+        SavedPlace(
+            place: Place(
+                placeID: String(dto.placeId),
+                kakaoPlaceID: nil,
+                name: dto.name,
+                category: PlaceDTOMapper.category(code: nil, name: dto.categoryName),
+                address: dto.address,
+                roadAddress: PlaceDTOMapper.roadAddress(dto.roadAddress),
+                coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
+                bookmarkCount: nil,
+                thumbnailURLs: PlaceDTOMapper.photoURLs(
+                    thumbnailURL: dto.thumbnailUrl,
+                    imageURLs: dto.imageUrls
+                )
+            ),
+            // 모르는 저장 관계는 내가 저장한 것으로 둔다
+            ownership: PlaceDTOMapper.ownership(dto.ownershipStatus) ?? .mine,
             alias: dto.alias,
-            thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
+            memo: nil,
+            savedAt: nil
         )
     }
 
     private static func mapPlace(_ dto: DateCoursePlaceResponseDTO) -> Place {
-        let imageURLs = (dto.imageUrls ?? []).compactMap(URL.init(string:))
-        let thumbnailURLs: [URL]
-        if imageURLs.isEmpty, let thumb = dto.thumbnailUrl.flatMap(URL.init(string:)) {
-            thumbnailURLs = [thumb]
-        } else {
-            thumbnailURLs = imageURLs
-        }
-        return Place(
-            id: String(dto.placeId),
+        Place(
+            placeID: String(dto.placeId),
             kakaoPlaceID: nil,
             name: dto.name,
-            category: category(dto.categoryName ?? ""),
-            address: dto.address ?? "",
-            roadAddress: dto.roadAddress ?? "",
+            category: PlaceDTOMapper.category(code: nil, name: dto.categoryName),
+            address: dto.address,
+            roadAddress: PlaceDTOMapper.roadAddress(dto.roadAddress),
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
-            bookmarkCount: 0,
-            thumbnailURLs: thumbnailURLs
+            // 코스 응답에는 저장 수가 없다
+            bookmarkCount: nil,
+            thumbnailURLs: PlaceDTOMapper.photoURLs(
+                thumbnailURL: dto.thumbnailUrl,
+                imageURLs: dto.imageUrls ?? []
+            )
         )
     }
 
     // 모르는 값이 오면 DRAFT 로 둔다. 홈은 CONFIRMED 만 보므로 안 뜨는 쪽이 덜 위험하다
     private static func status(_ raw: String) -> CourseStatus {
-        CourseStatus(rawValue: raw.lowercased()) ?? .draft
-    }
-
-    private static func ownership(_ raw: String) -> PlaceOwnership {
-        PlaceOwnership(rawValue: raw.lowercased()) ?? .mine
-    }
-
-    // 서버 categoryName(한글) 을 카테고리로 매핑. PlaceDTOMapper 와 같은 표다
-    private static func category(_ name: String) -> PlaceCategory {
-        switch name {
-        case "카페": return .cafe
-        case "관광": return .tourism
-        case "놀거리": return .activity
-        case "쇼핑": return .shopping
-        case "숙박": return .accommodation
-        case "편의", "생활 편의": return .convenience
-        default: return .food
+        switch raw.uppercased() {
+        case "CONFIRMED": return .confirmed
+        default: return .draft
         }
     }
 

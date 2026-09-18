@@ -165,7 +165,7 @@ public struct HomeView: View {
                         Button {
                             store.send(.pastScheduleTapped(schedule.id))
                         } label: {
-                            DateScheduleCard(schedule: schedule)
+                            PastDateCourseCard(course: schedule)
                         }
                         .buttonStyle(.plain)
                     }

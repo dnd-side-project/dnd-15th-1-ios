@@ -70,7 +70,7 @@ public struct PastDateCoursesView: View {
     }
 
     // 끝에서 세 번째 카드가 보이면 미리 다음 페이지를 받아 스크롤이 끊기지 않게 한다
-    private func prefetchIfNeeded(_ course: DateSchedule) {
+    private func prefetchIfNeeded(_ course: DateCourseSummary) {
         if course.id == store.courses.suffix(3).first?.id {
             store.send(.reachedEnd)
         }
@@ -133,7 +133,7 @@ public struct PastDateCoursesView: View {
 
 // 지난 데이트 카드. 홈의 가로 카드와 달리 폭을 꽉 채운다
 private struct PastDateCourseRow: View {
-    let schedule: DateSchedule
+    let schedule: DateCourseSummary
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -149,7 +149,7 @@ private struct PastDateCourseRow: View {
                         .frame(width: 16, height: 16)
                         .foregroundStyle(Color.primaryPink)
 
-                    Text("총 \(schedule.placeCount)곳의 장소")
+                    Text("총 \(schedule.totalPlaceCount)곳의 장소")
                         .typography(.body2M)
                         .foregroundStyle(Color.brandPrimary)
                 }
@@ -160,7 +160,7 @@ private struct PastDateCourseRow: View {
 
                 Spacer()
 
-                Text(schedule.date)
+                Text(schedule.scheduledAt.shortDateText)
                     .typography(.caption1R)
                     .foregroundStyle(Color.textTertiary)
             }

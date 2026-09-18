@@ -127,7 +127,7 @@ public struct CourseEditFeature {
         case undoTapped
         case toastDismissed
         case addPlaceTapped
-        case placesAdded([CoursePlaceCandidate])
+        case placesAdded([SavedPlace])
 
         case saveTapped
         case backTapped
@@ -440,18 +440,16 @@ extension CourseEditFeature.EditablePlace {
             id: stop.place.id,
             name: stop.place.name,
             category: stop.place.category,
-            address: stop.place.roadAddress.isEmpty
-                ? stop.place.address
-                : stop.place.roadAddress
+            address: stop.place.roadAddress ?? stop.place.address
         )
     }
 
-    init(candidate: CoursePlaceCandidate) {
+    init(candidate: SavedPlace) {
         self.init(
             id: candidate.id,
-            name: candidate.name,
-            category: candidate.category,
-            address: candidate.address
+            name: candidate.place.name,
+            category: candidate.place.category,
+            address: candidate.place.roadAddress ?? candidate.place.address
         )
     }
 }

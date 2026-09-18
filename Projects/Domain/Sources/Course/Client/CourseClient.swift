@@ -12,13 +12,22 @@ public struct CourseClient: Sendable {
     ) async throws -> DateCourse
 
     /// GET /api/v1/date-courses/places
-    public var coursePlaces: @Sendable () async throws -> [CoursePlaceCandidate]
+    /// 코스에 담을 수 있는 저장 장소. 장소 번호가 늘 있다
+    public var coursePlaces: @Sendable () async throws -> [SavedPlace]
 
     /// GET /api/v1/date-courses/{dateCourseId}
     public var course: @Sendable (_ id: String) async throws -> DateCourse
 
     /// GET /api/v1/date-courses/current
     public var currentCourse: @Sendable () async throws -> DateCourseSummary?
+
+    /// GET /api/v1/home/past-dates
+    /// 가장 최근 지난 데이트부터 size 개다
+    public var latestPastCourses: @Sendable (_ size: Int) async throws -> [DateCourseSummary]
+
+    /// GET /api/v1/date-courses/past
+    /// totalCount 는 전체 데이트 횟수다
+    public var pastCourses: @Sendable (_ page: Int, _ size: Int) async throws -> PastDateCoursePage
 
     /// PUT /api/v1/date-courses/{dateCourseId}
     /// 확정 저장이다

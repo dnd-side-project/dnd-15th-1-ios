@@ -390,14 +390,14 @@ private struct DeferredWheel: View {
 private extension Place {
     static func editPreview(id: String, latitude: Double, longitude: Double) -> Place {
         Place(
-            id: id,
+            placeID: id,
             kakaoPlaceID: nil,
             name: "장소명",
             category: .food,
             address: "경기도 안산시 모모로 145길 (뭐뭐동)",
             roadAddress: "경기도 안산시 모모로 145길 (뭐뭐동)",
             coordinate: Coordinate(latitude: latitude, longitude: longitude),
-            bookmarkCount: 0,
+            bookmarkCount: nil,
             thumbnailURLs: []
         )
     }

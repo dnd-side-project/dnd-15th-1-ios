@@ -155,9 +155,22 @@ final class CourseEditFeatureTests: XCTestCase {
 
     func test_장소를_더하면_목록_뒤에_붙는다() async {
         let store = await loadedStore()
-        let candidate = CoursePlaceCandidate.fixture(id: "p9")
+        let candidate = SavedPlace.candidateFixture(id: "p9")
         await store.send(.placesAdded([candidate]))
         XCTAssertEqual(store.state.places.last?.id, "p9")
+    }
+
+    /// 담긴 장소와 방금 더한 장소가 같은 줄에 나란히 서므로 주소 규칙도 같아야 한다
+    func test_더한_장소도_담긴_장소처럼_도로명을_먼저_보인다() async {
+        let store = await loadedStore()
+        await store.send(.placesAdded([SavedPlace.candidateFixture(id: "p9")]))
+        XCTAssertEqual(store.state.places.last?.address, "경기도 안산시 모모로 145")
+    }
+
+    func test_도로명이_없는_장소는_지번_주소를_보인다() async {
+        let store = await loadedStore()
+        await store.send(.placesAdded([SavedPlace.candidateFixture(id: "p9", roadAddress: nil)]))
+        XCTAssertEqual(store.state.places.last?.address, "경기도 안산시 모모로 145길")
     }
 
     func test_장소_추가_후_onAppear는_편집을_안_지운다() async {
@@ -176,7 +189,7 @@ final class CourseEditFeatureTests: XCTestCase {
         XCTAssertEqual(fetchCount.value, 1)
 
         await store.send(.titleChanged("새 제목"))
-        await store.send(.placesAdded([CoursePlaceCandidate.fixture(id: "p9")]))
+        await store.send(.placesAdded([SavedPlace.candidateFixture(id: "p9")]))
         await store.send(.onAppear)
 
         XCTAssertEqual(store.state.title, "새 제목")
@@ -279,7 +292,7 @@ final class CourseEditAnalyticsTests: XCTestCase {
         store.dependencies.analyticsClient.track = { event in
             sent.withValue { $0.append(event) }
         }
-        await store.send(.placesAdded([CoursePlaceCandidate.fixture(id: "p9")]))
+        await store.send(.placesAdded([SavedPlace.candidateFixture(id: "p9")]))
         await store.finish()
         XCTAssertEqual(sent.value, [.placeAddedToCourse])
     }
@@ -290,7 +303,7 @@ final class CourseEditAnalyticsTests: XCTestCase {
         store.dependencies.analyticsClient.track = { event in
             sent.withValue { $0.append(event) }
         }
-        await store.send(.placesAdded([CoursePlaceCandidate.fixture(id: "p0")]))
+        await store.send(.placesAdded([SavedPlace.candidateFixture(id: "p0")]))
         await store.finish()
         XCTAssertEqual(sent.value, [])
     }

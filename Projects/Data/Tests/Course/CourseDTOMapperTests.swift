@@ -1,4 +1,5 @@
 import Domain
+import Foundation
 import XCTest
 
 @testable import Data
@@ -242,7 +243,6 @@ final class CourseDTOMapperSummaryTests: XCTestCase {
         XCTAssertEqual(summary.id, "42")
         XCTAssertEqual(summary.title, "26.08.05 데이트")
         XCTAssertEqual(summary.status, .confirmed)
-        XCTAssertEqual(summary.version, 1)
         XCTAssertEqual(summary.totalPlaceCount, 3)
 
         var seoul = Calendar(identifier: .gregorian)
@@ -393,25 +393,33 @@ final class CourseDTOMapperCandidateTests: XCTestCase {
             placeId: 7,
             name: "장소명",
             address: "경기도 안산시 모모로 145길",
+            roadAddress: "경기도 안산시 단원구 모모로 145",
             latitude: 37.5665,
             longitude: 126.9780,
             categoryName: "카페",
             ownershipStatus: "TOGETHER",
             alias: "우리 카페",
+            thumbnailUrl: nil,
             imageUrls: ["https://example.com/a.jpg", ""]
         )
 
         let candidate = CourseDTOMapper.toDomain(dto)
 
         XCTAssertEqual(candidate.id, "7")
-        XCTAssertEqual(candidate.name, "장소명")
-        XCTAssertEqual(candidate.address, "경기도 안산시 모모로 145길")
-        XCTAssertEqual(candidate.category, .cafe)
+        XCTAssertEqual(candidate.place.placeID, "7")
+        XCTAssertEqual(candidate.place.name, "장소명")
+        XCTAssertEqual(candidate.place.address, "경기도 안산시 모모로 145길")
+        XCTAssertEqual(candidate.place.roadAddress, "경기도 안산시 단원구 모모로 145")
+        XCTAssertEqual(candidate.place.category, .cafe)
         XCTAssertEqual(candidate.ownership, .together)
         XCTAssertEqual(candidate.alias, "우리 카페")
-        XCTAssertEqual(candidate.coordinate.latitude, 37.5665, accuracy: 0.0001)
-        XCTAssertEqual(candidate.coordinate.longitude, 126.9780, accuracy: 0.0001)
-        XCTAssertEqual(candidate.thumbnailURLs.count, 1)
+        XCTAssertEqual(candidate.place.coordinate.latitude, 37.5665, accuracy: 0.0001)
+        XCTAssertEqual(candidate.place.coordinate.longitude, 126.9780, accuracy: 0.0001)
+        XCTAssertEqual(candidate.place.thumbnailURLs.count, 1)
+        // 이 응답에 없는 값은 지어내지 않는다
+        XCTAssertNil(candidate.place.kakaoPlaceID)
+        XCTAssertNil(candidate.place.bookmarkCount)
+        XCTAssertNil(candidate.savedAt)
     }
 
     func test_카테고리_한글_일곱값을_모두_옮긴다() {
@@ -430,15 +438,243 @@ final class CourseDTOMapperCandidateTests: XCTestCase {
                 placeId: 1,
                 name: "n",
                 address: "a",
+                roadAddress: nil,
                 latitude: 0,
                 longitude: 0,
                 categoryName: name,
                 ownershipStatus: "MINE",
                 alias: nil,
+                thumbnailUrl: nil,
                 imageUrls: []
             )
 
-            XCTAssertEqual(CourseDTOMapper.toDomain(dto).category, expected, name)
+            XCTAssertEqual(CourseDTOMapper.toDomain(dto).place.category, expected, name)
+        }
+    }
+}
+
+final class CourseDTOMapperPhotoTests: XCTestCase {
+
+    func test_코스_장소_사진은_대표_사진이_맨_앞이고_겹치면_한_번이다() throws {
+        let dto = DateCourseResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: nil,
+            status: "CONFIRMED",
+            version: 1,
+            totalPlaceCount: 1,
+            places: [
+                DateCoursePlaceResponseDTO(
+                    order: 1,
+                    placeId: 7,
+                    name: "장소7",
+                    address: "주소",
+                    roadAddress: nil,
+                    latitude: 37.5,
+                    longitude: 127.0,
+                    category: nil,
+                    categoryName: "카페",
+                    thumbnailUrl: "https://example.com/t.jpg",
+                    imageUrls: ["https://example.com/a.jpg", "https://example.com/t.jpg"],
+                    walkToNext: nil
+                ),
+            ]
+        )
+
+        let course = try CourseDTOMapper.toDomain(dto)
+
+        XCTAssertEqual(course.stops.first?.place.thumbnailURLs.map(\.absoluteString), [
+            "https://example.com/t.jpg",
+            "https://example.com/a.jpg",
+        ])
+    }
+
+    func test_후보_장소_사진은_대표_사진이_맨_앞이다() {
+        let dto = DateCoursePlaceCandidateResponseDTO(
+            placeId: 7,
+            name: "장소명",
+            address: "주소",
+            roadAddress: nil,
+            latitude: 37.5,
+            longitude: 127.0,
+            categoryName: "카페",
+            ownershipStatus: "MINE",
+            alias: nil,
+            thumbnailUrl: "https://example.com/t.jpg",
+            imageUrls: ["https://example.com/a.jpg"]
+        )
+
+        XCTAssertEqual(CourseDTOMapper.toDomain(dto).place.thumbnailURLs.map(\.absoluteString), [
+            "https://example.com/t.jpg",
+            "https://example.com/a.jpg",
+        ])
+    }
+
+    func test_후보_장소의_빈_도로명은_없음으로_옮긴다() {
+        let dto = DateCoursePlaceCandidateResponseDTO(
+            placeId: 7,
+            name: "장소명",
+            address: "주소",
+            roadAddress: "",
+            latitude: 37.5,
+            longitude: 127.0,
+            categoryName: "카페",
+            ownershipStatus: "MINE",
+            alias: nil,
+            thumbnailUrl: nil,
+            imageUrls: []
+        )
+
+        XCTAssertNil(CourseDTOMapper.toDomain(dto).place.roadAddress)
+    }
+
+    func test_후보_장소의_모르는_저장_관계는_mine이다() {
+        let dto = DateCoursePlaceCandidateResponseDTO(
+            placeId: 7,
+            name: "장소명",
+            address: "주소",
+            roadAddress: nil,
+            latitude: 37.5,
+            longitude: 127.0,
+            categoryName: "카페",
+            ownershipStatus: "???",
+            alias: nil,
+            thumbnailUrl: nil,
+            imageUrls: []
+        )
+
+        XCTAssertEqual(CourseDTOMapper.toDomain(dto).ownership, .mine)
+    }
+
+    func test_코스_장소에_지번_주소가_없으면_읽기에_실패한다() {
+        let json = Data("""
+        {
+          "order": 1,
+          "placeId": 7,
+          "name": "장소7",
+          "roadAddress": "도로명",
+          "latitude": 37.5,
+          "longitude": 127.0
+        }
+        """.utf8)
+
+        XCTAssertThrowsError(try JSONDecoder().decode(DateCoursePlaceResponseDTO.self, from: json))
+    }
+
+    // 화면이 빈 도로명을 "없음" 으로 다룬다. 서버가 "" 를 줘도 같게 읽혀야 한다
+    func test_코스_장소_도로명_빈_문자열은_없음으로_본다() throws {
+        let dto = DateCourseResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: nil,
+            status: "CONFIRMED",
+            version: 1,
+            totalPlaceCount: 1,
+            places: [
+                DateCoursePlaceResponseDTO(
+                    order: 1,
+                    placeId: 7,
+                    name: "장소7",
+                    address: "주소",
+                    roadAddress: "",
+                    latitude: 37.5,
+                    longitude: 127.0,
+                    category: nil,
+                    categoryName: "카페",
+                    thumbnailUrl: nil,
+                    imageUrls: [],
+                    walkToNext: nil
+                ),
+            ]
+        )
+
+        let course = try CourseDTOMapper.toDomain(dto)
+
+        XCTAssertNil(course.stops.first?.place.roadAddress)
+    }
+
+    func test_코스_장소는_장소_번호가_있고_저장_수와_도로명은_응답대로다() throws {
+        let dto = DateCourseResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: nil,
+            status: "CONFIRMED",
+            version: 1,
+            totalPlaceCount: 1,
+            places: [
+                DateCoursePlaceResponseDTO(
+                    order: 1,
+                    placeId: 7,
+                    name: "장소7",
+                    address: "주소",
+                    roadAddress: nil,
+                    latitude: 37.5,
+                    longitude: 127.0,
+                    category: nil,
+                    categoryName: "카페",
+                    thumbnailUrl: nil,
+                    imageUrls: nil,
+                    walkToNext: nil
+                ),
+            ]
+        )
+
+        let place = try XCTUnwrap(try CourseDTOMapper.toDomain(dto).stops.first?.place)
+
+        XCTAssertEqual(place.placeID, "7")
+        XCTAssertNil(place.roadAddress)
+        XCTAssertNil(place.bookmarkCount)
+    }
+}
+
+final class CourseDTOMapperPastTests: XCTestCase {
+
+    func test_상태와_버전이_없어도_지난_데이트를_읽고_상태는_nil이다() throws {
+        let json = Data("""
+        {
+          "dateCourses": [
+            { "dateCourseId": 7, "title": "성수역 데이트", "date": "2026-08-06", "totalPlaceCount": 5 }
+          ],
+          "totalCount": 1,
+          "hasNext": false
+        }
+        """.utf8)
+        let dto = try JSONDecoder().decode(PastDateCoursesResponseDTO.self, from: json)
+
+        let page = try CourseDTOMapper.toPage(dto)
+
+        XCTAssertEqual(page.courses.map(\.id), ["7"])
+        XCTAssertEqual(page.courses.first?.title, "성수역 데이트")
+        XCTAssertEqual(page.courses.first?.totalPlaceCount, 5)
+        XCTAssertNil(page.courses.first?.status)
+        // 2026-08-06 00:00 Asia/Seoul
+        XCTAssertEqual(page.courses.first?.scheduledAt, Date(timeIntervalSince1970: 1_785_942_000))
+        XCTAssertEqual(page.totalCount, 1)
+        XCTAssertFalse(page.hasNext)
+    }
+
+    func test_지난_데이트_날짜를_못_읽으면_목록_읽기가_실패한다() {
+        let dto = PastDateCoursesResponseDTO(
+            dateCourses: [
+                DateCourseSummaryResponseDTO(
+                    dateCourseId: 7,
+                    title: "t",
+                    date: "not-a-date",
+                    time: nil,
+                    status: nil,
+                    version: nil,
+                    totalPlaceCount: 1
+                ),
+            ],
+            totalCount: 1,
+            hasNext: false
+        )
+
+        XCTAssertThrowsError(try CourseDTOMapper.toPage(dto)) { error in
+            XCTAssertEqual(error as? CourseError, .unknown)
         }
     }
 }

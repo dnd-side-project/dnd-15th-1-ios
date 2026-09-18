@@ -293,7 +293,6 @@ final class CourseRepositoryCurrentTests: XCTestCase {
         XCTAssertEqual(course?.id, "42")
         XCTAssertEqual(course?.title, "26.08.05 데이트")
         XCTAssertEqual(course?.status, .confirmed)
-        XCTAssertEqual(course?.version, 1)
         XCTAssertEqual(course?.totalPlaceCount, 3)
     }
 
@@ -310,5 +309,72 @@ final class CourseRepositoryCurrentTests: XCTestCase {
 
         XCTAssertEqual(network.requestedKeys, ["GET \(currentPath)"])
         XCTAssertNil(course)
+    }
+}
+
+final class CourseRepositoryPastTests: XCTestCase {
+    private let latestPath = "/api/v1/home/past-dates"
+    private let pastPath = "/api/v1/date-courses/past"
+
+    func test_최근_지난_데이트는_홈_주소를_size와_부른다() async throws {
+        let network = StubNetworkClient()
+        network.responses["GET \(latestPath)"] = [summaryDTO(date: "2026-08-06")]
+        let repository = CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
+
+        let courses = try await repository.latestPastCourses(size: 3)
+
+        XCTAssertEqual(network.requestedKeys, ["GET \(latestPath)"])
+        XCTAssertEqual(courses.map(\.id), ["7"])
+        XCTAssertEqual(
+            CourseEndpoint.latestPast(size: 3).queryItems,
+            [URLQueryItem(name: "size", value: "3")]
+        )
+    }
+
+    func test_지난_데이트_목록은_date_courses_past_주소를_page와_size로_부른다() async throws {
+        let network = StubNetworkClient()
+        network.responses["GET \(pastPath)"] = PastDateCoursesResponseDTO(
+            dateCourses: [summaryDTO(date: "2026-08-06")],
+            totalCount: 12,
+            hasNext: true
+        )
+        let repository = CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
+
+        let page = try await repository.pastCourses(page: 1, size: 20)
+
+        XCTAssertEqual(network.requestedKeys, ["GET \(pastPath)"])
+        XCTAssertEqual(page.totalCount, 12)
+        XCTAssertTrue(page.hasNext)
+        XCTAssertEqual(
+            CourseEndpoint.past(page: 1, size: 20).queryItems,
+            [URLQueryItem(name: "page", value: "1"), URLQueryItem(name: "size", value: "20")]
+        )
+    }
+
+    func test_최근_지난_데이트의_날짜를_못_읽으면_unknown을_던진다() async {
+        let network = StubNetworkClient()
+        network.responses["GET \(latestPath)"] = [summaryDTO(date: "not-a-date")]
+        let repository = CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
+
+        do {
+            _ = try await repository.latestPastCourses(size: 3)
+            XCTFail("Expected unknown")
+        } catch let error as CourseError {
+            XCTAssertEqual(error, .unknown)
+        } catch {
+            XCTFail("Expected CourseError, got \(error)")
+        }
+    }
+
+    private func summaryDTO(date: String) -> DateCourseSummaryResponseDTO {
+        DateCourseSummaryResponseDTO(
+            dateCourseId: 7,
+            title: "성수역 데이트",
+            date: date,
+            time: nil,
+            status: nil,
+            version: nil,
+            totalPlaceCount: 5
+        )
     }
 }

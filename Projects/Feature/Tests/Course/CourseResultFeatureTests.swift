@@ -525,7 +525,7 @@ final class CourseResultOriginTests: XCTestCase {
 
 private let originFixtureStop = Domain.CourseStop(
     place: Place(
-        id: "p0",
+        placeID: "p0",
         kakaoPlaceID: nil,
         name: "장소",
         category: .food,

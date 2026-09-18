@@ -15,7 +15,7 @@ public struct PastDateCoursesFeature {
 
     @ObservableState
     public struct State: Equatable {
-        public var courses: [DateSchedule]
+        public var courses: [DateCourseSummary]
         public var totalCount: Int
         public var page: Int
         public var hasNext: Bool
@@ -25,7 +25,7 @@ public struct PastDateCoursesFeature {
         public var hasCurrentCourse: Bool
 
         public init(
-            courses: [DateSchedule] = [],
+            courses: [DateCourseSummary] = [],
             totalCount: Int = 0,
             page: Int = 0,
             hasNext: Bool = true,
@@ -62,7 +62,7 @@ public struct PastDateCoursesFeature {
         }
     }
 
-    @Dependency(\.homeClient) var homeClient
+    @Dependency(\.courseClient) var courseClient
 
     public init() {}
 
@@ -113,8 +113,8 @@ public struct PastDateCoursesFeature {
 
     // 지정한 페이지를 받아 지정한 액션으로 돌려준다
     private func loadPage(_ page: Int, action: @escaping @Sendable (PastDateCoursePage?) -> Action) -> Effect<Action> {
-        .run { [homeClient] send in
-            let result = try? await homeClient.pastCourses(page, Self.pageSize)
+        .run { [courseClient] send in
+            let result = try? await courseClient.pastCourses(page, Self.pageSize)
             await send(action(result))
         }
     }
