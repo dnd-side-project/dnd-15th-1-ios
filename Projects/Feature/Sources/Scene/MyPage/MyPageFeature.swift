@@ -122,7 +122,7 @@ public struct MyPageFeature {
         case pathChanged([Route])
         case dateType(DateTypeFeature.Action)
         case connection(ConnectionManageFeature.Action)
-        case connectionStatusResolved(CoupleStatus?)
+        case connectionStatusResolved(CoupleStatus)
         case connectionStatusFailed(CoupleError)
         case couple(CoupleConnectFeature.Action)
         case delegate(Delegate)
@@ -142,6 +142,7 @@ public struct MyPageFeature {
     @Dependency(\.authClient) var authClient
     @Dependency(\.profileClient) var profileClient
     @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.notificationClient) var notificationClient
 
     private enum CancelID { case updateNotification }
 
@@ -335,12 +336,12 @@ private extension MyPageFeature {
             }
 
         case let .connectionStatusResolved(status):
-            // 성공 응답. nil 은 진짜 미연결(404)이라 연결 플로우로 보낸다
-            if status?.connected == true {
+            // 연결 안 됨(404 포함)이면 연결 플로우로 보낸다
+            if case let .connected(me, partner, daysTogether) = status {
                 state.connection = ConnectionManageFeature.State(
-                    me: status?.me,
-                    partner: status?.partner,
-                    daysTogether: status?.daysTogether
+                    me: me,
+                    partner: partner,
+                    daysTogether: daysTogether
                 )
                 state.path.append(.connection)
             } else {
@@ -539,9 +540,9 @@ private extension MyPageFeature {
     }
 
     private func loadNotificationSettings() -> Effect<Action> {
-        .run { [profileClient] send in
+        .run { [notificationClient] send in
             do {
-                let settings = try await profileClient.notificationSettings()
+                let settings = try await notificationClient.notificationSettings()
                 await send(.notificationSettingsLoaded(settings))
             } catch {
                 // 실패해도 스켈레톤은 걷는다(무한 로딩 방지)
@@ -560,9 +561,9 @@ private extension MyPageFeature {
                 ?? state.availableMarketingConsentVersion,
             availableMarketingConsentVersion: state.availableMarketingConsentVersion
         )
-        return .run { [profileClient] send in
+        return .run { [notificationClient] send in
             do {
-                let updated = try await profileClient.updateNotificationSettings(outgoing)
+                let updated = try await notificationClient.updateNotificationSettings(outgoing)
                 await send(.notificationSettingsLoaded(updated))
             } catch {
                 // 다음 토글이 이 PUT 을 취소한 경우는 실패가 아니다

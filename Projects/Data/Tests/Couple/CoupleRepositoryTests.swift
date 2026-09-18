@@ -62,7 +62,7 @@ final class CoupleRepositoryTests: XCTestCase {
         XCTAssertEqual(json?["connectionCode"] as? String, "ABCDE")
     }
 
-    func test_연결_응답이_connected면_Couple로_매핑한다() async throws {
+    func test_연결_응답이_connected면_상대로_매핑한다() async throws {
         let network = StubNetworkClient()
         network.responses["POST \(connectPath)"] = CoupleConnectionStatusResponseDTO(
             connected: true,
@@ -74,13 +74,12 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let repository = makeRepository(network: network)
 
-        let couple = try await repository.connect(inviteCode: "ABCDE")
+        let partner = try await repository.connect(inviteCode: "ABCDE")
 
-        XCTAssertEqual(couple.partnerNickname, "상대방")
-        XCTAssertEqual(couple.partnerIconID, 4)
+        XCTAssertEqual(partner, CoupleMember(nickname: "상대방", iconID: 4))
     }
 
-    func test_connectedAt이_없어도_Couple로_매핑한다() async throws {
+    func test_connectedAt이_없어도_상대로_매핑한다() async throws {
         let network = StubNetworkClient()
         network.responses["POST \(connectPath)"] = CoupleConnectionStatusResponseDTO(
             connected: true,
@@ -92,10 +91,9 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let repository = makeRepository(network: network)
 
-        let couple = try await repository.connect(inviteCode: "ABCDE")
+        let partner = try await repository.connect(inviteCode: "ABCDE")
 
-        XCTAssertEqual(couple.partnerNickname, "상대방")
-        XCTAssertEqual(couple.partnerIconID, 4)
+        XCTAssertEqual(partner, CoupleMember(nickname: "상대방", iconID: 4))
     }
 
     func test_연결_응답이_미연결이면_unknown을_던진다() async throws {
@@ -118,7 +116,7 @@ final class CoupleRepositoryTests: XCTestCase {
         }
     }
 
-    func test_현재_상태가_미연결이면_nil을_준다() async throws {
+    func test_현재_상태가_미연결이면_연결_안_됨을_준다() async throws {
         let network = StubNetworkClient()
         network.responses["GET \(currentPath)"] = CoupleConnectionStatusResponseDTO(
             connected: false,
@@ -132,9 +130,7 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let status = try await repository.current()
 
-        XCTAssertEqual(status?.connected, false)
-        XCTAssertNil(status?.partner)
-        XCTAssertEqual(status?.me.nickname, "나")
+        XCTAssertEqual(status, .notConnected)
     }
 
     func test_현재_상태가_연결이면_파트너를_준다() async throws {
@@ -151,10 +147,14 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let status = try await repository.current()
 
-        XCTAssertEqual(status?.connected, true)
-        XCTAssertEqual(status?.partner?.nickname, "상대방")
-        XCTAssertEqual(status?.partner?.iconID, 2)
-        XCTAssertEqual(status?.daysTogether, 10)
+        XCTAssertEqual(
+            status,
+            .connected(
+                me: CoupleMember(nickname: "나", iconID: 1),
+                partner: CoupleMember(nickname: "상대방", iconID: 2),
+                daysTogether: 10
+            )
+        )
     }
 
     func test_409는_alreadyConnected로_매핑된다() async throws {
@@ -171,7 +171,7 @@ final class CoupleRepositoryTests: XCTestCase {
         }
     }
 
-    func test_현재_상태가_404면_커플_없음으로_보고_nil을_준다() async throws {
+    func test_현재_상태가_404면_프로필_설정_미완료라도_연결_안_됨을_준다() async throws {
         let network = StubNetworkClient()
         network.errors["GET \(currentPath)"] = NetworkError.notFound(message: nil)
 
@@ -179,7 +179,7 @@ final class CoupleRepositoryTests: XCTestCase {
 
         let status = try await repository.current()
 
-        XCTAssertNil(status)
+        XCTAssertEqual(status, .notConnected)
     }
 
     func test_연결에서_404는_여전히_invalidInviteCode를_던진다() async throws {
@@ -214,5 +214,71 @@ final class CoupleRepositoryTests: XCTestCase {
         CoupleRepository(
             coupleRemote: CoupleRemoteDataSource(networkClient: network)
         )
+    }
+}
+
+// 위 클래스가 type_body_length 한계에 가까워 상태 모양 검사는 따로 둔다
+final class CoupleRepositoryStatusTests: XCTestCase {
+    private let currentPath = "/api/v1/couples/me"
+
+    func test_미연결_응답에_내_정보가_없어도_연결_안_됨을_준다() async throws {
+        let repository = makeRepository(
+            status: CoupleConnectionStatusResponseDTO(
+                connected: false,
+                me: nil,
+                partner: nil,
+                connectedAt: nil,
+                daysTogether: nil
+            )
+        )
+
+        let status = try await repository.current()
+
+        XCTAssertEqual(status, .notConnected)
+    }
+
+    func test_연결인데_상대가_없으면_unknown을_던진다() async {
+        let repository = makeRepository(
+            status: CoupleConnectionStatusResponseDTO(
+                connected: true,
+                me: CoupleMemberProfileResponseDTO(nickname: "나", profileIcon: 1),
+                partner: nil,
+                connectedAt: nil,
+                daysTogether: nil
+            )
+        )
+
+        await assertUnknown { try await repository.current() }
+    }
+
+    func test_연결인데_내_정보가_없으면_unknown을_던진다() async {
+        let repository = makeRepository(
+            status: CoupleConnectionStatusResponseDTO(
+                connected: true,
+                me: nil,
+                partner: CoupleMemberProfileResponseDTO(nickname: "상대방", profileIcon: 2),
+                connectedAt: nil,
+                daysTogether: 3
+            )
+        )
+
+        await assertUnknown { try await repository.current() }
+    }
+
+    private func makeRepository(status: CoupleConnectionStatusResponseDTO) -> CoupleRepository {
+        let network = StubNetworkClient()
+        network.responses["GET \(currentPath)"] = status
+        return CoupleRepository(coupleRemote: CoupleRemoteDataSource(networkClient: network))
+    }
+
+    private func assertUnknown(_ operation: () async throws -> CoupleStatus) async {
+        do {
+            _ = try await operation()
+            XCTFail("Expected unknown")
+        } catch let error as CoupleError {
+            XCTAssertEqual(error, .unknown)
+        } catch {
+            XCTFail("Expected CoupleError, got \(error)")
+        }
     }
 }
