@@ -7,71 +7,34 @@
 
 import Foundation
 
+/// 인스타 게시물에서 장소를 가져오는 작업 하나
 public struct PlaceImport: Equatable, Identifiable, Sendable {
-    public var id: Int { importId }
-    public let importId: Int
-    public let contentId: Int?
-    public let canonicalUrl: String
-    public let sourceType: ImportSourceType
-    public let status: ImportStatus
-    public let nextAction: ImportNextAction
-    public let retryAfterSeconds: Int?
-    public let failure: ImportFailure?
+    public let id: String
+    /// 추적 파라미터를 없앤 원본 게시물 링크. 주소를 못 읽으면 nil 이고, 가져오기는 그대로 계속된다
+    public let canonicalURL: URL?
+    public let progress: ImportProgress
     public let content: ImportContent
-    public let candidates: [ImportCandidate]
 
     public init(
-        importId: Int,
-        contentId: Int?,
-        canonicalUrl: String,
-        sourceType: ImportSourceType,
-        status: ImportStatus,
-        nextAction: ImportNextAction,
-        retryAfterSeconds: Int?,
-        failure: ImportFailure?,
-        content: ImportContent,
-        candidates: [ImportCandidate]
+        id: String,
+        canonicalURL: URL?,
+        progress: ImportProgress,
+        content: ImportContent
     ) {
-        self.importId = importId
-        self.contentId = contentId
-        self.canonicalUrl = canonicalUrl
-        self.sourceType = sourceType
-        self.status = status
-        self.nextAction = nextAction
-        self.retryAfterSeconds = retryAfterSeconds
-        self.failure = failure
+        self.id = id
+        self.canonicalURL = canonicalURL
+        self.progress = progress
         self.content = content
-        self.candidates = candidates
     }
 }
 
-public enum ImportStatus: String, Equatable, Sendable {
-    case received = "RECEIVED"
-    case processing = "PROCESSING"
-    case reviewRequired = "REVIEW_REQUIRED"
-    case completed = "COMPLETED"
-    case failed = "FAILED"
-}
-
-public enum ImportNextAction: String, Equatable, Sendable {
-    case wait = "WAIT"
-    case selectPlaces = "SELECT_PLACES"
-    case retry = "RETRY"
-    case completed = "COMPLETED"
-    case noAction = "NONE"
-}
-
-public enum ImportSourceType: String, Equatable, Sendable {
-    case instagramReel = "INSTAGRAM_REEL"
-    case instagramPost = "INSTAGRAM_POST"
-}
-
-public struct ImportFailure: Equatable, Sendable {
-    public let code: String
-    public let retryable: Bool
-
-    public init(code: String, retryable: Bool) {
-        self.code = code
-        self.retryable = retryable
-    }
+/// 가져오기 진행 상태. 서버의 작업 상태와 다음 동작 두 값을 Data 가 이 넷으로 읽는다
+public enum ImportProgress: Equatable, Sendable {
+    /// 아직 분석 중이다. 다시 물을 때까지 기다릴 초를 서버가 주기도 한다
+    case processing(retryAfterSeconds: Int?)
+    /// 사용자가 저장할 장소를 고른다
+    case reviewRequired([ImportCandidate])
+    /// 분석이 끝났다. 후보가 없으면 화면이 실패로 본다
+    case completed([ImportCandidate])
+    case failed
 }

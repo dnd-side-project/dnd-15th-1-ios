@@ -7,40 +7,18 @@ import XCTest
 @MainActor
 final class PlaceImportFeatureTests: XCTestCase {
     func test_재공유_이미저장된후보넷_목록이뜨고_넷다체크된다() async throws {
-        let saved = (1...4).map { ImportCandidate.fixture(candidateId: $0, savedByMe: true) }
-        let store = try makeStore(response: .fixture(
-            status: .completed,
-            nextAction: .completed,
-            candidates: saved
-        ))
+        let saved = (1...4).map { ImportCandidate.fixture(id: "\($0)", isSaved: true) }
+        let store = try makeStore(response: .fixture(progress: .completed(saved)))
 
         await store.send(.onAppear)
         await store.receive(\.importUpdated)
 
-        XCTAssertEqual(store.state.candidates.map(\.candidateId), [1, 2, 3, 4])
-        XCTAssertEqual(store.state.selectedIDs, [1, 2, 3, 4])
+        XCTAssertEqual(store.state.candidates.map(\.id), ["1", "2", "3", "4"])
+        XCTAssertEqual(store.state.selectedIDs, ["1", "2", "3", "4"])
     }
 
-    func test_다음동작이없고_작업상태가완료면_목록이뜬다() async throws {
-        let saved = [ImportCandidate.fixture(candidateId: 1, savedByMe: true)]
-        let store = try makeStore(response: .fixture(
-            status: .completed,
-            nextAction: .noAction,
-            candidates: saved
-        ))
-
-        await store.send(.onAppear)
-        await store.receive(\.importUpdated)
-
-        XCTAssertEqual(store.state.candidates.map(\.candidateId), [1])
-    }
-
-    func test_다음동작이없고_작업상태가실패면_실패화면이뜬다() async throws {
-        let store = try makeStore(response: .fixture(
-            status: .failed,
-            nextAction: .noAction,
-            candidates: []
-        ))
+    func test_완료인데_후보가없으면_실패화면이뜬다() async throws {
+        let store = try makeStore(response: .fixture(progress: .completed([])))
 
         await store.send(.onAppear)
         await store.receive(\.importUpdated)
@@ -48,12 +26,17 @@ final class PlaceImportFeatureTests: XCTestCase {
         XCTAssertEqual(store.state.phase, .failed)
     }
 
-    func test_완료인데_후보가없으면_실패화면이뜬다() async throws {
-        let store = try makeStore(response: .fixture(
-            status: .completed,
-            nextAction: .completed,
-            candidates: []
-        ))
+    func test_검토필요는_후보가없어도_실패화면이_아니다() async throws {
+        let store = try makeStore(response: .fixture(progress: .reviewRequired([])))
+
+        await store.send(.onAppear)
+        await store.receive(\.importUpdated)
+
+        XCTAssertNotEqual(store.state.phase, .failed)
+    }
+
+    func test_실패면_실패화면이뜬다() async throws {
+        let store = try makeStore(response: .fixture(progress: .failed))
 
         await store.send(.onAppear)
         await store.receive(\.importUpdated)
@@ -63,72 +46,53 @@ final class PlaceImportFeatureTests: XCTestCase {
 
     func test_일부만저장됐어도_넷다체크된다() async throws {
         let candidates = [
-            ImportCandidate.fixture(candidateId: 1, savedByMe: true),
-            ImportCandidate.fixture(candidateId: 2, savedByMe: false),
-            ImportCandidate.fixture(candidateId: 3, savedByMe: true),
-            ImportCandidate.fixture(candidateId: 4, savedByMe: false),
+            ImportCandidate.fixture(id: "1", isSaved: true),
+            ImportCandidate.fixture(id: "2", isSaved: false),
+            ImportCandidate.fixture(id: "3", isSaved: true),
+            ImportCandidate.fixture(id: "4", isSaved: false),
         ]
-        let store = try makeStore(response: .fixture(
-            status: .completed,
-            nextAction: .completed,
-            candidates: candidates
-        ))
+        let store = try makeStore(response: .fixture(progress: .completed(candidates)))
 
         await store.send(.onAppear)
         await store.receive(\.importUpdated)
 
-        XCTAssertEqual(store.state.selectedIDs, [1, 2, 3, 4])
+        XCTAssertEqual(store.state.selectedIDs, ["1", "2", "3", "4"])
     }
 
     func test_체크를다끄면_버튼문구가_닫기다() async throws {
-        let saved = (1...4).map { ImportCandidate.fixture(candidateId: $0, savedByMe: true) }
-        let store = try makeStore(response: .fixture(
-            status: .completed,
-            nextAction: .completed,
-            candidates: saved
-        ))
+        let saved = (1...4).map { ImportCandidate.fixture(id: "\($0)", isSaved: true) }
+        let store = try makeStore(response: .fixture(progress: .completed(saved)))
 
         await store.send(.onAppear)
         await store.receive(\.importUpdated)
 
-        await store.send(.candidateToggled(1))
-        await store.send(.candidateToggled(2))
-        await store.send(.candidateToggled(3))
-        await store.send(.candidateToggled(4))
+        await store.send(.candidateToggled("1"))
+        await store.send(.candidateToggled("2"))
+        await store.send(.candidateToggled("3"))
+        await store.send(.candidateToggled("4"))
 
         XCTAssertEqual(store.state.saveButtonTitle, "닫기")
     }
 
     func test_후보가전부체크되면_버튼문구가_모두저장이다() async throws {
-        let fresh = (1...3).map { ImportCandidate.fixture(candidateId: $0, savedByMe: false) }
-        let store = try makeStore(response: .fixture(
-            status: .reviewRequired,
-            nextAction: .selectPlaces,
-            candidates: fresh
-        ))
+        let fresh = (1...3).map { ImportCandidate.fixture(id: "\($0)", isSaved: false) }
+        let store = try makeStore(response: .fixture(progress: .reviewRequired(fresh)))
 
         await store.send(.onAppear)
         await store.receive(\.importUpdated)
 
         XCTAssertEqual(store.state.saveButtonTitle, "모두 저장")
 
-        await store.send(.candidateToggled(1))
+        await store.send(.candidateToggled("1"))
 
         XCTAssertEqual(store.state.saveButtonTitle, "2곳만 저장")
     }
 
-    func test_다음동작이없고_작업상태가처리중이면_폴링을이어간다() async throws {
+    func test_처리중이면_폴링을이어간다() async throws {
         // 첫 응답은 처리 중, 두 번째는 완료. 같은 응답이면 최대 7번까지 폴링한다
-        let first = PlaceImport.fixture(
-            status: .processing,
-            nextAction: .noAction,
-            candidates: [],
-            retryAfterSeconds: 1
-        )
+        let first = PlaceImport.fixture(progress: .processing(retryAfterSeconds: 1))
         let second = PlaceImport.fixture(
-            status: .completed,
-            nextAction: .completed,
-            candidates: [ImportCandidate.fixture(candidateId: 1, savedByMe: false)]
+            progress: .completed([ImportCandidate.fixture(id: "1", isSaved: false)])
         )
         let store = try makeStore(startResponse: first, pollResponse: second)
 
@@ -142,7 +106,7 @@ final class PlaceImportFeatureTests: XCTestCase {
 
         XCTAssertNotEqual(store.state.phase, .failed)
         XCTAssertEqual(store.state.pollCount, 1)
-        XCTAssertEqual(store.state.candidates.map(\.candidateId), [1])
+        XCTAssertEqual(store.state.candidates.map(\.id), ["1"])
     }
 
     private func makeStore(
@@ -179,7 +143,7 @@ final class PlaceImportAnalyticsTests: XCTestCase {
 
     func test_장소_후보가_나오면_모달_이벤트를_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
-        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
+        let placeImport = makeImport(progress: .reviewRequired([makeCandidate(id: "1")]))
         let store = TestStore(
             initialState: PlaceImportFeature.State(link: link)
         ) {
@@ -189,9 +153,9 @@ final class PlaceImportAnalyticsTests: XCTestCase {
         }
 
         await store.send(.importUpdated(.success(placeImport))) {
-            $0.importId = placeImport.importId
+            $0.importID = placeImport.id
             $0.phase = .loaded(placeImport)
-            $0.selectedIDs = [1]
+            $0.selectedIDs = ["1"]
         }
         await store.finish()
         XCTAssertEqual(sent.value, [.placeSaveModalViewed])
@@ -199,7 +163,7 @@ final class PlaceImportAnalyticsTests: XCTestCase {
 
     func test_분석_실패_갈래에서는_모달_이벤트를_안_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
-        let placeImport = makeImport(nextAction: .retry)
+        let placeImport = makeImport(progress: .failed)
         let store = TestStore(
             initialState: PlaceImportFeature.State(link: link)
         ) {
@@ -209,7 +173,7 @@ final class PlaceImportAnalyticsTests: XCTestCase {
         }
 
         await store.send(.importUpdated(.success(placeImport))) {
-            $0.importId = placeImport.importId
+            $0.importID = placeImport.id
             $0.phase = .failed
         }
         await store.finish()
@@ -220,7 +184,7 @@ final class PlaceImportAnalyticsTests: XCTestCase {
         let sent = LockIsolated<[AnalyticsEvent]>([])
         var state = PlaceImportFeature.State(link: link)
         state.pollCount = 7
-        let placeImport = makeImport(nextAction: .wait)
+        let placeImport = makeImport(progress: .processing(retryAfterSeconds: 1))
         let store = TestStore(initialState: state) {
             PlaceImportFeature()
         } withDependencies: {
@@ -228,7 +192,7 @@ final class PlaceImportAnalyticsTests: XCTestCase {
         }
 
         await store.send(.importUpdated(.success(placeImport))) {
-            $0.importId = placeImport.importId
+            $0.importID = placeImport.id
             $0.phase = .failed
         }
         await store.finish()
@@ -237,9 +201,9 @@ final class PlaceImportAnalyticsTests: XCTestCase {
 
     func test_저장_버튼을_누르면_공유_경로로_시작_이벤트를_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
-        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
-        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: [1])
-        state.importId = placeImport.importId
+        let placeImport = makeImport(progress: .reviewRequired([makeCandidate(id: "1")]))
+        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: ["1"])
+        state.importID = placeImport.id
         let store = TestStore(initialState: state) {
             PlaceImportFeature()
         } withDependencies: {
@@ -266,9 +230,9 @@ final class PlaceImportAnalyticsTests: XCTestCase {
 
     func test_공유_저장이_성공하면_완료_이벤트를_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
-        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
-        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: [1])
-        state.importId = placeImport.importId
+        let placeImport = makeImport(progress: .reviewRequired([makeCandidate(id: "1")]))
+        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: ["1"])
+        state.importID = placeImport.id
         let store = TestStore(initialState: state) {
             PlaceImportFeature()
         } withDependencies: {
@@ -287,9 +251,9 @@ final class PlaceImportAnalyticsTests: XCTestCase {
 
     func test_저장이_서버에서_실패하면_완료_이벤트를_안_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
-        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
-        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: [1])
-        state.importId = placeImport.importId
+        let placeImport = makeImport(progress: .reviewRequired([makeCandidate(id: "1")]))
+        var state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: ["1"])
+        state.importID = placeImport.id
         let store = TestStore(initialState: state) {
             PlaceImportFeature()
         } withDependencies: {
@@ -305,8 +269,8 @@ final class PlaceImportAnalyticsTests: XCTestCase {
 
     func test_가져오기_번호가_없으면_시작_이벤트를_안_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
-        let placeImport = makeImport(nextAction: .selectPlaces, candidates: [makeCandidate(id: 1)])
-        let state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: [1])
+        let placeImport = makeImport(progress: .reviewRequired([makeCandidate(id: "1")]))
+        let state = PlaceImportFeature.State(link: link, phase: .loaded(placeImport), selectedIDs: ["1"])
         let store = TestStore(initialState: state) {
             PlaceImportFeature()
         } withDependencies: {
@@ -319,37 +283,26 @@ final class PlaceImportAnalyticsTests: XCTestCase {
     }
 }
 
-private func makeCandidate(id: Int) -> ImportCandidate {
+private func makeCandidate(id: String) -> ImportCandidate {
     ImportCandidate(
-        candidateId: id,
-        verificationStatus: .verified,
+        id: id,
         extractedName: "후보 \(id)",
         extractedAddressHint: nil,
-        place: nil,
-        evidence: nil
+        place: nil
     )
 }
 
-private func makeImport(
-    nextAction: ImportNextAction,
-    candidates: [ImportCandidate] = []
-) -> PlaceImport {
+private func makeImport(progress: ImportProgress) -> PlaceImport {
     PlaceImport(
-        importId: 9,
-        contentId: 1,
-        canonicalUrl: "https://www.instagram.com/reel/example/",
-        sourceType: .instagramReel,
-        status: nextAction == .selectPlaces ? .reviewRequired : .processing,
-        nextAction: nextAction,
-        retryAfterSeconds: 1,
-        failure: nil,
+        id: "9",
+        canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
+        progress: progress,
         content: ImportContent(
             title: "제목",
             caption: nil,
-            thumbnailUrl: nil,
+            thumbnailURL: nil,
             author: nil,
             publishedOn: nil
-        ),
-        candidates: candidates
+        )
     )
 }

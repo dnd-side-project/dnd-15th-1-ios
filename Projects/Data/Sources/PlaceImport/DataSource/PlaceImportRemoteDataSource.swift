@@ -15,17 +15,17 @@ public struct PlaceImportRemoteDataSource: Sendable {
         self.networkClient = networkClient
     }
 
-    func start(sourceUrl: String) async throws -> PlaceImportResponseDTO {
-        try await networkClient.request(PlaceImportEndpoint.start(sourceUrl: sourceUrl))
+    func start(sourceURL: String) async throws -> PlaceImportResponseDTO {
+        try await networkClient.request(PlaceImportEndpoint.start(sourceURL: sourceURL))
     }
 
-    func poll(importId: Int) async throws -> PlaceImportResponseDTO {
-        try await networkClient.request(PlaceImportEndpoint.poll(importId: importId))
+    func poll(importID: String) async throws -> PlaceImportResponseDTO {
+        try await networkClient.request(PlaceImportEndpoint.poll(importID: importID))
     }
 
-    func confirm(importId: Int, candidateIDs: [Int]) async throws {
+    func confirm(importID: String, candidateIDs: [Int]) async throws {
         try await networkClient.request(
-            PlaceImportEndpoint.confirm(importId: importId, candidateIDs: candidateIDs)
+            PlaceImportEndpoint.confirm(importID: importID, candidateIDs: candidateIDs)
         )
     }
 }

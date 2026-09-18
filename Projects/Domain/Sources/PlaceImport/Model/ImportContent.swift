@@ -10,20 +10,21 @@ import Foundation
 public struct ImportContent: Equatable, Sendable {
     public let title: String?
     public let caption: String?
-    public let thumbnailUrl: String?
+    public let thumbnailURL: URL?
     public let author: ImportAuthor?
-    public let publishedOn: String?
+    /// 게시일. 서버 값을 못 읽으면 nil 이다
+    public let publishedOn: Date?
 
     public init(
         title: String?,
         caption: String?,
-        thumbnailUrl: String?,
+        thumbnailURL: URL?,
         author: ImportAuthor?,
-        publishedOn: String?
+        publishedOn: Date?
     ) {
         self.title = title
         self.caption = caption
-        self.thumbnailUrl = thumbnailUrl
+        self.thumbnailURL = thumbnailURL
         self.author = author
         self.publishedOn = publishedOn
     }
