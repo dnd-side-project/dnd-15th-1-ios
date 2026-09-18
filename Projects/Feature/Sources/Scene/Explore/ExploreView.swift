@@ -146,7 +146,7 @@ private enum ExploreViewMetric {
             store: Store(initialState: ExploreFeature.State()) {
                 ExploreFeature()
             } withDependencies: {
-                $0.exploreClient = .mock
+                $0.contentClient = .mock
             }
         )
     }

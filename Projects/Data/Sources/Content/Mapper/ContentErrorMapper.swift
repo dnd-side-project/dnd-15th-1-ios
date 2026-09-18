@@ -1,5 +1,5 @@
 //
-//  ExploreErrorMapper.swift
+//  ContentErrorMapper.swift
 //  Dulpick
 //
 //  Created by 이인호 on 8/17/26.
@@ -9,10 +9,10 @@ import CoreNetwork
 import Domain
 import Foundation
 
-enum ExploreErrorMapper {
-    static func map(_ error: Error) -> ExploreError {
-        if let exploreError = error as? ExploreError {
-            return exploreError
+enum ContentErrorMapper {
+    static func map(_ error: Error) -> ContentError {
+        if let contentError = error as? ContentError {
+            return contentError
         }
         if let networkError = error as? NetworkError {
             return mapNetworkError(networkError)
@@ -20,7 +20,7 @@ enum ExploreErrorMapper {
         return .unknown
     }
 
-    private static func mapNetworkError(_ error: NetworkError) -> ExploreError {
+    private static func mapNetworkError(_ error: NetworkError) -> ContentError {
         switch error {
         case .transport:
             return .network

@@ -35,7 +35,7 @@ public struct PostDetailFeature {
     public enum Action: Equatable {
         case onAppear
         case detailResponse(PostDetailContent)
-        case detailFailed(ExploreError)
+        case detailFailed(ContentError)
         case retryTapped
         case expandToggled
         case closeTapped
@@ -63,7 +63,7 @@ public struct PostDetailFeature {
         case save(String)
     }
 
-    @Dependency(\.postDetailContentClient) var postDetailContentClient
+    @Dependency(\.contentClient) var contentClient
     @Dependency(\.placeClient) var placeClient
     @Dependency(\.analyticsClient) var analyticsClient
     @Dependency(\.authClient) var authClient
@@ -135,7 +135,7 @@ public struct PostDetailFeature {
         guard let place = state.detail?.places.first(where: { $0.id == id }) else { return .none }
         let wasSaved = state.savedPlaceIDs.contains(id)
         // 저장하려는데 카카오 식별자가 없으면 부를 수 없다
-        if !wasSaved, place.kakaoPlaceID == nil { return .none }
+        if !wasSaved, place.place.kakaoPlaceID == nil { return .none }
         if wasSaved {
             state.savedPlaceIDs.remove(id)
         } else {
@@ -144,13 +144,18 @@ public struct PostDetailFeature {
         return runSave(place, wasSaved: wasSaved)
     }
 
-    private func runSave(_ place: PostDetailPlace, wasSaved: Bool) -> Effect<Action> {
+    private func runSave(_ place: ContentPlace, wasSaved: Bool) -> Effect<Action> {
         let request = Effect<Action>.run { [placeClient] send in
             do {
                 if wasSaved {
-                    try await placeClient.removePlace(place.id)
-                } else if let kakaoID = place.kakaoPlaceID {
-                    _ = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
+                    // 게시글 속 장소는 장소 번호가 늘 있다. 없으면 부를 곳이 없어 되돌린다
+                    guard let placeID = place.place.placeID else {
+                        await send(.placeSaveFailed(id: place.id, wasSaved: wasSaved))
+                        return
+                    }
+                    try await placeClient.removePlace(placeID)
+                } else if let kakaoID = place.place.kakaoPlaceID {
+                    _ = try await placeClient.savePlace(kakaoID, place.place.name, nil, nil)
                     await send(.placeSaved(id: place.id))
                 }
             } catch {
@@ -178,13 +183,13 @@ public struct PostDetailFeature {
     }
 
     private func load(id: String) -> Effect<Action> {
-        .run { [postDetailContentClient] send in
+        .run { [contentClient] send in
             do {
-                await send(.detailResponse(try await postDetailContentClient.contentDetail(id)))
-            } catch let error as ExploreError {
+                await send(.detailResponse(try await contentClient.contentDetail(id)))
+            } catch let error as ContentError {
                 await send(.detailFailed(error))
             } catch {
-                // ExploreError 가 아닌 것을 network 로 부르면 원인을 잘못 이름 붙인다
+                // ContentError 가 아닌 것을 network 로 부르면 원인을 잘못 이름 붙인다
                 await send(.detailFailed(.unknown))
             }
         }

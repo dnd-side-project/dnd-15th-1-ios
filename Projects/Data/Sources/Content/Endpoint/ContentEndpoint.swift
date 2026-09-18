@@ -13,7 +13,7 @@ enum ContentEndpoint: APIEndpoint {
     case contents(sort: ContentSort, page: Int, size: Int)
     case search(query: String, sort: ContentSort, page: Int, size: Int)
     case detail(id: String)
-    case placeContents(placeID: Int, page: Int, size: Int)
+    case placeContents(placeID: String, page: Int, size: Int)
 
     var path: String {
         switch self {
@@ -41,14 +41,14 @@ enum ContentEndpoint: APIEndpoint {
             return []
         case let .contents(sort, page, size):
             return [
-                URLQueryItem(name: "sort", value: sort.rawValue),
+                URLQueryItem(name: "sort", value: ContentDTOMapper.toQuery(sort)),
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "size", value: String(size)),
             ]
         case let .search(query, sort, page, size):
             return [
                 URLQueryItem(name: "query", value: query),
-                URLQueryItem(name: "sort", value: sort.rawValue),
+                URLQueryItem(name: "sort", value: ContentDTOMapper.toQuery(sort)),
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "size", value: String(size)),
             ]

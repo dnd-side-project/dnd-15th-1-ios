@@ -11,12 +11,9 @@ import Foundation
 public struct ContentPage: Equatable, Sendable {
     public let items: [Content]
     public let hasNext: Bool
-    // 탐색 탭 필터칩으로 쓰는 인기 태그. 첫 페이지 응답에 담겨 온다
-    public let popularTags: [String]
 
-    public init(items: [Content], hasNext: Bool, popularTags: [String]) {
+    public init(items: [Content], hasNext: Bool) {
         self.items = items
         self.hasNext = hasNext
-        self.popularTags = popularTags
     }
 }

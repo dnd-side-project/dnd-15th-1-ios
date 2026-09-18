@@ -15,11 +15,11 @@ public struct ContentRepository: Sendable {
         self.remote = remote
     }
 
-    public func contents(sort: ContentSort, page: Int, size: Int) async throws -> ContentPage {
+    public func contents(sort: ContentSort, page: Int, size: Int) async throws -> ContentFeed {
         do {
-            return ContentDTOMapper.toDomain(try await remote.contents(sort: sort, page: page, size: size))
+            return ContentDTOMapper.toFeed(try await remote.contents(sort: sort, page: page, size: size))
         } catch {
-            throw ExploreErrorMapper.map(error)
+            throw ContentErrorMapper.map(error)
         }
     }
 
@@ -34,7 +34,7 @@ public struct ContentRepository: Sendable {
                 try await remote.searchContents(query: query, sort: sort, page: page, size: size)
             )
         } catch {
-            throw ExploreErrorMapper.map(error)
+            throw ContentErrorMapper.map(error)
         }
     }
 
@@ -42,17 +42,17 @@ public struct ContentRepository: Sendable {
         do {
             return ContentDTOMapper.toDetail(try await remote.contentDetail(id: id))
         } catch {
-            throw ExploreErrorMapper.map(error)
+            throw ContentErrorMapper.map(error)
         }
     }
 
-    public func placeContents(placeID: Int, page: Int, size: Int) async throws -> ContentPage {
+    public func placeContents(placeID: String, page: Int, size: Int) async throws -> ContentPage {
         do {
             return ContentDTOMapper.toDomain(
                 try await remote.placeContents(placeID: placeID, page: page, size: size)
             )
         } catch {
-            throw ExploreErrorMapper.map(error)
+            throw ContentErrorMapper.map(error)
         }
     }
 }

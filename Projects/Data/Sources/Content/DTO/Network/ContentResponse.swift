@@ -30,13 +30,13 @@ struct ContentDetailResponseDTO: Decodable, Sendable {
     let places: [ContentDetailPlaceResponseDTO]?
 }
 
-// 인스타 추출(ImportPlace)과 동일한 형태. 쓰는 필드만 선언
+// 게시글 상세가 쓰는 필드만 선언
 struct ContentDetailPlaceResponseDTO: Decodable, Sendable {
     let placeId: Int
     let kakaoPlaceId: String?
     let name: String
-    // 주소·도로명은 없는 장소가 있어 옵셔널
-    let address: String?
+    // 지번 주소는 명세상 필수다. 도로명은 없는 장소가 있어 옵셔널
+    let address: String
     let roadAddress: String?
     let categoryName: String
     let latitude: Double
