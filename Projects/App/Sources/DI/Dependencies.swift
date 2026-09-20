@@ -22,6 +22,7 @@ enum Dependencies {
 
         values.placeClient = PlaceClientFactory.make(session: authSession)
         values.courseClient = CourseClientFactory.make(session: authSession)
+        values.noticeClient = NoticeClientFactory.make(session: authSession)
 
         values.recentSearchClient = RecentSearchClientFactory.make(
             userDefaults: infra.userDefaults
