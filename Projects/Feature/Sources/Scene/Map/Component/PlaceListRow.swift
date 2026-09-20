@@ -407,7 +407,7 @@ private struct PlaceListRowPreviewMark: View {
         Button {
             isBookmarked.toggle()
         } label: {
-            (isBookmarked ? Image.bookmarkFillColor : Image.bookmarkStroke)
+            (isBookmarked ? Image.bookmarkFilled : Image.bookmarkEmpty)
                 .resizable()
                 .frame(width: 24, height: 24)
         }
@@ -423,7 +423,7 @@ private struct PlaceListRowPreviewMark: View {
             name: PlaceListRowPreview.name,
             address: PlaceListRowPreview.address
         ) {
-            Image.bookmarkStroke
+            Image.bookmarkEmpty
                 .resizable()
                 .frame(width: 24, height: 24)
         }

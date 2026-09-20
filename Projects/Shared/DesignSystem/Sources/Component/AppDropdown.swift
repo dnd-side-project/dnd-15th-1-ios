@@ -77,7 +77,7 @@ public struct AppDropdown: View {
                     .typography(.body1M)
                     .foregroundStyle(isSelected ? Color.textPrimary : Color.textTertiary)
 
-                (isExpanded ? Image.arrowUp : Image.arrowDown)
+                (isExpanded ? Image.chevronUp : Image.chevronDown)
                     .renderingMode(.template)
                     .resizable()
                     .frame(width: 16, height: 16)

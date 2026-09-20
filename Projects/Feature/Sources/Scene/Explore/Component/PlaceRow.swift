@@ -48,7 +48,7 @@ struct PlaceRow: View {
 
     private func bookmarkBadge(_ text: String) -> some View {
         HStack(spacing: 2) {
-            Image.bookmarkFillColor
+            Image.bookmarkFilled
                 .resizable()
                 .frame(width: 14, height: 14)
             Text(text)

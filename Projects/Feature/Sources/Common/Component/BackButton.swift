@@ -18,7 +18,7 @@ struct BackButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image.arrowLeft
+            Image.chevronLeft
                 .renderingMode(.template)
                 .resizable()
                 .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)
@@ -39,7 +39,7 @@ struct BackToolbarItem: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             Button(action: action) {
-                Image.arrowLeft
+                Image.chevronLeft
                     .renderingMode(.template)
                     .resizable()
                     .frame(width: BackButtonMetric.iconSize, height: BackButtonMetric.iconSize)

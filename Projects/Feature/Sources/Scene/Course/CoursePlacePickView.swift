@@ -225,7 +225,7 @@ private extension CoursePlacePickView {
     var failureState: some View {
         VStack(spacing: Spacing.s16) {
             EmptyStateView(
-                image: .placeEmpty,
+                image: .emptyResult,
                 title: "장소를 불러오지 못했어요",
                 message: "잠시 뒤 다시 시도해주세요"
             )
@@ -241,7 +241,7 @@ private extension CoursePlacePickView {
 
     var emptyState: some View {
         EmptyStateView(
-            image: .placeEmpty,
+            image: .emptyResult,
             title: store.hasNoSavedPlace ? "저장한 장소가 없어요" : "조건에 맞는 장소가 없어요",
             message: store.hasNoSavedPlace ? "마음에 드는 장소를 저장해보세요" : "필터를 바꿔보세요"
         )

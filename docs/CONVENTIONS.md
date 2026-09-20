@@ -87,6 +87,25 @@ logoutButtonTapped
 onAppear
 ```
 
+에셋 카탈로그:
+
+| 대상 | 규칙 | 예 |
+|---|---|---|
+| 이미지 맨 위 폴더 | `Icons` · `Graphics` · `Logos` 셋 | |
+| 폴더 판정 | 로고면 `Logos`, 44pt 이하면 `Icons`, 나머지는 `Graphics` | |
+| 하위 폴더 | 네임스페이스 폴더만, `Icons` 아래에만 둔다 | `Icons/Pin` |
+| 이름 표기 | lowerCamelCase, svg 파일 이름도 같게 | `modalSave.imageset/modalSave.svg` |
+| 아이콘 이름 | 모양. 변주는 뒤에 붙인다 | `calendarHeart` · `bookmarkFilled` |
+| 큰 그림 이름 | `<쓰임새><전하는 상황>` | `emptyResult` · `bannerCourse` |
+| 프로필 이름 | `profile<마스코트 몸 색>` | `profileWhite` |
+| 로고 이름 | `brand<무엇>` | `brandLockup` |
+
+큰 그림의 쓰임새는 여섯이다. `illustration` · `modal` · `empty` · `banner` · `profile` · `background`.
+화면 이름을 에셋 이름과 폴더에 넣지 않는다.
+꺾쇠는 `chevron`, 몸통 있는 화살표는 `arrow` 다. 상태로 번갈아 쓰는 쌍은 `Filled` · `Empty` 로 짓는다.
+`Image.swift` 구획은 폴더와 쓰임새를 따르고, 구획 안은 이름순이다. `Color.swift` 는 단계 차례를 따른다.
+앱 모듈 카탈로그의 `SplashBackground` · `SplashBundle` 은 런치 화면이 글자 그대로 읽으므로 이 규칙에서 뺀다.
+
 ### 3. 타입 / 클로저 / 접근 제어
 
 - 상속 없는 class 는 `final`

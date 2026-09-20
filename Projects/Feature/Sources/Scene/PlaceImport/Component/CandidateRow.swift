@@ -48,7 +48,7 @@ struct CandidateRow: View {
 
                 Spacer()
 
-                (isSelected ? Image.checkTrue : Image.checkFalse)
+                (isSelected ? Image.checkFilled : Image.checkEmpty)
                     .resizable()
                     .frame(width: 24, height: 24)
             }

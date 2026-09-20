@@ -42,7 +42,7 @@ struct HomeHeader: View {
             .padding(.trailing, 8)
 
             Button(action: calendarTapped) {
-                Image.dateCalendar
+                Image.calendarHeart
                     .renderingMode(.template)
                     .foregroundStyle(Color.textInverseTertiary)
                     .frame(width: 44, height: 44)

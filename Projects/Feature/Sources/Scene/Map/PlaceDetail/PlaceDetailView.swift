@@ -89,7 +89,7 @@ private extension PlaceDetailView {
 
     var bookmarkButton: some View {
         headerIconButton(
-            icon: store.isBookmarked ? Image.bookmarkFillColor : Image.bookmarkStroke
+            icon: store.isBookmarked ? Image.bookmarkFilled : Image.bookmarkEmpty
         ) {
             store.send(.bookmarkTapped)
         }
@@ -129,7 +129,7 @@ private extension PlaceDetailView {
             }
         } label: {
             HStack(spacing: Spacing.s4) {
-                Image.mappin
+                Image.mapPin
                     .renderingMode(.template)
                     .resizable()
                     .frame(width: 16, height: 16)
@@ -200,7 +200,7 @@ private extension PlaceDetailView {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             Button { store.send(.addressToggled) } label: {
                 HStack(alignment: .center, spacing: Spacing.s8) {
-                    Image.mappin
+                    Image.mapPin
                         .renderingMode(.template)
                         .resizable()
                         .frame(width: 20, height: 20)
@@ -209,7 +209,7 @@ private extension PlaceDetailView {
                         .typography(.body2M)
                         .multilineTextAlignment(.leading)
 
-                    (store.isAddressExpanded ? Image.arrowUp : Image.arrowDown)
+                    (store.isAddressExpanded ? Image.chevronUp : Image.chevronDown)
                         .renderingMode(.template)
                         .resizable()
                         .frame(width: 16, height: 16)
@@ -286,7 +286,7 @@ private extension PlaceDetailView {
     var contentsFailure: some View {
         VStack(spacing: Spacing.s16) {
             EmptyStateView(
-                image: .placeEmpty,
+                image: .emptyResult,
                 title: "게시물을 불러오지 못했어요",
                 message: "잠시 뒤 다시 시도해주세요"
             )

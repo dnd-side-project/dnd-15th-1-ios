@@ -96,7 +96,7 @@ public struct AuthView: View {
     }
 
     private var illustration: some View {
-        Image.authIllustration
+        Image.illustrationWelcome
             .resizable()
             .aspectRatio(
                 IllustrationMetric.width / IllustrationMetric.height,
