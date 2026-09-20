@@ -32,7 +32,7 @@ Projects/
 | SharedDesignSystem | UI 토큰/컴포넌트 |
 | SharedLogger | 전 계층 공통 OSLog facade. `Reducer.logged(as:)` 자체는 Feature 의 `Sources/Common/Log/FeatureLogReducer.swift` 에 있다 |
 | ThirdParty* | 외부 패키지 진입점. ThirdPartyCore = Alamofire + 소셜 SDK 입구 |
-| Domain | Entity, `*Client`, Error |
+| Domain | Entity, `*Client`, Error. 개념 둘 이상이 함께 쓰는 모델은 `Sources/Common` 에 둔다 (쪽 나눈 목록 `Page`) |
 | Core/* | 데이터 계층이 쓰는 인프라. Network / Storage / SocialAuth / Notification |
 | CoreUI/* | 화면 층이 직접 쓰는 인프라. 화면이 창구 없이 직접 import 한다. ImageCache, KakaoMap, UserAnalytics |
 | Data | DTO, DataSource, `*Repository`, `*ClientFactory` |
@@ -137,7 +137,7 @@ appIntro / onboardingFlow 는 home|explore|map|myPage 만 pending, signIn 은 �
 5. DataSource 프로퍼티는 `authLocal`, `authRemote`
 6. Core/인프라 에러는 Data 에서 Domain 에러로 매핑
 7. 여러 Client 조합은 Feature/RootFlow 에서 처리
-8. Domain·Data 폴더는 개념으로 나누고 이름을 짝지운다. 조립 코드도 그 개념 폴더에 둔다. 기준은 [CONVENTIONS.md](CONVENTIONS.md) §6
+8. Domain·Data 폴더는 개념으로 나누고 이름을 짝지운다. 조립 코드도 그 개념 폴더에 둔다. 개념 둘 이상이 함께 쓰는 Domain 모델은 `Domain/Sources/Common` 에 두고 Data 에 짝을 안 만든다. 기준은 [CONVENTIONS.md](CONVENTIONS.md) §6
 9. Data 는 다른 개념 폴더의 저장소·매퍼를 가져다 쓸 수 있다. 같은 코드를 복사하지 않는다
 10. Domain 모델은 서버 응답 모양을 생각 없이 옮기지 않는다. Domain 모델 규칙 9개는 [CONVENTIONS.md](CONVENTIONS.md) §10
 
