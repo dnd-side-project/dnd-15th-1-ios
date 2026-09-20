@@ -32,7 +32,7 @@ Projects/
 | SharedDesignSystem | UI 토큰/컴포넌트 |
 | SharedLogger | 전 계층 공통 OSLog facade. `Reducer.logged(as:)` 자체는 Feature 의 `Sources/Common/Log/FeatureLogReducer.swift` 에 있다 |
 | ThirdParty* | 외부 패키지 진입점. ThirdPartyCore = Alamofire + 소셜 SDK 입구 |
-| Domain | Entity, `*Client`, Error. 개념 둘 이상이 함께 쓰는 모델은 `Sources/Common` 에 둔다 (쪽 나눈 목록 `Page`) |
+| Domain | Entity, `*Client`, Error. 개념 둘 이상이 함께 쓰는 모델은 `Sources/Common` 에 둔다 (페이지로 나뉜 목록 `Page`) |
 | Core/* | 데이터 계층이 쓰는 인프라. Network / Storage / SocialAuth / Notification |
 | CoreUI/* | 화면 층이 직접 쓰는 인프라. 화면이 창구 없이 직접 import 한다. ImageCache, KakaoMap, UserAnalytics |
 | Data | DTO, DataSource, `*Repository`, `*ClientFactory` |
