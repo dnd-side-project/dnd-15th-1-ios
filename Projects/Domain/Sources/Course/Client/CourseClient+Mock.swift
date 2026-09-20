@@ -15,20 +15,7 @@ public extension CourseClient {
                 status: .draft
             )
         },
-        coursePlaces: {
-            SavedPlace.mocks.map { saved in
-                CoursePlaceCandidate(
-                    id: saved.place.id,
-                    name: saved.place.name,
-                    address: saved.place.address,
-                    category: saved.place.category,
-                    coordinate: saved.place.coordinate,
-                    ownership: saved.ownership,
-                    alias: saved.alias,
-                    thumbnailURLs: saved.place.thumbnailURLs
-                )
-            }
-        },
+        coursePlaces: { SavedPlace.mocks },
         course: { id in
             mockCourse(
                 id: id,
@@ -47,8 +34,17 @@ public extension CourseClient {
                 title: DateCourseTitle.make(date: mockDateComponents),
                 scheduledAt: mockScheduledAt,
                 status: .confirmed,
-                version: 1,
                 totalPlaceCount: 3
+            )
+        },
+        latestPastCourses: { size in
+            Array(DateCourseSummary.pastMocks.prefix(size))
+        },
+        pastCourses: { _, _ in
+            PastDateCoursePage(
+                courses: DateCourseSummary.pastMocks,
+                totalCount: DateCourseSummary.pastMocks.count,
+                hasNext: false
             )
         },
         updateCourse: { id, content, _ in
@@ -113,4 +109,39 @@ private func mockCourse(
         stops: stops,
         legs: legs
     )
+}
+
+public extension DateCourseSummary {
+    static let mock = DateCourseSummary(
+        id: "1",
+        title: "성수동 데이트",
+        scheduledAt: Date(timeIntervalSince1970: 1_785_931_200),
+        status: .confirmed,
+        totalPlaceCount: 5
+    )
+
+    /// 지난 데이트 목록 가짜 데이터. 목록 응답에는 상태가 없다
+    static let pastMocks: [DateCourseSummary] = [
+        DateCourseSummary(
+            id: "1",
+            title: "성수역 데이트",
+            scheduledAt: Date(timeIntervalSince1970: 1_785_942_000),
+            status: nil,
+            totalPlaceCount: 5
+        ),
+        DateCourseSummary(
+            id: "2",
+            title: "강남역 데이트",
+            scheduledAt: Date(timeIntervalSince1970: 1_785_164_400),
+            status: nil,
+            totalPlaceCount: 3
+        ),
+        DateCourseSummary(
+            id: "3",
+            title: "한강 데이트",
+            scheduledAt: Date(timeIntervalSince1970: 1_783_954_800),
+            status: nil,
+            totalPlaceCount: 4
+        ),
+    ]
 }

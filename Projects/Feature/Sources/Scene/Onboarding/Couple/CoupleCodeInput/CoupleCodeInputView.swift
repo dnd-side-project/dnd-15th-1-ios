@@ -65,7 +65,7 @@ struct CoupleCodeInputView: View {
         // 연결 중에는 입력칸이 disabled 라 포커스가 풀린다.
         // 실패로 끝나면 되돌리고, 성공은 완료 화면이 푸시되므로 켜지 않는다
         .onChange(of: store.isConnecting) { _, isConnecting in
-            if !isConnecting, store.connectedCouple == nil {
+            if !isConnecting, store.connectedPartner == nil {
                 isCodeFocused = true
             }
         }

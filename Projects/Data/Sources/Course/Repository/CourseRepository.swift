@@ -32,7 +32,7 @@ public struct CourseRepository: Sendable {
         }
     }
 
-    public func coursePlaces() async throws -> [CoursePlaceCandidate] {
+    public func coursePlaces() async throws -> [SavedPlace] {
         do {
             return try await remote.placePool().places.map(CourseDTOMapper.toDomain)
         } catch {
@@ -51,6 +51,22 @@ public struct CourseRepository: Sendable {
     public func currentCourse() async throws -> DateCourseSummary? {
         do {
             return try await remote.current().currentDateCourse.map(CourseDTOMapper.toDomain)
+        } catch {
+            throw CourseErrorMapper.map(error)
+        }
+    }
+
+    public func latestPastCourses(size: Int) async throws -> [DateCourseSummary] {
+        do {
+            return try await remote.latestPast(size: size).map(CourseDTOMapper.toDomain)
+        } catch {
+            throw CourseErrorMapper.map(error)
+        }
+    }
+
+    public func pastCourses(page: Int, size: Int) async throws -> PastDateCoursePage {
+        do {
+            return try CourseDTOMapper.toPage(try await remote.past(page: page, size: size))
         } catch {
             throw CourseErrorMapper.map(error)
         }

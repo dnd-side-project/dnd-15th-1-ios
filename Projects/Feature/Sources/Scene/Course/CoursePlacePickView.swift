@@ -190,15 +190,15 @@ private extension CoursePlacePickView {
         .padding(.bottom, ctaCoverPadding)
     }
 
-    func row(_ candidate: CoursePlaceCandidate, showsDivider: Bool) -> some View {
+    func row(_ candidate: SavedPlace, showsDivider: Bool) -> some View {
         let badge = store.state.badgeState(for: candidate.id)
 
         return PlaceListRow(
-            icon: candidate.category.icon,
-            name: candidate.alias ?? candidate.name,
-            address: candidate.address,
+            icon: candidate.place.category.icon,
+            name: candidate.alias ?? candidate.place.name,
+            address: candidate.place.address,
             showsDivider: showsDivider,
-            thumbnailURLs: candidate.thumbnailURLs,
+            thumbnailURLs: candidate.place.thumbnailURLs,
             isNameSensitive: candidate.alias != nil
         ) { url in
             RemoteImage(url: url, cornerRadius: CoursePlacePickMetric.cornerRadius)

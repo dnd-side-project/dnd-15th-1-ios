@@ -95,6 +95,7 @@ public struct NicknameFeature {
     }
 
     @Dependency(\.profileClient) var profileClient
+    @Dependency(\.notificationClient) var notificationClient
 
     public init() {}
 
@@ -176,7 +177,7 @@ private extension NicknameFeature {
         state.toast = nil
         return .run { [profileClient] send in
             do {
-                let profile = try await profileClient.updateNickname(nickname, iconID)
+                let profile = try await profileClient.setUpProfile(nickname, iconID)
                 await send(.updateNicknameResponse(.success(profile)))
             } catch {
                 await send(.updateNicknameResponse(.failure(mapProfileError(error))))
@@ -193,9 +194,9 @@ private extension NicknameFeature {
             // 마케팅을 켠 채 제출했을 때만 알림 설정을 건드린다. 실패해도 화면은 다음으로 간다
             // 알림 설정이 끝날 때까지 isSubmitting 을 켠 채로 둔다
             let enablesMarketing = state.agreedTerms.contains(.marketing)
-            return .run { [profileClient] send in
+            return .run { [notificationClient] send in
                 if enablesMarketing {
-                    await enableMarketingNotification(profileClient)
+                    await enableMarketingNotification(notificationClient)
                 }
                 await send(.nicknameSubmitFinished(profile))
             }
@@ -251,10 +252,10 @@ private func mapProfileError(_ error: Error) -> ProfileError {
 /// 조회로 나머지 두 값과 동의 버전을 받고, 마케팅만 켜서 통째로 되돌려 보낸다.
 /// 변경이 전체 교체라 세 값을 다 실어야 한다. 조회 실패·동의 버전 없음·변경 실패 셋 중
 /// 무엇이든 화면은 다음으로 가고 콘솔에만 남긴다
-private func enableMarketingNotification(_ profileClient: ProfileClient) async {
+private func enableMarketingNotification(_ notificationClient: NotificationClient) async {
     let current: NotificationSettings
     do {
-        current = try await profileClient.notificationSettings()
+        current = try await notificationClient.notificationSettings()
     } catch {
         FeatureLog.error(
             scene: "Nickname",
@@ -281,7 +282,7 @@ private func enableMarketingNotification(_ profileClient: ProfileClient) async {
         availableMarketingConsentVersion: consentVersion
     )
     do {
-        _ = try await profileClient.updateNotificationSettings(outgoing)
+        _ = try await notificationClient.updateNotificationSettings(outgoing)
     } catch {
         FeatureLog.error(
             scene: "Nickname",

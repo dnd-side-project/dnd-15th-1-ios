@@ -44,7 +44,7 @@ struct PostDetailSheetContent: View {
         }
     }
 
-    private func placeSection(_ places: [PostDetailPlace]) -> some View {
+    private func placeSection(_ places: [ContentPlace]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s12) {
             Text("저장할 수 있는 곳")
                 .typography(.headline)

@@ -113,7 +113,7 @@ public struct RootFlowFeature {
     /// 로그인 직후와 앱 재실행 직후에도 한 번 등록된다.
     private var registerPushDevice: Effect<Action> {
         .run { [notificationClient] _ in
-            for await token in await notificationClient.fcmTokenStream() {
+            for await token in await notificationClient.pushTokenStream() {
                 do {
                     try await notificationClient.registerDevice(token)
                 } catch {

@@ -55,18 +55,12 @@ final class HomeFlowFeatureTests: XCTestCase {
         ) {
             HomeFlowFeature()
         } withDependencies: {
-            $0.homeClient.home = {
-                HomeSummary(
-                    connected: false,
-                    myNickname: "나",
-                    partnerNickname: nil,
-                    currentDateCourse: nil
-                )
-            }
+            $0.coupleClient.current = { .notConnected }
+            $0.profileClient.member = { UserProfile(nickname: "나", iconID: 0, datePreference: nil) }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
-        await store.send(.couple(.delegate(.connected(Couple(partnerNickname: "짝", partnerIconID: 1))))) {
+        await store.send(.couple(.delegate(.connected(partner: CoupleMember(nickname: "짝", iconID: 1))))) {
             $0.path = []
             $0.couple = nil
         }
@@ -225,14 +219,8 @@ final class HomeFlowFeatureTests: XCTestCase {
         ) {
             HomeFlowFeature()
         } withDependencies: {
-            $0.homeClient.home = {
-                HomeSummary(
-                    connected: false,
-                    myNickname: "나",
-                    partnerNickname: nil,
-                    currentDateCourse: nil
-                )
-            }
+            $0.coupleClient.current = { .notConnected }
+            $0.profileClient.member = { UserProfile(nickname: "나", iconID: 0, datePreference: nil) }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 

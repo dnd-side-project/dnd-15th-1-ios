@@ -15,14 +15,14 @@ public enum PlaceImportClientFactory {
 
     private static func makeClient(repository: PlaceImportRepository) -> PlaceImportClient {
         PlaceImportClient(
-            start: { sourceUrl in
-                try await repository.start(sourceUrl: sourceUrl)
+            start: { sourceURL in
+                try await repository.start(sourceURL: sourceURL)
             },
-            poll: { importId in
-                try await repository.poll(importId: importId)
+            poll: { importID in
+                try await repository.poll(importID: importID)
             },
-            confirm: { importId, candidateIDs in
-                try await repository.confirm(importId: importId, candidateIDs: candidateIDs)
+            confirm: { importID, candidateIDs in
+                try await repository.confirm(importID: importID, candidateIDs: candidateIDs)
             }
         )
     }

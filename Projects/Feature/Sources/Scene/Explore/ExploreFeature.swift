@@ -41,7 +41,7 @@ public struct ExploreFeature {
     public enum Action: Equatable {
         case onAppear
         case reachedEnd
-        case contentsResponse(ContentPage)
+        case contentsResponse(ContentPage, popularTags: [String])
         case contentsLoadFailed
         case filterTapped(String)
         case searchButtonTapped
@@ -60,7 +60,7 @@ public struct ExploreFeature {
         }
     }
 
-    @Dependency(\.exploreClient) var exploreClient
+    @Dependency(\.contentClient) var contentClient
 
     private enum CancelID { case load }
 
@@ -81,11 +81,11 @@ public struct ExploreFeature {
         case .reachedEnd:
             return loadNext(state: &state)
 
-        case let .contentsResponse(page):
+        case let .contentsResponse(page, popularTags):
             state.isLoadingContents = false
             state.contents += page.items
             state.hasNext = page.hasNext
-            updateFilters(state: &state, page: page)
+            updateFilters(state: &state, popularTags: popularTags)
             state.page += 1
             return .none
 
@@ -117,9 +117,9 @@ public struct ExploreFeature {
     }
 
     // 인기 태그는 첫 페이지 응답에 담겨 온다. 하드코딩 대신 서버값으로 칩 구성
-    private func updateFilters(state: inout State, page: ContentPage) {
-        guard state.page == 0, !page.popularTags.isEmpty else { return }
-        state.filters = [Self.popularFilter] + page.popularTags.map { "#\($0)" }
+    private func updateFilters(state: inout State, popularTags: [String]) {
+        guard state.page == 0, !popularTags.isEmpty else { return }
+        state.filters = [Self.popularFilter] + popularTags.map { "#\($0)" }
     }
 
     // 로딩 중이거나 마지막 페이지면 무시. 선택 칩이 인기면 목록, 태그면 검색을 받는다
@@ -128,17 +128,18 @@ public struct ExploreFeature {
         state.isLoadingContents = true
         let page = state.page
         let selected = state.selectedFilter
-        return .run { [exploreClient] send in
+        return .run { [contentClient] send in
             do {
-                let result: ContentPage
                 if selected == Self.popularFilter {
-                    result = try await exploreClient.contents(.popular, page, Self.pageSize)
+                    let feed = try await contentClient.contents(.popular, page, Self.pageSize)
+                    await send(.contentsResponse(feed.page, popularTags: feed.popularTags))
                 } else {
-                    result = try await exploreClient.searchContents(
+                    let result = try await contentClient.searchContents(
                         Self.tagQuery(selected), .popular, page, Self.pageSize
                     )
+                    // 태그 검색 응답에는 인기 태그가 없다
+                    await send(.contentsResponse(result, popularTags: []))
                 }
-                await send(.contentsResponse(result))
             } catch {
                 await send(.contentsLoadFailed)
             }

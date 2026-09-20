@@ -20,28 +20,6 @@ public struct ProfileRepository: Sendable {
         }
     }
 
-    public func notificationSettings() async throws -> NotificationSettings {
-        do {
-            let dto = try await profileRemote.notificationSettings()
-            return ProfileDTOMapper.toDomain(dto)
-        } catch {
-            throw ProfileErrorMapper.map(error)
-        }
-    }
-
-    public func updateNotificationSettings(
-        _ settings: NotificationSettings
-    ) async throws -> NotificationSettings {
-        do {
-            let dto = try await profileRemote.updateNotificationSettings(
-                ProfileDTOMapper.toRequest(settings)
-            )
-            return ProfileDTOMapper.toDomain(dto)
-        } catch {
-            throw ProfileErrorMapper.map(error)
-        }
-    }
-
     public func withdraw() async throws {
         do {
             try await profileRemote.withdraw()
@@ -51,21 +29,17 @@ public struct ProfileRepository: Sendable {
     }
 
     // 온보딩과 달리 초기화 분기 없이 곧장 PATCH 한다. 프로필 수정 화면용.
-    // PATCH 응답엔 성향이 없어 방금 읽은 회원 정보의 성향을 재사용한다
     public func updateProfile(nickname: String, iconID: Int) async throws -> UserProfile {
         do {
             let member = try await profileRemote.member()
-            let updated = try await profileRemote.updateProfile(nickname: nickname, profileIcon: iconID)
-            return ProfileDTOMapper.toDomain(
-                updated,
-                datePreference: ProfileDTOMapper.toDatePreference(member.datePreferences)
-            )
+            return try await patchProfile(nickname: nickname, iconID: iconID, member: member)
         } catch {
             throw ProfileErrorMapper.map(error)
         }
     }
 
-    public func updateNickname(nickname: String, iconID: Int) async throws -> UserProfile {
+    /// 온보딩 닉네임 단계. 프로필이 없으면 만들고, 이미 있으면 고친다
+    public func setUpProfile(nickname: String, iconID: Int) async throws -> UserProfile {
         do {
             let member = try await profileRemote.member()
 
@@ -78,15 +52,7 @@ public struct ProfileRepository: Sendable {
                 return ProfileDTOMapper.toDomain(initialized)
             }
 
-            let updated = try await profileRemote.updateProfile(
-                nickname: nickname,
-                profileIcon: iconID
-            )
-            // PATCH 응답에 성향이 없어서 방금 읽은 회원 정보의 값을 재사용한다.
-            return ProfileDTOMapper.toDomain(
-                updated,
-                datePreference: ProfileDTOMapper.toDatePreference(member.datePreferences)
-            )
+            return try await patchProfile(nickname: nickname, iconID: iconID, member: member)
         } catch {
             throw ProfileErrorMapper.map(error)
         }
@@ -105,5 +71,18 @@ public struct ProfileRepository: Sendable {
         } catch {
             throw ProfileErrorMapper.map(error)
         }
+    }
+
+    // PATCH 응답엔 성향이 없어 방금 읽은 회원 정보의 성향을 재사용한다
+    private func patchProfile(
+        nickname: String,
+        iconID: Int,
+        member: MemberResponseDTO
+    ) async throws -> UserProfile {
+        let updated = try await profileRemote.updateProfile(nickname: nickname, profileIcon: iconID)
+        return ProfileDTOMapper.toDomain(
+            updated,
+            datePreference: ProfileDTOMapper.toDatePreference(member.datePreferences)
+        )
     }
 }

@@ -16,8 +16,8 @@ public struct PlaceImportFeature {
         // 공유로 받은 인스타 링크. API 요청에 사용
         public var link: URL
         public var phase: Phase
-        public var selectedIDs: Set<Int>
-        var importId: Int?
+        public var selectedIDs: Set<String>
+        var importID: String?
         var started = false
         var pollCount = 0
 
@@ -28,10 +28,13 @@ public struct PlaceImportFeature {
         }
 
         public var candidates: [ImportCandidate] {
-            if case let .loaded(placeImport) = phase {
-                return placeImport.candidates
+            guard case let .loaded(placeImport) = phase else { return [] }
+            switch placeImport.progress {
+            case let .reviewRequired(candidates), let .completed(candidates):
+                return candidates
+            case .processing, .failed:
+                return []
             }
-            return []
         }
 
         public var isAllSelected: Bool {
@@ -45,7 +48,7 @@ public struct PlaceImportFeature {
             return isAllSelected ? "모두 저장" : "\(selectedIDs.count)곳만 저장"
         }
 
-        public init(link: URL, phase: Phase = .loading, selectedIDs: Set<Int> = []) {
+        public init(link: URL, phase: Phase = .loading, selectedIDs: Set<String> = []) {
             self.link = link
             self.phase = phase
             self.selectedIDs = selectedIDs
@@ -55,7 +58,7 @@ public struct PlaceImportFeature {
     public enum Action: Equatable {
         case onAppear
         case importUpdated(Result<PlaceImport, PlaceImportError>)
-        case candidateToggled(Int)
+        case candidateToggled(String)
         case saveTapped
         case confirmed(Result<Bool, PlaceImportError>)
         case closeTapped
@@ -133,71 +136,77 @@ public struct PlaceImportFeature {
         guard !state.selectedIDs.isEmpty else {
             return .run { [dismiss] _ in await dismiss() }
         }
-        guard let importId = state.importId else { return .none }
+        guard let importID = state.importID else { return .none }
         return .merge(
             .run { [analyticsClient] _ in
                 await analyticsClient.track(.placeSaveStarted(saveSource: .share))
             },
-            confirm(importId: importId, candidateIDs: Array(state.selectedIDs))
+            confirm(importID: importID, candidateIDs: Array(state.selectedIDs))
         )
     }
 
+    // 서버 값 조합의 해석은 Data 매퍼가 맡는다. 여기서는 네 갈래만 본다
     private func applyImport(state: inout State, placeImport: PlaceImport) -> Effect<Action> {
-        state.importId = placeImport.importId
+        state.importID = placeImport.id
 
-        switch placeImport.nextAction {
-        case .wait:
-            return waitAndPoll(state: &state, placeImport: placeImport)
+        switch placeImport.progress {
+        case let .processing(retryAfterSeconds):
+            return waitAndPoll(
+                state: &state,
+                importID: placeImport.id,
+                retryAfterSeconds: retryAfterSeconds
+            )
 
-        case .selectPlaces:
-            return showCandidates(state: &state, placeImport: placeImport, failWhenEmpty: false)
+        case let .reviewRequired(candidates):
+            return showCandidates(
+                state: &state,
+                placeImport: placeImport,
+                candidates: candidates,
+                failWhenEmpty: false
+            )
 
-        case .completed:
-            return showCandidates(state: &state, placeImport: placeImport, failWhenEmpty: true)
+        case let .completed(candidates):
+            return showCandidates(
+                state: &state,
+                placeImport: placeImport,
+                candidates: candidates,
+                failWhenEmpty: true
+            )
 
-        case .noAction:
-            // 서버가 이 값을 언제 주는지 명세에 없다. 작업 상태를 보고 정한다
-            switch placeImport.status {
-            case .completed:
-                return showCandidates(state: &state, placeImport: placeImport, failWhenEmpty: true)
-            case .reviewRequired:
-                return showCandidates(state: &state, placeImport: placeImport, failWhenEmpty: false)
-            case .failed:
-                state.phase = .failed
-                return .none
-            case .received, .processing:
-                return waitAndPoll(state: &state, placeImport: placeImport)
-            }
-
-        case .retry:
+        case .failed:
             state.phase = .failed
             return .none
         }
     }
 
-    private func waitAndPoll(state: inout State, placeImport: PlaceImport) -> Effect<Action> {
+    private func waitAndPoll(
+        state: inout State,
+        importID: String,
+        retryAfterSeconds: Int?
+    ) -> Effect<Action> {
         guard state.pollCount < maxPollCount else {
             state.phase = .failed
             return .none
         }
         state.pollCount += 1
-        let delay = placeImport.retryAfterSeconds
+        let delay = retryAfterSeconds
             .flatMap { $0 > 0 ? $0 : nil }
             ?? fallbackDelay
-        return poll(importId: placeImport.importId, after: delay)
+        return poll(importID: importID, after: delay)
     }
 
     private func showCandidates(
         state: inout State,
         placeImport: PlaceImport,
+        candidates: [ImportCandidate],
         failWhenEmpty: Bool
     ) -> Effect<Action> {
-        if failWhenEmpty, placeImport.candidates.isEmpty {
+        if failWhenEmpty, candidates.isEmpty {
             state.phase = .failed
             return .none
         }
         state.phase = .loaded(placeImport)
-        state.selectedIDs = Set(placeImport.candidates.map(\.candidateId))
+        state.selectedIDs = Set(candidates.map(\.id))
         return .run { [analyticsClient] _ in
             await analyticsClient.track(.placeSaveModalViewed)
         }
@@ -206,7 +215,7 @@ public struct PlaceImportFeature {
     private func start(link: URL) -> Effect<Action> {
         .run { [placeImportClient] send in
             do {
-                let result = try await placeImportClient.start(sourceUrl: link.absoluteString)
+                let result = try await placeImportClient.start(sourceURL: link)
                 await send(.importUpdated(.success(result)))
             } catch {
                 await send(.importUpdated(.failure(mapError(error))))
@@ -214,7 +223,7 @@ public struct PlaceImportFeature {
         }
     }
 
-    private func poll(importId: Int, after seconds: Int) -> Effect<Action> {
+    private func poll(importID: String, after seconds: Int) -> Effect<Action> {
         .run { [placeImportClient] send in
             do {
                 try await Task.sleep(for: .seconds(seconds))
@@ -222,7 +231,7 @@ public struct PlaceImportFeature {
                 return
             }
             do {
-                let result = try await placeImportClient.poll(importId: importId)
+                let result = try await placeImportClient.poll(importID: importID)
                 await send(.importUpdated(.success(result)))
             } catch {
                 await send(.importUpdated(.failure(mapError(error))))
@@ -230,10 +239,10 @@ public struct PlaceImportFeature {
         }
     }
 
-    private func confirm(importId: Int, candidateIDs: [Int]) -> Effect<Action> {
+    private func confirm(importID: String, candidateIDs: [String]) -> Effect<Action> {
         .run { [placeImportClient] send in
             do {
-                try await placeImportClient.confirm(importId: importId, candidateIDs: candidateIDs)
+                try await placeImportClient.confirm(importID: importID, candidateIDs: candidateIDs)
                 await send(.confirmed(.success(true)))
             } catch {
                 await send(.confirmed(.failure(mapError(error))))

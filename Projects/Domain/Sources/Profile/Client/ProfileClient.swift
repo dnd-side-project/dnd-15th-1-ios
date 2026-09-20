@@ -5,10 +5,9 @@ import ThirdParty
 public struct ProfileClient: Sendable {
     public var member: @Sendable () async throws -> UserProfile
     public var withdraw: @Sendable () async throws -> Void
-    public var notificationSettings: @Sendable () async throws -> NotificationSettings
-    public var updateNotificationSettings: @Sendable (NotificationSettings) async throws -> NotificationSettings
     public var updateProfile: @Sendable (_ nickname: String, _ iconID: Int) async throws -> UserProfile
-    public var updateNickname: @Sendable (_ nickname: String, _ iconID: Int) async throws -> UserProfile
+    /// 온보딩 닉네임 단계. 프로필이 없으면 만들고, 이미 있으면 고친다
+    public var setUpProfile: @Sendable (_ nickname: String, _ iconID: Int) async throws -> UserProfile
     public var updateDatePreference: @Sendable (_ preference: DatePreference) async throws -> UserProfile
 }
 

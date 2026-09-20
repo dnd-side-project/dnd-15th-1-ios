@@ -1,21 +1,8 @@
 import Foundation
 
-/// 커플 연결 상태 조회(`GET /couples/me`) 결과. connected 로 연결 여부를 직접 판단한다.
-public struct CoupleStatus: Equatable, Sendable {
-    public let connected: Bool
-    public let me: CoupleMember
-    public let partner: CoupleMember?
-    public let daysTogether: Int?
-
-    public init(
-        connected: Bool,
-        me: CoupleMember,
-        partner: CoupleMember?,
-        daysTogether: Int?
-    ) {
-        self.connected = connected
-        self.me = me
-        self.partner = partner
-        self.daysTogether = daysTogether
-    }
+/// 커플 연결 상태(`GET /couples/me`). 연결됐을 때만 내 정보·상대·함께한 날이 있다
+public enum CoupleStatus: Equatable, Sendable {
+    /// 함께한 날은 서버가 null 을 줄 수 있다
+    case connected(me: CoupleMember, partner: CoupleMember, daysTogether: Int?)
+    case notConnected
 }

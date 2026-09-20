@@ -72,13 +72,17 @@ private extension PlaceDetailView {
         }
     }
 
-    /// `장소 카테고리 · 저장한 사람 124` — 숫자만 강조색이다
+    /// `장소 카테고리 · 저장한 사람 124` — 숫자만 강조색이다. 저장 수를 모르면 카테고리만 보인다
     var subtitle: some View {
         HStack(spacing: 0) {
-            Text("\(store.place.category.displayName) · 저장한 사람 ")
+            Text(store.place.category.displayName)
                 .foregroundStyle(Color.textTertiary)
-            Text("\(store.bookmarkCount)")
-                .foregroundStyle(Color.brandPrimary)
+            if let bookmarkCount = store.bookmarkCount {
+                Text(" · 저장한 사람 ")
+                    .foregroundStyle(Color.textTertiary)
+                Text("\(bookmarkCount)")
+                    .foregroundStyle(Color.brandPrimary)
+            }
         }
         .typography(.body2M)
     }
@@ -201,7 +205,7 @@ private extension PlaceDetailView {
                         .resizable()
                         .frame(width: 20, height: 20)
 
-                    Text(store.place.roadAddress)
+                    Text(store.place.roadAddress ?? "")
                         .typography(.body2M)
                         .multilineTextAlignment(.leading)
 
@@ -340,7 +344,7 @@ private struct StaticButtonStyle: ButtonStyle {
 #Preview("사진·게시물 없음") {
     let source = Place.mocks.first { $0.thumbnailURLs.isEmpty } ?? Place.mocks[0]
     let place = Place(
-        id: source.id,
+        placeID: source.placeID,
         kakaoPlaceID: source.kakaoPlaceID,
         name: source.name,
         category: source.category,
@@ -365,7 +369,7 @@ private struct StaticButtonStyle: ButtonStyle {
         ) {
             PlaceDetailFeature()
         } withDependencies: {
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         },
         bottomInset: 0
     )

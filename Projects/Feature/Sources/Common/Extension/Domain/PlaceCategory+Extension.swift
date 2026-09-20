@@ -40,19 +40,6 @@ extension PlaceCategory {
         case .convenience: SharedDesignSystemAsset.Pin.convenience.image
         }
     }
-
-    // 서버 categoryName(한글) 을 카테고리로 매핑
-    init(categoryName: String) {
-        switch categoryName {
-        case "카페": self = .cafe
-        case "관광": self = .tourism
-        case "놀거리": self = .activity
-        case "쇼핑": self = .shopping
-        case "숙박": self = .accommodation
-        case "편의", "생활 편의": self = .convenience
-        default: self = .food
-        }
-    }
 }
 
 public extension PlaceCategory {

@@ -26,7 +26,7 @@ public struct CoupleConnectFeature {
         public var isSkipConfirmPresented: Bool
         public var code: String
         public var isConnecting: Bool
-        public var connectedCouple: Couple?
+        public var connectedPartner: CoupleMember?
         public var isCheckingConnection: Bool = false
         public var toast: ToastState?
 
@@ -40,7 +40,7 @@ public struct CoupleConnectFeature {
             isSkipConfirmPresented: Bool = false,
             code: String = "",
             isConnecting: Bool = false,
-            connectedCouple: Couple? = nil,
+            connectedPartner: CoupleMember? = nil,
             toast: ToastState? = nil
         ) {
             self.myNickname = myNickname
@@ -52,7 +52,7 @@ public struct CoupleConnectFeature {
             self.isSkipConfirmPresented = isSkipConfirmPresented
             self.code = code
             self.isConnecting = isConnecting
-            self.connectedCouple = connectedCouple
+            self.connectedPartner = connectedPartner
             self.toast = toast
         }
 
@@ -61,7 +61,7 @@ public struct CoupleConnectFeature {
         }
 
         public var partnerNickname: String {
-            connectedCouple?.partnerNickname ?? ""
+            connectedPartner?.nickname ?? ""
         }
     }
 
@@ -75,9 +75,9 @@ public struct CoupleConnectFeature {
         case codeInputButtonTapped
         case codeChanged(String)
         case connectButtonTapped
-        case connectResponse(Result<Couple, CoupleError>)
+        case connectResponse(Result<CoupleMember, CoupleError>)
         case sceneBecameActive
-        case connectionStatusResponse(Result<CoupleStatus?, CoupleError>)
+        case connectionStatusResponse(Result<CoupleStatus, CoupleError>)
         case completeButtonTapped
         case backButtonTapped
         case dismissToast
@@ -89,7 +89,7 @@ public struct CoupleConnectFeature {
             case showCodeInput
             case showComplete
             case back
-            case connected(Couple)
+            case connected(partner: CoupleMember)
             case skipped
             case sessionExpired
         }
@@ -145,7 +145,7 @@ private extension CoupleConnectFeature {
     }
 
     func checkConnectionIfNeeded(state: inout State) -> Effect<Action> {
-        guard state.connectedCouple == nil, !state.isCheckingConnection else { return .none }
+        guard state.connectedPartner == nil, !state.isCheckingConnection else { return .none }
         state.isCheckingConnection = true
         return .run { [coupleClient] send in
             do {
@@ -182,8 +182,8 @@ private extension CoupleConnectFeature {
     }
 
     func completeButtonTapped(state: inout State) -> Effect<Action> {
-        guard let couple = state.connectedCouple else { return .none }
-        return .send(.delegate(.connected(couple)))
+        guard let partner = state.connectedPartner else { return .none }
+        return .send(.delegate(.connected(partner: partner)))
     }
 
     func backButtonTapped(state: inout State) -> Effect<Action> {
@@ -253,8 +253,8 @@ private extension CoupleConnectFeature {
         state.toast = nil
         return .run { [coupleClient] send in
             do {
-                let couple = try await coupleClient.connect(code)
-                await send(.connectResponse(.success(couple)))
+                let partner = try await coupleClient.connect(code)
+                await send(.connectResponse(.success(partner)))
             } catch {
                 await send(.connectResponse(.failure(mapCoupleError(error))))
             }
@@ -262,14 +262,14 @@ private extension CoupleConnectFeature {
     }
 
     func connectResponse(
-        _ result: Result<Couple, CoupleError>,
+        _ result: Result<CoupleMember, CoupleError>,
         state: inout State
     ) -> Effect<Action> {
         state.isConnecting = false
         switch result {
-        case let .success(couple):
-            guard state.connectedCouple == nil else { return .none }
-            state.connectedCouple = couple
+        case let .success(partner):
+            guard state.connectedPartner == nil else { return .none }
+            state.connectedPartner = partner
             return .merge(
                 .run { [analyticsClient] _ in
                     await analyticsClient.track(.coupleConnected)
@@ -282,20 +282,16 @@ private extension CoupleConnectFeature {
     }
 
     func connectionStatusResponse(
-        _ result: Result<CoupleStatus?, CoupleError>,
+        _ result: Result<CoupleStatus, CoupleError>,
         state: inout State
     ) -> Effect<Action> {
         state.isCheckingConnection = false
         switch result {
         case let .success(status):
             // 연결 요청과 조회가 겹쳐 응답하면 완료 화면이 두 장 쌓인다
-            guard state.connectedCouple == nil else { return .none }
-            // 상대 정보가 비면 완료 화면의 이름 칸이 빈다. 그 상태로는 안 넘긴다
-            guard let status, status.connected, let partner = status.partner else { return .none }
-            state.connectedCouple = Couple(
-                partnerNickname: partner.nickname,
-                partnerIconID: partner.iconID
-            )
+            guard state.connectedPartner == nil else { return .none }
+            guard case let .connected(_, partner, _) = status else { return .none }
+            state.connectedPartner = partner
             return .send(.delegate(.showComplete))
 
         case .failure(.unauthorized):

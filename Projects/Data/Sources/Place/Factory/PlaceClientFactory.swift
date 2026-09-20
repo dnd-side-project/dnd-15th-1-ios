@@ -20,6 +20,9 @@ public enum PlaceClientFactory {
             savedPlaces: {
                 try await repository.savedPlaces()
             },
+            recentSavedPlaces: { size in
+                try await repository.recentSavedPlaces(size: size)
+            },
             searchPlaces: { query, page in
                 try await repository.searchPlaces(query: query, page: page, size: pageSize)
             },

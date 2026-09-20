@@ -386,6 +386,6 @@ private enum CourseResultText {
     }
 
     static func address(of place: Place) -> String {
-        place.roadAddress.isEmpty ? place.address : place.roadAddress
+        place.roadAddress ?? place.address
     }
 }

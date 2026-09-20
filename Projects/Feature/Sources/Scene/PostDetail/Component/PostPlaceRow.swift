@@ -5,7 +5,7 @@ import SwiftUI
 
 /// 게시글에 딸린 장소 한 행. 시안 `353×56`, 배경 `#F5F5F5`, 반지름 12
 struct PostPlaceRow: View {
-    let place: PostDetailPlace
+    let place: ContentPlace
     /// 화면 안 북마크. 서버 값 `place.isSaved` 는 시트 진입 때의 값이라 안 쓴다
     let isSavedLocally: Bool
     let onTap: () -> Void
@@ -13,11 +13,11 @@ struct PostPlaceRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.s8) {
-            place.category.icon
+            place.place.category.icon
                 .resizable()
                 .frame(width: PostDetailMetric.iconSize, height: PostDetailMetric.iconSize)
 
-            Text(place.name)
+            Text(place.place.name)
                 .typography(.body1M)
                 .foregroundStyle(Color.textPrimary)
                 .lineLimit(1)
@@ -46,24 +46,17 @@ struct PostPlaceRow: View {
 #Preview("저장됨 · 미저장") {
     VStack(spacing: Spacing.s8) {
         PostPlaceRow(
-            place: PostDetailPlace(
-                id: "1",
-                name: "한강뷰 감성카페",
-                category: .cafe,
-                isSaved: true,
-                coordinate: Coordinate(latitude: 37.5, longitude: 127.0)
-            ),
+            place: previewPlace(id: "1", name: "한강뷰 감성카페", category: .cafe, isSaved: true),
             isSavedLocally: true,
             onTap: {},
             onBookmarkTap: {}
         )
         PostPlaceRow(
-            place: PostDetailPlace(
+            place: previewPlace(
                 id: "2",
                 name: "이름이 아주 길어서 한 줄에 다 들어가지 않는 장소 이름",
                 category: .food,
-                isSaved: false,
-                coordinate: Coordinate(latitude: 37.6, longitude: 127.1)
+                isSaved: false
             ),
             isSavedLocally: false,
             onTap: {},
@@ -71,5 +64,22 @@ struct PostPlaceRow: View {
         )
     }
     .padding(Spacing.s20)
+}
+
+private func previewPlace(id: String, name: String, category: PlaceCategory, isSaved: Bool) -> ContentPlace {
+    ContentPlace(
+        place: Place(
+            placeID: id,
+            kakaoPlaceID: nil,
+            name: name,
+            category: category,
+            address: "",
+            roadAddress: nil,
+            coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
+            bookmarkCount: nil,
+            thumbnailURLs: []
+        ),
+        isSaved: isSaved
+    )
 }
 #endif

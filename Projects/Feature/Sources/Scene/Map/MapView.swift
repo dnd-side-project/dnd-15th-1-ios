@@ -560,8 +560,7 @@ private enum MapViewMetric {
             } withDependencies: {
                 $0.placeClient = .mock
                 $0.coupleClient.current = {
-                    CoupleStatus(
-                        connected: true,
+                    .connected(
                         me: CoupleMember(nickname: "나", iconID: 1),
                         partner: CoupleMember(nickname: "둘", iconID: 1),
                         daysTogether: nil
@@ -580,7 +579,7 @@ private enum MapViewMetric {
                 MapFeature()
             } withDependencies: {
                 $0.placeClient = .mock
-                $0.coupleClient.current = { nil }
+                $0.coupleClient.current = { .notConnected }
             }
         )
     }
@@ -594,7 +593,7 @@ private enum MapViewMetric {
                 MapFeature()
             } withDependencies: {
                 $0.placeClient.savedPlaces = { [] }
-                $0.coupleClient.current = { nil }
+                $0.coupleClient.current = { .notConnected }
             }
         )
     }

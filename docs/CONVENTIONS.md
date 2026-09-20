@@ -61,6 +61,15 @@ func getName(for user: User) -> String
 | Feature reducer | `*Feature` | `HomeFeature` |
 | Feature view | `*View` | `HomeView` |
 
+Domain 모델 이름은 §10 의 Domain 모델 규칙 2·8·9 를 따른다.
+
+| 대상 | 규칙 | 예 |
+|---|---|---|
+| 서버 필드 이름 | DTO 에만 둔다. Domain 은 위 공통 규칙으로 부른다 | DTO `savedByMe` → Domain `isSaved`, DTO `placeId` → Domain `placeID` |
+| 같은 뜻 | 한 이름으로 쓴다 | 저장한 사람 수는 어디서나 `bookmarkCount` |
+| 기술 이름 | 화면에 안 보이는 기술 이름(FCM·서버·DB)은 Domain 에 쓰지 않는다. 화면에 보이는 외부 서비스 이름은 둔다 | `fcmTokenStream` ❌ → `pushTokenStream`, `kakaoPlaceID` ✅ |
+| 서버 ID | Domain 에서는 문자열이다. 서버가 숫자를 받으면 Data 가 바꾼다 | `placeID: String?`, `importID: String` |
+
 phase case 이름은 자식 타입에서 `Feature` 를 뗀 lowerCamel — `appIntro` / `onboardingFlow` / `mainTab`
 
 DataSource 프로퍼티:
@@ -197,6 +206,16 @@ Feature 폴더 배치는 [ARCHITECTURE.md](ARCHITECTURE.md) §3 규칙을 본다
 4. 커스텀 폴더는 단수 (`Model`, `Repository`, `Scene`)
 5. 표준 컨테이너만 복수 (`Sources`, `Tests`)
 
+Domain·Data 폴더:
+
+1. `Domain/Sources` 와 `Data/Sources` 는 개념으로 나누고 두 계층의 폴더 이름을 짝지운다 (`Place` ↔ `Place`). 화면 이름(`Home`)이나 서버 주소로 나누지 않는다
+2. 조립 코드(`*ClientFactory`)도 그 개념 폴더에 둔다. 창구 하나가 여러 서버 주소를 불러도 폴더는 창구의 개념을 따른다
+3. Data 는 다른 개념 폴더의 저장소·매퍼를 가져다 쓸 수 있다 (코스 매퍼가 `PlaceDTOMapper.category` 를 부른다). 같은 코드를 복사하지 않는다
+4. 에러 타입은 개념마다 하나다. 이름은 폴더에 맞춘다 (`Content` → `ContentError`)
+5. 서버를 안 쓰는 개념 폴더도 하위 폴더(`Factory`, `Service` 등)를 둔다
+6. 개념이 없는 보조 코드(가짜 썸네일 주소 생성기 `MockThumbnailURL`)는 Domain 에 폴더를 만들지 않고 `SharedUtils` 에 둔다
+7. `Data/Tests` 도 같은 개념 폴더로 나눈다. 공용 스텁은 `Data/Tests/Support/` 에 둔다
+
 ### 7. Import / DI
 
 모듈별 허용·금지 의존은 [ARCHITECTURE.md](ARCHITECTURE.md) §1 을 본다.
@@ -281,12 +300,26 @@ test_로그인성공_델리게이트_전달
 
 ### 10. 새 기능 체크
 
-1. Domain `{Model,Error,Client}`
-2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,ClientFactory}` — `DTO/` 아래 `Network`·`Storage` 는 선택
+1. Domain `{Model,Error,Client}` — §6 의 개념 폴더 안. 모델은 아래 Domain 모델 규칙을 따른다
+2. Data `{DTO,DataSource,Endpoint,Mapper,Repository,Service,Factory}` — Domain 과 같은 이름의 개념 폴더 안. `DTO/` 아래 `Network`·`Storage` 는 선택
 3. App `Dependencies.register`
 4. Feature `Scene/<Name>`
 5. 필요 시 RootFlow / MainTab / DeepLink
 6. Feature 테스트
+
+Domain 모델 규칙:
+
+1. 알맞은 Domain 타입(좌표·카테고리·URL·날짜)이 있으면 원시값을 쓰지 않는다
+2. 서버 이름은 DTO 에만 둔다. 저장소 이름 규칙(§2)을 따르고, 같은 뜻은 한 이름으로 쓴다
+3. 한 사실을 두 번 담지 않는다. 함께 있어야 하는 값은 한 케이스에 묶는다
+4. 화면에 보일 형식은 Domain 에 넣지 않는다
+5. Domain enum 은 서버 문자열을 원시값으로 갖지 않는다. 변환은 Data 가 맡는다
+6. 화면이 쓰지 않는 응답 값은 옮기지 않는다. 장소·게시글이 원래 가진 속성은 둔다
+7. 일부 응답에만 있는 값은 옵셔널로 둔다. 값을 지어내지 않는다
+8. 화면에 안 보이는 기술 이름(FCM·서버·DB)은 Domain 에 두지 않는다
+9. Domain 의 서버 ID 는 문자열이다. 서버가 숫자를 받으면 Data 가 바꾼다
+
+예: 장소 `id` 는 저장하지 않고 장소 번호 → 카카오 번호 → 이름·좌표 순서로 계산한다 (규칙 3). 커플 상태는 `connected(me:partner:daysTogether:)` / `notConnected` 두 케이스다 (규칙 3). 저장 수를 모르는 응답의 장소는 `bookmarkCount` 가 nil 이다 (규칙 7).
 
 ```text
 화면? Feature

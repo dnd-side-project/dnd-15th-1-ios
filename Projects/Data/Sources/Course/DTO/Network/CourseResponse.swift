@@ -22,13 +22,14 @@ struct CurrentDateCourseResponseDTO: Decodable, Sendable {
     let currentDateCourse: DateCourseSummaryResponseDTO?
 }
 
+// 지난 데이트 목록엔 status·version 이 안 와서 옵셔널이다
 struct DateCourseSummaryResponseDTO: Decodable, Sendable {
     let dateCourseId: Int
     let title: String
     let date: String
     let time: String?
-    let status: String
-    let version: Int
+    let status: String?
+    let version: Int?
     let totalPlaceCount: Int
 }
 
@@ -36,7 +37,7 @@ struct DateCoursePlaceResponseDTO: Decodable, Sendable {
     let order: Int
     let placeId: Int64
     let name: String
-    let address: String?
+    let address: String
     let roadAddress: String?
     let latitude: Double
     let longitude: Double
@@ -61,16 +62,26 @@ struct DateCoursePlacePoolResponseDTO: Decodable, Sendable {
     let places: [DateCoursePlaceCandidateResponseDTO]
 }
 
-/// `region` · `roadAddress` · `savedAt` · `category`(카카오 분류 단계값) 는 담지 않는다.
+/// `region` · `savedAt` · `category`(카카오 분류 단계값) 는 담지 않는다.
 /// 지금 코스 장소 선택 화면이 안 읽는다
 struct DateCoursePlaceCandidateResponseDTO: Decodable, Sendable {
     let placeId: Int
     let name: String
+    // 지번 주소는 명세상 필수다. 도로명은 없는 장소가 있어 옵셔널
     let address: String
+    let roadAddress: String?
     let latitude: Double
     let longitude: Double
     let categoryName: String
     let ownershipStatus: String
     let alias: String?
+    let thumbnailUrl: String?
     let imageUrls: [String]
+}
+
+// 지난 데이트 코스 목록(GET /date-courses/past). totalCount 는 전체 데이트 횟수
+struct PastDateCoursesResponseDTO: Decodable, Sendable {
+    let dateCourses: [DateCourseSummaryResponseDTO]
+    let totalCount: Int
+    let hasNext: Bool
 }

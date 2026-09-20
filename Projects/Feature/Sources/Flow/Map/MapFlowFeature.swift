@@ -497,7 +497,7 @@ private extension MapFlowFeature {
 
         case let .postDetail(.presented(.delegate(.detailLoaded(detail)))):
             // 어느 길로 열었든 상세의 places 로 핀·카메라를 세운다
-            return .send(.map(.contentPlacesApplied(places: detail.places.map(place))))
+            return .send(.map(.contentPlacesApplied(places: detail.places.map(\.place))))
 
         case .postDetail(.presented(.delegate(.closeRequested))), .postDetail(.dismiss):
             return closePostDetail(state: &state)
@@ -539,13 +539,13 @@ private extension MapFlowFeature {
             return .none
 
         case let .detail(.presented(.delegate(.bookmarkSaved(id, saved)))):
-            state.map.savedServerIDs[id] = saved.place.id
+            state.map.savedPlaceIDs[id] = saved.place.id
             state.map.applySavedPlace(saved)
             return .none
 
         case let .detail(.presented(.delegate(.bookmarkRemoved(serverID)))):
             state.map.places.removeAll { $0.id == serverID }
-            state.map.savedServerIDs = state.map.savedServerIDs.filter {
+            state.map.savedPlaceIDs = state.map.savedPlaceIDs.filter {
                 $0.value != serverID
             }
             return .none
@@ -634,10 +634,7 @@ private extension MapFlowFeature {
         if let place = state.map.contentPlaces.first(where: { $0.id == id }) {
             return place
         }
-        if let detailPlace = state.postDetail?.detail?.places.first(where: { $0.id == id }) {
-            return place(detailPlace)
-        }
-        return nil
+        return state.postDetail?.detail?.places.first(where: { $0.id == id })?.place
     }
 
     /// 게시글 상세는 남겨 둬 장소 상세를 닫으면 그 자리로 돌아간다
@@ -676,7 +673,7 @@ private extension MapFlowFeature {
     func presentDetail(state: inout State, place: Place, query: String) -> Effect<Action> {
         var detail = PlaceDetailFeature.State(place: place, query: query)
         detail.isBookmarked = state.map.bookmarkedPlaceIDs.contains(place.id)
-        detail.savedServerID = state.map.savedServerIDs[place.id]
+        detail.savedServerID = state.map.savedPlaceIDs[place.id]
         state.detail = detail
         state.map.selectedPlace = MapFeature.State.SelectedPlace(
             id: place.id,
@@ -704,20 +701,5 @@ private extension MapFlowFeature {
         dismissDetail(state: &state)
         state.topDetail = nil
         return .send(.map(.searchClearTapped))
-    }
-
-    /// 게시글 장소를 지도 핀·장소 상세용 Place 로 바꾼다. 저장수는 응답에 없어 0 으로 둔다
-    func place(_ detailPlace: PostDetailPlace) -> Place {
-        Place(
-            id: detailPlace.id,
-            kakaoPlaceID: detailPlace.kakaoPlaceID,
-            name: detailPlace.name,
-            category: detailPlace.category,
-            address: detailPlace.address,
-            roadAddress: detailPlace.roadAddress,
-            coordinate: detailPlace.coordinate,
-            bookmarkCount: 0,
-            thumbnailURLs: detailPlace.imageURLs
-        )
     }
 }

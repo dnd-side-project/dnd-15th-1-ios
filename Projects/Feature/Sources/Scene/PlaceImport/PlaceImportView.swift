@@ -190,7 +190,7 @@ public struct PlaceImportView: View {
 
     private var originURL: URL? {
         if case let .loaded(placeImport) = store.phase {
-            return URL(string: placeImport.canonicalUrl)
+            return placeImport.canonicalURL
         }
         return nil
     }

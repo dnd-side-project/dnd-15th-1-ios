@@ -36,10 +36,10 @@ enum ProfileDTOMapper {
     static func toDatePreference(_ dto: MemberDatePreferencesResponseDTO?) -> DatePreference? {
         guard
             let dto,
-            let indoorOutdoor = dto.indoorOutdoor.flatMap(IndoorOutdoor.init(rawValue:)),
-            let activityLevel = dto.activityLevel.flatMap(ActivityLevel.init(rawValue:)),
-            let dateTime = dto.dateTime.flatMap(DateTime.init(rawValue:)),
-            let dateFocus = dto.dateFocus.flatMap(DateFocus.init(rawValue:))
+            let indoorOutdoor = dto.indoorOutdoor.flatMap(parseIndoorOutdoor),
+            let activityLevel = dto.activityLevel.flatMap(parseActivityLevel),
+            let dateTime = dto.dateTime.flatMap(parseDateTime),
+            let dateFocus = dto.dateFocus.flatMap(parseDateFocus)
         else {
             return nil
         }
@@ -51,33 +51,77 @@ enum ProfileDTOMapper {
         )
     }
 
-    static func toDomain(_ dto: NotificationSettingsResponseDTO) -> NotificationSettings {
-        NotificationSettings(
-            contentSavedEnabled: dto.contentSavedEnabled,
-            dateScheduleEnabled: dto.dateScheduleEnabled,
-            marketingEnabled: dto.marketingEnabled,
-            marketingConsentVersion: dto.marketingConsentVersion,
-            availableMarketingConsentVersion: dto.availableMarketingConsentVersion
-        )
-    }
-
-    static func toRequest(_ settings: NotificationSettings) -> NotificationSettingsRequestDTO {
-        NotificationSettingsRequestDTO(
-            contentSavedEnabled: settings.contentSavedEnabled,
-            dateScheduleEnabled: settings.dateScheduleEnabled,
-            marketingEnabled: settings.marketingEnabled,
-            marketingConsentVersion: settings.marketingConsentVersion
-        )
-    }
-
     static func toRequest(_ preference: DatePreference) -> DatePreferencesRequestDTO {
         DatePreferencesRequestDTO(
-            indoorOutdoor: preference.indoorOutdoor.rawValue,
-            activityLevel: preference.activityLevel.rawValue,
-            dateTime: preference.dateTime.rawValue,
-            dateFocus: preference.dateFocus.rawValue
+            indoorOutdoor: serverValue(preference.indoorOutdoor),
+            activityLevel: serverValue(preference.activityLevel),
+            dateTime: serverValue(preference.dateTime),
+            dateFocus: serverValue(preference.dateFocus)
         )
     }
 
     private static let defaultIconID = 1
+
+    // MARK: - 성향 서버 문자열
+
+    // 모르는 값은 nil 이다. 한 축이라도 모르면 성향 전체를 없는 것으로 본다
+    private static func parseIndoorOutdoor(_ raw: String) -> IndoorOutdoor? {
+        switch raw {
+        case "INDOOR": return .indoor
+        case "OUTDOOR": return .outdoor
+        default: return nil
+        }
+    }
+
+    private static func parseActivityLevel(_ raw: String) -> ActivityLevel? {
+        switch raw {
+        case "ACTIVE": return .active
+        case "STATIC": return .`static`
+        default: return nil
+        }
+    }
+
+    private static func parseDateTime(_ raw: String) -> DateTime? {
+        switch raw {
+        case "DAY": return .day
+        case "NIGHT": return .night
+        default: return nil
+        }
+    }
+
+    private static func parseDateFocus(_ raw: String) -> DateFocus? {
+        switch raw {
+        case "FOOD": return .food
+        case "SIGHTSEEING": return .sightseeing
+        default: return nil
+        }
+    }
+
+    private static func serverValue(_ value: IndoorOutdoor) -> String {
+        switch value {
+        case .indoor: return "INDOOR"
+        case .outdoor: return "OUTDOOR"
+        }
+    }
+
+    private static func serverValue(_ value: ActivityLevel) -> String {
+        switch value {
+        case .active: return "ACTIVE"
+        case .`static`: return "STATIC"
+        }
+    }
+
+    private static func serverValue(_ value: DateTime) -> String {
+        switch value {
+        case .day: return "DAY"
+        case .night: return "NIGHT"
+        }
+    }
+
+    private static func serverValue(_ value: DateFocus) -> String {
+        switch value {
+        case .food: return "FOOD"
+        case .sightseeing: return "SIGHTSEEING"
+        }
+    }
 }

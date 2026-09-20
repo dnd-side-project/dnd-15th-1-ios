@@ -13,7 +13,8 @@ enum PlaceDTOMapper {
     static func toDomain(_ dto: SavedPlaceResponseDTO) -> SavedPlace {
         SavedPlace(
             place: toPlace(dto),
-            ownership: ownership(dto.ownershipStatus),
+            // 모르는 저장 관계는 내가 저장한 것으로 둔다
+            ownership: ownership(dto.ownershipStatus) ?? .mine,
             alias: dto.alias,
             memo: nil,
             savedAt: parseDate(dto.savedAt)
@@ -34,69 +35,86 @@ enum PlaceDTOMapper {
     static func toDomain(_ dto: PlaceDetailResponseDTO) -> PlaceDetail {
         PlaceDetail(
             place: toPlace(dto),
-            savedByMe: dto.savedByMe,
-            savedMemberCount: dto.savedMemberCount,
-            ownership: dto.ownershipStatus.flatMap { PlaceOwnership(rawValue: $0.lowercased()) },
+            isSaved: dto.savedByMe,
+            ownership: dto.ownershipStatus.flatMap { ownership($0) },
             phone: dto.phone,
             kakaoPlaceURL: dto.kakaoPlaceUrl.flatMap(URL.init(string:))
         )
     }
 
-    // placeId 는 미저장 장소라 null → kakaoPlaceId 를 식별자로 쓴다.
-    // 둘 다 없어도 매핑마다 달라지지 않게 좌표·이름으로 결정적 식별자를 만든다
+    // 미저장 장소는 placeId 가 null 로 온다. id 는 Place 가 카카오 번호·이름·좌표로 계산한다
     private static func toPlace(_ dto: PlaceSearchItemDTO) -> Place {
         Place(
-            id: dto.placeId.map(String.init) ?? dto.kakaoPlaceId ?? "\(dto.name)|\(dto.latitude)|\(dto.longitude)",
+            placeID: dto.placeId.map(String.init),
             kakaoPlaceID: dto.kakaoPlaceId,
             name: dto.name,
             category: category(code: dto.categoryCode, name: dto.categoryName),
             address: dto.address,
-            roadAddress: dto.roadAddress ?? "",
+            roadAddress: roadAddress(dto.roadAddress),
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
-            bookmarkCount: 0,
-            thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
+            // 검색 응답에는 저장 수가 없다
+            bookmarkCount: nil,
+            thumbnailURLs: photoURLs(thumbnailURL: dto.thumbnailUrl, imageURLs: dto.imageUrls)
         )
     }
 
-    // 상세 응답은 kakaoPlaceId 가 항상 있어 합성 폴백이 필요 없다
+    // 서버가 모르는 카카오 장소는 placeId 가 null 이다
     private static func toPlace(_ dto: PlaceDetailResponseDTO) -> Place {
         Place(
-            id: dto.placeId.map(String.init) ?? dto.kakaoPlaceId,
+            placeID: dto.placeId.map(String.init),
             kakaoPlaceID: dto.kakaoPlaceId,
             name: dto.name,
             category: category(code: dto.categoryCode, name: dto.categoryName),
             address: dto.address,
-            roadAddress: dto.roadAddress ?? "",
+            roadAddress: roadAddress(dto.roadAddress),
             // 명세는 nullable 이지만 실측 120/120 값이 있었다. 없는 응답은 0,0 으로 둔다
             coordinate: Coordinate(
                 latitude: dto.latitude ?? 0,
                 longitude: dto.longitude ?? 0
             ),
             bookmarkCount: dto.savedMemberCount,
-            thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
+            thumbnailURLs: photoURLs(thumbnailURL: dto.thumbnailUrl, imageURLs: dto.imageUrls)
         )
     }
 
     private static func toPlace(_ dto: SavedPlaceResponseDTO) -> Place {
         Place(
-            id: String(dto.placeId),
+            placeID: String(dto.placeId),
             kakaoPlaceID: dto.kakaoPlaceId,
             name: dto.name,
-            category: category(dto.categoryName),
+            // 저장 목록·저장 응답에는 ASCII 코드가 없어 한글 이름으로 읽는다
+            category: category(code: nil, name: dto.categoryName),
             address: dto.address,
-            roadAddress: dto.roadAddress ?? "",
+            roadAddress: roadAddress(dto.roadAddress),
             coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
-            bookmarkCount: 0,
-            thumbnailURLs: dto.imageUrls.compactMap(URL.init(string:))
+            bookmarkCount: dto.savedMemberCount,
+            thumbnailURLs: photoURLs(thumbnailURL: dto.thumbnailUrl, imageURLs: dto.imageUrls)
         )
     }
 
-    private static func ownership(_ raw: String) -> PlaceOwnership {
-        PlaceOwnership(rawValue: raw.lowercased()) ?? .mine
+    // MARK: - 장소 응답 공통 변환
+
+    /// 서버 카테고리를 앱 카테고리로 바꾼다. 상세·검색 응답의 ASCII 코드가 있으면 먼저 보고,
+    /// 없거나 모르는 코드면 한글 이름을 본다. 둘 다 모르면 food 다.
+    /// 코스·게시글·장소 가져오기 매퍼도 이 표 하나를 쓴다
+    static func category(code: String?, name: String?) -> PlaceCategory {
+        code.flatMap(categoryByCode) ?? categoryByName(name)
     }
 
-    // 서버 categoryName(한글) 을 카테고리로 매핑
-    private static func category(_ name: String) -> PlaceCategory {
+    private static func categoryByCode(_ code: String) -> PlaceCategory? {
+        switch code {
+        case "RESTAURANT": return .food
+        case "CAFE": return .cafe
+        case "ENTERTAINMENT": return .activity
+        case "SHOPPING": return .shopping
+        case "CONVENIENCE": return .convenience
+        case "TOURISM": return .tourism
+        case "ACCOMMODATION": return .accommodation
+        default: return nil
+        }
+    }
+
+    private static func categoryByName(_ name: String?) -> PlaceCategory {
         switch name {
         case "카페": return .cafe
         case "관광": return .tourism
@@ -108,19 +126,30 @@ enum PlaceDTOMapper {
         }
     }
 
-    // 상세·검색 응답에는 ASCII categoryCode 가 실려 온다. 그것이 있으면 먼저 본다.
-    // 저장 목록·저장 응답에는 없어 한글 categoryName 으로 계속 매핑한다
-    private static func category(code: String?, name: String) -> PlaceCategory {
-        switch code {
-        case "RESTAURANT": return .food
-        case "CAFE": return .cafe
-        case "ENTERTAINMENT": return .activity
-        case "SHOPPING": return .shopping
-        case "CONVENIENCE": return .convenience
-        case "TOURISM": return .tourism
-        case "ACCOMMODATION": return .accommodation
-        default: return category(name)
+    /// 서버 `ownershipStatus` 를 저장 관계로 바꾼다. 대소문자를 가리지 않고, 모르는 값은 nil 이다.
+    /// 모르는 값을 무엇으로 둘지는 부르는 쪽이 정한다
+    static func ownership(_ raw: String) -> PlaceOwnership? {
+        switch raw.uppercased() {
+        case "MINE": return .mine
+        case "PARTNER": return .partner
+        case "TOGETHER": return .together
+        default: return nil
         }
+    }
+
+    /// 대표 사진을 맨 앞에 두고 나머지 사진을 잇는다.
+    /// 같은 주소는 처음 한 번만 남기고, URL 로 못 읽는 값은 버린다
+    static func photoURLs(thumbnailURL: String?, imageURLs: [String]) -> [URL] {
+        var seen = Set<String>()
+        return ([thumbnailURL].compactMap { $0 } + imageURLs)
+            .filter { seen.insert($0).inserted }
+            .compactMap(URL.init(string:))
+    }
+
+    // 서버가 도로명 없음을 nil 대신 "" 로 주기도 한다. Place.roadAddress 가 옵셔널이라
+    // 여기서 빈 문자열도 nil 로 합쳐 둔다. 코스·게시글·가져오기 매퍼도 이 함수 하나를 쓴다
+    static func roadAddress(_ raw: String?) -> String? {
+        raw.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     // "2026-08-17T01:27:55.129814" 처럼 타임존 없는 형식이라 초 단위까지만 파싱.

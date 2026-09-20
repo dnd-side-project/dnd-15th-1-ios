@@ -106,7 +106,7 @@ final class MapSearchModeTests: XCTestCase {
         XCTAssertTrue(store.state.isBookmarked("s1"))
 
         await store.receive(.bookmarkSaved(id: "s1", saved: saved)) {
-            $0.savedServerIDs = ["s1": saved.place.id]
+            $0.savedPlaceIDs = ["s1": saved.place.id]
             $0.places = [saved]
         }
         XCTAssertEqual(kakaoIDArg.value, "kakao-s1")
@@ -122,7 +122,7 @@ final class MapSearchModeTests: XCTestCase {
         var state = MapFeature.State()
         state.mode = .searchResult(query: "음식점", places: [place])
         state.bookmarkedPlaceIDs = ["s1"]
-        state.savedServerIDs = ["s1": serverID]
+        state.savedPlaceIDs = ["s1": serverID]
         state.places = [saved]
 
         let removedID = LockIsolated<String?>(nil)
@@ -205,7 +205,7 @@ final class MapSearchModeTests: XCTestCase {
 
     private func searchPlace() -> Place {
         Place(
-            id: "s1",
+            placeID: "s1",
             kakaoPlaceID: "kakao-s1",
             name: "검색 장소",
             category: .cafe,
@@ -241,7 +241,7 @@ final class MapSearchModeAnalyticsTests: XCTestCase {
             $0.bookmarkedPlaceIDs = ["s1"]
         }
         await store.receive(.bookmarkSaved(id: "s1", saved: saved)) {
-            $0.savedServerIDs = ["s1": saved.place.id]
+            $0.savedPlaceIDs = ["s1": saved.place.id]
             $0.places = [saved]
         }
         await store.finish()
@@ -305,7 +305,7 @@ final class MapSearchModeAnalyticsTests: XCTestCase {
         var state = MapFeature.State()
         state.mode = .searchResult(query: "음식점", places: [place])
         state.bookmarkedPlaceIDs = ["s1"]
-        state.savedServerIDs = ["s1": serverID]
+        state.savedPlaceIDs = ["s1": serverID]
         state.places = [saved]
 
         let sent = LockIsolated<[AnalyticsEvent]>([])
@@ -331,7 +331,7 @@ final class MapSearchModeAnalyticsTests: XCTestCase {
 
     private func searchPlaceForAnalytics() -> Place {
         Place(
-            id: "s1",
+            placeID: "s1",
             kakaoPlaceID: "kakao-s1",
             name: "검색 장소",
             category: .cafe,
@@ -341,5 +341,38 @@ final class MapSearchModeAnalyticsTests: XCTestCase {
             bookmarkCount: 0,
             thumbnailURLs: []
         )
+    }
+}
+
+// 위 두 클래스가 type_body_length 한계라 장소 번호를 모르는 삭제는 따로 둔다
+@MainActor
+final class MapSearchModeRemoveTests: XCTestCase {
+    func test_장소_번호를_모르는_검색_장소는_저장_취소를_서버에_보내지_않고_되돌린다() async {
+        let place = Place(
+            placeID: nil,
+            kakaoPlaceID: "kakao-s9",
+            name: "검색 장소",
+            category: .cafe,
+            address: "주소",
+            roadAddress: nil,
+            coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
+            bookmarkCount: nil,
+            thumbnailURLs: []
+        )
+        var state = MapFeature.State()
+        state.mode = .searchResult(query: "검색", places: [place])
+        state.bookmarkedPlaceIDs = [place.id]
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.placeClient.removePlace = { _ in XCTFail("장소 번호 없이 삭제를 부르면 안 된다") }
+        }
+
+        await store.send(.bookmarkTapped(place.id)) {
+            $0.bookmarkedPlaceIDs = []
+        }
+        await store.receive(.bookmarkFailed(id: place.id, wasBookmarked: true)) {
+            $0.bookmarkedPlaceIDs = [place.id]
+        }
     }
 }

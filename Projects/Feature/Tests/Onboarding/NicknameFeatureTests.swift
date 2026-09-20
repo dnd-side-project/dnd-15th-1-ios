@@ -137,7 +137,7 @@ final class NicknameFeatureTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { nickname, iconID in
+            $0.profileClient.setUpProfile = { nickname, iconID in
                 requestedNickname.setValue(nickname)
                 requestedIconID.setValue(iconID)
                 return profile
@@ -166,7 +166,7 @@ final class NicknameFeatureTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in throw ProfileError.invalidNickname }
+            $0.profileClient.setUpProfile = { _, _ in throw ProfileError.invalidNickname }
         }
 
         await store.send(.nextButtonTapped) {
@@ -192,7 +192,7 @@ final class NicknameFeatureTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in throw ProfileError.unauthorized }
+            $0.profileClient.setUpProfile = { _, _ in throw ProfileError.unauthorized }
         }
 
         await store.send(.nextButtonTapped) {
@@ -351,12 +351,12 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = {
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = {
                 calls.withValue { $0.append("load") }
                 return loaded
             }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.notificationClient.updateNotificationSettings = { settings in
                 calls.withValue { $0.append("update") }
                 sent.setValue(settings)
                 return settings
@@ -388,9 +388,9 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = { loaded }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = { loaded }
+            $0.notificationClient.updateNotificationSettings = { settings in
                 sent.setValue(settings)
                 return settings
             }
@@ -425,12 +425,12 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = {
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = {
                 calls.withValue { $0.append("load") }
                 return loaded
             }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.notificationClient.updateNotificationSettings = { settings in
                 calls.withValue { $0.append("update") }
                 return settings
             }
@@ -459,9 +459,9 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = { throw ProfileError.unknown }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = { throw NotificationError.unknown }
+            $0.notificationClient.updateNotificationSettings = { settings in
                 XCTFail("조회가 실패하면 변경을 부르지 않는다")
                 return settings
             }
@@ -491,9 +491,9 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = { loaded }
-            $0.profileClient.updateNotificationSettings = { _ in throw ProfileError.unknown }
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = { loaded }
+            $0.notificationClient.updateNotificationSettings = { _ in throw NotificationError.unknown }
         }
 
         await store.send(.nextButtonTapped) {
@@ -521,12 +521,12 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = {
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = {
                 for await _ in gate.stream { break }
                 return loaded
             }
-            $0.profileClient.updateNotificationSettings = { settings in settings }
+            $0.notificationClient.updateNotificationSettings = { settings in settings }
         }
 
         await store.send(.nextButtonTapped) {
@@ -563,9 +563,9 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = { loaded }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = { loaded }
+            $0.notificationClient.updateNotificationSettings = { settings in
                 XCTFail("동의 버전이 없으면 변경을 부르지 않는다")
                 return settings
             }

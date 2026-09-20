@@ -13,7 +13,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { inviteCode }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
 
         await store.send(.onAppear) {
@@ -42,7 +42,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
                 }
                 return inviteCode
             }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
 
         await store.send(.onAppear) {
@@ -76,7 +76,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unknown }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
 
         await store.send(.onAppear) {
@@ -99,7 +99,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unauthorized }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
 
         await store.send(.onAppear) {
@@ -123,10 +123,7 @@ final class CoupleConnectFeatureTests: XCTestCase {
 // 스킵·코드 입력·연결 성공은 케이스가 많아 별도 클래스로 둔다. type_body_length 한계 때문이다
 @MainActor
 final class CoupleConnectInteractionTests: XCTestCase {
-    private let couple = Couple(
-        partnerNickname: "픽둘",
-        partnerIconID: 1
-    )
+    private let couple = CoupleMember(nickname: "픽둘", iconID: 1)
 
     func test_스킵확인_네_스킵델리게이트() async {
         let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽")) {
@@ -285,7 +282,7 @@ final class CoupleConnectInteractionTests: XCTestCase {
         }
         await store.receive(\.connectResponse.success) {
             $0.isConnecting = false
-            $0.connectedCouple = couple
+            $0.connectedPartner = couple
         }
         await store.receive(\.delegate.showComplete)
 
@@ -298,14 +295,14 @@ final class CoupleConnectInteractionTests: XCTestCase {
             initialState: CoupleConnectFeature.State(
                 myNickname: "둘픽",
                 code: "AB12C",
-                connectedCouple: couple
+                connectedPartner: couple
             )
         ) {
             CoupleConnectFeature()
         }
 
         await store.send(.completeButtonTapped)
-        await store.receive(.delegate(.connected(couple)))
+        await store.receive(.delegate(.connected(partner: couple)))
     }
 }
 
@@ -356,7 +353,7 @@ final class CoupleConnectInviteCodePlaceholderTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unauthorized }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
 
         await store.send(.onAppear) {
@@ -386,8 +383,7 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
     private let inviteCode = InviteCode(value: "AB12C", shareURL: nil)
 
     private func connectedStatus() -> CoupleStatus {
-        CoupleStatus(
-            connected: true,
+        .connected(
             me: CoupleMember(nickname: "둘픽", iconID: 1),
             partner: CoupleMember(nickname: "픽둘", iconID: 2),
             daysTogether: 0
@@ -408,7 +404,7 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
         }
         await store.receive(\.connectionStatusResponse.success) {
             $0.isCheckingConnection = false
-            $0.connectedCouple = Couple(partnerNickname: "픽둘", partnerIconID: 2)
+            $0.connectedPartner = CoupleMember(nickname: "픽둘", iconID: 2)
         }
         await store.receive(\.delegate.showComplete)
     }
@@ -418,7 +414,7 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
         let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽", inviteCode: inviteCode)) {
             CoupleConnectFeature()
         } withDependencies: {
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
 
         await store.send(.onAppear) {
@@ -427,30 +423,7 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
         await store.receive(\.connectionStatusResponse.success) {
             $0.isCheckingConnection = false
         }
-        XCTAssertNil(store.state.connectedCouple)
-    }
-
-    func test_상대정보가없으면_안넘어간다() async {
-        let inviteCode = self.inviteCode
-        let status = CoupleStatus(
-            connected: true,
-            me: CoupleMember(nickname: "둘픽", iconID: 1),
-            partner: nil,
-            daysTogether: nil
-        )
-        let store = TestStore(initialState: CoupleConnectFeature.State(myNickname: "둘픽", inviteCode: inviteCode)) {
-            CoupleConnectFeature()
-        } withDependencies: {
-            $0.coupleClient.current = { status }
-        }
-
-        await store.send(.onAppear) {
-            $0.isCheckingConnection = true
-        }
-        await store.receive(\.connectionStatusResponse.success) {
-            $0.isCheckingConnection = false
-        }
-        XCTAssertNil(store.state.connectedCouple)
+        XCTAssertNil(store.state.connectedPartner)
     }
 
     func test_앱이앞으로오면_다시묻는다() async {
@@ -468,7 +441,7 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
         }
         await store.receive(\.connectionStatusResponse.success) {
             $0.isCheckingConnection = false
-            $0.connectedCouple = Couple(partnerNickname: "픽둘", partnerIconID: 2)
+            $0.connectedPartner = CoupleMember(nickname: "픽둘", iconID: 2)
         }
         await store.receive(\.delegate.showComplete)
     }
@@ -478,14 +451,14 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
             initialState: CoupleConnectFeature.State(
                 myNickname: "둘픽",
                 inviteCode: inviteCode,
-                connectedCouple: Couple(partnerNickname: "픽둘", partnerIconID: 2)
+                connectedPartner: CoupleMember(nickname: "픽둘", iconID: 2)
             )
         ) {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.current = {
                 XCTFail("이미 연결된 뒤에는 조회하지 않아야 한다")
-                return nil
+                return .notConnected
             }
         }
 
@@ -508,7 +481,7 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
             $0.isCheckingConnection = false
         }
         XCTAssertNil(store.state.toast)
-        XCTAssertNil(store.state.connectedCouple)
+        XCTAssertNil(store.state.connectedPartner)
     }
 
     func test_세션만료는_위로올린다() async {
@@ -533,7 +506,7 @@ final class CoupleConnectStatusCheckTests: XCTestCase {
 @MainActor
 final class CoupleConnectAnalyticsTests: XCTestCase {
     private let inviteCode = InviteCode(value: "AB12C", shareURL: nil)
-    private let couple = Couple(partnerNickname: "픽둘", partnerIconID: 2)
+    private let couple = CoupleMember(nickname: "픽둘", iconID: 2)
 
     func test_커플_연결_화면에_들어가면_이벤트를_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
@@ -542,7 +515,7 @@ final class CoupleConnectAnalyticsTests: XCTestCase {
             CoupleConnectFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { inviteCode }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
             $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
         }
 
@@ -582,7 +555,7 @@ final class CoupleConnectAnalyticsTests: XCTestCase {
         }
         await store.receive(\.connectResponse.success) {
             $0.isConnecting = false
-            $0.connectedCouple = couple
+            $0.connectedPartner = couple
         }
         await store.receive(\.delegate.showComplete)
         await store.finish()

@@ -23,7 +23,7 @@ final class MapFeatureTests: XCTestCase {
                 callCount.withValue { $0 += 1 }
                 return places
             }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
             $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
@@ -328,7 +328,7 @@ final class MapFeatureLoadTests: XCTestCase {
             MapFeature()
         } withDependencies: {
             $0.placeClient.savedPlaces = { throw PlaceError.network }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
             $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
@@ -357,7 +357,7 @@ final class MapFeatureLoadTests: XCTestCase {
                 callCount.withValue { $0 += 1 }
                 return loaded
             }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
             $0.courseClient.currentCourse = { nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
@@ -379,8 +379,7 @@ final class MapFeatureLoadTests: XCTestCase {
         } withDependencies: {
             $0.placeClient.savedPlaces = { [] }
             $0.coupleClient.current = {
-                CoupleStatus(
-                    connected: true,
+                .connected(
                     me: CoupleMember(nickname: "나", iconID: 1),
                     partner: CoupleMember(nickname: "둘", iconID: 1),
                     daysTogether: nil
@@ -467,7 +466,7 @@ final class MapFeatureLoadTests: XCTestCase {
             MapFeature()
         } withDependencies: {
             $0.placeClient.savedPlaces = { [] }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
             $0.courseClient.currentCourse = { mapCurrentCourse }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
@@ -486,7 +485,7 @@ final class MapFeatureLoadTests: XCTestCase {
             MapFeature()
         } withDependencies: {
             $0.placeClient.savedPlaces = { [] }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
             $0.courseClient.currentCourse = {
                 courseCalls.withValue { $0 += 1 }
                 return mapCurrentCourse
@@ -633,7 +632,7 @@ final class MapFeatureDelegateTests: XCTestCase {
         var state = MapFeature.State()
         state.places = [.fixture(id: "7")]
         state.bookmarkedPlaceIDs = ["7", "kakao-7"]
-        state.savedServerIDs = ["kakao-7": "7"]
+        state.savedPlaceIDs = ["kakao-7": "7"]
         let store = TestStore(initialState: state) {
             MapFeature()
         } withDependencies: {
@@ -643,11 +642,11 @@ final class MapFeatureDelegateTests: XCTestCase {
 
         await store.send(.deleteTapped("7")) {
             $0.bookmarkedPlaceIDs = []
-            $0.savedServerIDs = [:]
+            $0.savedPlaceIDs = [:]
         }
         await store.receive(\.deleteFailed) {
             $0.bookmarkedPlaceIDs = ["7", "kakao-7"]
-            $0.savedServerIDs = ["kakao-7": "7"]
+            $0.savedPlaceIDs = ["kakao-7": "7"]
         }
     }
 
@@ -970,6 +969,5 @@ private let mapCurrentCourse = DateCourseSummary(
     title: "성수동 데이트",
     scheduledAt: Date(timeIntervalSince1970: 0),
     status: .confirmed,
-    version: 1,
     totalPlaceCount: 5
 )

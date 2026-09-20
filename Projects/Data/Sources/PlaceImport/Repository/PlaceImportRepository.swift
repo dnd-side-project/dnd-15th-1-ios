@@ -15,25 +15,30 @@ public struct PlaceImportRepository: Sendable {
         self.remote = remote
     }
 
-    public func start(sourceUrl: String) async throws -> PlaceImport {
+    public func start(sourceURL: URL) async throws -> PlaceImport {
         do {
-            return PlaceImportDTOMapper.toDomain(try await remote.start(sourceUrl: sourceUrl))
+            return PlaceImportDTOMapper.toDomain(try await remote.start(sourceURL: sourceURL.absoluteString))
         } catch {
             throw PlaceImportErrorMapper.map(error)
         }
     }
 
-    public func poll(importId: Int) async throws -> PlaceImport {
+    public func poll(importID: String) async throws -> PlaceImport {
         do {
-            return PlaceImportDTOMapper.toDomain(try await remote.poll(importId: importId))
+            return PlaceImportDTOMapper.toDomain(try await remote.poll(importID: importID))
         } catch {
             throw PlaceImportErrorMapper.map(error)
         }
     }
 
-    public func confirm(importId: Int, candidateIDs: [Int]) async throws {
+    // 서버는 후보 번호를 숫자로 받는다. 숫자가 아닌 번호가 있으면 보내지 않고 unknown 으로 끝낸다
+    public func confirm(importID: String, candidateIDs: [String]) async throws {
         do {
-            try await remote.confirm(importId: importId, candidateIDs: candidateIDs)
+            let numbers = try candidateIDs.map { raw -> Int in
+                guard let number = Int(raw) else { throw PlaceImportError.unknown }
+                return number
+            }
+            try await remote.confirm(importID: importID, candidateIDs: numbers)
         } catch {
             throw PlaceImportErrorMapper.map(error)
         }

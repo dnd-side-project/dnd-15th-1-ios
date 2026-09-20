@@ -19,7 +19,7 @@ final class MapFlowFeatureTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
 
         await store.send(.map(.markerTapped("7"))) {
@@ -58,7 +58,7 @@ final class MapFlowFeatureTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
 
         await store.send(.map(.rowTapped("7"))) {
@@ -334,7 +334,7 @@ final class MapFlowSearchServerIDTests: XCTestCase {
         var map = MapFeature.State()
         map.mode = .searchResult(query: "카페", places: [place])
         map.bookmarkedPlaceIDs = ["s1"]
-        map.savedServerIDs = ["s1": "3"]
+        map.savedPlaceIDs = ["s1": "3"]
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
         }
@@ -368,7 +368,7 @@ final class MapFlowSearchServerIDTests: XCTestCase {
         }
 
         await store.send(.detail(.presented(.delegate(.bookmarkSaved("s1", saved))))) {
-            $0.map.savedServerIDs = ["s1": saved.place.id]
+            $0.map.savedPlaceIDs = ["s1": saved.place.id]
             $0.map.places = [saved]
         }
     }
@@ -378,7 +378,7 @@ final class MapFlowSearchServerIDTests: XCTestCase {
         var state = MapFlowFeature.State()
         state.detail = PlaceDetailFeature.State(savedPlace: saved)
         state.map.bookmarkedPlaceIDs = ["7"]
-        state.map.savedServerIDs = ["7": "3"]
+        state.map.savedPlaceIDs = ["7": "3"]
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         }
@@ -386,10 +386,10 @@ final class MapFlowSearchServerIDTests: XCTestCase {
         await store.send(.detail(.presented(.delegate(.bookmarkToggled("7", false))))) {
             $0.map.bookmarkedPlaceIDs = []
         }
-        XCTAssertEqual(store.state.map.savedServerIDs, ["7": "3"])
+        XCTAssertEqual(store.state.map.savedPlaceIDs, ["7": "3"])
 
         await store.send(.detail(.presented(.delegate(.bookmarkRemoved("3"))))) {
-            $0.map.savedServerIDs = [:]
+            $0.map.savedPlaceIDs = [:]
         }
     }
 
@@ -397,13 +397,13 @@ final class MapFlowSearchServerIDTests: XCTestCase {
         let place = Place.fixture(id: "kakao-99", name: "검색 장소")
         var state = MapFlowFeature.State()
         state.detail = PlaceDetailFeature.State(place: place, query: "카페")
-        state.map.savedServerIDs = ["3": "17", "kakao-99": "3"]
+        state.map.savedPlaceIDs = ["3": "17", "kakao-99": "3"]
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         }
 
         await store.send(.detail(.presented(.delegate(.bookmarkRemoved("3"))))) {
-            $0.map.savedServerIDs = ["3": "17"]
+            $0.map.savedPlaceIDs = ["3": "17"]
         }
     }
 
@@ -413,7 +413,7 @@ final class MapFlowSearchServerIDTests: XCTestCase {
         state.detail = PlaceDetailFeature.State(savedPlace: saved)
         state.map.places = [saved]
         state.map.bookmarkedPlaceIDs = ["7"]
-        state.map.savedServerIDs = ["7": saved.id]
+        state.map.savedPlaceIDs = ["7": saved.id]
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         }
@@ -422,11 +422,11 @@ final class MapFlowSearchServerIDTests: XCTestCase {
             $0.map.bookmarkedPlaceIDs = []
         }
         XCTAssertEqual(store.state.map.places, [saved])
-        XCTAssertEqual(store.state.map.savedServerIDs, ["7": saved.id])
+        XCTAssertEqual(store.state.map.savedPlaceIDs, ["7": saved.id])
 
         await store.send(.detail(.presented(.delegate(.bookmarkRemoved(saved.id))))) {
             $0.map.places = []
-            $0.map.savedServerIDs = [:]
+            $0.map.savedPlaceIDs = [:]
         }
     }
 }
@@ -446,7 +446,7 @@ final class MapFlowPostDetailTests: XCTestCase {
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         } withDependencies: {
-            $0.postDetailContentClient.contentDetail = { _ in loaded }
+            $0.contentClient.contentDetail = { _ in loaded }
         }
 
         await store.send(.detail(.presented(.delegate(.contentSelected("1"))))) {
@@ -505,7 +505,7 @@ final class MapFlowPostDetailTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
 
         await store.send(.map(.markerTapped("7"))) {
@@ -571,7 +571,7 @@ final class MapFlowPostDetailTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
 
         await store.send(.map(.markerTapped("101"))) {
@@ -609,10 +609,10 @@ final class MapFlowPostDetailTests: XCTestCase {
             caption: "본문",
             canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
             places: [
-                PostDetailPlace(id: "101", name: "가게 하나", category: .cafe, isSaved: true,
-                                coordinate: Coordinate(latitude: 37.5, longitude: 127.0)),
-                PostDetailPlace(id: "102", name: "가게 둘", category: .food, isSaved: false,
-                                coordinate: Coordinate(latitude: 37.6, longitude: 127.1)),
+                .fixture(placeID: "101", name: "가게 하나", category: .cafe, isSaved: true,
+                         latitude: 37.5, longitude: 127.0),
+                .fixture(placeID: "102", name: "가게 둘", category: .food, isSaved: false,
+                         latitude: 37.6, longitude: 127.1),
             ]
         )
         var state = MapFlowFeature.State()
@@ -620,7 +620,7 @@ final class MapFlowPostDetailTests: XCTestCase {
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         } withDependencies: {
-            $0.postDetailContentClient.contentDetail = { _ in loaded }
+            $0.contentClient.contentDetail = { _ in loaded }
         }
 
         await store.send(.postDetail(.presented(.onAppear))) {
@@ -652,7 +652,7 @@ final class MapFlowContentPinTests: XCTestCase {
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         } withDependencies: {
-            $0.postDetailContentClient.contentDetail = { _ in loaded }
+            $0.contentClient.contentDetail = { _ in loaded }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -697,7 +697,7 @@ final class MapFlowContentPinTests: XCTestCase {
 
     func test_게시글핀모드에서_연_게시글을_닫으면_앞_게시글핀으로_돌아온다() async {
         let first = Place(
-            id: "101",
+            placeID: "101",
             kakaoPlaceID: nil,
             name: "한강뷰 감성카페",
             category: .cafe,
@@ -751,7 +751,7 @@ final class MapFlowContentPinLeakTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
 
         await store.send(.map(.markerTapped("101"))) {
@@ -919,7 +919,7 @@ final class MapFlowContentPinLeakTests: XCTestCase {
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         } withDependencies: {
-            $0.postDetailContentClient.contentDetail = { _ in .fixture(id: "9") }
+            $0.contentClient.contentDetail = { _ in .fixture(id: "9") }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -934,13 +934,8 @@ final class MapFlowContentPinLeakTests: XCTestCase {
 final class MapFlowDetailStackTests: XCTestCase {
     func test_장소에서_연_게시글의_장소행을_누르면_장소가_위고_게시글은_남는다() async {
         let saved = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
-        let row = PostDetailPlace(
-            id: "201",
-            name: "행 장소",
-            category: .cafe,
-            isSaved: false,
-            coordinate: Coordinate(latitude: 37.5, longitude: 127.0)
-        )
+        let row = ContentPlace.fixture(placeID: "201", name: "행 장소", category: .cafe,
+                                        latitude: 37.5, longitude: 127.0)
         var state = MapFlowFeature.State()
         state.detail = PlaceDetailFeature.State(savedPlace: saved)
         state.postDetail = PostDetailFeature.State(contentID: "1")
@@ -957,26 +952,14 @@ final class MapFlowDetailStackTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
-        let expectedPlace = Place(
-            id: row.id,
-            kakaoPlaceID: row.kakaoPlaceID,
-            name: row.name,
-            category: row.category,
-            address: row.address,
-            roadAddress: row.roadAddress,
-            coordinate: row.coordinate,
-            bookmarkCount: 0,
-            thumbnailURLs: row.imageURLs
-        )
-
         await store.send(.postDetail(.presented(.delegate(.placeSelected("201"))))) {
-            $0.map.camera = .focusing(row.coordinate, zoomLevel: state.map.camera.zoomLevel)
-            $0.detail = PlaceDetailFeature.State(contentPlace: expectedPlace)
+            $0.map.camera = .focusing(row.place.coordinate, zoomLevel: state.map.camera.zoomLevel)
+            $0.detail = PlaceDetailFeature.State(contentPlace: row.place)
             $0.map.selectedPlace = MapFeature.State.SelectedPlace(
                 id: row.id,
-                coordinate: row.coordinate
+                coordinate: row.place.coordinate
             )
             $0.topDetail = .place
         }
@@ -998,13 +981,8 @@ final class MapFlowDetailStackTests: XCTestCase {
 
     func test_장소A에서_게시글P에서_장소B를_열면_A는_없고_P는_남는다() async {
         let savedA = SavedPlace.fixture(id: "7", latitude: 37.3, longitude: 126.9)
-        let rowB = PostDetailPlace(
-            id: "202",
-            name: "장소 B",
-            category: .food,
-            isSaved: false,
-            coordinate: Coordinate(latitude: 37.6, longitude: 127.1)
-        )
+        let rowB = ContentPlace.fixture(placeID: "202", name: "장소 B", category: .food,
+                                         latitude: 37.6, longitude: 127.1)
         var state = MapFlowFeature.State()
         state.detail = PlaceDetailFeature.State(savedPlace: savedA)
         state.postDetail = PostDetailFeature.State(contentID: "P")
@@ -1021,26 +999,14 @@ final class MapFlowDetailStackTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
-        let expectedPlace = Place(
-            id: rowB.id,
-            kakaoPlaceID: rowB.kakaoPlaceID,
-            name: rowB.name,
-            category: rowB.category,
-            address: rowB.address,
-            roadAddress: rowB.roadAddress,
-            coordinate: rowB.coordinate,
-            bookmarkCount: 0,
-            thumbnailURLs: rowB.imageURLs
-        )
-
         await store.send(.postDetail(.presented(.delegate(.placeSelected("202"))))) {
-            $0.map.camera = .focusing(rowB.coordinate, zoomLevel: state.map.camera.zoomLevel)
-            $0.detail = PlaceDetailFeature.State(contentPlace: expectedPlace)
+            $0.map.camera = .focusing(rowB.place.coordinate, zoomLevel: state.map.camera.zoomLevel)
+            $0.detail = PlaceDetailFeature.State(contentPlace: rowB.place)
             $0.map.selectedPlace = MapFeature.State.SelectedPlace(
                 id: rowB.id,
-                coordinate: rowB.coordinate
+                coordinate: rowB.place.coordinate
             )
             $0.topDetail = .place
         }
@@ -1078,7 +1044,7 @@ final class MapFlowSelectedPinTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 이 테스트는 조회 결과를 안 본다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
     }
 
@@ -1137,7 +1103,7 @@ final class MapFlowContentReturnTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
         let zoom = store.state.map.camera.zoomLevel
 
@@ -1256,7 +1222,7 @@ final class MapFlowContentReturnTests: XCTestCase {
         } withDependencies: {
             // 흐름이 상세를 바꿔 끼우며 조회를 시작한다. 빠짐없이 검사하는 스토어라 조회 흐름도 받아 둔다
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         }
         let zoom = store.state.map.camera.zoomLevel
 
@@ -1296,7 +1262,7 @@ final class MapFlowContentReturnTests: XCTestCase {
         let store = TestStore(initialState: state) {
             MapFlowFeature()
         } withDependencies: {
-            $0.postDetailContentClient.contentDetail = { _ in .fixture(id: "1") }
+            $0.contentClient.contentDetail = { _ in .fixture(id: "1") }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -1360,8 +1326,7 @@ final class MapFlowSamePlaceReopenTests: XCTestCase {
         let post = PostDetailContent.fixture(id: "1")
         let related = ContentPage(
             items: [Content(id: "c1", title: "관련 게시글", thumbnailURLs: [], placeCount: 1)],
-            hasNext: false,
-            popularTags: []
+            hasNext: false
         )
         var map = MapFeature.State()
         map.selectedPlace = MapFeature.State.SelectedPlace(
@@ -1375,8 +1340,8 @@ final class MapFlowSamePlaceReopenTests: XCTestCase {
             MapFlowFeature()
         } withDependencies: {
             $0.placeClient.placeDetail = { _ in throw PlaceError.network }
-            $0.exploreClient.placeContents = { _, _, _ in related }
-            $0.postDetailContentClient.contentDetail = { _ in post }
+            $0.contentClient.placeContents = { _, _, _ in related }
+            $0.contentClient.contentDetail = { _ in post }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -1439,9 +1404,9 @@ final class MapFlowSamePlaceReopenTests: XCTestCase {
                 }
                 throw PlaceError.network
             }
-            $0.exploreClient.placeContents = { _, page, _ in
+            $0.contentClient.placeContents = { _, page, _ in
                 guard page > 0 else {
-                    return ContentPage(items: firstPage, hasNext: true, popularTags: [])
+                    return ContentPage(items: firstPage, hasNext: true)
                 }
                 let call = secondPageCalls.withValue { count in
                     count += 1
@@ -1454,9 +1419,9 @@ final class MapFlowSamePlaceReopenTests: XCTestCase {
                     secondPageCancelled.continuation.yield(cancelled)
                     if cancelled { throw CancellationError() }
                 }
-                return ContentPage(items: secondPage, hasNext: false, popularTags: [])
+                return ContentPage(items: secondPage, hasNext: false)
             }
-            $0.postDetailContentClient.contentDetail = { _ in post }
+            $0.contentClient.contentDetail = { _ in post }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 

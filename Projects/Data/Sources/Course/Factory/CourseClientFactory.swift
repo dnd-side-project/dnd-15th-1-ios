@@ -22,6 +22,12 @@ public enum CourseClientFactory {
             },
             course: { try await repository.course(id: $0) },
             currentCourse: { try await repository.currentCourse() },
+            latestPastCourses: { size in
+                try await repository.latestPastCourses(size: size)
+            },
+            pastCourses: { page, size in
+                try await repository.pastCourses(page: page, size: size)
+            },
             updateCourse: { id, content, version in
                 try await repository.updateCourse(
                     id: id,
