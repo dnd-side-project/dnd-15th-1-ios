@@ -79,6 +79,7 @@ public struct PlaceImportFeature {
     @Dependency(\.analyticsClient) var analyticsClient
     @Dependency(\.authClient) var authClient
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.continuousClock) var clock
 
     public init() {}
 
@@ -224,9 +225,9 @@ public struct PlaceImportFeature {
     }
 
     private func poll(importID: String, after seconds: Int) -> Effect<Action> {
-        .run { [placeImportClient] send in
+        .run { [placeImportClient, clock] send in
             do {
-                try await Task.sleep(for: .seconds(seconds))
+                try await clock.sleep(for: .seconds(seconds))
             } catch {
                 return
             }
