@@ -18,7 +18,6 @@ public struct ContentClient: Sendable {
     public var placeContents: @Sendable (
         _ placeID: String, _ page: Int, _ size: Int
     ) async throws -> ContentPage
-    /// GET /api/v1/contents/{id}
     public var contentDetail: @Sendable (_ id: String) async throws -> PostDetailContent
 }
 
