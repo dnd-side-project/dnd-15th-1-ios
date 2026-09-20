@@ -39,9 +39,6 @@ public struct MyPageView: View {
             }
         }
         .toolbarRole(.editor)
-        .navigationDestination(for: MyPageFeature.Route.self) { route in
-            destination(route)
-        }
         .sheet(item: presentedTermsBinding) { terms in
             if let url = terms.url {
                 SafariView(url: url)
@@ -62,71 +59,6 @@ public struct MyPageView: View {
         .task {
             store.send(.onAppear)
         }
-    }
-
-    // push 목적지. 각 화면은 하단탭을 스스로 숨긴다
-    @ViewBuilder
-    private func destination(_ route: MyPageFeature.Route) -> some View {
-        switch route {
-        case .dateType:
-            dateTypeDestination
-        case .connection:
-            connectionDestination
-        case .connect, .codeInput, .complete:
-            coupleDestination(route)
-        }
-    }
-
-    // 미연결 시 타는 커플 연결 3화면. 각 뷰가 자체 back·nav 를 가진다
-    @ViewBuilder
-    private func coupleDestination(_ route: MyPageFeature.Route) -> some View {
-        if let coupleStore = store.scope(state: \.couple, action: \.couple) {
-            Group {
-                switch route {
-                case .codeInput:
-                    CoupleCodeInputView(store: coupleStore)
-                case .complete:
-                    CoupleCompleteView(store: coupleStore)
-                default:
-                    CoupleConnectView(store: coupleStore)
-                }
-            }
-            .toolbar(.hidden, for: .tabBar)
-        }
-    }
-
-    @ViewBuilder
-    private var dateTypeDestination: some View {
-        if let dateTypeStore = store.scope(state: \.dateType, action: \.dateType) {
-            DateTypeView(store: dateTypeStore)
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationBarBackButtonHidden(true)
-                .toolbar {
-                    backToolbarItem
-                    ToolbarItem(placement: .principal) {
-                        Text("나의 데이트 유형")
-                            .typography(.body1SB)
-                            .foregroundStyle(Color.commonWhite)
-                    }
-                }
-                .toolbar(.hidden, for: .tabBar)
-        }
-    }
-
-    @ViewBuilder
-    private var connectionDestination: some View {
-        if let connectionStore = store.scope(state: \.connection, action: \.connection) {
-            ConnectionManageView(store: connectionStore)
-                .navigationTitle("연결 관리")
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationBarBackButtonHidden(true)
-                .toolbar { backToolbarItem }
-                .toolbar(.hidden, for: .tabBar)
-        }
-    }
-
-    private var backToolbarItem: some ToolbarContent {
-        BackToolbarItem { store.send(.pathChanged([])) }
     }
 
     private var profileEditBinding: Binding<Bool> {
