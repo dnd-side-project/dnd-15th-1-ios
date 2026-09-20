@@ -24,7 +24,7 @@ Dulpick 작업 시 에이전트 진입점.
 5. Core/인프라 에러는 Data 에서 Domain 에러로 매핑한다
 6. 전역 에러(`sessionExpired` 등)만 RootFlow 로 승격한다
 7. 외부 SDK 를 감싸 화면이 직접 쓰는 인프라는 `CoreUI` 계층에 둔다. 외부 패키지 진입점(`ThirdParty*`)과 디자인 토큰(`SharedDesignSystem`)은 지금 자리를 지킨다
-8. Domain·Data 폴더는 개념으로 나눈다. 두 계층의 폴더 이름을 짝짓는다
+8. Domain·Data 폴더는 개념으로 나눈다. 두 계층의 폴더 이름을 짝짓는다. 개념 둘 이상이 함께 쓰는 Domain 모델만 `Domain/Sources/Common` 에 두고 Data 에 짝을 안 만든다
 
 ---
 
