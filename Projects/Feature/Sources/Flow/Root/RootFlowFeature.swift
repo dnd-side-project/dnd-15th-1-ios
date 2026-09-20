@@ -425,7 +425,7 @@ private extension RootFlowFeature {
             home: HomeFlowFeature.State(),
             explore: ExploreFlowFeature.State(),
             map: MapFlowFeature.State(map: MapFeature.State()),
-            myPage: MyPageFeature.State()
+            myPage: MyPageFlowFeature.State()
         )
     }
 

@@ -107,7 +107,7 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -202,7 +202,7 @@ final class RootFlowTransitionTests: XCTestCase {
             initialState: RootFlowFeature.State(
                 phase: .mainTab(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State()
+                        myPage: MyPageFlowFeature.State()
                     )
                 )
             )
@@ -254,7 +254,7 @@ final class RootFlowTransitionTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -265,7 +265,7 @@ final class RootFlowTransitionTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .map,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -277,7 +277,7 @@ final class RootFlowTransitionTests: XCTestCase {
             initialState: RootFlowFeature.State(
                 phase: .mainTab(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State()
+                        myPage: MyPageFlowFeature.State()
                     )
                 )
             )
@@ -394,7 +394,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -462,7 +462,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -521,7 +521,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -532,7 +532,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .map,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -845,7 +845,7 @@ final class RootFlowFeatureIdentityTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -861,7 +861,7 @@ final class RootFlowFeatureIdentityTests: XCTestCase {
             initialState: RootFlowFeature.State(
                 phase: .mainTab(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State()
+                        myPage: MyPageFlowFeature.State()
                     )
                 )
             )

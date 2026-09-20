@@ -17,7 +17,7 @@ public struct MainTabFeature {
         public var home: HomeFlowFeature.State
         public var explore: ExploreFlowFeature.State
         public var map: MapFlowFeature.State
-        public var myPage: MyPageFeature.State
+        public var myPage: MyPageFlowFeature.State
 
         /// 상세를 열기 직전 탭. 상세를 닫으면 이 탭으로 되돌린다
         public var contentReturnTab: Tab?
@@ -27,7 +27,7 @@ public struct MainTabFeature {
             home: HomeFlowFeature.State = HomeFlowFeature.State(),
             explore: ExploreFlowFeature.State = ExploreFlowFeature.State(),
             map: MapFlowFeature.State = MapFlowFeature.State(),
-            myPage: MyPageFeature.State = MyPageFeature.State(),
+            myPage: MyPageFlowFeature.State = MyPageFlowFeature.State(),
             contentReturnTab: Tab? = nil
         ) {
             self.selectedTab = selectedTab
@@ -44,7 +44,7 @@ public struct MainTabFeature {
         case home(HomeFlowFeature.Action)
         case explore(ExploreFlowFeature.Action)
         case map(MapFlowFeature.Action)
-        case myPage(MyPageFeature.Action)
+        case myPage(MyPageFlowFeature.Action)
         case delegate(Delegate)
 
         @CasePathable
@@ -70,7 +70,7 @@ public struct MainTabFeature {
             MapFlowFeature()
         }
         Scope(state: \.myPage, action: \.myPage) {
-            MyPageFeature()
+            MyPageFlowFeature()
         }
         Reduce(core)
         .logged(as: Self.self)
@@ -103,7 +103,7 @@ public struct MainTabFeature {
         }
     }
 
-    private func handleMyPage(_ delegate: MyPageFeature.Action.Delegate) -> Effect<Action> {
+    private func handleMyPage(_ delegate: MyPageFlowFeature.Action.Delegate) -> Effect<Action> {
         switch delegate {
         case .logoutSucceeded:
             return .send(.delegate(.logoutSucceeded))

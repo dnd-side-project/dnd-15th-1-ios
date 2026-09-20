@@ -97,11 +97,11 @@ extension ExploreFlowFeature.State {
     }
 }
 
-extension MyPageFeature.State {
+extension MyPageFlowFeature.State {
     var currentScreenName: AnalyticsScreenName {
         if isWithdrawModalPresented { return .withdraw }
         // 프로필 수정은 바텀시트로 뜬다
-        if isProfileEditPresented { return .profileEdit }
+        if myPage.isProfileEditPresented { return .profileEdit }
 
         switch path.last {
         case .none: return .myPage

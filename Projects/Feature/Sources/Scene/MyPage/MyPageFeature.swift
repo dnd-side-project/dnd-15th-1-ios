@@ -5,19 +5,6 @@ import ThirdParty
 
 @Reducer
 public struct MyPageFeature {
-    public enum Route: Hashable {
-        case dateType
-        case connection
-        // 미연결 상태에서 타는 커플 연결 플로우
-        case connect
-        case codeInput
-        case complete
-
-        var isCouple: Bool {
-            self == .connect || self == .codeInput || self == .complete
-        }
-    }
-
     @ObservableState
     public struct State: Equatable {
         public var nickname: String
@@ -38,11 +25,6 @@ public struct MyPageFeature {
         // 프로필 수정 바텀시트. 플래그가 먼저 내려가고, 퇴장이 끝난 뒤 profileEdit 을 비운다
         @Presents public var profileEdit: ProfileEditFeature.State?
         public var isProfileEditPresented: Bool
-        // push 스택. 나의 데이트 유형 / 연결 관리
-        public var path: [Route]
-        public var dateType: DateTypeFeature.State?
-        public var connection: ConnectionManageFeature.State?
-        public var couple: CoupleConnectFeature.State?
         // 회원탈퇴 확인 모달
         public var isWithdrawModalPresented: Bool
         public var isWithdrawing: Bool
@@ -63,10 +45,6 @@ public struct MyPageFeature {
             presentedTerms: TermsType? = nil,
             profileEdit: ProfileEditFeature.State? = nil,
             isProfileEditPresented: Bool = false,
-            path: [Route] = [],
-            dateType: DateTypeFeature.State? = nil,
-            connection: ConnectionManageFeature.State? = nil,
-            couple: CoupleConnectFeature.State? = nil,
             isWithdrawModalPresented: Bool = false,
             isWithdrawing: Bool = false,
             toast: ToastState? = nil,
@@ -85,10 +63,6 @@ public struct MyPageFeature {
             self.presentedTerms = presentedTerms
             self.profileEdit = profileEdit
             self.isProfileEditPresented = isProfileEditPresented
-            self.path = path
-            self.dateType = dateType
-            self.connection = connection
-            self.couple = couple
             self.isWithdrawModalPresented = isWithdrawModalPresented
             self.isWithdrawing = isWithdrawing
             self.toast = toast
@@ -119,12 +93,10 @@ public struct MyPageFeature {
         case logoutButtonTapped
         case logoutResponse(Result<EquatableVoid, AuthError>)
         case profileEdit(PresentationAction<ProfileEditFeature.Action>)
-        case pathChanged([Route])
-        case dateType(DateTypeFeature.Action)
-        case connection(ConnectionManageFeature.Action)
         case connectionStatusResolved(CoupleStatus)
         case connectionStatusFailed(CoupleError)
-        case couple(CoupleConnectFeature.Action)
+        // 전환 담당이 데이트 유형 저장 결과를 내려보낸다
+        case datePreferenceUpdated(DatePreference?)
         case delegate(Delegate)
 
         @CasePathable
@@ -132,6 +104,12 @@ public struct MyPageFeature {
             case logoutSucceeded
             case accountWithdrawn
             case sessionExpired
+            /// 나의 데이트 유형으로 간다. 지금 값을 함께 올려 미리 채우게 한다
+            case dateTypeRequested(DatePreference?)
+            /// 연결됨. 연결 관리 화면의 첫 값을 함께 올린다
+            case connectionManageRequested(me: CoupleMember, partner: CoupleMember, daysTogether: Int?)
+            /// 미연결. 커플 연결 3화면으로 간다
+            case coupleConnectRequested(myNickname: String)
         }
     }
 
@@ -153,15 +131,6 @@ public struct MyPageFeature {
         Reduce(core)
             .ifLet(\.$profileEdit, action: \.profileEdit) {
                 ProfileEditFeature()
-            }
-            .ifLet(\.dateType, action: \.dateType) {
-                DateTypeFeature()
-            }
-            .ifLet(\.connection, action: \.connection) {
-                ConnectionManageFeature()
-            }
-            .ifLet(\.couple, action: \.couple) {
-                CoupleConnectFeature()
             }
             .logged(as: Self.self)
     }
@@ -202,11 +171,10 @@ public struct MyPageFeature {
         case .profileEditTapped, .profileEditCloseRequested, .profileEdit:
             return handleProfileEdit(state: &state, action: action)
 
-        case .dateTypeTapped, .pathChanged, .dateType:
+        case .dateTypeTapped, .datePreferenceUpdated:
             return handleDateType(state: &state, action: action)
 
-        case .connectionTapped, .connectionStatusResolved, .connectionStatusFailed,
-             .connection, .couple:
+        case .connectionTapped, .connectionStatusResolved, .connectionStatusFailed:
             return handleConnection(state: &state, action: action)
 
         case .withdrawTapped, .withdrawConfirmed, .dismissWithdrawModal,
@@ -263,40 +231,12 @@ public struct MyPageFeature {
     private func handleDateType(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .dateTypeTapped:
-            // 현재 데이트 유형을 미리 채우고, 건너뛰기 없이 push
-            let pref = state.datePreference
-            state.dateType = DateTypeFeature.State(
-                indoorOutdoor: pref?.indoorOutdoor,
-                activityLevel: pref?.activityLevel,
-                dateTime: pref?.dateTime,
-                dateFocus: pref?.dateFocus,
-                showsSkip: false
-            )
-            state.path.append(.dateType)
-            return .none
+            // 지금 값을 실어 올린다. 화면 상태는 전환 담당이 만든다
+            return .send(.delegate(.dateTypeRequested(state.datePreference)))
 
-        case let .pathChanged(path):
-            state.path = path
-            // 스택에서 빠진 화면의 자식 상태를 내린다
-            if !path.contains(.dateType) { state.dateType = nil }
-            if !path.contains(.connection) { state.connection = nil }
-            if !path.contains(where: \.isCouple) { state.couple = nil }
-            return .none
-
-        case let .dateType(.delegate(.saved(profile))):
-            // 저장 성공. 새 유형을 반영하고 뒤로 돌아온다
-            state.datePreference = profile.datePreference
-            state.dateType = nil
-            if !state.path.isEmpty { state.path.removeLast() }
-            return .none
-
-        case .dateType(.delegate(.sessionExpired)):
-            state.dateType = nil
-            state.path = []
-            return .send(.delegate(.sessionExpired))
-
-        case .dateType:
-            // 마이페이지엔 건너뛰기가 없어 skipped 는 오지 않는다
+        case let .datePreferenceUpdated(preference):
+            // 저장 결과가 전환 담당을 거쳐 내려온다. 서버에 다시 묻지 않는다
+            state.datePreference = preference
             return .none
 
         default:
@@ -338,17 +278,13 @@ private extension MyPageFeature {
         case let .connectionStatusResolved(status):
             // 연결 안 됨(404 포함)이면 연결 플로우로 보낸다
             if case let .connected(me, partner, daysTogether) = status {
-                state.connection = ConnectionManageFeature.State(
+                return .send(.delegate(.connectionManageRequested(
                     me: me,
                     partner: partner,
                     daysTogether: daysTogether
-                )
-                state.path.append(.connection)
-            } else {
-                state.couple = CoupleConnectFeature.State(myNickname: state.nickname, showsSkip: false)
-                state.path.append(.connect)
+                )))
             }
-            return .none
+            return .send(.delegate(.coupleConnectRequested(myNickname: state.nickname)))
 
         case let .connectionStatusFailed(error):
             // 조회 실패를 미연결로 오해하지 않도록 이동 없이 알린다
@@ -358,64 +294,8 @@ private extension MyPageFeature {
             state.toast = Self.connectionStatusToast(for: error)
             return .none
 
-        case let .couple(.delegate(delegate)):
-            return handleCoupleDelegate(state: &state, delegate: delegate)
-
-        case .connection(.delegate(.disconnected)):
-            // 연결 해제 성공 → 마이페이지로 돌아간다
-            state.connection = nil
-            if !state.path.isEmpty { state.path.removeLast() }
-            return .none
-
-        case .connection(.delegate(.sessionExpired)):
-            state.connection = nil
-            state.path = []
-            return .send(.delegate(.sessionExpired))
-
-        case .connection, .couple:
-            return .none
-
         default:
             return .none
-        }
-    }
-
-    func handleCoupleDelegate(
-        state: inout State,
-        delegate: CoupleConnectFeature.Action.Delegate
-    ) -> Effect<Action> {
-        switch delegate {
-        case .showCodeInput:
-            state.path.append(.codeInput)
-            return .none
-
-        case .showComplete:
-            state.path.append(.complete)
-            return .none
-
-        case .back:
-            guard !state.path.isEmpty else { return .none }
-            state.path.removeLast()
-            if !state.path.contains(where: \.isCouple) { state.couple = nil }
-            return .none
-
-        case .connected:
-            // 연결 성공 → 커플 플로우를 닫고 연결 관리 화면으로 대체
-            state.couple = nil
-            state.connection = ConnectionManageFeature.State()
-            state.path = [.connection]
-            return .none
-
-        case .skipped:
-            // 마이페이지엔 건너뛰기가 없어 오지 않지만 방어적으로 닫는다
-            state.couple = nil
-            state.path.removeAll(where: \.isCouple)
-            return .none
-
-        case .sessionExpired:
-            state.couple = nil
-            state.path = []
-            return .send(.delegate(.sessionExpired))
         }
     }
 
