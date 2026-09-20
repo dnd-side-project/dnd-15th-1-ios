@@ -1,6 +1,6 @@
 import Foundation
 
-/// 쪽 나눈 목록 한 장. hasNext 로만 다음 쪽 유무 판단
+/// 페이지로 나뉜 목록의 한 페이지. hasNext 로만 다음 페이지 유무 판단
 public struct Page<Item: Equatable & Sendable>: Equatable, Sendable {
     public let items: [Item]
     public let hasNext: Bool
