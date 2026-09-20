@@ -6,6 +6,8 @@ import XCTest
 
 @MainActor
 final class PlaceImportFeatureTests: XCTestCase {
+    private let clock = TestClock()
+
     func test_재공유_이미저장된후보넷_목록이뜨고_넷다체크된다() async throws {
         let saved = (1...4).map { ImportCandidate.fixture(id: "\($0)", isSaved: true) }
         let store = try makeStore(response: .fixture(progress: .completed(saved)))
@@ -102,6 +104,7 @@ final class PlaceImportFeatureTests: XCTestCase {
         XCTAssertEqual(store.state.phase, .loading)
         XCTAssertEqual(store.state.pollCount, 1)
 
+        await clock.advance(by: .seconds(1))
         await store.receive(\.importUpdated)
 
         XCTAssertNotEqual(store.state.phase, .failed)
@@ -123,6 +126,7 @@ final class PlaceImportFeatureTests: XCTestCase {
         let store = TestStore(initialState: PlaceImportFeature.State(link: link)) {
             PlaceImportFeature()
         } withDependencies: {
+            $0.continuousClock = clock
             $0.placeImportClient.start = { _ in startResponse }
             $0.placeImportClient.poll = { _ in pollResponse }
         }
