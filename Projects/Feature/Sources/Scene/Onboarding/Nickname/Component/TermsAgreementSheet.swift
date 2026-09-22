@@ -42,8 +42,11 @@ struct TermsAgreementSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // 만 14세 동의는 약관 항목이 아니라 sheetTerms 밖이다. 시안대로 약관 셋 위에 둔다
     private var termsRows: some View {
         VStack(spacing: 0) {
+            over14Row
+
             ForEach(NicknameFeature.sheetTerms) { terms in
                 termsRow(terms)
             }
@@ -52,14 +55,36 @@ struct TermsAgreementSheet: View {
 
     // 체크 슬롯과 라벨이 동의를 켜고 끈다. 오른쪽 화살표만 약관 내용을 연다
     private func termsRow(_ terms: TermsType) -> some View {
-        HStack(spacing: 0) {
-            Button {
-                store.send(.termsCheckTapped(terms))
-            } label: {
-                HStack(spacing: 0) {
-                    checkIcon(isOn: store.agreedTerms.contains(terms))
+        agreementRow(
+            title: terms.agreementTitle,
+            isOn: store.agreedTerms.contains(terms),
+            onToggle: { store.send(.termsCheckTapped(terms)) },
+            onOpenDetail: { store.send(.termsDetailTapped(terms)) }
+        )
+    }
 
-                    Text(terms.agreementTitle)
+    // 열 문서가 없어 화살표를 그리지 않는다. 줄 전체가 체크를 토글한다
+    private var over14Row: some View {
+        agreementRow(
+            title: "만 14세 이상 이용 동의(필수)",
+            isOn: store.isOver14Agreed,
+            onToggle: { store.send(.over14CheckTapped) },
+            onOpenDetail: nil
+        )
+    }
+
+    private func agreementRow(
+        title: String,
+        isOn: Bool,
+        onToggle: @escaping () -> Void,
+        onOpenDetail: (() -> Void)?
+    ) -> some View {
+        HStack(spacing: 0) {
+            Button(action: onToggle) {
+                HStack(spacing: 0) {
+                    checkIcon(isOn: isOn)
+
+                    Text(title)
                         .typography(.body1M)
                         .foregroundStyle(Color.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -69,18 +94,24 @@ struct TermsAgreementSheet: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-                store.send(.termsDetailTapped(terms))
-            } label: {
-                Image.chevronRight
-                    .renderingMode(.template)
-                    .resizable()
-                    .frame(width: TermsRowMetric.arrowIconSize, height: TermsRowMetric.arrowIconSize)
-                    .foregroundStyle(Color.textSecondary)
-                    .frame(width: TermsRowMetric.arrowHitArea, height: TermsRowMetric.arrowHitArea)
-                    .contentShape(Rectangle())
+            if let onOpenDetail {
+                Button(action: onOpenDetail) {
+                    Image.chevronRight
+                        .renderingMode(.template)
+                        .resizable()
+                        .frame(
+                            width: TermsRowMetric.arrowIconSize,
+                            height: TermsRowMetric.arrowIconSize
+                        )
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(
+                            width: TermsRowMetric.arrowHitArea,
+                            height: TermsRowMetric.arrowHitArea
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .frame(height: TermsRowMetric.height)
         .padding(.horizontal, TermsRowMetric.horizontalPadding)
