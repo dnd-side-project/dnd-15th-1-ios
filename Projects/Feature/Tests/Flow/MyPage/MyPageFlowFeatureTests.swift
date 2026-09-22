@@ -259,3 +259,89 @@ final class MyPageFlowFeatureTests: XCTestCase {
         XCTAssertFalse(store.state.isWithdrawModalPresented)
     }
 }
+
+@MainActor
+final class MyPageFlowNoticeTests: XCTestCase {
+    private var sampleNotice: Notice {
+        Notice(
+            id: "1",
+            title: "둘픽 업데이트 안내",
+            content: "새 기능이 추가되었어요",
+            createdAt: Date(timeIntervalSince1970: 1_785_943_800)
+        )
+    }
+
+    func test_공지사항을_누르면_공지_목록이_열린다() async {
+        let store = TestStore(
+            initialState: MyPageFlowFeature.State(
+                myPage: MyPageFeature.State(nickname: "나")
+            )
+        ) {
+            MyPageFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.myPage(.delegate(.noticeRequested))) {
+            $0.path = [.noticeList]
+        }
+        XCTAssertNotNil(store.state.noticeList)
+    }
+
+    func test_공지_한_건을_누르면_상세가_열린다() async {
+        let picked = sampleNotice
+        let store = TestStore(
+            initialState: MyPageFlowFeature.State(
+                myPage: MyPageFeature.State(nickname: "나"),
+                path: [.noticeList],
+                noticeList: NoticeListFeature.State(notices: [picked], hasLoaded: true)
+            )
+        ) {
+            MyPageFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.noticeList(.delegate(.noticeSelected(picked)))) {
+            $0.path = [.noticeList, .noticeDetail]
+        }
+        XCTAssertEqual(store.state.noticeDetail?.notice, picked)
+    }
+
+    func test_상세에서_뒤로_가면_목록만_남는다() async {
+        let picked = sampleNotice
+        let store = TestStore(
+            initialState: MyPageFlowFeature.State(
+                myPage: MyPageFeature.State(nickname: "나"),
+                path: [.noticeList, .noticeDetail],
+                noticeList: NoticeListFeature.State(notices: [picked], hasLoaded: true),
+                noticeDetail: NoticeDetailFeature.State(notice: picked)
+            )
+        ) {
+            MyPageFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.noticeDetail(.delegate(.back))) {
+            $0.path = [.noticeList]
+        }
+        XCTAssertNil(store.state.noticeDetail)
+        XCTAssertNotNil(store.state.noticeList)
+    }
+
+    func test_목록에서_뒤로_가면_마이페이지로_돌아간다() async {
+        let store = TestStore(
+            initialState: MyPageFlowFeature.State(
+                myPage: MyPageFeature.State(nickname: "나"),
+                path: [.noticeList],
+                noticeList: NoticeListFeature.State()
+            )
+        ) {
+            MyPageFlowFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.noticeList(.delegate(.back))) {
+            $0.path = []
+        }
+        XCTAssertNil(store.state.noticeList)
+    }
+}

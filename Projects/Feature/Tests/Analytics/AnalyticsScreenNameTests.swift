@@ -111,4 +111,23 @@ final class AnalyticsScreenNameTests: XCTestCase {
         map.path = [.search]
         XCTAssertEqual(map.currentScreenName, .placeSearch)
     }
+
+    func test_마이탭의_공지_목록_이름을_준다() {
+        var tab = MainTabFeature.State()
+        tab.selectedTab = .myPage
+        tab.myPage.path = [.noticeList]
+        XCTAssertEqual(tab.currentScreenName, .noticeList)
+    }
+
+    func test_마이탭의_공지_상세_이름을_준다() {
+        var tab = MainTabFeature.State()
+        tab.selectedTab = .myPage
+        tab.myPage.path = [.noticeList, .noticeDetail]
+        XCTAssertEqual(tab.currentScreenName, .noticeDetail)
+    }
+
+    func test_공지_화면_이름은_대시보드_문자열과_같다() {
+        XCTAssertEqual(AnalyticsScreenName.noticeList.rawValue, "NoticeList")
+        XCTAssertEqual(AnalyticsScreenName.noticeDetail.rawValue, "NoticeDetail")
+    }
 }

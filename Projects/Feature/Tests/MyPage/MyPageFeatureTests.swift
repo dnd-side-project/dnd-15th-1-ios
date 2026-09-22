@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import Domain
 @testable import Feature
 import XCTest
 
@@ -49,5 +50,70 @@ final class MyPageFeatureTests: XCTestCase {
             $0.isProfileEditPresented = false
         }
         XCTAssertNotNil(store.state.profileEdit)
+    }
+
+    func test_공지사항_줄을_누르면_공지_목록을_위로_올린다() async {
+        let store = TestStore(initialState: MyPageFeature.State(isSkeleton: false)) {
+            MyPageFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.noticeTapped)
+        await store.receive(\.delegate.noticeRequested)
+    }
+
+    func test_알림설정을_받으면_스켈레톤이_걷히고_토글이_채워진다() async {
+        let store = TestStore(initialState: MyPageFeature.State()) {
+            MyPageFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        let settings = NotificationSettings(
+            contentSavedEnabled: true,
+            dateScheduleEnabled: false,
+            marketingEnabled: true,
+            marketingConsentVersion: "v1",
+            availableMarketingConsentVersion: "v2"
+        )
+        await store.send(.notificationSettingsLoaded(settings)) {
+            $0.isSkeleton = false
+            $0.savedContentAlarmOn = true
+            $0.dateScheduleAlarmOn = false
+            $0.marketingAlarmOn = true
+            $0.marketingConsentVersion = "v1"
+            $0.availableMarketingConsentVersion = "v2"
+        }
+    }
+
+    func test_알림설정_조회에_실패해도_스켈레톤은_걷힌다() async {
+        let store = TestStore(initialState: MyPageFeature.State()) {
+            MyPageFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.notificationSettingsLoadFailed) {
+            $0.isSkeleton = false
+        }
+    }
+
+    func test_알림설정_저장에_실패하면_서버_값을_다시_불러온다() async {
+        let served = NotificationSettings(
+            contentSavedEnabled: true,
+            dateScheduleEnabled: true,
+            marketingEnabled: false
+        )
+        let store = TestStore(initialState: MyPageFeature.State(isSkeleton: false)) {
+            MyPageFeature()
+        } withDependencies: {
+            $0.notificationClient.notificationSettings = { served }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.notificationSettingsUpdateFailed)
+        await store.receive(\.notificationSettingsLoaded) {
+            $0.savedContentAlarmOn = true
+            $0.dateScheduleAlarmOn = true
+            $0.marketingAlarmOn = false
+        }
     }
 }

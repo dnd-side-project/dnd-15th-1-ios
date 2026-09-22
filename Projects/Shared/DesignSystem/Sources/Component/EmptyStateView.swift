@@ -8,6 +8,7 @@
 import SwiftUI
 
 // 사용법: EmptyStateView(image: .emptyResult, title: "저장된 장소가 없어요!", message: "장소를 저장해보세요")
+// 문구가 한 줄이면 message 를 빼고 부른다
 public struct EmptyStateView: View {
     private let image: Image
     private let imageSize: CGFloat?
@@ -21,7 +22,7 @@ public struct EmptyStateView: View {
         imageSize: CGFloat? = nil,
         imageColor: Color? = nil,
         title: String,
-        message: String,
+        message: String = "",
         alignment: Alignment = .center
     ) {
         self.image = image
@@ -40,9 +41,12 @@ public struct EmptyStateView: View {
                 Text(title)
                     .typography(.title3SB)
                     .foregroundStyle(Color.textPrimary)
-                Text(message)
-                    .typography(.body1M)
-                    .foregroundStyle(Color.textTertiary)
+
+                if !message.isEmpty {
+                    Text(message)
+                        .typography(.body1M)
+                        .foregroundStyle(Color.textTertiary)
+                }
             }
             .padding(.horizontal, Spacing.s20)
         }

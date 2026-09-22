@@ -28,6 +28,8 @@ enum AnalyticsScreenName: String {
     case connectionManage = "ConnectionManage"
     case profileEdit = "ProfileEdit"
     case withdraw = "Withdraw"
+    case noticeList = "NoticeList"
+    case noticeDetail = "NoticeDetail"
 }
 
 extension RootFlowFeature.State {
@@ -107,6 +109,8 @@ extension MyPageFlowFeature.State {
         case .none: return .myPage
         case .dateType: return .dateType
         case .connection: return .connectionManage
+        case .noticeList: return .noticeList
+        case .noticeDetail: return .noticeDetail
         case .connect: return .coupleConnect
         case .codeInput: return .coupleCodeInput
         case .complete: return .coupleComplete

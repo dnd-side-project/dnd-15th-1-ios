@@ -9,6 +9,8 @@ import ThirdParty
 public struct MyPageFlowFeature {
     /// 마이페이지(root) 위로 쌓이는 화면. 커플 세 화면은 `couple` 스토어를 공유한다
     public enum Route: Hashable {
+        case noticeList
+        case noticeDetail
         case dateType
         case connection
         // 미연결 상태에서 타는 커플 연결 플로우
@@ -28,6 +30,8 @@ public struct MyPageFlowFeature {
         public var dateType: DateTypeFeature.State?
         public var connection: ConnectionManageFeature.State?
         public var couple: CoupleConnectFeature.State?
+        public var noticeList: NoticeListFeature.State?
+        public var noticeDetail: NoticeDetailFeature.State?
 
         /// 회원탈퇴 모달은 탭뷰가 띄운다. 탭뷰가 자식까지 파고들지 않게 여기서 비춘다
         public var isWithdrawModalPresented: Bool {
@@ -39,13 +43,17 @@ public struct MyPageFlowFeature {
             path: [Route] = [],
             dateType: DateTypeFeature.State? = nil,
             connection: ConnectionManageFeature.State? = nil,
-            couple: CoupleConnectFeature.State? = nil
+            couple: CoupleConnectFeature.State? = nil,
+            noticeList: NoticeListFeature.State? = nil,
+            noticeDetail: NoticeDetailFeature.State? = nil
         ) {
             self.myPage = myPage
             self.path = path
             self.dateType = dateType
             self.connection = connection
             self.couple = couple
+            self.noticeList = noticeList
+            self.noticeDetail = noticeDetail
         }
     }
 
@@ -55,6 +63,8 @@ public struct MyPageFlowFeature {
         case dateType(DateTypeFeature.Action)
         case connection(ConnectionManageFeature.Action)
         case couple(CoupleConnectFeature.Action)
+        case noticeList(NoticeListFeature.Action)
+        case noticeDetail(NoticeDetailFeature.Action)
         // 탈퇴 모달은 탭바까지 덮어야 해서 탭뷰가 띄운다. 그 두 신호를 받아 아래로 넘긴다
         case withdrawConfirmed
         case dismissWithdrawModal
@@ -84,6 +94,12 @@ public struct MyPageFlowFeature {
             .ifLet(\.couple, action: \.couple) {
                 CoupleConnectFeature()
             }
+            .ifLet(\.noticeList, action: \.noticeList) {
+                NoticeListFeature()
+            }
+            .ifLet(\.noticeDetail, action: \.noticeDetail) {
+                NoticeDetailFeature()
+            }
             .logged(as: Self.self)
     }
 
@@ -110,7 +126,14 @@ public struct MyPageFlowFeature {
         case let .couple(.delegate(delegate)):
             return handle(coupleDelegate: delegate, state: &state)
 
-        case .myPage, .dateType, .connection, .couple, .delegate:
+        case let .noticeList(.delegate(delegate)):
+            return handle(noticeListDelegate: delegate, state: &state)
+
+        case let .noticeDetail(.delegate(delegate)):
+            return handle(noticeDetailDelegate: delegate, state: &state)
+
+        case .myPage, .dateType, .connection, .couple,
+             .noticeList, .noticeDetail, .delegate:
             return .none
         }
     }
@@ -123,6 +146,8 @@ private extension MyPageFlowFeature {
         if !path.contains(.dateType) { state.dateType = nil }
         if !path.contains(.connection) { state.connection = nil }
         if !path.contains(where: \.isCouple) { state.couple = nil }
+        if !path.contains(.noticeList) { state.noticeList = nil }
+        if !path.contains(.noticeDetail) { state.noticeDetail = nil }
         return .none
     }
 
@@ -162,6 +187,10 @@ private extension MyPageFlowFeature {
 
         case .sessionExpired:
             return .send(.delegate(.sessionExpired))
+
+        case .noticeRequested:
+            state.noticeList = NoticeListFeature.State()
+            return applyPath(state.path + [.noticeList], state: &state)
         }
     }
 
@@ -207,6 +236,35 @@ private extension MyPageFlowFeature {
                 applyPath([], state: &state),
                 .send(.delegate(.sessionExpired))
             )
+        }
+    }
+
+    func handle(
+        noticeListDelegate: NoticeListFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch noticeListDelegate {
+        case .back:
+            var next = state.path
+            if !next.isEmpty { next.removeLast() }
+            return applyPath(next, state: &state)
+
+        case let .noticeSelected(notice):
+            // 상세 조회가 없어 목록에서 받은 값을 그대로 넘긴다
+            state.noticeDetail = NoticeDetailFeature.State(notice: notice)
+            return applyPath(state.path + [.noticeDetail], state: &state)
+        }
+    }
+
+    func handle(
+        noticeDetailDelegate: NoticeDetailFeature.Action.Delegate,
+        state: inout State
+    ) -> Effect<Action> {
+        switch noticeDetailDelegate {
+        case .back:
+            var next = state.path
+            if !next.isEmpty { next.removeLast() }
+            return applyPath(next, state: &state)
         }
     }
 
