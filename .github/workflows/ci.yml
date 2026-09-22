@@ -14,6 +14,46 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  lint:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      TUIST_CI_WORKSPACE: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+          cache: true
+
+      - name: Prepare local config
+        run: |
+          cp Config/Example.xcconfig Config/Debug.xcconfig
+          cp Config/Example.xcconfig Config/Release.xcconfig
+          cp Config/GoogleService-Info-Example.plist Config/GoogleService-Info-Debug.plist
+          cp Config/GoogleService-Info-Example.plist Config/GoogleService-Info-Release.plist
+
+      # build 잡이 만든 캐시를 읽기만 한다. 린트는 빌드 산출물을 만들지 않아 따로 저장할 것이 없고,
+      # 잡마다 저장하면 항목이 셋이 되어 저장소 한도 10GB 를 밀어낸다.
+      - name: Restore derived data
+        uses: actions/cache/restore@v4
+        with:
+          path: .derivedData
+          key: dd-build-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
+          restore-keys: |
+            dd-build-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-
+            dd-build-${{ runner.os }}-
+
+      - name: Generate project
+        run: mise exec -- tuist generate --no-open
+
+      - name: SwiftLint
+        run: mise exec -- swiftlint lint --strict
+
   build:
     runs-on: macos-15
     timeout-minutes: 60
@@ -48,9 +88,6 @@ jobs:
 
       - name: Generate project
         run: mise exec -- tuist generate --no-open
-
-      - name: SwiftLint
-        run: mise exec -- swiftlint lint --strict
 
       - name: Select simulator
         run: |
