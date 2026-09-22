@@ -22,10 +22,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v4
         with:
           install: true
           cache: true
@@ -40,7 +40,7 @@ jobs:
       # build 잡이 만든 캐시를 읽기만 한다. 린트는 빌드 산출물을 만들지 않아 따로 저장할 것이 없고,
       # 잡마다 저장하면 항목이 셋이 되어 저장소 한도 10GB 를 밀어낸다.
       - name: Restore derived data
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .derivedData
           key: dd-build-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
@@ -62,10 +62,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v4
         with:
           install: true
           cache: true
@@ -78,7 +78,7 @@ jobs:
           cp Config/GoogleService-Info-Example.plist Config/GoogleService-Info-Release.plist
 
       - name: Restore derived data
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .derivedData
           key: dd-build-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
@@ -131,7 +131,7 @@ jobs:
 
       - name: Save derived data
         if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .derivedData
           key: dd-build-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
@@ -144,10 +144,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v4
         with:
           install: true
           cache: true
@@ -160,7 +160,7 @@ jobs:
           cp Config/GoogleService-Info-Example.plist Config/GoogleService-Info-Release.plist
 
       - name: Restore derived data
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .derivedData
           key: dd-test-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
@@ -213,7 +213,7 @@ jobs:
 
       - name: Save derived data
         if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .derivedData
           key: dd-test-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
