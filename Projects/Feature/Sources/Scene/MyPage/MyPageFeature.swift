@@ -80,6 +80,7 @@ public struct MyPageFeature {
         case notificationSettingsUpdateFailed
         case profileEditTapped
         case profileEditCloseRequested
+        case noticeTapped
         case dateTypeTapped
         case connectionTapped
         case termsLinkTapped(TermsType)
@@ -110,6 +111,8 @@ public struct MyPageFeature {
             case connectionManageRequested(me: CoupleMember, partner: CoupleMember, daysTogether: Int?)
             /// 미연결. 커플 연결 3화면으로 간다
             case coupleConnectRequested(myNickname: String)
+            /// 공지사항 목록으로 간다
+            case noticeRequested
         }
     }
 
@@ -146,21 +149,11 @@ public struct MyPageFeature {
             state.datePreference = profile.datePreference
             return .none
 
-        case let .notificationSettingsLoaded(settings):
-            state.isSkeleton = false
-            state.savedContentAlarmOn = settings.contentSavedEnabled
-            state.dateScheduleAlarmOn = settings.dateScheduleEnabled
-            state.marketingAlarmOn = settings.marketingEnabled
-            state.marketingConsentVersion = settings.marketingConsentVersion
-            state.availableMarketingConsentVersion = settings.availableMarketingConsentVersion
-            return .none
-
-        case .notificationSettingsLoadFailed, .notificationSettingsUpdateFailed:
-            return handleNotificationFailure(state: &state, action: action)
-
-        case .binding(\.savedContentAlarmOn), .binding(\.dateScheduleAlarmOn),
+        case .notificationSettingsLoaded, .notificationSettingsLoadFailed,
+             .notificationSettingsUpdateFailed,
+             .binding(\.savedContentAlarmOn), .binding(\.dateScheduleAlarmOn),
              .binding(\.marketingAlarmOn):
-            return updateNotificationSettings(state: state)
+            return handleNotification(state: &state, action: action)
 
         case .logoutButtonTapped, .logoutResponse:
             return handleLogout(state: &state, action: action)
@@ -180,6 +173,9 @@ public struct MyPageFeature {
         case .withdrawTapped, .withdrawConfirmed, .dismissWithdrawModal,
              .withdrawSucceeded, .withdrawFailed, .dismissToast:
             return handleWithdraw(state: &state, action: action)
+
+        case .noticeTapped:
+            return .send(.delegate(.noticeRequested))
 
         case .binding, .delegate:
             return .none
@@ -246,8 +242,17 @@ public struct MyPageFeature {
 }
 
 private extension MyPageFeature {
-    func handleNotificationFailure(state: inout State, action: Action) -> Effect<Action> {
+    func handleNotification(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case let .notificationSettingsLoaded(settings):
+            state.isSkeleton = false
+            state.savedContentAlarmOn = settings.contentSavedEnabled
+            state.dateScheduleAlarmOn = settings.dateScheduleEnabled
+            state.marketingAlarmOn = settings.marketingEnabled
+            state.marketingConsentVersion = settings.marketingConsentVersion
+            state.availableMarketingConsentVersion = settings.availableMarketingConsentVersion
+            return .none
+
         case .notificationSettingsLoadFailed:
             // 최초 로드 실패면 스켈레톤을 걷고 기본 화면을 보인다
             state.isSkeleton = false
@@ -256,6 +261,10 @@ private extension MyPageFeature {
         case .notificationSettingsUpdateFailed:
             // 저장 실패면 서버 값으로 되돌려 화면과 서버를 다시 맞춘다
             return loadNotificationSettings()
+
+        case .binding(\.savedContentAlarmOn), .binding(\.dateScheduleAlarmOn),
+             .binding(\.marketingAlarmOn):
+            return updateNotificationSettings(state: state)
 
         default:
             return .none

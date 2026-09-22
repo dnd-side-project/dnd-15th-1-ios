@@ -21,7 +21,7 @@ public struct MyPageView: View {
                 profileSection.padding(.bottom, 20)
                 securityCard.padding(.bottom, 30)
                 notificationCard.padding(.bottom, 30)
-                inquiryCard.padding(.bottom, 20)
+                supportCard.padding(.bottom, 20)
                 footer.padding(.vertical, 10)
                 withdrawButton.padding(.vertical, 10)
             }
@@ -156,12 +156,16 @@ public struct MyPageView: View {
         }
     }
 
-    private var inquiryCard: some View {
-        card("문의하기") {
+    private var supportCard: some View {
+        card("고객지원") {
             if store.isSkeleton {
-                skeletonNavRow(edge: .only)
+                skeletonNavRow(edge: .first)
+                divider
+                skeletonNavRow(edge: .last)
             } else {
-                navRow("서비스 피드백하기", edge: .only) { sendFeedbackMail() }
+                navRow("공지사항", edge: .first) { store.send(.noticeTapped) }
+                divider
+                navRow("서비스 피드백하기", edge: .last) { sendFeedbackMail() }
             }
         }
     }
