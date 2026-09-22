@@ -14,9 +14,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  quality:
+  build:
     runs-on: macos-15
     timeout-minutes: 60
+    env:
+      TUIST_CI_WORKSPACE: ${{ github.workspace }}
 
     steps:
       - name: Checkout
@@ -34,6 +36,15 @@ jobs:
           cp Config/Example.xcconfig Config/Release.xcconfig
           cp Config/GoogleService-Info-Example.plist Config/GoogleService-Info-Debug.plist
           cp Config/GoogleService-Info-Example.plist Config/GoogleService-Info-Release.plist
+
+      - name: Restore derived data
+        uses: actions/cache/restore@v4
+        with:
+          path: .derivedData
+          key: dd-build-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
+          restore-keys: |
+            dd-build-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-
+            dd-build-${{ runner.os }}-
 
       - name: Generate project
         run: mise exec -- tuist generate --no-open
@@ -64,14 +75,6 @@ jobs:
           echo "Using destination: $DESTINATION"
           echo "DESTINATION=$DESTINATION" >> "$GITHUB_ENV"
 
-      - name: Cache Swift packages
-        uses: actions/cache@v4
-        with:
-          path: .derivedData/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}
-          restore-keys: |
-            spm-${{ runner.os }}-
-
       - name: Build
         run: |
           xcodebuild \
@@ -82,6 +85,78 @@ jobs:
             -skipMacroValidation \
             build
 
+      # path 에 폴더 이름만 적으면 actions/cache 가 그 아래 파일을 후보로 올리지 않아
+      # `!` 제외 줄이 뺄 대상을 못 찾는다 (actions/toolkit#713). 그래서 저장 전에 지운다.
+      # 둘 다 다시 만들어지는 폴더다.
+      - name: Trim derived data before caching
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: rm -rf .derivedData/Logs .derivedData/Index.noindex
+
+      - name: Save derived data
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        uses: actions/cache/save@v4
+        with:
+          path: .derivedData
+          key: dd-build-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
+
+  test:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      TUIST_CI_WORKSPACE: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+          cache: true
+
+      - name: Prepare local config
+        run: |
+          cp Config/Example.xcconfig Config/Debug.xcconfig
+          cp Config/Example.xcconfig Config/Release.xcconfig
+          cp Config/GoogleService-Info-Example.plist Config/GoogleService-Info-Debug.plist
+          cp Config/GoogleService-Info-Example.plist Config/GoogleService-Info-Release.plist
+
+      - name: Restore derived data
+        uses: actions/cache/restore@v4
+        with:
+          path: .derivedData
+          key: dd-test-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
+          restore-keys: |
+            dd-test-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-
+            dd-test-${{ runner.os }}-
+
+      - name: Generate project
+        run: mise exec -- tuist generate --no-open
+
+      - name: Select simulator
+        run: |
+          DESTINATION="$(
+            python3 -c '
+          import re
+          import subprocess
+
+          output = subprocess.check_output(
+              ["xcrun", "simctl", "list", "devices", "available"],
+              text=True,
+          )
+          for line in output.splitlines():
+              match = re.search(r"iPhone.+?\(([A-F0-9-]{36})\)", line)
+              if match:
+                  print(f"platform=iOS Simulator,id={match.group(1)}")
+                  break
+          else:
+              raise SystemExit("No available iPhone simulator found")
+          '
+          )"
+          echo "Using destination: $DESTINATION"
+          echo "DESTINATION=$DESTINATION" >> "$GITHUB_ENV"
+
       - name: Test Feature Reducers
         run: |
           xcodebuild \
@@ -91,3 +166,17 @@ jobs:
             -derivedDataPath .derivedData \
             -skipMacroValidation \
             test
+
+      # path 에 폴더 이름만 적으면 actions/cache 가 그 아래 파일을 후보로 올리지 않아
+      # `!` 제외 줄이 뺄 대상을 못 찾는다 (actions/toolkit#713). 그래서 저장 전에 지운다.
+      # 둘 다 다시 만들어지는 폴더다.
+      - name: Trim derived data before caching
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: rm -rf .derivedData/Logs .derivedData/Index.noindex
+
+      - name: Save derived data
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        uses: actions/cache/save@v4
+        with:
+          path: .derivedData
+          key: dd-test-${{ runner.os }}-${{ hashFiles('.package.resolved', 'Projects/**/Project.swift') }}-${{ github.sha }}
