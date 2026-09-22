@@ -26,6 +26,10 @@ public struct MyPageFlowView: View {
             dateTypeDestination
         case .connection:
             connectionDestination
+        case .noticeList:
+            noticeListDestination
+        case .noticeDetail:
+            noticeDetailDestination
         case .connect, .codeInput, .complete:
             coupleDestination(route)
         }
@@ -75,6 +79,22 @@ public struct MyPageFlowView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarBackButtonHidden(true)
                 .toolbar { backToolbarItem }
+                .toolbar(.hidden, for: .tabBar)
+        }
+    }
+
+    @ViewBuilder
+    private var noticeListDestination: some View {
+        if let noticeListStore = store.scope(state: \.noticeList, action: \.noticeList) {
+            NoticeListView(store: noticeListStore)
+                .toolbar(.hidden, for: .tabBar)
+        }
+    }
+
+    @ViewBuilder
+    private var noticeDetailDestination: some View {
+        if let noticeDetailStore = store.scope(state: \.noticeDetail, action: \.noticeDetail) {
+            NoticeDetailView(store: noticeDetailStore)
                 .toolbar(.hidden, for: .tabBar)
         }
     }
