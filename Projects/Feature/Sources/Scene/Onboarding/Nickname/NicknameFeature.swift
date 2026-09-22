@@ -8,7 +8,7 @@ public struct NicknameFeature {
     /// 시안에 프로필 아이콘 선택이 없어 서버 계약상 필요한 값만 고정으로 보낸다
     static let iconID = 1
 
-    /// 시트가 그리는 동의 항목과 그 표시 순서. 필수 둘과 선택 하나다
+    /// 시트가 그리는 약관 항목과 그 표시 순서. 만 14세 동의 줄은 이 목록 위에 따로 그린다
     static let sheetTerms: [TermsType] = [.service, .privacy, .marketing]
 
     /// 통과 기준
@@ -32,6 +32,8 @@ public struct NicknameFeature {
         public var presentedTerms: TermsType?
         /// 사용자가 켜 둔 약관. 기본은 빈 집합이다
         public var agreedTerms: Set<TermsType>
+        /// 만 14세 이상 이용 동의. 약관 항목이 아니라 시트만 갖는 필수 항목이다
+        public var isOver14Agreed: Bool
 
         public init(
             nickname: String = "",
@@ -40,7 +42,8 @@ public struct NicknameFeature {
             toast: ToastState? = nil,
             isTermsSheetPresented: Bool = true,
             presentedTerms: TermsType? = nil,
-            agreedTerms: Set<TermsType> = []
+            agreedTerms: Set<TermsType> = [],
+            isOver14Agreed: Bool = false
         ) {
             self.nickname = NicknameFeature.sanitizedNickname(nickname)
             self.isSubmitting = isSubmitting
@@ -49,6 +52,7 @@ public struct NicknameFeature {
             self.isTermsSheetPresented = isTermsSheetPresented
             self.presentedTerms = presentedTerms
             self.agreedTerms = agreedTerms
+            self.isOver14Agreed = isOver14Agreed
         }
 
         public var isNextEnabled: Bool {
@@ -59,9 +63,9 @@ public struct NicknameFeature {
             nickname.count > NicknameFeature.maxNicknameLength ? "최대 6글자 내로 입력해주세요" : nil
         }
 
-        /// 필수 약관 둘이 모두 켜져 있는지
+        /// 필수 셋이 모두 켜져 있는지. 약관 둘과 만 14세 동의다
         public var isRequiredTermsAgreed: Bool {
-            NicknameFeature.sheetTerms
+            isOver14Agreed && NicknameFeature.sheetTerms
                 .filter(\.isRequired)
                 .allSatisfy { agreedTerms.contains($0) }
         }
@@ -80,6 +84,7 @@ public struct NicknameFeature {
         case termsDetailTapped(TermsType)
         case dismissTermsDetail
         case termsCheckTapped(TermsType)
+        case over14CheckTapped
         case termsAgreeButtonTapped
         case backButtonTapped
         case dismissToast
@@ -122,6 +127,22 @@ private extension NicknameFeature {
             return updateNicknameResponse(result, state: &state)
         case let .nicknameSubmitFinished(profile):
             return nicknameSubmitFinished(profile, state: &state)
+        case .termsDetailTapped, .dismissTermsDetail, .termsCheckTapped,
+             .over14CheckTapped, .termsAgreeButtonTapped:
+            return termsCore(state: &state, action: action)
+        case .backButtonTapped:
+            return backButtonTapped(state: &state)
+        case .dismissToast:
+            state.toast = nil
+            return .none
+        case .delegate:
+            return .none
+        }
+    }
+
+    /// 약관 동의 시트가 보내는 액션만 받는다. core 에 두면 갈래가 린트 한도 12 를 넘는다
+    func termsCore(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
         case let .termsDetailTapped(terms):
             return termsDetailTapped(terms, state: &state)
         case .dismissTermsDetail:
@@ -129,14 +150,13 @@ private extension NicknameFeature {
             return .none
         case let .termsCheckTapped(terms):
             return termsCheckTapped(terms, state: &state)
+        case .over14CheckTapped:
+            state.isOver14Agreed.toggle()
+            return .none
         case .termsAgreeButtonTapped:
             return termsAgreeButtonTapped(state: &state)
-        case .backButtonTapped:
-            return backButtonTapped(state: &state)
-        case .dismissToast:
-            state.toast = nil
-            return .none
-        case .delegate:
+        case .binding, .nextButtonTapped, .updateNicknameResponse,
+             .nicknameSubmitFinished, .backButtonTapped, .dismissToast, .delegate:
             return .none
         }
     }
@@ -156,6 +176,7 @@ private extension NicknameFeature {
     func termsAgreeButtonTapped(state: inout State) -> Effect<Action> {
         if !state.isRequiredTermsAgreed {
             state.agreedTerms = Set(Self.sheetTerms)
+            state.isOver14Agreed = true
         }
         state.isTermsSheetPresented = false
         return .none
