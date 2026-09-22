@@ -38,6 +38,31 @@ final class NoticeListFeatureTests: XCTestCase {
         XCTAssertEqual(asked.value, [0])
     }
 
+    func test_이미_받았으면_다시_나타나도_안_부른다() async {
+        let asked = LockIsolated<[Int]>([])
+        let store = TestStore(
+            initialState: NoticeListFeature.State(
+                notices: [notice("1")],
+                page: 1,
+                hasNext: true,
+                hasLoaded: true
+            )
+        ) {
+            NoticeListFeature()
+        } withDependencies: {
+            $0.noticeClient.notices = { page in
+                asked.withValue { $0.append(page) }
+                return NoticePage(items: [notice("9")], hasNext: false)
+            }
+        }
+
+        await store.send(.onAppear)
+
+        XCTAssertEqual(asked.value, [])
+        XCTAssertEqual(store.state.notices, [notice("1")])
+        XCTAssertEqual(store.state.page, 1)
+    }
+
     func test_못_불러오면_빈_목록이_된다() async {
         struct Failure: Error {}
         let store = TestStore(initialState: NoticeListFeature.State()) {

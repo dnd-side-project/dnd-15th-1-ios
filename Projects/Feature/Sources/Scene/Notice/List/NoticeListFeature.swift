@@ -55,6 +55,8 @@ public struct NoticeListFeature {
     private func core(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .onAppear:
+            // 상세에서 돌아올 때도 불리므로, 받아 둔 페이지를 덮지 않게 한 번만 받는다
+            guard !state.hasLoaded else { return .none }
             return loadPage(0, action: Action.noticesLoaded)
 
         case let .noticesLoaded(page):
