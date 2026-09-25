@@ -44,7 +44,7 @@ struct PostDetailSheetContent: View {
         }
     }
 
-    private func placeSection(_ places: [PostDetailPlace]) -> some View {
+    private func placeSection(_ places: [ContentPlace]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s12) {
             Text("저장할 수 있는 곳")
                 .typography(.headline)
@@ -81,7 +81,7 @@ struct PostDetailSheetContent: View {
     private var failureState: some View {
         VStack(spacing: Spacing.s16) {
             EmptyStateView(
-                image: .placeEmpty,
+                image: .emptyResult,
                 title: "게시글을 불러오지 못했어요",
                 message: "잠시 뒤 다시 시도해주세요"
             )

@@ -23,6 +23,14 @@ public struct PlaceRepository: Sendable {
         }
     }
 
+    public func recentSavedPlaces(size: Int) async throws -> [SavedPlace] {
+        do {
+            return try await remote.recentSavedPlaces(size: size).map(PlaceDTOMapper.toDomain)
+        } catch {
+            throw PlaceErrorMapper.map(error)
+        }
+    }
+
     public func searchPlaces(query: String, page: Int, size: Int) async throws -> PlacePage {
         do {
             return PlaceDTOMapper.toSearchPage(
@@ -52,7 +60,7 @@ public struct PlaceRepository: Sendable {
         }
     }
 
-    public func detail(placeID: Int) async throws -> PlaceDetail {
+    public func detail(placeID: String) async throws -> PlaceDetail {
         do {
             return PlaceDTOMapper.toDomain(try await remote.detail(placeID: placeID))
         } catch {
@@ -70,7 +78,7 @@ public struct PlaceRepository: Sendable {
         }
     }
 
-    public func updateAlias(placeID: Int, alias: String?) async throws -> SavedPlace {
+    public func updateAlias(placeID: String, alias: String?) async throws -> SavedPlace {
         do {
             return PlaceDTOMapper.toDomain(
                 try await remote.updateAlias(placeID: placeID, alias: alias)

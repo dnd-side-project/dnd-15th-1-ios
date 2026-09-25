@@ -165,7 +165,7 @@ public struct HomeView: View {
                         Button {
                             store.send(.pastScheduleTapped(schedule.id))
                         } label: {
-                            DateScheduleCard(schedule: schedule)
+                            PastDateCourseCard(course: schedule)
                         }
                         .buttonStyle(.plain)
                     }
@@ -199,7 +199,7 @@ public struct HomeView: View {
                     HStack(spacing: 2) {
                         Text("전체보기")
                             .typography(.body1M)
-                        Image.arrowRight
+                        Image.chevronRight
                             .renderingMode(.template)
                             .resizable()
                             .frame(width: 20, height: 20)
@@ -222,7 +222,7 @@ public struct HomeView: View {
             .padding(.horizontal, 20)
         } else if store.visibleSavedPlaces.isEmpty {
             EmptyStateView(
-                image: .placeEmpty,
+                image: .emptyResult,
                 title: "최근 저장된 장소가 없어요!",
                 message: "장소를 저장해주세요"
             )

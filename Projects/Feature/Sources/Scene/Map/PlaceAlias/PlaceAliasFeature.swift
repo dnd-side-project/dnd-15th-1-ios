@@ -20,9 +20,10 @@ public struct PlaceAliasFeature {
 
     @ObservableState
     public struct State: Equatable, Identifiable {
-        public var id: String { placeID }
+        public let id: String
 
-        public let placeID: String
+        /// 별칭을 고칠 장소 번호. 저장 장소는 늘 있다. 없으면 부르지 않고 문구만 띄운다
+        public let placeID: String?
         public let placeName: String
         /// 시안 a01 의 회색 주소 줄
         public let address: String
@@ -40,9 +41,10 @@ public struct PlaceAliasFeature {
         public var isSaveEnabled: Bool { !trimmedAlias.isEmpty }
 
         public init(savedPlace: SavedPlace) {
-            placeID = savedPlace.id
+            id = savedPlace.id
+            placeID = savedPlace.place.placeID
             placeName = savedPlace.place.name
-            address = savedPlace.place.roadAddress
+            address = savedPlace.place.roadAddress ?? ""
             alias = PlaceAliasFeature.sanitizedAlias(savedPlace.alias ?? savedPlace.place.name)
         }
     }
@@ -100,7 +102,7 @@ public struct PlaceAliasFeature {
         switch action {
         case .saveTapped:
             guard state.isSaveEnabled, !state.isSaving else { return .none }
-            guard let placeID = Int(state.placeID) else {
+            guard let placeID = state.placeID else {
                 state.errorMessage = "저장한 장소가 아니에요"
                 return .none
             }

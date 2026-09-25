@@ -72,16 +72,13 @@ private final class Harness {
                 AuthSession(accessToken: "access", refreshToken: "refresh", userID: "1")
             }
             // mainTab 전환 시 홈 onAppear 가 호출하므로 네트워크 없이 응답만 준다
-            $0.homeClient.home = {
-                HomeSummary(connected: false, myNickname: "둘픽", partnerNickname: nil, currentDateCourse: nil)
-            }
-            $0.homeClient.recentSavedPlaces = { _ in [] }
-            $0.homeClient.pastDates = { _ in [] }
-            $0.coupleClient.current = { nil }
+            $0.placeClient.recentSavedPlaces = { _ in [] }
+            $0.courseClient.latestPastCourses = { _ in [] }
+            $0.coupleClient.current = { .notConnected }
             $0.placeClient.savedPlaces = { [] }
             $0.profileClient.member = { UserProfile(nickname: "둘픽", iconID: 0, datePreference: nil) }
-            $0.exploreClient.contents = { _, _, _ in
-                ContentPage(items: [], hasNext: false, popularTags: [])
+            $0.contentClient.contents = { _, _, _ in
+                ContentFeed(page: ContentPage(items: [], hasNext: false), popularTags: [])
             }
         } operation: {
             Store(initialState: RootFlowFeature.State(phase: phase)) {

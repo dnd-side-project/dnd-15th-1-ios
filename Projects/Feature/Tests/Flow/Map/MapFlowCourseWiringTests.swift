@@ -208,7 +208,6 @@ private let mapFlowCurrentCourse = DateCourseSummary(
     title: "성수동 데이트",
     scheduledAt: Date(timeIntervalSince1970: 0),
     status: .confirmed,
-    version: 1,
     totalPlaceCount: 5
 )
 
@@ -381,7 +380,7 @@ private let twoStopCourse = makeCourse(
     ]
 )
 
-private let candidate102 = CoursePlaceCandidate.fixture(id: "102")
+private let candidate102 = SavedPlace.candidateFixture(id: "102")
 
 private func makeCourse(
     stopCount: Int,

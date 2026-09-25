@@ -137,7 +137,7 @@ final class NicknameFeatureTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { nickname, iconID in
+            $0.profileClient.setUpProfile = { nickname, iconID in
                 requestedNickname.setValue(nickname)
                 requestedIconID.setValue(iconID)
                 return profile
@@ -166,7 +166,7 @@ final class NicknameFeatureTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in throw ProfileError.invalidNickname }
+            $0.profileClient.setUpProfile = { _, _ in throw ProfileError.invalidNickname }
         }
 
         await store.send(.nextButtonTapped) {
@@ -192,7 +192,7 @@ final class NicknameFeatureTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in throw ProfileError.unauthorized }
+            $0.profileClient.setUpProfile = { _, _ in throw ProfileError.unauthorized }
         }
 
         await store.send(.nextButtonTapped) {
@@ -271,22 +271,53 @@ final class NicknameTermsAgreementTests: XCTestCase {
         XCTAssertEqual(state.termsAgreeButtonTitle, "모두 동의하기")
     }
 
-    func test_필수둘켜짐_버튼문구_완료() {
-        let state = NicknameFeature.State(agreedTerms: [.service, .privacy])
-
-        XCTAssertEqual(state.termsAgreeButtonTitle, "완료")
-    }
-
+    // 만 14세를 켜 두어야 약관 조건만 남는다. 꺼 두면 그 하나에서 끊겨 약관 판정을 못 짚는다
     func test_필수하나만켜짐_버튼문구_모두동의하기() {
-        let state = NicknameFeature.State(agreedTerms: [.service])
+        let state = NicknameFeature.State(agreedTerms: [.service], isOver14Agreed: true)
 
         XCTAssertEqual(state.termsAgreeButtonTitle, "모두 동의하기")
     }
 
     func test_마케팅만켜짐_버튼문구_모두동의하기() {
-        let state = NicknameFeature.State(agreedTerms: [.marketing])
+        let state = NicknameFeature.State(agreedTerms: [.marketing], isOver14Agreed: true)
 
         XCTAssertEqual(state.termsAgreeButtonTitle, "모두 동의하기")
+    }
+
+    // MARK: - 만 14세 이상 이용 동의
+
+    func test_만14세체크누르기_켜짐_다시누르면_꺼짐() async {
+        let store = TestStore(initialState: NicknameFeature.State()) {
+            NicknameFeature()
+        }
+
+        await store.send(.over14CheckTapped) {
+            $0.isOver14Agreed = true
+        }
+        await store.send(.over14CheckTapped) {
+            $0.isOver14Agreed = false
+        }
+    }
+
+    func test_약관필수둘만켜짐_버튼문구_모두동의하기() {
+        let state = NicknameFeature.State(agreedTerms: [.service, .privacy])
+
+        XCTAssertEqual(state.termsAgreeButtonTitle, "모두 동의하기")
+    }
+
+    func test_만14세만켜짐_버튼문구_모두동의하기() {
+        let state = NicknameFeature.State(isOver14Agreed: true)
+
+        XCTAssertEqual(state.termsAgreeButtonTitle, "모두 동의하기")
+    }
+
+    func test_필수셋다켜짐_버튼문구_완료() {
+        let state = NicknameFeature.State(
+            agreedTerms: [.service, .privacy],
+            isOver14Agreed: true
+        )
+
+        XCTAssertEqual(state.termsAgreeButtonTitle, "완료")
     }
 
     func test_전부꺼짐_버튼누름_셋다켜지고_시트닫힘() async {
@@ -298,13 +329,17 @@ final class NicknameTermsAgreementTests: XCTestCase {
 
         await store.send(.termsAgreeButtonTapped) {
             $0.agreedTerms = [.service, .privacy, .marketing]
+            $0.isOver14Agreed = true
             $0.isTermsSheetPresented = false
         }
     }
 
-    func test_필수둘만켜짐_버튼누름_마케팅꺼진채_시트닫힘() async {
+    func test_필수셋다켜짐_버튼누름_마케팅꺼진채_시트닫힘() async {
         let store = TestStore(
-            initialState: NicknameFeature.State(agreedTerms: [.service, .privacy])
+            initialState: NicknameFeature.State(
+                agreedTerms: [.service, .privacy],
+                isOver14Agreed: true
+            )
         ) {
             NicknameFeature()
         }
@@ -351,12 +386,12 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = {
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = {
                 calls.withValue { $0.append("load") }
                 return loaded
             }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.notificationClient.updateNotificationSettings = { settings in
                 calls.withValue { $0.append("update") }
                 sent.setValue(settings)
                 return settings
@@ -388,9 +423,9 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = { loaded }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = { loaded }
+            $0.notificationClient.updateNotificationSettings = { settings in
                 sent.setValue(settings)
                 return settings
             }
@@ -425,12 +460,12 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = {
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = {
                 calls.withValue { $0.append("load") }
                 return loaded
             }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.notificationClient.updateNotificationSettings = { settings in
                 calls.withValue { $0.append("update") }
                 return settings
             }
@@ -459,9 +494,9 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = { throw ProfileError.unknown }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = { throw NotificationError.unknown }
+            $0.notificationClient.updateNotificationSettings = { settings in
                 XCTFail("조회가 실패하면 변경을 부르지 않는다")
                 return settings
             }
@@ -491,9 +526,9 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = { loaded }
-            $0.profileClient.updateNotificationSettings = { _ in throw ProfileError.unknown }
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = { loaded }
+            $0.notificationClient.updateNotificationSettings = { _ in throw NotificationError.unknown }
         }
 
         await store.send(.nextButtonTapped) {
@@ -521,12 +556,12 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = {
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = {
                 for await _ in gate.stream { break }
                 return loaded
             }
-            $0.profileClient.updateNotificationSettings = { settings in settings }
+            $0.notificationClient.updateNotificationSettings = { settings in settings }
         }
 
         await store.send(.nextButtonTapped) {
@@ -563,9 +598,9 @@ final class NicknameMarketingNotificationTests: XCTestCase {
         ) {
             NicknameFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
-            $0.profileClient.notificationSettings = { loaded }
-            $0.profileClient.updateNotificationSettings = { settings in
+            $0.profileClient.setUpProfile = { _, _ in profile }
+            $0.notificationClient.notificationSettings = { loaded }
+            $0.notificationClient.updateNotificationSettings = { settings in
                 XCTFail("동의 버전이 없으면 변경을 부르지 않는다")
                 return settings
             }

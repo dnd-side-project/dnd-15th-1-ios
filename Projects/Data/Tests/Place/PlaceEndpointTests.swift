@@ -7,7 +7,7 @@ import XCTest
 final class PlaceEndpointTests: XCTestCase {
 
     func test_장소_상세는_placeID를_경로에_넣는다() {
-        let endpoint = PlaceEndpoint.detail(placeID: 42)
+        let endpoint = PlaceEndpoint.detail(placeID: "42")
         XCTAssertEqual(endpoint.path, "/api/v1/places/42")
         XCTAssertEqual(endpoint.method, .get)
         XCTAssertTrue(endpoint.queryItems.isEmpty)
@@ -23,7 +23,7 @@ final class PlaceEndpointTests: XCTestCase {
     }
 
     func test_별칭_수정은_PATCH이고_body에_alias를_담는다() throws {
-        let endpoint = PlaceEndpoint.updateAlias(placeID: 7, alias: "우리 카페")
+        let endpoint = PlaceEndpoint.updateAlias(placeID: "7", alias: "우리 카페")
         XCTAssertEqual(endpoint.path, "/api/v1/places/7/alias")
         XCTAssertEqual(endpoint.method, .patch)
         XCTAssertTrue(endpoint.queryItems.isEmpty)
@@ -34,7 +34,7 @@ final class PlaceEndpointTests: XCTestCase {
     }
 
     func test_별칭이_nil이면_body에_null로_실린다() throws {
-        let endpoint = PlaceEndpoint.updateAlias(placeID: 7, alias: nil)
+        let endpoint = PlaceEndpoint.updateAlias(placeID: "7", alias: nil)
         let body = try XCTUnwrap(endpoint.body)
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertTrue(json.keys.contains("alias"))

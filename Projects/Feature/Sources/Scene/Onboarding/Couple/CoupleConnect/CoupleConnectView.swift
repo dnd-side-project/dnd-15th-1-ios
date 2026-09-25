@@ -39,7 +39,7 @@ public struct CoupleConnectView: View {
                 ModalContent(
                     title: "다음과 같은 둘픽의 기능들을 사용할 수 없어요!",
                     content: "괜찮으신가요?",
-                    image: Image.coupleConnectModal.resizable(),
+                    image: Image.modalSkip.resizable(),
                     primaryTitle: "연결할게요",
                     primaryAction: { store.send(.skipConfirmDismissed) },
                     secondaryTitle: "네",
@@ -61,7 +61,7 @@ public struct CoupleConnectView: View {
             Spacer()
                 .frame(height: IllustrationMetric.topSpacing)
 
-            Image.coupleConnectBefore
+            Image.illustrationConnect
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: IllustrationMetric.maxWidth, maxHeight: IllustrationMetric.maxHeight)

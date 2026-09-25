@@ -10,9 +10,11 @@ import ThirdParty
 
 @DependencyClient
 public struct PlaceImportClient: Sendable {
-    public var start: @Sendable (_ sourceUrl: String) async throws -> PlaceImport
-    public var poll: @Sendable (_ importId: Int) async throws -> PlaceImport
-    public var confirm: @Sendable (_ importId: Int, _ candidateIDs: [Int]) async throws -> Void
+    /// 공유로 받은 링크의 장소 가져오기를 시작한다
+    public var start: @Sendable (_ sourceURL: URL) async throws -> PlaceImport
+    public var poll: @Sendable (_ importID: String) async throws -> PlaceImport
+    /// 고른 후보를 저장한다
+    public var confirm: @Sendable (_ importID: String, _ candidateIDs: [String]) async throws -> Void
 }
 
 extension PlaceImportClient: TestDependencyKey {

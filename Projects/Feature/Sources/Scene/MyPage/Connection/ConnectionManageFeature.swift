@@ -67,9 +67,7 @@ public struct ConnectionManageFeature {
             }
 
         case let .coupleLoaded(status):
-            state.me = status.me
-            state.partner = status.partner
-            state.daysTogether = status.daysTogether
+            apply(status, to: &state)
             return .none
 
         case .disconnectTapped:
@@ -105,6 +103,19 @@ public struct ConnectionManageFeature {
 
         case .delegate:
             return .none
+        }
+    }
+
+    private func apply(_ status: CoupleStatus, to state: inout State) {
+        switch status {
+        case let .connected(me, partner, daysTogether):
+            state.me = me
+            state.partner = partner
+            state.daysTogether = daysTogether
+        case .notConnected:
+            // 다시 읽는 사이 연결이 풀렸다. 내 정보는 두고 상대·함께한 날만 비운다
+            state.partner = nil
+            state.daysTogether = nil
         }
     }
 

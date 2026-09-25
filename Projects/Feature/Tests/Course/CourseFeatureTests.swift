@@ -349,10 +349,10 @@ final class CourseScheduleAnalyticsTests: XCTestCase {
 
 @MainActor
 final class CoursePlacePickTests: XCTestCase {
-    private let savedPlaces: [CoursePlaceCandidate] = [
-        .courseFixture(id: "a", latitude: 37.31, longitude: 126.90),
-        .courseFixture(id: "b", latitude: 37.32, longitude: 126.91),
-        .courseFixture(id: "c", latitude: 37.33, longitude: 126.92),
+    private let savedPlaces: [SavedPlace] = [
+        .candidateFixture(id: "a", latitude: 37.31, longitude: 126.90),
+        .candidateFixture(id: "b", latitude: 37.32, longitude: 126.91),
+        .candidateFixture(id: "c", latitude: 37.33, longitude: 126.92),
     ]
 
     private func loadedStore() -> TestStoreOf<CourseFeature> {
@@ -479,9 +479,9 @@ final class CoursePlacePickTests: XCTestCase {
     }
 
     func test_고른장소_필터밖_물방울핀남음() async {
-        let places: [CoursePlaceCandidate] = [
-            .courseFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food),
-            .courseFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe),
+        let places: [SavedPlace] = [
+            .candidateFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food),
+            .candidateFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe),
         ]
         var initial = CourseFeature.State()
         initial.places = places
@@ -562,7 +562,7 @@ final class CoursePickModeTests: XCTestCase {
             CourseFeature()
         } withDependencies: {
             $0.courseClient.coursePlaces = { places }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
         store.exhaustivity = .off
 
@@ -583,7 +583,7 @@ final class CoursePickModeTests: XCTestCase {
             CourseFeature()
         } withDependencies: {
             $0.courseClient.coursePlaces = { places }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
             $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
         }
         store.exhaustivity = .off
@@ -607,7 +607,7 @@ final class CoursePickModeTests: XCTestCase {
             CourseFeature()
         } withDependencies: {
             $0.courseClient.coursePlaces = { places }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
         store.exhaustivity = .off
 
@@ -622,12 +622,12 @@ final class CoursePickModeTests: XCTestCase {
 final class CourseLoadTests: XCTestCase {
 
     func test_onAppear_저장장소_상태반영() async {
-        let places: [CoursePlaceCandidate] = [.courseFixture(id: "a", latitude: 37.31, longitude: 126.90)]
+        let places: [SavedPlace] = [.candidateFixture(id: "a", latitude: 37.31, longitude: 126.90)]
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
             $0.courseClient.coursePlaces = { places }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -640,7 +640,7 @@ final class CourseLoadTests: XCTestCase {
 
     func test_로드실패_재시도() async {
         let shouldFail = LockIsolated(true)
-        let places: [CoursePlaceCandidate] = [.courseFixture(id: "a", latitude: 37.31, longitude: 126.90)]
+        let places: [SavedPlace] = [.candidateFixture(id: "a", latitude: 37.31, longitude: 126.90)]
         let store = TestStore(initialState: CourseFeature.State()) {
             CourseFeature()
         } withDependencies: {
@@ -648,7 +648,7 @@ final class CourseLoadTests: XCTestCase {
                 if shouldFail.value { throw CourseError.network }
                 return places
             }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -668,8 +668,7 @@ final class CourseLoadTests: XCTestCase {
     }
 
     func test_커플닉네임_제목에반영() async {
-        let status = CoupleStatus(
-            connected: true,
+        let status = CoupleStatus.connected(
             me: CoupleMember(nickname: "나", iconID: 0),
             partner: CoupleMember(nickname: "당근맛감자채", iconID: 1),
             daysTogether: 100
@@ -696,7 +695,7 @@ final class CourseLoadTests: XCTestCase {
             CourseFeature()
         } withDependencies: {
             $0.courseClient.coursePlaces = { [] }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -712,9 +711,9 @@ final class CourseLoadTests: XCTestCase {
 final class CourseFilterTests: XCTestCase {
 
     func test_필터변경_목록반영() async {
-        let places: [CoursePlaceCandidate] = [
-            .courseFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food),
-            .courseFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe),
+        let places: [SavedPlace] = [
+            .candidateFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food),
+            .candidateFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe),
         ]
         var initial = CourseFeature.State()
         initial.places = places
@@ -732,10 +731,10 @@ final class CourseFilterTests: XCTestCase {
     }
 
     func test_저장자필터_카테고리와_겹친다() async {
-        let places: [CoursePlaceCandidate] = [
-            .courseFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food, ownership: .mine),
-            .courseFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe, ownership: .partner),
-            .courseFixture(id: "c", latitude: 37.33, longitude: 126.92, category: .food, ownership: .together),
+        let places: [SavedPlace] = [
+            .candidateFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food, ownership: .mine),
+            .candidateFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe, ownership: .partner),
+            .candidateFixture(id: "c", latitude: 37.33, longitude: 126.92, category: .food, ownership: .together),
         ]
         var initial = CourseFeature.State()
         initial.places = places
@@ -758,30 +757,9 @@ final class CourseFilterTests: XCTestCase {
 
 // MARK: - Fixture
 
-private extension CoursePlaceCandidate {
-    static func courseFixture(
-        id: String,
-        latitude: Double,
-        longitude: Double,
-        category: PlaceCategory = .food,
-        ownership: PlaceOwnership = .together
-    ) -> CoursePlaceCandidate {
-        CoursePlaceCandidate(
-            id: id,
-            name: "장소명",
-            address: "경기도 안산시 모모로 145길",
-            category: category,
-            coordinate: Coordinate(latitude: latitude, longitude: longitude),
-            ownership: ownership,
-            alias: nil,
-            thumbnailURLs: []
-        )
-    }
-}
-
-private let pickModeCandidates: [CoursePlaceCandidate] = [
-    .courseFixture(id: "101", latitude: 37.31, longitude: 126.90),
-    .courseFixture(id: "102", latitude: 37.32, longitude: 126.91),
+private let pickModeCandidates: [SavedPlace] = [
+    .candidateFixture(id: "101", latitude: 37.31, longitude: 126.90),
+    .candidateFixture(id: "102", latitude: 37.32, longitude: 126.91),
 ]
 
 @MainActor
@@ -796,7 +774,7 @@ final class CoursePlacePickCameraTests: XCTestCase {
         await store.send(.coursePlacesResponse(.success(candidates))) {
             $0.places = candidates
             $0.loadState = .loaded
-            $0.camera = .focusing(candidates[0].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+            $0.camera = .focusing(candidates[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
     }
 
@@ -815,9 +793,9 @@ final class CoursePlacePickCameraTests: XCTestCase {
 
 @MainActor
 final class CourseSaveTests: XCTestCase {
-    private let savedPlaces: [CoursePlaceCandidate] = [
-        .courseFixture(id: "a", latitude: 37.31, longitude: 126.90),
-        .courseFixture(id: "b", latitude: 37.32, longitude: 126.91),
+    private let savedPlaces: [SavedPlace] = [
+        .candidateFixture(id: "a", latitude: 37.31, longitude: 126.90),
+        .candidateFixture(id: "b", latitude: 37.32, longitude: 126.91),
     ]
 
     private var confirmedCourse: DateCourse {

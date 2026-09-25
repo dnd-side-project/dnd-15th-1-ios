@@ -19,26 +19,26 @@ public struct DatePreference: Equatable, Sendable {
     }
 }
 
-/// 실내/실외
-public enum IndoorOutdoor: String, Equatable, Sendable, CaseIterable {
-    case indoor = "INDOOR"
-    case outdoor = "OUTDOOR"
+/// 실내/실외. 서버 문자열 변환은 Data 가 맡는다
+public enum IndoorOutdoor: Equatable, Sendable, CaseIterable {
+    case indoor
+    case outdoor
 }
 
 /// 활동 강도
-public enum ActivityLevel: String, Equatable, Sendable, CaseIterable {
-    case active = "ACTIVE"
-    case `static` = "STATIC"
+public enum ActivityLevel: Equatable, Sendable, CaseIterable {
+    case active
+    case `static`
 }
 
 /// 데이트 시간대
-public enum DateTime: String, Equatable, Sendable, CaseIterable {
-    case day = "DAY"
-    case night = "NIGHT"
+public enum DateTime: Equatable, Sendable, CaseIterable {
+    case day
+    case night
 }
 
 /// 데이트 초점
-public enum DateFocus: String, Equatable, Sendable, CaseIterable {
-    case food = "FOOD"
-    case sightseeing = "SIGHTSEEING"
+public enum DateFocus: Equatable, Sendable, CaseIterable {
+    case food
+    case sightseeing
 }

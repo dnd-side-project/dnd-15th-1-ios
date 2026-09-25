@@ -342,7 +342,7 @@ private extension MapView {
         Button {
             store.send(.bookmarkTapped(id))
         } label: {
-            (store.bookmarkedPlaceIDs.contains(id) ? Image.bookmarkFillColor : Image.bookmarkStroke)
+            (store.bookmarkedPlaceIDs.contains(id) ? Image.bookmarkFilled : Image.bookmarkEmpty)
                 .resizable()
                 .frame(
                     width: MapViewMetric.menuIconSize,
@@ -356,7 +356,7 @@ private extension MapView {
     var failureState: some View {
         VStack(spacing: Spacing.s16) {
             EmptyStateView(
-                image: .placeEmpty,
+                image: .emptyResult,
                 title: "장소를 불러오지 못했어요",
                 message: "잠시 뒤 다시 시도해주세요"
             )
@@ -382,7 +382,7 @@ private extension MapView {
 
     var emptyState: some View {
         EmptyStateView(
-            image: .placeEmpty,
+            image: .emptyResult,
             title: store.hasNoSavedPlace ? "저장한 장소가 없어요" : "조건에 맞는 장소가 없어요",
             message: store.hasNoSavedPlace ? "마음에 드는 장소를 저장해보세요" : "필터를 바꿔보세요"
         )
@@ -560,8 +560,7 @@ private enum MapViewMetric {
             } withDependencies: {
                 $0.placeClient = .mock
                 $0.coupleClient.current = {
-                    CoupleStatus(
-                        connected: true,
+                    .connected(
                         me: CoupleMember(nickname: "나", iconID: 1),
                         partner: CoupleMember(nickname: "둘", iconID: 1),
                         daysTogether: nil
@@ -580,7 +579,7 @@ private enum MapViewMetric {
                 MapFeature()
             } withDependencies: {
                 $0.placeClient = .mock
-                $0.coupleClient.current = { nil }
+                $0.coupleClient.current = { .notConnected }
             }
         )
     }
@@ -594,7 +593,7 @@ private enum MapViewMetric {
                 MapFeature()
             } withDependencies: {
                 $0.placeClient.savedPlaces = { [] }
-                $0.coupleClient.current = { nil }
+                $0.coupleClient.current = { .notConnected }
             }
         )
     }

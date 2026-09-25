@@ -72,20 +72,24 @@ private extension PlaceDetailView {
         }
     }
 
-    /// `장소 카테고리 · 저장한 사람 124` — 숫자만 강조색이다
+    /// `장소 카테고리 · 저장한 사람 124` — 숫자만 강조색이다. 저장 수를 모르면 카테고리만 보인다
     var subtitle: some View {
         HStack(spacing: 0) {
-            Text("\(store.place.category.displayName) · 저장한 사람 ")
+            Text(store.place.category.displayName)
                 .foregroundStyle(Color.textTertiary)
-            Text("\(store.bookmarkCount)")
-                .foregroundStyle(Color.brandPrimary)
+            if let bookmarkCount = store.bookmarkCount {
+                Text(" · 저장한 사람 ")
+                    .foregroundStyle(Color.textTertiary)
+                Text("\(bookmarkCount)")
+                    .foregroundStyle(Color.brandPrimary)
+            }
         }
         .typography(.body2M)
     }
 
     var bookmarkButton: some View {
         headerIconButton(
-            icon: store.isBookmarked ? Image.bookmarkFillColor : Image.bookmarkStroke
+            icon: store.isBookmarked ? Image.bookmarkFilled : Image.bookmarkEmpty
         ) {
             store.send(.bookmarkTapped)
         }
@@ -125,7 +129,7 @@ private extension PlaceDetailView {
             }
         } label: {
             HStack(spacing: Spacing.s4) {
-                Image.mappin
+                Image.mapPin
                     .renderingMode(.template)
                     .resizable()
                     .frame(width: 16, height: 16)
@@ -196,16 +200,16 @@ private extension PlaceDetailView {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             Button { store.send(.addressToggled) } label: {
                 HStack(alignment: .center, spacing: Spacing.s8) {
-                    Image.mappin
+                    Image.mapPin
                         .renderingMode(.template)
                         .resizable()
                         .frame(width: 20, height: 20)
 
-                    Text(store.place.roadAddress)
+                    Text(store.place.roadAddress ?? "")
                         .typography(.body2M)
                         .multilineTextAlignment(.leading)
 
-                    (store.isAddressExpanded ? Image.arrowUp : Image.arrowDown)
+                    (store.isAddressExpanded ? Image.chevronUp : Image.chevronDown)
                         .renderingMode(.template)
                         .resizable()
                         .frame(width: 16, height: 16)
@@ -282,7 +286,7 @@ private extension PlaceDetailView {
     var contentsFailure: some View {
         VStack(spacing: Spacing.s16) {
             EmptyStateView(
-                image: .placeEmpty,
+                image: .emptyResult,
                 title: "게시물을 불러오지 못했어요",
                 message: "잠시 뒤 다시 시도해주세요"
             )
@@ -340,7 +344,7 @@ private struct StaticButtonStyle: ButtonStyle {
 #Preview("사진·게시물 없음") {
     let source = Place.mocks.first { $0.thumbnailURLs.isEmpty } ?? Place.mocks[0]
     let place = Place(
-        id: source.id,
+        placeID: source.placeID,
         kakaoPlaceID: source.kakaoPlaceID,
         name: source.name,
         category: source.category,
@@ -365,7 +369,7 @@ private struct StaticButtonStyle: ButtonStyle {
         ) {
             PlaceDetailFeature()
         } withDependencies: {
-            $0.exploreClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false, popularTags: []) }
+            $0.contentClient.placeContents = { _, _, _ in ContentPage(items: [], hasNext: false) }
         },
         bottomInset: 0
     )

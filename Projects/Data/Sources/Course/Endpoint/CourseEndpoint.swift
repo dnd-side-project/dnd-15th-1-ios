@@ -13,6 +13,8 @@ enum CourseEndpoint: APIEndpoint {
     case placePool
     case detail(String)
     case current
+    case latestPast(size: Int)
+    case past(page: Int, size: Int)
     case save(String, SaveDateCourseRequestDTO)
     case notifyPartner(String)
 
@@ -26,6 +28,10 @@ enum CourseEndpoint: APIEndpoint {
             return "/api/v1/date-courses/\(id)"
         case .current:
             return "/api/v1/date-courses/current"
+        case .latestPast:
+            return "/api/v1/home/past-dates"
+        case .past:
+            return "/api/v1/date-courses/past"
         case let .save(id, _):
             return "/api/v1/date-courses/\(id)"
         case let .notifyPartner(id):
@@ -37,10 +43,24 @@ enum CourseEndpoint: APIEndpoint {
         switch self {
         case .create, .notifyPartner:
             return .post
-        case .placePool, .detail, .current:
+        case .placePool, .detail, .current, .latestPast, .past:
             return .get
         case .save:
             return .put
+        }
+    }
+
+    var queryItems: [URLQueryItem] {
+        switch self {
+        case let .latestPast(size):
+            return [URLQueryItem(name: "size", value: String(size))]
+        case let .past(page, size):
+            return [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "size", value: String(size)),
+            ]
+        case .create, .placePool, .detail, .current, .save, .notifyPartner:
+            return []
         }
     }
 
@@ -52,7 +72,7 @@ enum CourseEndpoint: APIEndpoint {
             return try? NetworkJSONCoding.makeEncoder().encode(request)
         case let .save(_, request):
             return try? NetworkJSONCoding.makeEncoder().encode(request)
-        case .placePool, .detail, .current, .notifyPartner:
+        case .placePool, .detail, .current, .latestPast, .past, .notifyPartner:
             return nil
         }
     }

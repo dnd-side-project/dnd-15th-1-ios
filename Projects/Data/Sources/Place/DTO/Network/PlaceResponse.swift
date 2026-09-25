@@ -24,6 +24,8 @@ struct SavedPlaceResponseDTO: Decodable, Sendable {
     let savedAt: String
     let thumbnailUrl: String?
     let imageUrls: [String]
+    /// 명세상 필수다. 장소 상세의 「저장한 사람 N」 을 저장 목록에서 연 장소에도 바로 보인다
+    let savedMemberCount: Int
 }
 
 // 장소 검색 결과. 그리드가 쓰는 필드만 선언한다. placeId 는 미저장 장소라 null 로 온다

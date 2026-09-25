@@ -13,6 +13,11 @@ import SwiftUI
 struct PlaceRow: View {
     let place: Place
 
+    /// 배지에 쓸 저장 수. 저장 수를 모르는 장소는 배지를 숨긴다. 0 으로 지어내지 않는다
+    var badgeText: String? {
+        place.bookmarkCount.map(String.init)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s12) {
             HStack(spacing: Spacing.s8) {
@@ -26,7 +31,9 @@ struct PlaceRow: View {
 
                 Spacer()
 
-                bookmarkBadge
+                if let badgeText {
+                    bookmarkBadge(badgeText)
+                }
             }
             .padding(.horizontal, Spacing.s20)
 
@@ -39,12 +46,12 @@ struct PlaceRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private var bookmarkBadge: some View {
+    private func bookmarkBadge(_ text: String) -> some View {
         HStack(spacing: 2) {
-            Image.bookmarkFillColor
+            Image.bookmarkFilled
                 .resizable()
                 .frame(width: 14, height: 14)
-            Text("\(place.bookmarkCount)")
+            Text(text)
                 .typography(.body2SB)
                 .foregroundStyle(Color.textSecondary)
         }

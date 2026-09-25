@@ -5,6 +5,7 @@
 
 import ComposableArchitecture
 import Domain
+import SharedUtils
 import XCTest
 
 @testable import Feature
@@ -66,7 +67,7 @@ final class PlaceAliasFeatureTests: XCTestCase {
             PlaceAliasFeature()
         } withDependencies: {
             $0.placeClient.updateAlias = { placeID, alias in
-                XCTAssertEqual(placeID, 7)
+                XCTAssertEqual(placeID, "7")
                 XCTAssertEqual(alias, "우리 첫 카페")
                 return updated
             }
@@ -121,7 +122,7 @@ final class PlaceAliasFeatureTests: XCTestCase {
             PlaceAliasFeature()
         } withDependencies: {
             $0.placeClient.updateAlias = { placeID, alias in
-                XCTAssertEqual(placeID, Int(saved.place.id))
+                XCTAssertEqual(placeID, saved.place.placeID)
                 XCTAssertEqual(alias, "우리 카페")
                 return updated
             }
@@ -206,5 +207,32 @@ final class PlaceAliasFeatureTests: XCTestCase {
         let store = TestStore(initialState: state) { PlaceAliasFeature() }
 
         await store.send(.saveTapped)
+    }
+
+    func test_장소_번호가_없는_저장_장소면_부르지_않고_문구를_보인다() async {
+        let saved = SavedPlace(
+            place: Place(
+                placeID: nil,
+                kakaoPlaceID: "kakao-9",
+                name: "장소",
+                category: .cafe,
+                address: "주소",
+                roadAddress: nil,
+                coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
+                bookmarkCount: nil,
+                thumbnailURLs: []
+            ),
+            ownership: .mine,
+            alias: nil,
+            memo: nil,
+            savedAt: nil
+        )
+        let store = TestStore(initialState: PlaceAliasFeature.State(savedPlace: saved)) {
+            PlaceAliasFeature()
+        }
+
+        await store.send(.saveTapped) {
+            $0.errorMessage = "저장한 장소가 아니에요"
+        }
     }
 }

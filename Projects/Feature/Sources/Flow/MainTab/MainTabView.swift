@@ -23,11 +23,9 @@ public struct MainTabView: View {
                 .tabItem { tabLabel("지도", icon: .map) }
                 .tag(MainTabFeature.Tab.map)
 
-            NavigationStack(path: myPagePath) {
-                MyPageView(store: myPageStore)
-            }
-            .tabItem { tabLabel("마이", icon: .my) }
-            .tag(MainTabFeature.Tab.myPage)
+            MyPageFlowView(store: store.scope(state: \.myPage, action: \.myPage))
+                .tabItem { tabLabel("마이", icon: .my) }
+                .tag(MainTabFeature.Tab.myPage)
         }
         .tint(Color.primaryPink)
         // 회원탈퇴 모달은 탭뷰 위에 올려 탭바까지 덮고 탭 선택을 막는다
@@ -35,34 +33,26 @@ public struct MainTabView: View {
             ModalContent(
                 title: "정말 탈퇴하시나요?",
                 content: "지금까지 저장된 데이터가 모두 날아가요",
-                image: .disconnect,
+                image: .modalWarning,
                 primaryTitle: "탈퇴하기",
-                primaryAction: { myPageStore.send(.withdrawConfirmed) },
+                primaryAction: { myPageFlowStore.send(.withdrawConfirmed) },
                 secondaryTitle: "취소",
-                secondaryAction: { myPageStore.send(.dismissWithdrawModal) }
+                secondaryAction: { myPageFlowStore.send(.dismissWithdrawModal) }
             )
         }
     }
 
-    private var myPageStore: StoreOf<MyPageFeature> {
+    private var myPageFlowStore: StoreOf<MyPageFlowFeature> {
         store.scope(state: \.myPage, action: \.myPage)
     }
 
-    private var myPagePath: Binding<[MyPageFeature.Route]> {
-        let myPageStore = myPageStore
-        return Binding(
-            get: { myPageStore.path },
-            set: { myPageStore.send(.pathChanged($0)) }
-        )
-    }
-
     private var withdrawModalBinding: Binding<Bool> {
-        let myPageStore = myPageStore
+        let myPageFlowStore = myPageFlowStore
         return Binding(
-            get: { myPageStore.isWithdrawModalPresented },
+            get: { myPageFlowStore.isWithdrawModalPresented },
             set: { isPresented in
                 if !isPresented {
-                    myPageStore.send(.dismissWithdrawModal)
+                    myPageFlowStore.send(.dismissWithdrawModal)
                 }
             }
         )

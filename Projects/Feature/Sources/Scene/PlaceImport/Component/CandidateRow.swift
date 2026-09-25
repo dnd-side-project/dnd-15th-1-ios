@@ -15,15 +15,16 @@ struct CandidateRow: View {
     let action: () -> Void
 
     private var name: String {
-        candidate.place?.name ?? candidate.extractedName
+        candidate.place?.place.name ?? candidate.extractedName
     }
 
     private var address: String {
-        candidate.place?.roadAddress ?? candidate.extractedAddressHint ?? ""
+        candidate.place?.place.roadAddress ?? candidate.extractedAddressHint ?? ""
     }
 
     private var icon: Image {
-        PlaceCategory(categoryName: candidate.place?.categoryName ?? "").icon
+        // 확인 못 한 후보는 카테고리를 몰라 장소 매퍼의 기본값과 같은 food 로 그린다
+        (candidate.place?.place.category ?? .food).icon
     }
 
     var body: some View {
@@ -47,7 +48,7 @@ struct CandidateRow: View {
 
                 Spacer()
 
-                (isSelected ? Image.checkTrue : Image.checkFalse)
+                (isSelected ? Image.checkFilled : Image.checkEmpty)
                     .resizable()
                     .frame(width: 24, height: 24)
             }

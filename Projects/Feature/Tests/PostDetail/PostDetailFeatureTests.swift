@@ -13,17 +13,17 @@ final class PostDetailFeatureTests: XCTestCase {
         caption: "본문",
         canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
         places: [
-            PostDetailPlace(id: "101", kakaoPlaceID: "k101", name: "가게 하나", category: .cafe,
-                            isSaved: true, coordinate: Coordinate(latitude: 37.5, longitude: 127.0)),
-            PostDetailPlace(id: "102", kakaoPlaceID: "k102", name: "가게 둘", category: .food,
-                            isSaved: false, coordinate: Coordinate(latitude: 37.6, longitude: 127.1)),
+            .fixture(placeID: "101", kakaoPlaceID: "k101", name: "가게 하나", category: .cafe,
+                     isSaved: true, latitude: 37.5, longitude: 127.0),
+            .fixture(placeID: "102", kakaoPlaceID: "k102", name: "가게 둘", category: .food,
+                     isSaved: false, latitude: 37.6, longitude: 127.1),
         ]
     )
 
     private func store(
         state: PostDetailFeature.State = PostDetailFeature.State(contentID: "1"),
         detail: PostDetailContent? = nil,
-        error: ExploreError? = nil,
+        error: ContentError? = nil,
         load: (@Sendable (String) async throws -> PostDetailContent)? = nil
     ) -> TestStore<PostDetailFeature.State, PostDetailFeature.Action> {
         let loaded = detail
@@ -31,10 +31,10 @@ final class PostDetailFeatureTests: XCTestCase {
         return TestStore(initialState: state) {
             PostDetailFeature()
         } withDependencies: {
-            $0.postDetailContentClient.contentDetail = { id in
+            $0.contentClient.contentDetail = { id in
                 if let load { return try await load(id) }
                 if let failure { throw failure }
-                guard let loaded else { throw ExploreError.unknown }
+                guard let loaded else { throw ContentError.unknown }
                 return loaded
             }
             $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
@@ -184,10 +184,10 @@ final class PostDetailFeatureSaveAnalyticsTests: XCTestCase {
         caption: "본문",
         canonicalURL: URL(string: "https://www.instagram.com/reel/example/"),
         places: [
-            PostDetailPlace(id: "101", kakaoPlaceID: "k101", name: "가게 하나", category: .cafe,
-                            isSaved: true, coordinate: Coordinate(latitude: 37.5, longitude: 127.0)),
-            PostDetailPlace(id: "102", kakaoPlaceID: "k102", name: "가게 둘", category: .food,
-                            isSaved: false, coordinate: Coordinate(latitude: 37.6, longitude: 127.1)),
+            .fixture(placeID: "101", kakaoPlaceID: "k101", name: "가게 하나", category: .cafe,
+                     isSaved: true, latitude: 37.5, longitude: 127.0),
+            .fixture(placeID: "102", kakaoPlaceID: "k102", name: "가게 둘", category: .food,
+                     isSaved: false, latitude: 37.6, longitude: 127.1),
         ]
     )
 

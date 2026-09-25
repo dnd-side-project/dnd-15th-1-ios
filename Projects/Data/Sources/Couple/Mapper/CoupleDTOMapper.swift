@@ -19,31 +19,24 @@ enum CoupleDTOMapper {
         )
     }
 
-    static func toDomain(_ dto: CoupleConnectionStatusResponseDTO) -> Couple? {
-        guard dto.connected, let partner = dto.partner else {
-            return nil
+    /// 연결 요청 응답에서 상대를 꺼낸다. 연결이 안 됐거나 상대가 없으면 불완전한 응답이라 unknown 을 던진다
+    static func toPartner(_ dto: CoupleConnectionStatusResponseDTO) throws -> CoupleMember {
+        guard dto.connected, let partner = member(dto.partner) else {
+            throw CoupleError.unknown
         }
-        return Couple(
-            partnerNickname: partner.nickname,
-            partnerIconID: partner.profileIcon
-        )
+        return partner
     }
 
-    // me 가 없거나 connected 인데 partner 가 없으면 불완전한 응답이라 sentinel 대신 에러로 올린다
+    // 연결됐으면 내 정보와 상대가 둘 다 있어야 한다. 하나라도 없으면 sentinel 대신 에러로 올린다.
+    // 연결 안 됨은 다른 값을 보지 않는다. 미연결 응답에 내 정보가 빠져도 정상이다
     static func toStatus(_ dto: CoupleConnectionStatusResponseDTO) throws -> CoupleStatus {
-        guard let me = member(dto.me) else {
+        guard dto.connected else {
+            return .notConnected
+        }
+        guard let me = member(dto.me), let partner = member(dto.partner) else {
             throw CoupleError.unknown
         }
-        let partner = member(dto.partner)
-        if dto.connected, partner == nil {
-            throw CoupleError.unknown
-        }
-        return CoupleStatus(
-            connected: dto.connected,
-            me: me,
-            partner: dto.connected ? partner : nil,
-            daysTogether: dto.daysTogether
-        )
+        return .connected(me: me, partner: partner, daysTogether: dto.daysTogether)
     }
 
     private static func member(_ dto: CoupleMemberProfileResponseDTO?) -> CoupleMember? {

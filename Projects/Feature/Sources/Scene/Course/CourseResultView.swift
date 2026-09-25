@@ -180,7 +180,7 @@ private extension CourseResultView {
 
     var failureState: some View {
         EmptyStateView(
-            image: .placeEmpty,
+            image: .emptyResult,
             title: "코스를 불러오지 못했어요",
             message: "잠시 뒤 다시 시도해주세요"
         )
@@ -207,14 +207,14 @@ private extension CourseResultView {
 private extension Place {
     static func preview(id: String, latitude: Double, longitude: Double) -> Place {
         Place(
-            id: id,
+            placeID: id,
             kakaoPlaceID: nil,
             name: "장소명",
             category: .food,
             address: "경기도 안산시 모모로 145길 (뭐뭐동)",
             roadAddress: "경기도 안산시 모모로 145길 (뭐뭐동)",
             coordinate: Coordinate(latitude: latitude, longitude: longitude),
-            bookmarkCount: 0,
+            bookmarkCount: nil,
             thumbnailURLs: []
         )
     }

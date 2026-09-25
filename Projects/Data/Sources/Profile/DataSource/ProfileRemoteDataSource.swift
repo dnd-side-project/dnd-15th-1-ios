@@ -16,16 +16,6 @@ public struct ProfileRemoteDataSource: Sendable {
         try await networkClient.request(ProfileEndpoint.withdraw)
     }
 
-    func notificationSettings() async throws -> NotificationSettingsResponseDTO {
-        try await networkClient.request(ProfileEndpoint.notificationSettings)
-    }
-
-    func updateNotificationSettings(
-        _ settings: NotificationSettingsRequestDTO
-    ) async throws -> NotificationSettingsResponseDTO {
-        try await networkClient.request(ProfileEndpoint.updateNotificationSettings(settings))
-    }
-
     func initializeProfile(
         nickname: String,
         profileIcon: Int,

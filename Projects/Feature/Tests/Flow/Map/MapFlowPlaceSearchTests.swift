@@ -163,5 +163,7 @@ final class MapFlowPlaceSearchTests: XCTestCase {
             $0.map.mode = .searchResult(query: "고른 장소", places: [place])
             $0.map.camera.center = place.coordinate
         }
+        // 화면 등장에 안 기댄다. 흐름이 상세의 조회를 직접 시작한다
+        await store.receive(\.detail.presented.onAppear)
     }
 }

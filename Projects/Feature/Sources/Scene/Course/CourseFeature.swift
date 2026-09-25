@@ -55,7 +55,7 @@ public struct CourseFeature {
         public var conflictAlertMessage: String?
 
         // 장소 화면
-        public var places: [CoursePlaceCandidate] = []
+        public var places: [SavedPlace] = []
         public var loadState: LoadState = .loading
         public var isCoupleConnected = false
         public var selectedOwnership: PlaceOwnership = .together
@@ -81,7 +81,7 @@ public struct CourseFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case coursePlacesResponse(Result<[CoursePlaceCandidate], CourseError>)
+        case coursePlacesResponse(Result<[SavedPlace], CourseError>)
         case coupleResponse(CoupleStatus?)
         case courseCreated(Result<DateCourse, CourseError>)
         case courseSaved(Result<DateCourse, CourseError>)
@@ -115,7 +115,7 @@ public struct CourseFeature {
             /// 확정 저장된 코스. 결과 화면이 받아 그린다
             case buildRequested(DateCourse)
             case placePickRequested(dateCourseID: String)
-            case placesPicked([CoursePlaceCandidate])
+            case placesPicked([SavedPlace])
             case dismissed
             case sessionExpired
         }
@@ -184,8 +184,14 @@ private extension CourseFeature {
             return error == .unauthorized ? .send(.delegate(.sessionExpired)) : .none
 
         case let .coupleResponse(status):
-            state.partnerNickname = status?.partner?.nickname
-            state.isCoupleConnected = status?.connected ?? false
+            // nil 은 조회 실패다. 연결 안 됨과 같게 칩을 숨긴다
+            if case let .connected(_, partner, _)? = status {
+                state.partnerNickname = partner.nickname
+                state.isCoupleConnected = true
+            } else {
+                state.partnerNickname = nil
+                state.isCoupleConnected = false
+            }
             // 연동이 풀린 채로 저장자 필터가 남아 있으면 목록이 이유 없이 좁아진다
             if !state.isCoupleConnected {
                 state.selectedOwnership = .together
@@ -529,10 +535,10 @@ private enum CourseMarkerID {
 
 public extension CourseFeature.State {
 
-    var filteredPlaces: [CoursePlaceCandidate] {
+    var filteredPlaces: [SavedPlace] {
         let base = places
             .filter { selectedOwnership.matches($0.ownership) }
-            .filter { selectedCategory == nil || $0.category == selectedCategory }
+            .filter { selectedCategory == nil || $0.place.category == selectedCategory }
         if case let .pick(excluding) = mode {
             let taken = Set(excluding)
             return base.filter { !taken.contains($0.id) }
@@ -547,8 +553,8 @@ public extension CourseFeature.State {
             .map { candidate in
                 MapMarker(
                     id: candidate.id,
-                    coordinate: candidate.coordinate,
-                    kind: .category(candidate.category)
+                    coordinate: candidate.place.coordinate,
+                    kind: .category(candidate.place.category)
                 )
             }
         // 고른 물방울은 필터를 타지 않는다. 목록에서 사라져도 핀으로 해제할 수 있어야 한다
@@ -557,7 +563,7 @@ public extension CourseFeature.State {
             .map { candidate in
                 MapMarker(
                     id: CourseMarkerID.candidate(candidate.id),
-                    coordinate: candidate.coordinate,
+                    coordinate: candidate.place.coordinate,
                     kind: .candidate
                 )
             }
@@ -611,6 +617,6 @@ private extension CourseFeature {
     /// 여러 장소를 보는 자리. 첫 행이 없으면 서울 시청이다
     static func overview(of state: State) -> MapCamera {
         guard let first = state.filteredPlaces.first else { return .seoulCityHall }
-        return .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        return .focusing(first.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
     }
 }

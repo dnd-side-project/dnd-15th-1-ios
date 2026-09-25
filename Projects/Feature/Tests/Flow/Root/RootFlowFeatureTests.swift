@@ -96,7 +96,7 @@ final class RootFlowFeatureTests: XCTestCase {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
                 return false
             }
-            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.notificationClient.pushTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(.onAppear) {
@@ -107,7 +107,7 @@ final class RootFlowFeatureTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -128,7 +128,7 @@ final class RootFlowFeatureTests: XCTestCase {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
                 return false
             }
-            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.notificationClient.pushTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(.onAppear) {
@@ -202,7 +202,7 @@ final class RootFlowTransitionTests: XCTestCase {
             initialState: RootFlowFeature.State(
                 phase: .mainTab(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State()
+                        myPage: MyPageFlowFeature.State()
                     )
                 )
             )
@@ -234,7 +234,7 @@ final class RootFlowTransitionTests: XCTestCase {
             RootFlowFeature()
         } withDependencies: {
             $0.notificationClient.requestAuthorization = { true }
-            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.notificationClient.pushTokenStream = { AsyncStream { $0.finish() } }
         }
         store.exhaustivity = .off
 
@@ -254,7 +254,7 @@ final class RootFlowTransitionTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -265,7 +265,7 @@ final class RootFlowTransitionTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .map,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -277,7 +277,7 @@ final class RootFlowTransitionTests: XCTestCase {
             initialState: RootFlowFeature.State(
                 phase: .mainTab(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State()
+                        myPage: MyPageFlowFeature.State()
                     )
                 )
             )
@@ -350,7 +350,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             RootFlowFeature()
         } withDependencies: {
             $0.notificationClient.requestAuthorization = { true }
-            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.notificationClient.pushTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(
@@ -381,7 +381,7 @@ final class RootFlowOnboardingTests: XCTestCase {
                 authorizationCount.withValue { $0 += 1 }
                 return true
             }
-            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.notificationClient.pushTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(
@@ -394,7 +394,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -417,7 +417,7 @@ final class RootFlowOnboardingTests: XCTestCase {
                 authorizationCount.withValue { $0 += 1 }
                 return true
             }
-            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.notificationClient.pushTokenStream = { AsyncStream { $0.finish() } }
         }
 
         await store.send(
@@ -462,7 +462,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -521,7 +521,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -532,7 +532,7 @@ final class RootFlowOnboardingTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .map,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -586,7 +586,7 @@ final class RootFlowPushTests: XCTestCase {
         ) {
             RootFlowFeature()
         } withDependencies: {
-            $0.notificationClient.fcmTokenStream = {
+            $0.notificationClient.pushTokenStream = {
                 AsyncStream { continuation in
                     continuation.yield("fcm-token")
                     continuation.finish()
@@ -613,7 +613,7 @@ final class RootFlowPushTests: XCTestCase {
         let store = TestStore(initialState: RootFlowFeature.State()) {
             RootFlowFeature()
         } withDependencies: {
-            $0.notificationClient.fcmTokenStream = {
+            $0.notificationClient.pushTokenStream = {
                 AsyncStream { continuation in
                     continuation.yield("fcm-token")
                     continuation.finish()
@@ -656,7 +656,7 @@ final class RootFlowPushTests: XCTestCase {
         ) {
             RootFlowFeature()
         } withDependencies: {
-            $0.notificationClient.fcmTokenStream = { stream }
+            $0.notificationClient.pushTokenStream = { stream }
             $0.notificationClient.registerDevice = { token in
                 registered.withValue { $0.append(token) }
                 if token == "fcm-token" {
@@ -689,7 +689,7 @@ final class RootFlowPushTests: XCTestCase {
         let store = TestStore(initialState: RootFlowFeature.State()) {
             RootFlowFeature()
         } withDependencies: {
-            $0.notificationClient.fcmTokenStream = { stream }
+            $0.notificationClient.pushTokenStream = { stream }
             $0.notificationClient.registerDevice = { token in
                 registered.withValue { $0.append(token) }
                 if token == "fcm-token" {
@@ -831,7 +831,7 @@ final class RootFlowFeatureIdentityTests: XCTestCase {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
                 return false
             }
-            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.notificationClient.pushTokenStream = { AsyncStream { $0.finish() } }
             $0.analyticsClient.identify = { userID in
                 identified.withValue { $0.append(userID) }
             }
@@ -845,7 +845,7 @@ final class RootFlowFeatureIdentityTests: XCTestCase {
             $0.phase = .mainTab(
                 MainTabFeature.State(
                     selectedTab: .home,
-                    myPage: MyPageFeature.State()
+                    myPage: MyPageFlowFeature.State()
                 )
             )
         }
@@ -861,7 +861,7 @@ final class RootFlowFeatureIdentityTests: XCTestCase {
             initialState: RootFlowFeature.State(
                 phase: .mainTab(
                     MainTabFeature.State(
-                        myPage: MyPageFeature.State()
+                        myPage: MyPageFlowFeature.State()
                     )
                 )
             )
@@ -930,7 +930,7 @@ final class RootFlowFeatureIdentityTests: XCTestCase {
                 XCTFail("hasSeenAppIntro must not be called when session exists")
                 return false
             }
-            $0.notificationClient.fcmTokenStream = { AsyncStream { $0.finish() } }
+            $0.notificationClient.pushTokenStream = { AsyncStream { $0.finish() } }
             $0.analyticsClient.identify = { userID in
                 identified.withValue { $0.append(userID) }
             }

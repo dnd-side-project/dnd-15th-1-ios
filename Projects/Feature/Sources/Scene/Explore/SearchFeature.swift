@@ -11,7 +11,8 @@ import ThirdParty
 
 @Reducer
 public struct SearchFeature {
-    /// 게시글 검색 한 페이지 크기. 탐색 무한스크롤과 동일하게 맞춘다
+    /// 게시글 검색 한 페이지 크기. 탐색 무한스크롤과 동일하게 맞춘다.
+    /// 장소 검색은 장소 창구가 같은 10건 고정으로 부른다
     static let pageSize = 10
 
     public enum Tab: String, Equatable, Sendable, CaseIterable {
@@ -86,7 +87,8 @@ public struct SearchFeature {
         }
     }
 
-    @Dependency(\.exploreClient) var exploreClient
+    @Dependency(\.contentClient) var contentClient
+    @Dependency(\.placeClient) var placeClient
     @Dependency(\.recentSearchClient) var recentSearchClient
     @Dependency(\.continuousClock) var clock
 
@@ -253,9 +255,9 @@ public struct SearchFeature {
         // 새 검색이 시작되면 진행 중인 이전 검색·더보기 응답이 이 결과를 덮지 않게 취소한다
         return .merge(
             .cancel(id: CancelID.loadMore),
-            .run { [exploreClient] send in
-                async let contents = exploreClient.searchContents(query, .popular, 0, Self.pageSize)
-                async let places = exploreClient.searchPlaces(query, 0, Self.pageSize)
+            .run { [contentClient, placeClient] send in
+                async let contents = contentClient.searchContents(query, .popular, 0, Self.pageSize)
+                async let places = placeClient.searchPlaces(query, 0)
                 // 로딩 → 결과/빈상태 전환을 페이드로 부드럽게 한다
                 await send(
                     .searchResponse(try await contents, try await places),
@@ -279,9 +281,9 @@ public struct SearchFeature {
         }
         state.isLoadingMore = true
         let page = state.contentsPage
-        return .run { [exploreClient] send in
+        return .run { [contentClient] send in
             do {
-                let result = try await exploreClient.searchContents(query, .popular, page, Self.pageSize)
+                let result = try await contentClient.searchContents(query, .popular, page, Self.pageSize)
                 await send(.moreContentsLoaded(result))
             } catch {
                 if error is CancellationError { return }
@@ -300,9 +302,9 @@ public struct SearchFeature {
         }
         state.isLoadingMore = true
         let page = state.placesPage
-        return .run { [exploreClient] send in
+        return .run { [placeClient] send in
             do {
-                let result = try await exploreClient.searchPlaces(query, page, Self.pageSize)
+                let result = try await placeClient.searchPlaces(query, page)
                 await send(.morePlacesLoaded(result))
             } catch {
                 if error is CancellationError { return }

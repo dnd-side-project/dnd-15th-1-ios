@@ -45,7 +45,7 @@ struct CoupleCompleteView: View {
 
     private var artwork: some View {
         VStack(spacing: ArtworkMetric.pillSpacing) {
-            Image.coupleConnectComplete
+            Image.illustrationConnected
                 .resizable()
                 .scaledToFit()
 
@@ -95,10 +95,7 @@ private enum NicknamePillMetric {
 }
 
 #if DEBUG
-private let previewCouple = Couple(
-    partnerNickname: "픽둘",
-    partnerIconID: 1
-)
+private let previewPartner = CoupleMember(nickname: "픽둘", iconID: 1)
 
 #Preview("연결 완료") {
     NavigationStack {
@@ -106,7 +103,7 @@ private let previewCouple = Couple(
             store: Store(
                 initialState: CoupleConnectFeature.State(
                     myNickname: "둘픽",
-                    connectedCouple: previewCouple
+                    connectedPartner: previewPartner
                 )
             ) {
                 CoupleConnectFeature()
@@ -121,10 +118,7 @@ private let previewCouple = Couple(
             store: Store(
                 initialState: CoupleConnectFeature.State(
                     myNickname: "여섯글자닉넴",
-                    connectedCouple: Couple(
-                        partnerNickname: "여섯글자상대",
-                        partnerIconID: 1
-                    )
+                    connectedPartner: CoupleMember(nickname: "여섯글자상대", iconID: 1)
                 )
             ) {
                 CoupleConnectFeature()

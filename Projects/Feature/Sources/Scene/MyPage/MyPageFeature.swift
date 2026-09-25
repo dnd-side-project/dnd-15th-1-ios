@@ -5,19 +5,6 @@ import ThirdParty
 
 @Reducer
 public struct MyPageFeature {
-    public enum Route: Hashable {
-        case dateType
-        case connection
-        // 미연결 상태에서 타는 커플 연결 플로우
-        case connect
-        case codeInput
-        case complete
-
-        var isCouple: Bool {
-            self == .connect || self == .codeInput || self == .complete
-        }
-    }
-
     @ObservableState
     public struct State: Equatable {
         public var nickname: String
@@ -38,11 +25,6 @@ public struct MyPageFeature {
         // 프로필 수정 바텀시트. 플래그가 먼저 내려가고, 퇴장이 끝난 뒤 profileEdit 을 비운다
         @Presents public var profileEdit: ProfileEditFeature.State?
         public var isProfileEditPresented: Bool
-        // push 스택. 나의 데이트 유형 / 연결 관리
-        public var path: [Route]
-        public var dateType: DateTypeFeature.State?
-        public var connection: ConnectionManageFeature.State?
-        public var couple: CoupleConnectFeature.State?
         // 회원탈퇴 확인 모달
         public var isWithdrawModalPresented: Bool
         public var isWithdrawing: Bool
@@ -63,10 +45,6 @@ public struct MyPageFeature {
             presentedTerms: TermsType? = nil,
             profileEdit: ProfileEditFeature.State? = nil,
             isProfileEditPresented: Bool = false,
-            path: [Route] = [],
-            dateType: DateTypeFeature.State? = nil,
-            connection: ConnectionManageFeature.State? = nil,
-            couple: CoupleConnectFeature.State? = nil,
             isWithdrawModalPresented: Bool = false,
             isWithdrawing: Bool = false,
             toast: ToastState? = nil,
@@ -85,10 +63,6 @@ public struct MyPageFeature {
             self.presentedTerms = presentedTerms
             self.profileEdit = profileEdit
             self.isProfileEditPresented = isProfileEditPresented
-            self.path = path
-            self.dateType = dateType
-            self.connection = connection
-            self.couple = couple
             self.isWithdrawModalPresented = isWithdrawModalPresented
             self.isWithdrawing = isWithdrawing
             self.toast = toast
@@ -106,6 +80,7 @@ public struct MyPageFeature {
         case notificationSettingsUpdateFailed
         case profileEditTapped
         case profileEditCloseRequested
+        case noticeTapped
         case dateTypeTapped
         case connectionTapped
         case termsLinkTapped(TermsType)
@@ -119,12 +94,10 @@ public struct MyPageFeature {
         case logoutButtonTapped
         case logoutResponse(Result<EquatableVoid, AuthError>)
         case profileEdit(PresentationAction<ProfileEditFeature.Action>)
-        case pathChanged([Route])
-        case dateType(DateTypeFeature.Action)
-        case connection(ConnectionManageFeature.Action)
-        case connectionStatusResolved(CoupleStatus?)
+        case connectionStatusResolved(CoupleStatus)
         case connectionStatusFailed(CoupleError)
-        case couple(CoupleConnectFeature.Action)
+        // 전환 담당이 데이트 유형 저장 결과를 내려보낸다
+        case datePreferenceUpdated(DatePreference?)
         case delegate(Delegate)
 
         @CasePathable
@@ -132,6 +105,14 @@ public struct MyPageFeature {
             case logoutSucceeded
             case accountWithdrawn
             case sessionExpired
+            /// 나의 데이트 유형으로 간다. 지금 값을 함께 올려 미리 채우게 한다
+            case dateTypeRequested(DatePreference?)
+            /// 연결됨. 연결 관리 화면의 첫 값을 함께 올린다
+            case connectionManageRequested(me: CoupleMember, partner: CoupleMember, daysTogether: Int?)
+            /// 미연결. 커플 연결 3화면으로 간다
+            case coupleConnectRequested(myNickname: String)
+            /// 공지사항 목록으로 간다
+            case noticeRequested
         }
     }
 
@@ -142,6 +123,7 @@ public struct MyPageFeature {
     @Dependency(\.authClient) var authClient
     @Dependency(\.profileClient) var profileClient
     @Dependency(\.coupleClient) var coupleClient
+    @Dependency(\.notificationClient) var notificationClient
 
     private enum CancelID { case updateNotification }
 
@@ -152,15 +134,6 @@ public struct MyPageFeature {
         Reduce(core)
             .ifLet(\.$profileEdit, action: \.profileEdit) {
                 ProfileEditFeature()
-            }
-            .ifLet(\.dateType, action: \.dateType) {
-                DateTypeFeature()
-            }
-            .ifLet(\.connection, action: \.connection) {
-                ConnectionManageFeature()
-            }
-            .ifLet(\.couple, action: \.couple) {
-                CoupleConnectFeature()
             }
             .logged(as: Self.self)
     }
@@ -176,21 +149,11 @@ public struct MyPageFeature {
             state.datePreference = profile.datePreference
             return .none
 
-        case let .notificationSettingsLoaded(settings):
-            state.isSkeleton = false
-            state.savedContentAlarmOn = settings.contentSavedEnabled
-            state.dateScheduleAlarmOn = settings.dateScheduleEnabled
-            state.marketingAlarmOn = settings.marketingEnabled
-            state.marketingConsentVersion = settings.marketingConsentVersion
-            state.availableMarketingConsentVersion = settings.availableMarketingConsentVersion
-            return .none
-
-        case .notificationSettingsLoadFailed, .notificationSettingsUpdateFailed:
-            return handleNotificationFailure(state: &state, action: action)
-
-        case .binding(\.savedContentAlarmOn), .binding(\.dateScheduleAlarmOn),
+        case .notificationSettingsLoaded, .notificationSettingsLoadFailed,
+             .notificationSettingsUpdateFailed,
+             .binding(\.savedContentAlarmOn), .binding(\.dateScheduleAlarmOn),
              .binding(\.marketingAlarmOn):
-            return updateNotificationSettings(state: state)
+            return handleNotification(state: &state, action: action)
 
         case .logoutButtonTapped, .logoutResponse:
             return handleLogout(state: &state, action: action)
@@ -201,16 +164,18 @@ public struct MyPageFeature {
         case .profileEditTapped, .profileEditCloseRequested, .profileEdit:
             return handleProfileEdit(state: &state, action: action)
 
-        case .dateTypeTapped, .pathChanged, .dateType:
+        case .dateTypeTapped, .datePreferenceUpdated:
             return handleDateType(state: &state, action: action)
 
-        case .connectionTapped, .connectionStatusResolved, .connectionStatusFailed,
-             .connection, .couple:
+        case .connectionTapped, .connectionStatusResolved, .connectionStatusFailed:
             return handleConnection(state: &state, action: action)
 
         case .withdrawTapped, .withdrawConfirmed, .dismissWithdrawModal,
              .withdrawSucceeded, .withdrawFailed, .dismissToast:
             return handleWithdraw(state: &state, action: action)
+
+        case .noticeTapped:
+            return .send(.delegate(.noticeRequested))
 
         case .binding, .delegate:
             return .none
@@ -262,40 +227,12 @@ public struct MyPageFeature {
     private func handleDateType(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .dateTypeTapped:
-            // 현재 데이트 유형을 미리 채우고, 건너뛰기 없이 push
-            let pref = state.datePreference
-            state.dateType = DateTypeFeature.State(
-                indoorOutdoor: pref?.indoorOutdoor,
-                activityLevel: pref?.activityLevel,
-                dateTime: pref?.dateTime,
-                dateFocus: pref?.dateFocus,
-                showsSkip: false
-            )
-            state.path.append(.dateType)
-            return .none
+            // 지금 값을 실어 올린다. 화면 상태는 전환 담당이 만든다
+            return .send(.delegate(.dateTypeRequested(state.datePreference)))
 
-        case let .pathChanged(path):
-            state.path = path
-            // 스택에서 빠진 화면의 자식 상태를 내린다
-            if !path.contains(.dateType) { state.dateType = nil }
-            if !path.contains(.connection) { state.connection = nil }
-            if !path.contains(where: \.isCouple) { state.couple = nil }
-            return .none
-
-        case let .dateType(.delegate(.saved(profile))):
-            // 저장 성공. 새 유형을 반영하고 뒤로 돌아온다
-            state.datePreference = profile.datePreference
-            state.dateType = nil
-            if !state.path.isEmpty { state.path.removeLast() }
-            return .none
-
-        case .dateType(.delegate(.sessionExpired)):
-            state.dateType = nil
-            state.path = []
-            return .send(.delegate(.sessionExpired))
-
-        case .dateType:
-            // 마이페이지엔 건너뛰기가 없어 skipped 는 오지 않는다
+        case let .datePreferenceUpdated(preference):
+            // 저장 결과가 전환 담당을 거쳐 내려온다. 서버에 다시 묻지 않는다
+            state.datePreference = preference
             return .none
 
         default:
@@ -305,8 +242,17 @@ public struct MyPageFeature {
 }
 
 private extension MyPageFeature {
-    func handleNotificationFailure(state: inout State, action: Action) -> Effect<Action> {
+    func handleNotification(state: inout State, action: Action) -> Effect<Action> {
         switch action {
+        case let .notificationSettingsLoaded(settings):
+            state.isSkeleton = false
+            state.savedContentAlarmOn = settings.contentSavedEnabled
+            state.dateScheduleAlarmOn = settings.dateScheduleEnabled
+            state.marketingAlarmOn = settings.marketingEnabled
+            state.marketingConsentVersion = settings.marketingConsentVersion
+            state.availableMarketingConsentVersion = settings.availableMarketingConsentVersion
+            return .none
+
         case .notificationSettingsLoadFailed:
             // 최초 로드 실패면 스켈레톤을 걷고 기본 화면을 보인다
             state.isSkeleton = false
@@ -315,6 +261,10 @@ private extension MyPageFeature {
         case .notificationSettingsUpdateFailed:
             // 저장 실패면 서버 값으로 되돌려 화면과 서버를 다시 맞춘다
             return loadNotificationSettings()
+
+        case .binding(\.savedContentAlarmOn), .binding(\.dateScheduleAlarmOn),
+             .binding(\.marketingAlarmOn):
+            return updateNotificationSettings(state: state)
 
         default:
             return .none
@@ -335,19 +285,15 @@ private extension MyPageFeature {
             }
 
         case let .connectionStatusResolved(status):
-            // 성공 응답. nil 은 진짜 미연결(404)이라 연결 플로우로 보낸다
-            if status?.connected == true {
-                state.connection = ConnectionManageFeature.State(
-                    me: status?.me,
-                    partner: status?.partner,
-                    daysTogether: status?.daysTogether
-                )
-                state.path.append(.connection)
-            } else {
-                state.couple = CoupleConnectFeature.State(myNickname: state.nickname, showsSkip: false)
-                state.path.append(.connect)
+            // 연결 안 됨(404 포함)이면 연결 플로우로 보낸다
+            if case let .connected(me, partner, daysTogether) = status {
+                return .send(.delegate(.connectionManageRequested(
+                    me: me,
+                    partner: partner,
+                    daysTogether: daysTogether
+                )))
             }
-            return .none
+            return .send(.delegate(.coupleConnectRequested(myNickname: state.nickname)))
 
         case let .connectionStatusFailed(error):
             // 조회 실패를 미연결로 오해하지 않도록 이동 없이 알린다
@@ -357,64 +303,8 @@ private extension MyPageFeature {
             state.toast = Self.connectionStatusToast(for: error)
             return .none
 
-        case let .couple(.delegate(delegate)):
-            return handleCoupleDelegate(state: &state, delegate: delegate)
-
-        case .connection(.delegate(.disconnected)):
-            // 연결 해제 성공 → 마이페이지로 돌아간다
-            state.connection = nil
-            if !state.path.isEmpty { state.path.removeLast() }
-            return .none
-
-        case .connection(.delegate(.sessionExpired)):
-            state.connection = nil
-            state.path = []
-            return .send(.delegate(.sessionExpired))
-
-        case .connection, .couple:
-            return .none
-
         default:
             return .none
-        }
-    }
-
-    func handleCoupleDelegate(
-        state: inout State,
-        delegate: CoupleConnectFeature.Action.Delegate
-    ) -> Effect<Action> {
-        switch delegate {
-        case .showCodeInput:
-            state.path.append(.codeInput)
-            return .none
-
-        case .showComplete:
-            state.path.append(.complete)
-            return .none
-
-        case .back:
-            guard !state.path.isEmpty else { return .none }
-            state.path.removeLast()
-            if !state.path.contains(where: \.isCouple) { state.couple = nil }
-            return .none
-
-        case .connected:
-            // 연결 성공 → 커플 플로우를 닫고 연결 관리 화면으로 대체
-            state.couple = nil
-            state.connection = ConnectionManageFeature.State()
-            state.path = [.connection]
-            return .none
-
-        case .skipped:
-            // 마이페이지엔 건너뛰기가 없어 오지 않지만 방어적으로 닫는다
-            state.couple = nil
-            state.path.removeAll(where: \.isCouple)
-            return .none
-
-        case .sessionExpired:
-            state.couple = nil
-            state.path = []
-            return .send(.delegate(.sessionExpired))
         }
     }
 
@@ -539,9 +429,9 @@ private extension MyPageFeature {
     }
 
     private func loadNotificationSettings() -> Effect<Action> {
-        .run { [profileClient] send in
+        .run { [notificationClient] send in
             do {
-                let settings = try await profileClient.notificationSettings()
+                let settings = try await notificationClient.notificationSettings()
                 await send(.notificationSettingsLoaded(settings))
             } catch {
                 // 실패해도 스켈레톤은 걷는다(무한 로딩 방지)
@@ -560,9 +450,9 @@ private extension MyPageFeature {
                 ?? state.availableMarketingConsentVersion,
             availableMarketingConsentVersion: state.availableMarketingConsentVersion
         )
-        return .run { [profileClient] send in
+        return .run { [notificationClient] send in
             do {
-                let updated = try await profileClient.updateNotificationSettings(outgoing)
+                let updated = try await notificationClient.updateNotificationSettings(outgoing)
                 await send(.notificationSettingsLoaded(updated))
             } catch {
                 // 다음 토글이 이 PUT 을 취소한 경우는 실패가 아니다

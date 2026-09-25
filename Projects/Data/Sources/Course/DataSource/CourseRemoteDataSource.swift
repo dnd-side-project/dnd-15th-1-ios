@@ -31,6 +31,14 @@ public struct CourseRemoteDataSource: Sendable {
         try await networkClient.request(CourseEndpoint.current)
     }
 
+    func latestPast(size: Int) async throws -> [DateCourseSummaryResponseDTO] {
+        try await networkClient.request(CourseEndpoint.latestPast(size: size))
+    }
+
+    func past(page: Int, size: Int) async throws -> PastDateCoursesResponseDTO {
+        try await networkClient.request(CourseEndpoint.past(page: page, size: size))
+    }
+
     func save(id: String, body: SaveDateCourseRequestDTO) async throws -> DateCourseResponseDTO {
         try await networkClient.request(CourseEndpoint.save(id, body))
     }

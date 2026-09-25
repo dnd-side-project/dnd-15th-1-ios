@@ -5,10 +5,7 @@ import XCTest
 
 @MainActor
 final class OnboardingFlowFeatureTests: XCTestCase {
-    private let couple = Couple(
-        partnerNickname: "픽둘",
-        partnerIconID: 1
-    )
+    private let couple = CoupleMember(nickname: "픽둘", iconID: 1)
 
     private var profile: UserProfile {
         UserProfile(
@@ -33,7 +30,7 @@ final class OnboardingFlowFeatureTests: XCTestCase {
         ) {
             OnboardingFlowFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in profile }
+            $0.profileClient.setUpProfile = { _, _ in profile }
             $0.profileClient.updateDatePreference = { _ in profile }
             $0.coupleClient.connect = { _ in couple }
         }
@@ -58,7 +55,7 @@ final class OnboardingFlowFeatureTests: XCTestCase {
         }
         await store.receive(\.couple.connectResponse.success) {
             $0.couple?.isConnecting = false
-            $0.couple?.connectedCouple = couple
+            $0.couple?.connectedPartner = couple
         }
         await store.receive(\.couple.delegate.showComplete) {
             $0.path = [.nickname, .couple, .coupleComplete]
@@ -313,10 +310,7 @@ final class OnboardingFlowSignOutTests: XCTestCase {
 // 커플 구간의 경로 조작만 따로 본다
 @MainActor
 final class OnboardingFlowPathTests: XCTestCase {
-    private let couple = Couple(
-        partnerNickname: "픽둘",
-        partnerIconID: 1
-    )
+    private let couple = CoupleMember(nickname: "픽둘", iconID: 1)
 
     func test_코드입력_연결완료_쌓이고_뒤로가기로_빠진다() async {
         let couple = self.couple
@@ -344,7 +338,7 @@ final class OnboardingFlowPathTests: XCTestCase {
         }
         await store.receive(\.couple.connectResponse.success) {
             $0.couple?.isConnecting = false
-            $0.couple?.connectedCouple = couple
+            $0.couple?.connectedPartner = couple
         }
         await store.receive(\.couple.delegate.showComplete) {
             $0.path = [.nickname, .couple, .coupleCodeInput, .coupleComplete]
@@ -417,7 +411,7 @@ final class OnboardingFlowSessionExpiredTests: XCTestCase {
         ) {
             OnboardingFlowFeature()
         } withDependencies: {
-            $0.profileClient.updateNickname = { _, _ in throw ProfileError.unauthorized }
+            $0.profileClient.setUpProfile = { _, _ in throw ProfileError.unauthorized }
         }
 
         await store.send(.nickname(.nextButtonTapped)) {
@@ -443,7 +437,7 @@ final class OnboardingFlowSessionExpiredTests: XCTestCase {
             OnboardingFlowFeature()
         } withDependencies: {
             $0.coupleClient.inviteCode = { throw CoupleError.unauthorized }
-            $0.coupleClient.current = { nil }
+            $0.coupleClient.current = { .notConnected }
         }
 
         await store.send(.couple(.onAppear)) {

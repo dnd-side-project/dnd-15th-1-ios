@@ -9,18 +9,18 @@ import CoreNetwork
 import Foundation
 
 enum PlaceImportEndpoint: APIEndpoint {
-    case start(sourceUrl: String)
-    case poll(importId: Int)
-    case confirm(importId: Int, candidateIDs: [Int])
+    case start(sourceURL: String)
+    case poll(importID: String)
+    case confirm(importID: String, candidateIDs: [Int])
 
     var path: String {
         switch self {
         case .start:
             return "/api/v1/place-imports"
-        case let .poll(importId):
-            return "/api/v1/place-imports/\(importId)"
-        case let .confirm(importId, _):
-            return "/api/v1/place-imports/\(importId)/confirm"
+        case let .poll(importID):
+            return "/api/v1/place-imports/\(importID)"
+        case let .confirm(importID, _):
+            return "/api/v1/place-imports/\(importID)/confirm"
         }
     }
 
@@ -36,8 +36,8 @@ enum PlaceImportEndpoint: APIEndpoint {
     var body: Data? {
         let encoder = NetworkJSONCoding.makeEncoder()
         switch self {
-        case let .start(sourceUrl):
-            return try? encoder.encode(PlaceImportDTOMapper.toStartRequest(sourceUrl: sourceUrl))
+        case let .start(sourceURL):
+            return try? encoder.encode(PlaceImportDTOMapper.toStartRequest(sourceURL: sourceURL))
         case let .confirm(_, candidateIDs):
             return try? encoder.encode(PlaceImportDTOMapper.toConfirmRequest(candidateIDs: candidateIDs))
         case .poll:

@@ -77,7 +77,7 @@ public struct PlaceImportView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Image.placeEmpty
+            Image.emptyResult
                 .padding(.top, 33)
                 .padding(.bottom, 40)
 
@@ -190,7 +190,7 @@ public struct PlaceImportView: View {
 
     private var originURL: URL? {
         if case let .loaded(placeImport) = store.phase {
-            return URL(string: placeImport.canonicalUrl)
+            return placeImport.canonicalURL
         }
         return nil
     }

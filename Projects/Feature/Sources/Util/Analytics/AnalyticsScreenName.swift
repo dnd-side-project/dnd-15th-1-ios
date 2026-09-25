@@ -28,6 +28,8 @@ enum AnalyticsScreenName: String {
     case connectionManage = "ConnectionManage"
     case profileEdit = "ProfileEdit"
     case withdraw = "Withdraw"
+    case noticeList = "NoticeList"
+    case noticeDetail = "NoticeDetail"
 }
 
 extension RootFlowFeature.State {
@@ -97,16 +99,18 @@ extension ExploreFlowFeature.State {
     }
 }
 
-extension MyPageFeature.State {
+extension MyPageFlowFeature.State {
     var currentScreenName: AnalyticsScreenName {
         if isWithdrawModalPresented { return .withdraw }
         // 프로필 수정은 바텀시트로 뜬다
-        if isProfileEditPresented { return .profileEdit }
+        if myPage.isProfileEditPresented { return .profileEdit }
 
         switch path.last {
         case .none: return .myPage
         case .dateType: return .dateType
         case .connection: return .connectionManage
+        case .noticeList: return .noticeList
+        case .noticeDetail: return .noticeDetail
         case .connect: return .coupleConnect
         case .codeInput: return .coupleCodeInput
         case .complete: return .coupleComplete

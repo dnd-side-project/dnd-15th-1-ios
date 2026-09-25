@@ -5,6 +5,7 @@ import ThirdParty
 public extension PlaceClient {
     static let mock = PlaceClient(
         savedPlaces: { SavedPlace.mocks },
+        recentSavedPlaces: { size in Array(SavedPlace.mocks.prefix(size)) },
         searchPlaces: { query, _ in
             let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
             // 빈 검색어는 빈 결과다. 화면이 이미 빈 질의를 막고 있고,
@@ -33,13 +34,12 @@ public extension PlaceClient {
         },
         removePlace: { _ in },
         placeDetail: { placeID in
-            guard let place = Place.mocks.first(where: { $0.id == String(placeID) }) else {
+            guard let place = Place.mocks.first(where: { $0.placeID == placeID }) else {
                 throw PlaceError.notFound
             }
             return PlaceDetail(
                 place: place,
-                savedByMe: true,
-                savedMemberCount: place.bookmarkCount,
+                isSaved: true,
                 ownership: .mine
             )
         },
@@ -49,13 +49,12 @@ public extension PlaceClient {
             }
             return PlaceDetail(
                 place: place,
-                savedByMe: false,
-                savedMemberCount: place.bookmarkCount,
+                isSaved: false,
                 ownership: nil
             )
         },
         updateAlias: { placeID, alias in
-            guard let saved = SavedPlace.mocks.first(where: { $0.id == String(placeID) }) else {
+            guard let saved = SavedPlace.mocks.first(where: { $0.place.placeID == placeID }) else {
                 throw PlaceError.notFound
             }
             return SavedPlace(
@@ -72,7 +71,7 @@ public extension PlaceClient {
 public extension Place {
     static let mocks: [Place] = [
         Place(
-            id: "1",
+            placeID: "1",
             kakaoPlaceID: "26338954",
             name: "까치화방 카페 강남점",
             category: .cafe,
@@ -83,7 +82,7 @@ public extension Place {
             thumbnailURLs: []
         ),
         Place(
-            id: "2",
+            placeID: "2",
             kakaoPlaceID: "26338955",
             name: "까치화방 카페 성수역",
             category: .cafe,
@@ -94,7 +93,7 @@ public extension Place {
             thumbnailURLs: MockThumbnailURL.list(4, seed: 50)
         ),
         Place(
-            id: "3",
+            placeID: "3",
             kakaoPlaceID: "10000003",
             name: "반월역 앞 국수집",
             category: .food,
@@ -105,7 +104,7 @@ public extension Place {
             thumbnailURLs: MockThumbnailURL.list(3, seed: 60)
         ),
         Place(
-            id: "4",
+            placeID: "4",
             kakaoPlaceID: "10000004",
             name: "건건동 로스터리",
             category: .cafe,
@@ -116,7 +115,7 @@ public extension Place {
             thumbnailURLs: MockThumbnailURL.list(3, seed: 70)
         ),
         Place(
-            id: "5",
+            placeID: "5",
             kakaoPlaceID: "10000005",
             name: "안산반월도서관",
             category: .tourism,
@@ -127,7 +126,7 @@ public extension Place {
             thumbnailURLs: MockThumbnailURL.list(2, seed: 80)
         ),
         Place(
-            id: "6",
+            placeID: "6",
             kakaoPlaceID: "10000006",
             name: "치맛산 등산로 입구",
             category: .activity,
@@ -138,7 +137,7 @@ public extension Place {
             thumbnailURLs: MockThumbnailURL.list(2, seed: 90)
         ),
         Place(
-            id: "7",
+            placeID: "7",
             kakaoPlaceID: "10000007",
             name: "창촌초 앞 분식",
             category: .food,
@@ -149,7 +148,7 @@ public extension Place {
             thumbnailURLs: MockThumbnailURL.list(2, seed: 100)
         ),
         Place(
-            id: "8",
+            placeID: "8",
             kakaoPlaceID: "10000008",
             name: "건건동 생활마트",
             category: .shopping,
@@ -160,7 +159,7 @@ public extension Place {
             thumbnailURLs: MockThumbnailURL.list(2, seed: 110)
         ),
         Place(
-            id: "9",
+            placeID: "9",
             kakaoPlaceID: "10000009",
             name: "e편한세상 앞 베이커리",
             category: .cafe,
