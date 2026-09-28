@@ -38,14 +38,21 @@ enum PlaceImportDTOMapper {
     }
 
     /// 서버의 작업 상태와 다음 동작을 진행 상태 넷으로 읽는다.
-    /// 두 값의 조합 명세가 없어 화면이 쓰던 해석을 그대로 옮겼다.
-    /// 다음 동작을 먼저 보고, 다음 동작이 없을 때만 작업 상태를 본다. 모르는 값은 실패다
+    /// 작업 상태와 다음 동작은 짝이 맞는 값으로 함께 오고, 실패일 때만 다음 동작이 둘로 갈린다.
+    ///
+    /// 아직 처리 중이라고 하면 다음 동작이 무엇이든 기다린다. 서버가 다음 동작 값을 늘려도
+    /// 처리 중인 작업이 실패로 끊기지 않는다.
+    /// 끝났으면 무엇을 보여줄지는 다음 동작이 정하고, 다음 동작이 없거나 모르는 값이면 작업 상태로 정한다
     static func progress(
         status: String,
         nextAction: String,
         retryAfterSeconds: Int?,
         candidates: [ImportCandidate]
     ) -> ImportProgress {
+        if status == "RECEIVED" || status == "PROCESSING" {
+            return .processing(retryAfterSeconds: retryAfterSeconds)
+        }
+
         switch nextAction {
         case "WAIT":
             return .processing(retryAfterSeconds: retryAfterSeconds)
@@ -53,19 +60,21 @@ enum PlaceImportDTOMapper {
             return .reviewRequired(candidates)
         case "COMPLETED":
             return .completed(candidates)
-        case "NONE":
-            switch status {
-            case "COMPLETED":
-                return .completed(candidates)
-            case "REVIEW_REQUIRED":
-                return .reviewRequired(candidates)
-            case "RECEIVED", "PROCESSING":
-                return .processing(retryAfterSeconds: retryAfterSeconds)
-            default:
-                return .failed
-            }
+        case "RETRY":
+            return .failed
         default:
-            // RETRY 와 모르는 값
+            // NONE 과 모르는 값. 서버가 시킨 게 없으니 작업 상태로 정한다
+            return progress(status: status, candidates: candidates)
+        }
+    }
+
+    private static func progress(status: String, candidates: [ImportCandidate]) -> ImportProgress {
+        switch status {
+        case "COMPLETED":
+            return .completed(candidates)
+        case "REVIEW_REQUIRED":
+            return .reviewRequired(candidates)
+        default:
             return .failed
         }
     }

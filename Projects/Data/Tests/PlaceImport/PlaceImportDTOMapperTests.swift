@@ -4,7 +4,8 @@ import XCTest
 
 @testable import Data
 
-/// 전 `PlaceImportFeature.applyImport` 의 해석표다. 다음 동작을 먼저 보고, 없을 때만 작업 상태를 본다
+/// 전 `PlaceImportFeature.applyImport` 의 해석표다. 처리 중이면 다음 동작과 상관없이 기다리고,
+/// 끝났으면 다음 동작이, 다음 동작이 없거나 모르는 값이면 작업 상태가 정한다
 final class PlaceImportDTOMapperProgressTests: XCTestCase {
 
     func test_다음_동작이_WAIT면_처리_중이고_다시_물을_초를_옮긴다() {
@@ -73,18 +74,36 @@ final class PlaceImportDTOMapperProgressTests: XCTestCase {
 
     func test_다음_동작이_RETRY면_실패다() {
         let progress = PlaceImportDTOMapper.progress(
-            status: "PROCESSING", nextAction: "RETRY", retryAfterSeconds: nil, candidates: []
+            status: "FAILED", nextAction: "RETRY", retryAfterSeconds: nil, candidates: []
         )
 
         XCTAssertEqual(progress, .failed)
     }
 
-    func test_모르는_다음_동작은_실패다() {
+    func test_모르는_다음_동작은_작업_상태로_정한다() {
         let progress = PlaceImportDTOMapper.progress(
             status: "COMPLETED", nextAction: "SOMETHING", retryAfterSeconds: nil, candidates: []
         )
 
-        XCTAssertEqual(progress, .failed)
+        XCTAssertEqual(progress, .completed([]))
+    }
+
+    func test_작업_상태가_처리_중이면_다음_동작이_무엇이든_기다린다() {
+        for nextAction in ["WAIT", "NONE", "SOMETHING", "RETRY", "COMPLETED"] {
+            let progress = PlaceImportDTOMapper.progress(
+                status: "PROCESSING", nextAction: nextAction, retryAfterSeconds: 2, candidates: []
+            )
+
+            XCTAssertEqual(progress, .processing(retryAfterSeconds: 2), nextAction)
+        }
+    }
+
+    func test_모르는_작업_상태는_다음_동작으로_정한다() {
+        let progress = PlaceImportDTOMapper.progress(
+            status: "SOMETHING", nextAction: "SELECT_PLACES", retryAfterSeconds: nil, candidates: []
+        )
+
+        XCTAssertEqual(progress, .reviewRequired([]))
     }
 
     func test_다음_동작이_없고_모르는_작업_상태는_실패다() {
