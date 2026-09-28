@@ -91,7 +91,7 @@ final class PlaceImportFeatureTests: XCTestCase {
     }
 
     func test_처리중이면_폴링을이어간다() async throws {
-        // 첫 응답은 처리 중, 두 번째는 완료. 같은 응답이면 최대 7번까지 폴링한다
+        // 첫 응답은 처리 중, 두 번째는 완료
         let first = PlaceImport.fixture(progress: .processing(retryAfterSeconds: 1))
         let second = PlaceImport.fixture(
             progress: .completed([ImportCandidate.fixture(id: "1", isSaved: false)])
@@ -102,14 +102,29 @@ final class PlaceImportFeatureTests: XCTestCase {
         await store.receive(\.importUpdated)
 
         XCTAssertEqual(store.state.phase, .loading)
-        XCTAssertEqual(store.state.pollCount, 1)
 
         await clock.advance(by: .seconds(1))
         await store.receive(\.importUpdated)
 
         XCTAssertNotEqual(store.state.phase, .failed)
-        XCTAssertEqual(store.state.pollCount, 1)
         XCTAssertEqual(store.state.candidates.map(\.id), ["1"])
+    }
+
+    func test_처리중이_길어져도_실패로_끊지_않는다() async throws {
+        let waiting = PlaceImport.fixture(progress: .processing(retryAfterSeconds: 1))
+        let store = try makeStore(response: waiting)
+
+        await store.send(.onAppear)
+        await store.receive(\.importUpdated)
+
+        // 예전엔 일곱 번째에서 실패로 끊었다
+        for _ in 1...10 {
+            await clock.advance(by: .seconds(1))
+            await store.receive(\.importUpdated)
+            XCTAssertEqual(store.state.phase, .loading)
+        }
+
+        await store.send(.closeTapped)
     }
 
     private func makeStore(
@@ -137,6 +152,8 @@ final class PlaceImportFeatureTests: XCTestCase {
 
 @MainActor
 final class PlaceImportAnalyticsTests: XCTestCase {
+    private let clock = TestClock()
+
     private var link: URL {
         guard let url = URL(string: "https://www.instagram.com/reel/example/") else {
             XCTFail("링크 URL 이 잘못됐다")
@@ -186,17 +203,21 @@ final class PlaceImportAnalyticsTests: XCTestCase {
 
     func test_분석_대기_갈래에서는_모달_이벤트를_안_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
-        var state = PlaceImportFeature.State(link: link)
-        state.pollCount = 7
-        let placeImport = makeImport(progress: .processing(retryAfterSeconds: 1))
-        let store = TestStore(initialState: state) {
+        let waiting = makeImport(progress: .processing(retryAfterSeconds: 1))
+        let failed = makeImport(progress: .failed)
+        let store = TestStore(initialState: PlaceImportFeature.State(link: link)) {
             PlaceImportFeature()
         } withDependencies: {
+            $0.continuousClock = clock
+            $0.placeImportClient.poll = { _ in failed }
             $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
         }
 
-        await store.send(.importUpdated(.success(placeImport))) {
-            $0.importID = placeImport.id
+        await store.send(.importUpdated(.success(waiting))) {
+            $0.importID = waiting.id
+        }
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.importUpdated) {
             $0.phase = .failed
         }
         await store.finish()
