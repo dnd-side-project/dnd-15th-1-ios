@@ -30,7 +30,7 @@ public struct PlaceImportFeature {
             guard case let .loaded(placeImport) = phase else { return [] }
             switch placeImport.progress {
             case let .reviewRequired(candidates), let .completed(candidates):
-                return candidates
+                return candidates.savable
             case .processing, .failed:
                 return []
             }
@@ -189,12 +189,13 @@ public struct PlaceImportFeature {
         candidates: [ImportCandidate],
         failWhenEmpty: Bool
     ) -> Effect<Action> {
-        if failWhenEmpty, candidates.isEmpty {
+        let savable = candidates.savable
+        if failWhenEmpty, savable.isEmpty {
             state.phase = .failed
             return .none
         }
         state.phase = .loaded(placeImport)
-        state.selectedIDs = Set(candidates.map(\.id))
+        state.selectedIDs = Set(savable.map(\.id))
         return .run { [analyticsClient] _ in
             await analyticsClient.track(.placeSaveModalViewed)
         }
@@ -241,4 +242,12 @@ public struct PlaceImportFeature {
 
 private func mapError(_ error: Error) -> PlaceImportError {
     error as? PlaceImportError ?? .unknown
+}
+
+private extension [ImportCandidate] {
+    /// 둘픽이 확인하지 못한 후보는 장소 번호가 없어 저장할 수 없다.
+    /// 고를 수 없는 걸 보여주지 않도록 화면에도 내보내지 않는다
+    var savable: [ImportCandidate] {
+        filter { $0.place != nil }
+    }
 }

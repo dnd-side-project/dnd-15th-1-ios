@@ -110,6 +110,40 @@ final class PlaceImportFeatureTests: XCTestCase {
         XCTAssertEqual(store.state.candidates.map(\.id), ["1"])
     }
 
+    func test_확인_못_한_후보는_목록과_선택에서_뺀다() async throws {
+        let verified = ImportCandidate.fixture(id: "1")
+        let unverified = ImportCandidate(
+            id: "2",
+            extractedName: "확인 못 한 곳",
+            extractedAddressHint: "서울 성동구",
+            place: nil
+        )
+        let store = try makeStore(response: .fixture(progress: .reviewRequired([verified, unverified])))
+
+        await store.send(.onAppear)
+        await store.receive(\.importUpdated)
+
+        XCTAssertEqual(store.state.candidates.map(\.id), ["1"])
+        XCTAssertEqual(store.state.selectedIDs, ["1"])
+        XCTAssertTrue(store.state.isAllSelected)
+    }
+
+    func test_확인한_후보가_하나도_없으면_완료여도_실패다() async throws {
+        let unverified = ImportCandidate(
+            id: "1",
+            extractedName: "확인 못 한 곳",
+            extractedAddressHint: nil,
+            place: nil
+        )
+        let store = try makeStore(response: .fixture(progress: .completed([unverified])))
+
+        await store.send(.onAppear)
+        await store.receive(\.importUpdated) {
+            $0.importID = "270"
+            $0.phase = .failed
+        }
+    }
+
     func test_처리중이_길어져도_실패로_끊지_않는다() async throws {
         let waiting = PlaceImport.fixture(progress: .processing(retryAfterSeconds: 1))
         let store = try makeStore(response: waiting)
@@ -309,12 +343,7 @@ final class PlaceImportAnalyticsTests: XCTestCase {
 }
 
 private func makeCandidate(id: String) -> ImportCandidate {
-    ImportCandidate(
-        id: id,
-        extractedName: "후보 \(id)",
-        extractedAddressHint: nil,
-        place: nil
-    )
+    .fixture(id: id)
 }
 
 private func makeImport(progress: ImportProgress) -> PlaceImport {
