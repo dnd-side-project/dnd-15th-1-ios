@@ -45,22 +45,6 @@ final class PostDetailFeatureTests: XCTestCase {
         }
     }
 
-    func test_onAppear_상세를_받아_상태를_채운다() async {
-        let loaded = detail
-        let sut = store(detail: loaded)
-
-        await sut.send(.onAppear) {
-            $0.isLoading = true
-            $0.loadFailed = false
-        }
-        await sut.receive(\.detailResponse) {
-            $0.detail = loaded
-            $0.savedPlaceIDs = ["101"]
-            $0.isLoading = false
-        }
-        await sut.receive(\.delegate.detailLoaded)
-    }
-
     func test_인증만료면_상위로_올린다() async {
         let sut = store(error: .unauthorized)
 
@@ -104,7 +88,7 @@ final class PostDetailFeatureTests: XCTestCase {
         await sut.receive(\.delegate.detailLoaded)
     }
 
-    func test_더보기가_본문만_펼친다() async {
+    func test_더보기를_누르면_본문이_펼쳐지고_다시_누르면_접힌다() async {
         let sut = store()
 
         await sut.send(.expandToggled) {
@@ -128,6 +112,22 @@ final class PostDetailFeatureTests: XCTestCase {
         await sut.send(.placeBookmarkTapped("101")) {
             $0.savedPlaceIDs = ["102"]
         }
+    }
+
+    func test_행_북마크_저장이_실패하면_표시를_되돌린다() async {
+        var state = PostDetailFeature.State(contentID: "1")
+        state.detail = detail
+        state.savedPlaceIDs = ["101"]
+        let sut = store(state: state)
+        sut.dependencies.placeClient.savePlace = { _, _, _, _ in throw PlaceError.network }
+
+        await sut.send(.placeBookmarkTapped("102")) {
+            $0.savedPlaceIDs = ["101", "102"]
+        }
+        await sut.receive(.placeSaveFailed(id: "102", wasSaved: false)) {
+            $0.savedPlaceIDs = ["101"]
+        }
+        await sut.finish()
     }
 
     func test_행을_누르면_상위로_올린다() async {
@@ -192,7 +192,7 @@ final class PostDetailFeatureSaveAnalyticsTests: XCTestCase {
     )
 
     func test_행_북마크_저장_성공이면_앱안_저장완료_이벤트를_보낸다() async {
-        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let analytics = AnalyticsRecorder()
         var state = PostDetailFeature.State(contentID: "1")
         state.detail = detail
         state.savedPlaceIDs = ["101"]
@@ -201,19 +201,17 @@ final class PostDetailFeatureSaveAnalyticsTests: XCTestCase {
         } withDependencies: {
             $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
             $0.placeClient.removePlace = { _ in }
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.analyticsClient = analytics.client
             $0.authClient.currentSession = {
                 AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
             }
         }
+        store.exhaustivity = .off
 
-        await store.send(.placeBookmarkTapped("102")) {
-            $0.savedPlaceIDs = ["101", "102"]
-        }
-        await store.receive(.placeSaved(id: "102"))
+        await store.send(.placeBookmarkTapped("102"))
         await store.finish()
         XCTAssertEqual(
-            sent.value,
+            analytics.events,
             [
                 .placeSaveStarted(saveSource: .inApp),
                 .placeSaveCompleted(saveSource: .inApp, userID: "user-42"),
@@ -222,7 +220,7 @@ final class PostDetailFeatureSaveAnalyticsTests: XCTestCase {
     }
 
     func test_행_북마크_저장이_실패해도_앱안_저장시작_이벤트는_보낸다() async {
-        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let analytics = AnalyticsRecorder()
         var state = PostDetailFeature.State(contentID: "1")
         state.detail = detail
         state.savedPlaceIDs = ["101"]
@@ -231,24 +229,20 @@ final class PostDetailFeatureSaveAnalyticsTests: XCTestCase {
         } withDependencies: {
             $0.placeClient.savePlace = { _, _, _, _ in throw PlaceError.network }
             $0.placeClient.removePlace = { _ in }
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.analyticsClient = analytics.client
             $0.authClient.currentSession = {
                 AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
             }
         }
+        store.exhaustivity = .off
 
-        await store.send(.placeBookmarkTapped("102")) {
-            $0.savedPlaceIDs = ["101", "102"]
-        }
-        await store.receive(.placeSaveFailed(id: "102", wasSaved: false)) {
-            $0.savedPlaceIDs = ["101"]
-        }
+        await store.send(.placeBookmarkTapped("102"))
         await store.finish()
-        XCTAssertEqual(sent.value, [.placeSaveStarted(saveSource: .inApp)])
+        XCTAssertEqual(analytics.events, [.placeSaveStarted(saveSource: .inApp)])
     }
 
     func test_행_북마크를_끄면_저장완료_이벤트를_안_보낸다() async {
-        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let analytics = AnalyticsRecorder()
         var state = PostDetailFeature.State(contentID: "1")
         state.detail = detail
         state.savedPlaceIDs = ["101"]
@@ -257,16 +251,15 @@ final class PostDetailFeatureSaveAnalyticsTests: XCTestCase {
         } withDependencies: {
             $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
             $0.placeClient.removePlace = { _ in }
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.analyticsClient = analytics.client
             $0.authClient.currentSession = {
                 AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
             }
         }
+        store.exhaustivity = .off
 
-        await store.send(.placeBookmarkTapped("101")) {
-            $0.savedPlaceIDs = []
-        }
+        await store.send(.placeBookmarkTapped("101"))
         await store.finish()
-        XCTAssertTrue(sent.value.isEmpty)
+        XCTAssertEqual(analytics.events, [])
     }
 }

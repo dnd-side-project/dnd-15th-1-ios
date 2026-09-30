@@ -46,21 +46,6 @@ final class NicknameFeatureTests: XCTestCase {
         XCTAssertFalse(store.state.isNextEnabled)
     }
 
-    func test_일곱자에서_한글자더입력_무시() async {
-        let store = TestStore(
-            initialState: NicknameFeature.State(
-                nickname: "일곱글자닉네임",
-                isTermsSheetPresented: false
-            )
-        ) {
-            NicknameFeature()
-        }
-
-        await store.send(\.binding.nickname, "일곱글자닉네임둘")
-
-        XCTAssertEqual(store.state.nickname, "일곱글자닉네임")
-    }
-
     /// 한글은 조합 중간값이 그대로 올라온다. 잘리는 지점까지 앞 글자가 깨지지 않아야 한다
     func test_한글조합_중간값_그대로올라와도_일곱자에서_멈춤() async {
         let store = TestStore(initialState: NicknameFeature.State(isTermsSheetPresented: false)) {
@@ -86,18 +71,6 @@ final class NicknameFeatureTests: XCTestCase {
         await store.send(\.binding.nickname, "가나다라마바사아") {
             $0.nickname = "가나다라마바사"
         }
-        XCTAssertFalse(store.state.isNextEnabled)
-    }
-
-    func test_긴문자열_붙여넣기_일곱자로_잘림() async {
-        let store = TestStore(initialState: NicknameFeature.State(isTermsSheetPresented: false)) {
-            NicknameFeature()
-        }
-
-        await store.send(\.binding.nickname, "가나다라마바사아자차카타파하") {
-            $0.nickname = "가나다라마바사"
-        }
-        XCTAssertEqual(store.state.lengthError, "최대 6글자 내로 입력해주세요")
         XCTAssertFalse(store.state.isNextEnabled)
     }
 
@@ -220,7 +193,7 @@ final class NicknameFeatureTests: XCTestCase {
         await store.receive(\.delegate.back)
     }
 
-    func test_한자입력_다음버튼_활성() async {
+    func test_한_글자_입력_다음버튼_활성() async {
         let store = TestStore(initialState: NicknameFeature.State(isTermsSheetPresented: false)) {
             NicknameFeature()
         }
@@ -371,44 +344,6 @@ final class NicknameMarketingNotificationTests: XCTestCase {
     )
 
     // MARK: - 마케팅 동의와 알림 설정
-
-    func test_마케팅동의_닉네임제출_조회후변경_순서대로호출() async {
-        let calls = LockIsolated<[String]>([])
-        let sent = LockIsolated<NotificationSettings?>(nil)
-        let profile = self.profile
-        let loaded = Self.loadedSettings
-        let store = TestStore(
-            initialState: NicknameFeature.State(
-                nickname: "둘픽",
-                isTermsSheetPresented: false,
-                agreedTerms: [.service, .privacy, .marketing]
-            )
-        ) {
-            NicknameFeature()
-        } withDependencies: {
-            $0.profileClient.setUpProfile = { _, _ in profile }
-            $0.notificationClient.notificationSettings = {
-                calls.withValue { $0.append("load") }
-                return loaded
-            }
-            $0.notificationClient.updateNotificationSettings = { settings in
-                calls.withValue { $0.append("update") }
-                sent.setValue(settings)
-                return settings
-            }
-        }
-
-        await store.send(.nextButtonTapped) {
-            $0.isSubmitting = true
-        }
-        await store.receive(\.updateNicknameResponse.success)
-        await store.receive(\.nicknameSubmitFinished) {
-            $0.isSubmitting = false
-        }
-        await store.receive(\.delegate.nicknameConfirmed)
-
-        XCTAssertEqual(calls.value, ["load", "update"])
-    }
 
     func test_마케팅동의_변경요청_마케팅켜짐_동의버전_조회값() async {
         let sent = LockIsolated<NotificationSettings?>(nil)

@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class SearchFeatureTests: XCTestCase {
-    func test_검색은_장소를_장소_창구의_첫_페이지로_부른다() async {
+    func test_검색하면_장소_결과의_첫_페이지가_채워진다() async {
         let place = Place.fixture(id: "p1", name: "성수 카페")
         let requested = LockIsolated<[String]>([])
         var state = SearchFeature.State()
@@ -35,7 +35,7 @@ final class SearchFeatureTests: XCTestCase {
         XCTAssertEqual(requested.value, ["성수#0"])
     }
 
-    func test_장소_탭_끝에서_다음_장을_장소_창구로_부른다() async {
+    func test_장소_탭_끝에_닿으면_다음_페이지_장소를_받는다() async {
         var state = SearchFeature.State()
         state.query = "성수"
         state.selectedTab = .place
