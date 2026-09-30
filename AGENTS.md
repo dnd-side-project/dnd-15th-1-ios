@@ -45,7 +45,11 @@ mise install && mise exec -- tuist generate --no-open
 xcodebuild -workspace Dulpick.xcworkspace -scheme Dulpick-Debug \
   -destination 'generic/platform=iOS Simulator' build
 
-xcodebuild -workspace Dulpick.xcworkspace -scheme Feature \
+# 전체 테스트. CI 가 돌리는 것과 같다. PR 을 올리기 전에 돌린다
+xcodebuild -workspace Dulpick.xcworkspace -scheme Dulpick-Tests \
+  -destination 'platform=iOS Simulator,name=iPhone 14' test
+# 모듈 하나만. 작업 중에 쓴다. <모듈> 은 Feature, Data, Domain, CoreNetwork 같은 스킴 이름이다
+xcodebuild -workspace Dulpick.xcworkspace -scheme <모듈> \
   -destination 'platform=iOS Simulator,name=iPhone 14' test
 # 이름이 없으면: xcrun simctl list devices available | grep iPhone
 

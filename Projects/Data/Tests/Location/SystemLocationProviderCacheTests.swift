@@ -26,7 +26,7 @@ final class SystemLocationProviderCacheTests: XCTestCase {
         )
     }
 
-    func test_캐시_초보다_작은_단위도_비교() {
+    func test_캐시_기한은_초보다_작은_단위까지_가른다() {
         XCTAssertTrue(
             SystemLocationProvider.isCacheFresh(age: 1.4, maxAge: .milliseconds(1500))
         )

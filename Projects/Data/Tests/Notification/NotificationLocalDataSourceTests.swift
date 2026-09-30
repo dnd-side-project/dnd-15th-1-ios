@@ -22,7 +22,7 @@ final class NotificationLocalDataSourceTests: XCTestCase {
         XCTAssertEqual(first, second)
     }
 
-    func test_세션_키와_다른_키를_쓴다() async throws {
+    func test_세션을_지워도_기기_ID는_그대로다() async throws {
         let storage = StubKeychainStorage()
         let local = NotificationLocalDataSource(storage: storage)
 

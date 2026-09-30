@@ -24,6 +24,26 @@ final class PlaceDTOMapperFieldTests: XCTestCase {
         XCTAssertEqual(PlaceDTOMapper.category(code: nil, name: "생활 편의"), .convenience)
     }
 
+    func test_한글_이름_일곱_값을_카테고리로_옮긴다() {
+        let pairs: [(String, PlaceCategory)] = [
+            ("맛집", .food),
+            ("카페", .cafe),
+            ("놀거리", .activity),
+            ("쇼핑", .shopping),
+            ("생활 편의", .convenience),
+            ("관광", .tourism),
+            ("숙박", .accommodation),
+        ]
+
+        for (name, expected) in pairs {
+            XCTAssertEqual(PlaceDTOMapper.category(code: nil, name: name), expected, name)
+        }
+    }
+
+    func test_RESTAURANT_코드는_food다() {
+        XCTAssertEqual(PlaceDTOMapper.category(code: "RESTAURANT", name: "카페"), .food)
+    }
+
     func test_저장_관계는_대소문자를_가리지_않는다() {
         XCTAssertEqual(PlaceDTOMapper.ownership("MINE"), .mine)
         XCTAssertEqual(PlaceDTOMapper.ownership("partner"), .partner)
@@ -72,6 +92,27 @@ final class PlaceDTOMapperFieldTests: XCTestCase {
         XCTAssertEqual(urls.map(\.absoluteString), ["https://example.com/a.jpg"])
     }
 
+    func test_대표_사진이_나머지_뒤쪽에_또_있어도_한_번만_넣는다() {
+        let urls = PlaceDTOMapper.photoURLs(
+            thumbnailURL: "https://example.com/t.jpg",
+            imageURLs: ["https://example.com/a.jpg", "https://example.com/t.jpg"]
+        )
+
+        XCTAssertEqual(urls.map(\.absoluteString), [
+            "https://example.com/t.jpg",
+            "https://example.com/a.jpg",
+        ])
+    }
+
+    func test_도로명은_값이_있으면_그대로고_비었거나_없으면_nil이다() {
+        XCTAssertEqual(
+            PlaceDTOMapper.roadAddress("경기도 안산시 단원구 모모로 145"),
+            "경기도 안산시 단원구 모모로 145"
+        )
+        XCTAssertNil(PlaceDTOMapper.roadAddress(""))
+        XCTAssertNil(PlaceDTOMapper.roadAddress(nil))
+    }
+
     func test_저장_장소는_응답의_저장_수를_읽는다() {
         let saved = PlaceDTOMapper.toDomain(savedPlaceDTO(ownershipStatus: "MINE", savedMemberCount: 7))
 
@@ -94,7 +135,7 @@ final class PlaceDTOMapperFieldTests: XCTestCase {
     }
 
     // 서버가 도로명 없음을 nil 대신 "" 로 주기도 한다. 매퍼가 빈 문자열도 nil 로 합친다 (2026-09-18 사용자 결정)
-    func test_도로명_빈_문자열은_없음으로_본다() {
+    func test_저장_장소의_도로명_빈_문자열은_없음으로_본다() {
         let dto = SavedPlaceResponseDTO(
             memberId: 1,
             placeId: 42,

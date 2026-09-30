@@ -59,13 +59,8 @@ final class NotificationRepositoryTests: XCTestCase {
         network.errors["GET \(settingsPath)"] = NetworkError.transport(message: "timeout")
         let repository = makeRepository(network: network)
 
-        do {
-            _ = try await repository.notificationSettings()
-            XCTFail("Expected network")
-        } catch let error as NotificationError {
-            XCTAssertEqual(error, .network)
-        } catch {
-            XCTFail("Expected NotificationError, got \(error)")
+        await assertThrows(NotificationError.network) {
+            try await repository.notificationSettings()
         }
     }
 
