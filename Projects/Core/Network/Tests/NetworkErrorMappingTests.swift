@@ -13,7 +13,7 @@ final class NetworkErrorMappingTests: XCTestCase {
         super.tearDown()
     }
 
-    func test_status_mapping() async throws {
+    func test_상태_코드마다_정해진_에러로_바꾼다() async throws {
         let cases: [StatusCase] = [
             .init(statusCode: 400, message: "bad", expected: .badRequest(message: "bad")),
             .init(statusCode: 403, message: "no", expected: .forbidden(message: "no")),
@@ -56,7 +56,7 @@ final class NetworkErrorMappingTests: XCTestCase {
         }
     }
 
-    func test_decoding_failed() async throws {
+    func test_응답을_디코딩하지_못하면_디코딩_실패_에러를_던진다() async throws {
         URLProtocolStub.requestHandler = { _ in
             .init(statusCode: 200, headers: [:], data: Data(#"{"ok":"nope"}"#.utf8))
         }

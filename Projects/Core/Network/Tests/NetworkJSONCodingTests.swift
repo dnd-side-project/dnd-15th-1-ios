@@ -2,7 +2,7 @@ import CoreNetwork
 import XCTest
 
 final class NetworkJSONCodingTests: XCTestCase {
-    func test_parseDate_supports_existing_and_iso8601_variants() {
+    func test_서버_날짜_형식_여섯_가지를_읽고_날짜가_아니면_nil을_준다() {
         XCTAssertNotNil(NetworkJSONCoding.parseDate("2026-08-08T13:03:22"))
         XCTAssertNotNil(NetworkJSONCoding.parseDate("2026-08-08"))
         XCTAssertNotNil(NetworkJSONCoding.parseDate("2026-08-08T13:03:22.727Z"))
@@ -12,7 +12,7 @@ final class NetworkJSONCodingTests: XCTestCase {
         XCTAssertNil(NetworkJSONCoding.parseDate("not-a-date"))
     }
 
-    func test_decoder_accepts_server_fractional_z() throws {
+    func test_소수점_초와_Z가_붙은_서버_날짜를_디코딩한다() throws {
         struct Payload: Decodable {
             let lastRejoinedAt: Date
         }
