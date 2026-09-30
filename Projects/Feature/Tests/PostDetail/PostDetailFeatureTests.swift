@@ -114,6 +114,22 @@ final class PostDetailFeatureTests: XCTestCase {
         }
     }
 
+    func test_행_북마크_저장이_실패하면_표시를_되돌린다() async {
+        var state = PostDetailFeature.State(contentID: "1")
+        state.detail = detail
+        state.savedPlaceIDs = ["101"]
+        let sut = store(state: state)
+        sut.dependencies.placeClient.savePlace = { _, _, _, _ in throw PlaceError.network }
+
+        await sut.send(.placeBookmarkTapped("102")) {
+            $0.savedPlaceIDs = ["101", "102"]
+        }
+        await sut.receive(.placeSaveFailed(id: "102", wasSaved: false)) {
+            $0.savedPlaceIDs = ["101"]
+        }
+        await sut.finish()
+    }
+
     func test_행을_누르면_상위로_올린다() async {
         let sut = store()
 
