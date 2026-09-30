@@ -16,18 +16,15 @@ final class ProfileErrorMapperTests: XCTestCase {
         XCTAssertEqual(ProfileErrorMapper.map(NetworkError.unauthorized), .unauthorized)
     }
 
-    func test_badRequest를_invalidNickname으로_매핑한다() {
-        XCTAssertEqual(
-            ProfileErrorMapper.map(NetworkError.badRequest(message: "invalid")),
-            .invalidNickname
-        )
-    }
+    func test_잘못된_요청과_충돌은_invalidNickname으로_매핑한다() {
+        let errors: [NetworkError] = [
+            .badRequest(message: "invalid"),
+            .conflict(message: "duplicated"),
+        ]
 
-    func test_conflict를_invalidNickname으로_매핑한다() {
-        XCTAssertEqual(
-            ProfileErrorMapper.map(NetworkError.conflict(message: "duplicated")),
-            .invalidNickname
-        )
+        for error in errors {
+            XCTAssertEqual(ProfileErrorMapper.map(error), .invalidNickname, "\(error)")
+        }
     }
 
     func test_422를_invalidNickname으로_매핑한다() {
@@ -44,25 +41,16 @@ final class ProfileErrorMapperTests: XCTestCase {
         )
     }
 
-    func test_notFound를_unknown으로_매핑한다() {
-        XCTAssertEqual(
-            ProfileErrorMapper.map(NetworkError.notFound(message: nil)),
-            .unknown
-        )
-    }
+    func test_권한_없음과_못찾음과_서버_에러는_unknown으로_매핑한다() {
+        let errors: [NetworkError] = [
+            .notFound(message: nil),
+            .forbidden(message: nil),
+            .serverError(statusCode: 500, message: nil),
+        ]
 
-    func test_forbidden을_unknown으로_매핑한다() {
-        XCTAssertEqual(
-            ProfileErrorMapper.map(NetworkError.forbidden(message: nil)),
-            .unknown
-        )
-    }
-
-    func test_serverError를_unknown으로_매핑한다() {
-        XCTAssertEqual(
-            ProfileErrorMapper.map(NetworkError.serverError(statusCode: 500, message: nil)),
-            .unknown
-        )
+        for error in errors {
+            XCTAssertEqual(ProfileErrorMapper.map(error), .unknown, "\(error)")
+        }
     }
 
     func test_디코딩_실패를_unknown으로_매핑한다() {

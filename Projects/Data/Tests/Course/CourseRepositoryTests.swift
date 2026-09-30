@@ -141,7 +141,7 @@ final class CourseRepositoryTests: XCTestCase {
         XCTAssertFalse(json.keys.contains("time"))
     }
 
-    func test_시간이_없으면_요청에_time을_안_싣는다() async throws {
+    func test_저장에서_시간이_없으면_요청에_time을_안_싣는다() async throws {
         let path = "/api/v1/date-courses/1001"
         let network = StubNetworkClient()
         network.responses["PUT \(path)"] = DateCourseResponseDTO(
@@ -156,7 +156,7 @@ final class CourseRepositoryTests: XCTestCase {
         )
         let repository = makeRepository(network: network)
 
-        _ = try? await repository.updateCourse(
+        _ = try await repository.updateCourse(
             id: "1001",
             content: DateCourseContent(
                 title: "성수동 데이트",
@@ -175,7 +175,7 @@ final class CourseRepositoryTests: XCTestCase {
         XCTAssertFalse(json.keys.contains("time"))
     }
 
-    func test_시간이_있으면_요청에_time을_싣는다() async throws {
+    func test_저장에서_시간이_있으면_요청에_time을_싣는다() async throws {
         let path = "/api/v1/date-courses/1001"
         let network = StubNetworkClient()
         network.responses["PUT \(path)"] = DateCourseResponseDTO(
@@ -190,7 +190,7 @@ final class CourseRepositoryTests: XCTestCase {
         )
         let repository = makeRepository(network: network)
 
-        _ = try? await repository.updateCourse(
+        _ = try await repository.updateCourse(
             id: "1001",
             content: DateCourseContent(
                 title: "성수동 데이트",
@@ -232,8 +232,8 @@ final class CourseRepositoryTests: XCTestCase {
         let network = StubNetworkClient()
         let repository = makeRepository(network: network)
 
-        do {
-            _ = try await repository.updateCourse(
+        await assertThrows(CourseError.unknown) {
+            try await repository.updateCourse(
                 id: "42",
                 content: DateCourseContent(
                     title: "t",
@@ -243,11 +243,6 @@ final class CourseRepositoryTests: XCTestCase {
                 ),
                 version: 0
             )
-            XCTFail("Expected unknown")
-        } catch let error as CourseError {
-            XCTAssertEqual(error, .unknown)
-        } catch {
-            XCTFail("Expected CourseError.unknown, got \(error)")
         }
 
         XCTAssertTrue(network.requestedKeys.isEmpty)
@@ -260,10 +255,6 @@ final class CourseRepositoryTests: XCTestCase {
         let placeIds: [Int64]
         let version: Int
         let saveType: String?
-    }
-
-    private func makeRepository(network: StubNetworkClient) -> CourseRepository {
-        CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
     }
 }
 
@@ -283,9 +274,7 @@ final class CourseRepositoryCurrentTests: XCTestCase {
                 totalPlaceCount: 3
             )
         )
-        let repository = CourseRepository(
-            remote: CourseRemoteDataSource(networkClient: network)
-        )
+        let repository = makeRepository(network: network)
 
         let course = try await repository.currentCourse()
 
@@ -301,9 +290,7 @@ final class CourseRepositoryCurrentTests: XCTestCase {
         network.responses["GET \(currentPath)"] = CurrentDateCourseResponseDTO(
             currentDateCourse: nil
         )
-        let repository = CourseRepository(
-            remote: CourseRemoteDataSource(networkClient: network)
-        )
+        let repository = makeRepository(network: network)
 
         let course = try await repository.currentCourse()
 
@@ -319,7 +306,7 @@ final class CourseRepositoryPastTests: XCTestCase {
     func test_최근_지난_데이트는_홈_주소를_size와_부른다() async throws {
         let network = StubNetworkClient()
         network.responses["GET \(latestPath)"] = [summaryDTO(date: "2026-08-06")]
-        let repository = CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
+        let repository = makeRepository(network: network)
 
         let courses = try await repository.latestPastCourses(size: 3)
 
@@ -338,7 +325,7 @@ final class CourseRepositoryPastTests: XCTestCase {
             totalCount: 12,
             hasNext: true
         )
-        let repository = CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
+        let repository = makeRepository(network: network)
 
         let page = try await repository.pastCourses(page: 1, size: 20)
 
@@ -354,15 +341,10 @@ final class CourseRepositoryPastTests: XCTestCase {
     func test_최근_지난_데이트의_날짜를_못_읽으면_unknown을_던진다() async {
         let network = StubNetworkClient()
         network.responses["GET \(latestPath)"] = [summaryDTO(date: "not-a-date")]
-        let repository = CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
+        let repository = makeRepository(network: network)
 
-        do {
-            _ = try await repository.latestPastCourses(size: 3)
-            XCTFail("Expected unknown")
-        } catch let error as CourseError {
-            XCTAssertEqual(error, .unknown)
-        } catch {
-            XCTFail("Expected CourseError, got \(error)")
+        await assertThrows(CourseError.unknown) {
+            try await repository.latestPastCourses(size: 3)
         }
     }
 
@@ -377,4 +359,8 @@ final class CourseRepositoryPastTests: XCTestCase {
             totalPlaceCount: 5
         )
     }
+}
+
+private func makeRepository(network: StubNetworkClient) -> CourseRepository {
+    CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
 }

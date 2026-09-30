@@ -51,7 +51,7 @@ final class PlaceEndpointTests: XCTestCase {
         ])
     }
 
-    func test_기존_case_셋의_경로는_그대로다() {
+    func test_저장_목록과_저장과_삭제는_places_아래_경로를_쓴다() {
         XCTAssertEqual(PlaceEndpoint.savedPlaces.path, "/api/v1/places")
         XCTAssertEqual(PlaceEndpoint.save(kakaoPlaceID: "1", query: "a", alias: nil).path, "/api/v1/places")
         XCTAssertEqual(PlaceEndpoint.remove(placeID: "9").path, "/api/v1/places/9")
