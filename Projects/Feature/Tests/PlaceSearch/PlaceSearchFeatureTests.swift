@@ -255,6 +255,36 @@ final class PlaceSearchFeatureTests: XCTestCase {
             $0.loadState = .loaded
         }
     }
+
+    func test_검색어를_들고_들어오면_바로_검색한다() async {
+        let places = [Place.fixture(id: "1", name: "장소명")]
+        let gate = AsyncStream.makeStream(of: Void.self)
+        let store = TestStore(initialState: PlaceSearchFeature.State(query: "성수")) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.placeClient.searchPlaces = { _, page in
+                XCTAssertEqual(page, 0)
+                // 최근 검색어가 먼저 도착하도록 검색 응답을 붙잡아 둔다
+                for await _ in gate.stream { break }
+                return PlacePage(items: places, hasNext: true)
+            }
+            $0.mapRecentSearchClient.load = { ["카페"] }
+        }
+
+        await store.send(.onAppear) {
+            $0.loadState = .loading
+        }
+        await store.receive(\.recentSearchesUpdated) {
+            $0.recentSearches = ["카페"]
+        }
+
+        gate.continuation.finish()
+        await store.receive(\.searchResponse.success) {
+            $0.results = places
+            $0.hasNext = true
+            $0.loadState = .loaded
+        }
+    }
 }
 
 @MainActor
@@ -262,25 +292,17 @@ final class PlaceSearchFeaturePaginationTests: XCTestCase {
     func test_끝에_닿으면_다음_페이지를_붙인다() async {
         let first = Array(Place.mocks.prefix(3))
         let second = Array(Place.mocks.suffix(2))
-        let store = TestStore(initialState: PlaceSearchFeature.State(query: "성수")) {
+        var state = PlaceSearchFeature.State(query: "성수")
+        state.results = first
+        state.hasNext = true
+        state.loadState = .loaded
+        let store = TestStore(initialState: state) {
             PlaceSearchFeature()
         } withDependencies: {
             $0.placeClient.searchPlaces = { _, page in
-                page == 0
-                    ? PlacePage(items: first, hasNext: true)
-                    : PlacePage(items: second, hasNext: false)
+                XCTAssertEqual(page, 1)
+                return PlacePage(items: second, hasNext: false)
             }
-            $0.mapRecentSearchClient.load = { [] }
-        }
-
-        await store.send(.onAppear) {
-            $0.loadState = .loading
-        }
-        await store.receive(\.recentSearchesUpdated)
-        await store.receive(\.searchResponse.success) {
-            $0.results = first
-            $0.hasNext = true
-            $0.loadState = .loaded
         }
 
         await store.send(.reachedEnd) {
