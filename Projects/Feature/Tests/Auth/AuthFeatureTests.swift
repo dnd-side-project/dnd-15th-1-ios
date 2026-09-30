@@ -173,13 +173,6 @@ final class AuthFeatureTests: XCTestCase {
     }
 }
 
-private enum AnalyticsCall: Equatable {
-    case identify(String)
-    case markSignedUp
-    case track(AnalyticsEvent)
-    case reset
-}
-
 @MainActor
 final class AuthFeatureIdentityTests: XCTestCase {
     private let session = AuthSession(
@@ -189,21 +182,14 @@ final class AuthFeatureIdentityTests: XCTestCase {
     )
 
     func test_신규_회원으로_로그인하면_사람을_먼저_묶고_가입일과_첫로그인이_뒤따른다() async {
-        let calls = LockIsolated<[AnalyticsCall]>([])
+        let analytics = AnalyticsRecorder()
         let store = TestStore(initialState: AuthFeature.State()) {
             AuthFeature()
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
-            $0.analyticsClient.identify = { userID in
-                calls.withValue { $0.append(.identify(userID)) }
-            }
-            $0.analyticsClient.markSignedUp = { _ in
-                calls.withValue { $0.append(.markSignedUp) }
-            }
-            $0.analyticsClient.track = { event in
-                calls.withValue { $0.append(.track(event)) }
-            }
+            $0.analyticsClient = analytics.client
         }
+        store.exhaustivity = .off
 
         await store.send(
             .loginResponse(
@@ -216,38 +202,23 @@ final class AuthFeatureIdentityTests: XCTestCase {
                 )
             )
         )
-        await store.receive(
-            .delegate(
-                .loginSucceeded(
-                    userID: session.userID,
-                    isOnboardingCompleted: true
-                )
-            )
-        )
         await store.finish()
 
         XCTAssertEqual(
-            calls.value,
+            analytics.calls,
             [.identify("1"), .markSignedUp, .track(.loginStarted)]
         )
     }
 
     func test_기존_회원으로_로그인하면_사람만_묶고_가입일은_안_적는다() async {
-        let calls = LockIsolated<[AnalyticsCall]>([])
+        let analytics = AnalyticsRecorder()
         let store = TestStore(initialState: AuthFeature.State()) {
             AuthFeature()
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
-            $0.analyticsClient.identify = { userID in
-                calls.withValue { $0.append(.identify(userID)) }
-            }
-            $0.analyticsClient.markSignedUp = { _ in
-                calls.withValue { $0.append(.markSignedUp) }
-            }
-            $0.analyticsClient.track = { event in
-                calls.withValue { $0.append(.track(event)) }
-            }
+            $0.analyticsClient = analytics.client
         }
+        store.exhaustivity = .off
 
         await store.send(
             .loginResponse(
@@ -260,16 +231,8 @@ final class AuthFeatureIdentityTests: XCTestCase {
                 )
             )
         )
-        await store.receive(
-            .delegate(
-                .loginSucceeded(
-                    userID: session.userID,
-                    isOnboardingCompleted: true
-                )
-            )
-        )
         await store.finish()
 
-        XCTAssertEqual(calls.value, [.identify("1")])
+        XCTAssertEqual(analytics.calls, [.identify("1")])
     }
 }

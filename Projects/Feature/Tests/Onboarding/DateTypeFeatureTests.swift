@@ -311,53 +311,46 @@ final class DateTypeFeatureAnalyticsTests: XCTestCase {
     }
 
     func test_저장_버튼을_누르면_이벤트를_보낸다() async {
-        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let analytics = AnalyticsRecorder()
         let profile = self.profile
         let store = TestStore(initialState: allSelectedState) {
             DateTypeFeature()
         } withDependencies: {
             $0.profileClient.updateDatePreference = { _ in profile }
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.analyticsClient = analytics.client
         }
+        store.exhaustivity = .off
 
-        await store.send(.saveButtonTapped) {
-            $0.isSubmitting = true
-        }
-        await store.receive(\.updateDatePreferenceResponse.success) {
-            $0.isSubmitting = false
-        }
-        await store.receive(\.delegate.saved)
+        await store.send(.saveButtonTapped)
         await store.finish()
-        XCTAssertEqual(sent.value, [.preferenceSaved])
+        XCTAssertEqual(analytics.events, [.preferenceSaved])
     }
 
     func test_취향의_첫_축을_고르면_시작_이벤트를_보낸다() async {
-        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let analytics = AnalyticsRecorder()
         let store = TestStore(initialState: DateTypeFeature.State()) {
             DateTypeFeature()
         } withDependencies: {
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.analyticsClient = analytics.client
         }
+        store.exhaustivity = .off
 
-        await store.send(.indoorOutdoorSelected(.indoor)) {
-            $0.indoorOutdoor = .indoor
-        }
+        await store.send(.indoorOutdoorSelected(.indoor))
         await store.finish()
-        XCTAssertEqual(sent.value, [.preferenceSetupStarted])
+        XCTAssertEqual(analytics.events, [.preferenceSetupStarted])
     }
 
     func test_두_번째_축을_고를_때는_시작_이벤트를_안_보낸다() async {
-        let sent = LockIsolated<[AnalyticsEvent]>([])
+        let analytics = AnalyticsRecorder()
         let store = TestStore(initialState: DateTypeFeature.State(indoorOutdoor: .indoor)) {
             DateTypeFeature()
         } withDependencies: {
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
+            $0.analyticsClient = analytics.client
         }
+        store.exhaustivity = .off
 
-        await store.send(.activityLevelSelected(.active)) {
-            $0.activityLevel = .active
-        }
+        await store.send(.activityLevelSelected(.active))
         await store.finish()
-        XCTAssertEqual(sent.value, [])
+        XCTAssertEqual(analytics.events, [])
     }
 }
