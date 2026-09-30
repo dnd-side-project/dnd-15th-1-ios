@@ -88,7 +88,7 @@ final class PostDetailFeatureTests: XCTestCase {
         await sut.receive(\.delegate.detailLoaded)
     }
 
-    func test_더보기가_본문만_펼친다() async {
+    func test_더보기를_누르면_본문이_펼쳐지고_다시_누르면_접힌다() async {
         let sut = store()
 
         await sut.send(.expandToggled) {

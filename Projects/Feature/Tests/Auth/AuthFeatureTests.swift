@@ -28,42 +28,39 @@ final class AuthFeatureTests: XCTestCase {
         await assertLoginSuccess(provider: .kakao, isOnboardingCompleted: false)
     }
 
-    func test_loginFailed_토스트() async {
+    func test_로그인에_실패하면_로그인_실패_토스트를_띄운다() async {
         await assertLoginFailure(
             error: .loginFailed,
             expectedMessage: "로그인에 실패했습니다."
         )
     }
 
-    func test_network_토스트() async {
+    func test_네트워크_오류로_실패하면_연결_확인_토스트를_띄운다() async {
         await assertLoginFailure(
             error: .network,
             expectedMessage: "네트워크 연결을 확인해 주세요."
         )
     }
 
-    func test_unknown_토스트() async {
+    func test_알_수_없는_오류로_실패하면_재시도_안내_토스트를_띄운다() async {
         await assertLoginFailure(
             error: .unknown,
             expectedMessage: "잠시 후 다시 시도해 주세요."
         )
     }
 
-    func test_unauthorized_토스트() async {
+    func test_인증_오류로_실패하면_재시도_안내_토스트를_띄운다() async {
         await assertLoginFailure(
             error: .unauthorized,
             expectedMessage: "잠시 후 다시 시도해 주세요."
         )
     }
-    func test_cancelled_토스트_없음() async {
-        let loginCount = LockIsolated(0)
+
+    func test_로그인을_취소하면_토스트를_띄우지_않는다() async {
         let store = TestStore(initialState: AuthFeature.State()) {
             AuthFeature()
         } withDependencies: {
-            $0.authClient.login = { _ in
-                loginCount.withValue { $0 += 1 }
-                throw AuthError.cancelled
-            }
+            $0.authClient.login = { _ in throw AuthError.cancelled }
         }
 
         await store.send(.loginButtonTapped(.kakao)) {
@@ -75,7 +72,7 @@ final class AuthFeatureTests: XCTestCase {
             $0.isLoading = false
             $0.loadingProvider = nil
         }
-        XCTAssertEqual(loginCount.value, 1)
+        XCTAssertNil(store.state.toast)
     }
 
     func test_로딩중_재탭_무시() async {
@@ -96,7 +93,7 @@ final class AuthFeatureTests: XCTestCase {
         XCTAssertEqual(loginCount.value, 0)
     }
 
-    func test_약관_링크_presentedTerms() async {
+    func test_약관_링크를_누르면_그_약관을_띄우고_닫으면_내린다() async {
         let store = TestStore(initialState: AuthFeature.State()) {
             AuthFeature()
         }

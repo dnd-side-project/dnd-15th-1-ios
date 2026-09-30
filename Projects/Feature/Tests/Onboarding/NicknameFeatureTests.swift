@@ -193,7 +193,7 @@ final class NicknameFeatureTests: XCTestCase {
         await store.receive(\.delegate.back)
     }
 
-    func test_한자입력_다음버튼_활성() async {
+    func test_한_글자_입력_다음버튼_활성() async {
         let store = TestStore(initialState: NicknameFeature.State(isTermsSheetPresented: false)) {
             NicknameFeature()
         }
