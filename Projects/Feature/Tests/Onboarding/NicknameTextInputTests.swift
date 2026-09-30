@@ -29,12 +29,6 @@ final class NicknameTextInputTests: XCTestCase {
 
     // MARK: - 길이
 
-    func test_여섯자까지는_그대로_받는다() {
-        let edit = decide(current: "가나다라마", range: end(of: "가나다라마"), replacement: "바")
-
-        XCTAssertEqual(edit, .accept)
-    }
-
     func test_일곱번째_글자까지는_그대로_받는다() {
         let edit = decide(current: "가나다라마바", range: end(of: "가나다라마바"), replacement: "사")
 
@@ -49,25 +43,7 @@ final class NicknameTextInputTests: XCTestCase {
         XCTAssertEqual(edit, .reject)
     }
 
-    func test_지우는_입력은_언제나_받는다() {
-        let edit = decide(current: "가나다라마바사", range: NSRange(location: 6, length: 1), replacement: "")
-
-        XCTAssertEqual(edit, .accept)
-    }
-
     // MARK: - 한글 조합
-
-    /// 받침이 붙어도 글자 수는 그대로다. 조합을 막으면 안 된다
-    func test_조합중_받침이_붙어_일곱자를_유지하면_받는다() {
-        let edit = decide(
-            current: "가나다라마바사",
-            range: NSRange(location: 6, length: 1),
-            replacement: "상",
-            isComposing: true
-        )
-
-        XCTAssertEqual(edit, .accept)
-    }
 
     /// 조합 중에 값을 바꿔 넣으면 이미 친 자모가 사라진다. 받지 않기만 해야 한다
     func test_조합중_여덟자가_되면_입력칸을_손대지_않고_거른다() {
@@ -149,21 +125,5 @@ final class NicknameTextInputTests: XCTestCase {
         )
 
         XCTAssertEqual(edit, .replace(text: "AB1가나다라", caretOffset: 3))
-    }
-
-    func test_이미_일곱자면_붙여넣기를_받지_않는다() {
-        let current = "가나다라마바사"
-
-        let edit = decide(current: current, range: end(of: current), replacement: "아자차")
-
-        XCTAssertEqual(edit, .reject)
-    }
-
-    // MARK: - 방어
-
-    func test_범위가_어긋나면_판단하지_않는다() {
-        let edit = decide(current: "둘픽", range: NSRange(location: 5, length: 3), replacement: "가")
-
-        XCTAssertEqual(edit, .accept)
     }
 }

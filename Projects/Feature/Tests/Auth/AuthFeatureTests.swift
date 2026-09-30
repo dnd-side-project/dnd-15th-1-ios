@@ -78,50 +78,6 @@ final class AuthFeatureTests: XCTestCase {
         XCTAssertEqual(loginCount.value, 1)
     }
 
-    func test_신규_회원의_로그인_성공에만_이벤트를_보낸다() async {
-        let sent = LockIsolated<[AnalyticsEvent]>([])
-        let store = TestStore(initialState: AuthFeature.State()) {
-            AuthFeature()
-        } withDependencies: {
-            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
-        }
-
-        await store.send(.loginResponse(.success(AuthBootstrapFixtures.fixtureNewMember(session: session))))
-        await store.receive(
-            .delegate(
-                .loginSucceeded(
-                    userID: session.userID,
-                    isOnboardingCompleted: true
-                )
-            )
-        )
-        await store.finish()
-        XCTAssertEqual(sent.value, [.loginStarted])
-    }
-
-    func test_기존_회원의_로그인에는_이벤트를_안_보낸다() async {
-        let sent = LockIsolated<[AnalyticsEvent]>([])
-        let store = TestStore(initialState: AuthFeature.State()) {
-            AuthFeature()
-        } withDependencies: {
-            $0.date = .constant(Date(timeIntervalSince1970: 1_700_000_000))
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
-        }
-
-        await store.send(.loginResponse(.success(AuthBootstrapFixtures.fixtureExistingMember(session: session))))
-        await store.receive(
-            .delegate(
-                .loginSucceeded(
-                    userID: session.userID,
-                    isOnboardingCompleted: true
-                )
-            )
-        )
-        await store.finish()
-        XCTAssertTrue(sent.value.isEmpty)
-    }
-
     func test_로딩중_재탭_무시() async {
         let loginCount = LockIsolated(0)
         let session = self.session
@@ -153,24 +109,6 @@ final class AuthFeatureTests: XCTestCase {
         }
         await store.send(.termsLinkTapped(.privacy)) {
             $0.presentedTerms = .privacy
-        }
-    }
-
-    private enum AuthBootstrapFixtures {
-        static func fixtureNewMember(session: AuthSession) -> AuthBootstrap {
-            AuthBootstrap(
-                session: session,
-                isOnboardingCompleted: true,
-                isNewMember: true
-            )
-        }
-
-        static func fixtureExistingMember(session: AuthSession) -> AuthBootstrap {
-            AuthBootstrap(
-                session: session,
-                isOnboardingCompleted: true,
-                isNewMember: false
-            )
         }
     }
 

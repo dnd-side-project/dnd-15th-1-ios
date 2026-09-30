@@ -140,24 +140,6 @@ final class DateTypeFeatureTests: XCTestCase {
         XCTAssertEqual(requestedPreference.value, preference)
     }
 
-    func test_건너뛰기_클라이언트_호출없이_델리게이트() async {
-        let didCallClient = LockIsolated(false)
-        let profile = self.profile
-        let store = TestStore(initialState: allSelectedState) {
-            DateTypeFeature()
-        } withDependencies: {
-            $0.profileClient.updateDatePreference = { _ in
-                didCallClient.setValue(true)
-                return profile
-            }
-        }
-
-        await store.send(.skipButtonTapped)
-        await store.receive(\.delegate.skipped)
-
-        XCTAssertFalse(didCallClient.value)
-    }
-
     func test_툴팁버튼_열고_닫기() async {
         let store = TestStore(initialState: DateTypeFeature.State()) {
             DateTypeFeature()

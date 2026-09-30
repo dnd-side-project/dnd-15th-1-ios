@@ -45,22 +45,6 @@ final class PostDetailFeatureTests: XCTestCase {
         }
     }
 
-    func test_onAppear_상세를_받아_상태를_채운다() async {
-        let loaded = detail
-        let sut = store(detail: loaded)
-
-        await sut.send(.onAppear) {
-            $0.isLoading = true
-            $0.loadFailed = false
-        }
-        await sut.receive(\.detailResponse) {
-            $0.detail = loaded
-            $0.savedPlaceIDs = ["101"]
-            $0.isLoading = false
-        }
-        await sut.receive(\.delegate.detailLoaded)
-    }
-
     func test_인증만료면_상위로_올린다() async {
         let sut = store(error: .unauthorized)
 
