@@ -10,12 +10,12 @@ import Domain
 /// Domain `PlaceOwnership` 은 서버 값만 갖고 한글 이름을 모른다.
 /// 화면에 필요한 것만 Feature 쪽에서 붙인다.
 public extension PlaceOwnership {
-    /// 시트 드롭다운이 쓰는 차례. `함께 저장한` 이 맨 앞이다
+    /// 시트 드롭다운이 쓰는 차례. `전체` 가 맨 앞이다
     static let mapDisplayOrder: [PlaceOwnership] = [.together, .mine, .partner]
 
     var displayName: String {
         switch self {
-        case .together: "함께 저장한"
+        case .together: "전체"
         case .mine: "내가 저장한"
         case .partner: "상대가 저장한"
         }
