@@ -3,6 +3,7 @@ import Domain
 @testable import Feature
 import Foundation
 @testable import SharedDesignSystem
+import SharedUtils
 import XCTest
 
 @MainActor
@@ -280,6 +281,41 @@ final class CourseEditFeatureTests: XCTestCase {
         await store.send(.backModalSaveTapped)
         await store.receive(\.saveResponse)
         await store.receive(.delegate(.saved(threeStopCourse)))
+    }
+}
+
+@MainActor
+final class CourseEditPlaceAddTests: XCTestCase {
+
+    func test_장소_추가는_저장_전_순서와_범위의_기존_장소를_좌표와_함께_올린다() async {
+        let store = await loadedStore()
+        await store.send(.placeMoved(from: 2, to: 0))
+        await store.send(.placeDeleteTapped(id: "p1"))
+
+        await store.send(.addPlaceTapped)
+
+        await store.receive(
+            .delegate(
+                .placeAddRequested(existing: [
+                    ExistingCoursePlace(
+                        id: "p2",
+                        category: .food,
+                        coordinate: Coordinate(
+                            latitude: 37.31 + Double(2) * 0.01,
+                            longitude: 126.90 + Double(2) * 0.01
+                        )
+                    ),
+                    ExistingCoursePlace(
+                        id: "p0",
+                        category: .food,
+                        coordinate: Coordinate(
+                            latitude: 37.31 + Double(0) * 0.01,
+                            longitude: 126.90 + Double(0) * 0.01
+                        )
+                    ),
+                ])
+            )
+        )
     }
 }
 

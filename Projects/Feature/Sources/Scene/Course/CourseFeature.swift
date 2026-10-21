@@ -3,6 +3,7 @@ import CoreKakaoMap
 import Domain
 import Foundation
 import SharedDesignSystem
+import SharedUtils
 
 // MARK: - CourseFeature
 
@@ -17,13 +18,25 @@ public struct CourseFeature {
 
     public enum Mode: Equatable, Sendable {
         case create
-        case pick(excluding: [String])
+        /// 코스 수정의 「장소 추가」. 기존 코스 장소를 수정 화면의 저장 전 순서 그대로 받는다
+        case pick(existing: [ExistingCoursePlace])
     }
 
     public enum LoadState: Equatable {
         case loading
         case loaded
         case failed
+    }
+
+    /// 목록을 이 행까지 올려 달라는 요청. 요청마다 번호가 하나씩 늘어 같은 행이어도 새 값이 된다
+    public struct RowScrollRequest: Equatable, Sendable {
+        public let placeID: String
+        public let sequence: Int
+
+        public init(placeID: String, sequence: Int) {
+            self.placeID = placeID
+            self.sequence = sequence
+        }
     }
 
     // MARK: State
@@ -63,6 +76,8 @@ public struct CourseFeature {
         /// 순서가 곧 번호다. Set 을 쓰면 번호를 못 매긴다
         public var selectedPlaceIDs: [String] = []
         public var camera: MapCamera = .seoulCityHall
+        /// 핀을 누르면 들어간다. 뷰가 받아 목록을 그 행까지 올린다
+        public var rowScrollRequest: RowScrollRequest?
 
         public init(now: Date = Date(), mode: Mode = .create) {
             var seoul = Calendar(identifier: .gregorian)
@@ -74,6 +89,10 @@ public struct CourseFeature {
             self.draftDate = tomorrow
             self.draftTime = nowTime
             self.mode = mode
+            // 기존 코스 핀은 불러오기와 상관없이 그려지므로 카메라도 처음부터 그 끝을 본다
+            if case let .pick(existing) = mode, let last = existing.last {
+                self.camera = .focusing(last.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+            }
         }
     }
 
@@ -302,14 +321,16 @@ private extension CourseFeature {
             state.selectedCategory = state.selectedCategory == category ? nil : category
             return .none
 
-        case .rowTapped(let id), .markerTapped(let id):
-            let placeID = CourseMarkerID.placeID(from: id)
+        case let .rowTapped(placeID):
             let wasSelected = state.selectedPlaceIDs.contains(placeID)
-            toggle(&state, id: id)
-            guard !wasSelected else { return .none }
-            return .run { [analyticsClient] _ in
-                await analyticsClient.track(.placeAddedToCourse)
+            toggle(&state, placeID: placeID)
+            if let candidate = state.places.first(where: { $0.id == placeID }) {
+                focus(&state, on: candidate.place.coordinate)
             }
+            return trackAdded(wasSelected: wasSelected)
+
+        case let .markerTapped(markerID):
+            return tapMarker(&state, markerID: markerID)
 
         case let .cameraChanged(camera):
             state.camera = camera
@@ -505,29 +526,83 @@ private extension CourseFeature {
         state.isWheelPresented = false
     }
 
-    func toggle(_ state: inout State, id: String) {
-        let placeID = CourseMarkerID.placeID(from: id)
+    func toggle(_ state: inout State, placeID: String) {
         if let index = state.selectedPlaceIDs.firstIndex(of: placeID) {
             state.selectedPlaceIDs.remove(at: index)
         } else {
             state.selectedPlaceIDs.append(placeID)
         }
     }
+
+    func tapMarker(_ state: inout State, markerID: String) -> Effect<Action> {
+        switch CourseMarkerID.target(of: markerID) {
+        case .existing:
+            // 기존 코스 장소는 이 화면에서 고르거나 빼지 않는다
+            return .none
+
+        case let .candidate(placeID):
+            let wasSelected = state.selectedPlaceIDs.contains(placeID)
+            let isListed = state.filteredPlaces.contains { $0.id == placeID }
+            toggle(&state, placeID: placeID)
+            // 필터에 걸려 목록에 없는 장소는 빼기만 한다. 옮길 행이 없고, 빼면 그 자리에 핀도 안 남는다
+            guard isListed else { return trackAdded(wasSelected: wasSelected) }
+            let sequence = (state.rowScrollRequest?.sequence ?? 0) + 1
+            state.rowScrollRequest = RowScrollRequest(placeID: placeID, sequence: sequence)
+            return trackAdded(wasSelected: wasSelected)
+        }
+    }
+
+    /// 지금 줌을 그대로 둔다
+    func focus(_ state: inout State, on coordinate: Coordinate) {
+        state.camera = .focusing(coordinate, zoomLevel: state.camera.zoomLevel)
+    }
+
+    /// 새로 담을 때만 담기 이벤트를 보낸다
+    func trackAdded(wasSelected: Bool) -> Effect<Action> {
+        guard !wasSelected else { return .none }
+        return .run { [analyticsClient] _ in
+            await analyticsClient.track(.placeAddedToCourse)
+        }
+    }
 }
 
 // MARK: - Marker ID
 
-/// 물방울 핀 id. 카테고리 핀과 같은 장소 id 를 쓰면 지도가 하나를 버린다
+/// 핀 id. 같은 장소에 카테고리 핀과 숫자 핀이 함께 서서 앞붙이로 가른다. 같은 id 면 지도가 하나를 버린다
 private enum CourseMarkerID {
-    static let candidatePrefix = "candidate:"
-
-    static func candidate(_ placeID: String) -> String {
-        candidatePrefix + placeID
+    enum Target: Equatable {
+        /// 저장한 장소. 이 화면에서 고르거나 뺀다
+        case candidate(String)
+        /// 기존 코스 장소. 눌러도 아무 일도 없다
+        case existing
     }
 
-    static func placeID(from markerID: String) -> String {
-        guard markerID.hasPrefix(candidatePrefix) else { return markerID }
-        return String(markerID.dropFirst(candidatePrefix.count))
+    static let numberedPrefix = "numbered:"
+    static let existingCategoryPrefix = "existing:"
+    static let existingNumberedPrefix = "existing-numbered:"
+
+    static func numbered(_ placeID: String) -> String {
+        numberedPrefix + placeID
+    }
+
+    static func existingCategory(_ placeID: String) -> String {
+        existingCategoryPrefix + placeID
+    }
+
+    static func existingNumbered(_ placeID: String) -> String {
+        existingNumberedPrefix + placeID
+    }
+
+    static func target(of markerID: String) -> Target {
+        if markerID.hasPrefix(existingNumberedPrefix) || markerID.hasPrefix(existingCategoryPrefix) {
+            return .existing
+        }
+        return .candidate(strip(numberedPrefix, from: markerID) ?? markerID)
+    }
+
+    private static func strip(_ prefix: String, from markerID: String) -> String? {
+        guard markerID.hasPrefix(prefix) else { return nil }
+        return String(markerID.dropFirst(prefix.count))
     }
 }
 
@@ -535,39 +610,64 @@ private enum CourseMarkerID {
 
 public extension CourseFeature.State {
 
-    var filteredPlaces: [SavedPlace] {
-        let base = places
-            .filter { selectedOwnership.matches($0.ownership) }
-            .filter { selectedCategory == nil || $0.place.category == selectedCategory }
-        if case let .pick(excluding) = mode {
-            let taken = Set(excluding)
-            return base.filter { !taken.contains($0.id) }
-        }
-        return base
+    /// 장소 추가로 들어왔을 때 기존 코스 장소. 저장 전 순서 그대로다
+    var existingPlaces: [ExistingCoursePlace] {
+        if case let .pick(existing) = mode { return existing }
+        return []
     }
 
-    /// 카테고리 핀을 먼저 두고 고른 물방울을 뒤에 둔다. 지도가 배열 순서로 그려 물방울이 위에 온다
+    var filteredPlaces: [SavedPlace] {
+        let taken = Set(existingPlaces.map(\.id))
+        return places
+            .filter { selectedOwnership.matches($0.ownership) }
+            .filter { selectedCategory == nil || $0.place.category == selectedCategory }
+            .filter { !taken.contains($0.id) }
+    }
+
+    /// 기존 코스 핀, 목록의 카테고리 핀, 고른 숫자 핀 순서다.
+    /// 겹침은 배열 순서가 아니라 핀 종류가 정한다. 숫자 핀이 카테고리 핀 위에 앉는다 (`MapMarkerStyle.rank(for:)`)
     var markers: [MapMarker] {
-        let selected = Set(selectedPlaceIDs)
-        let categoryPins = filteredPlaces
-            .map { candidate in
+        let existingPins = existingPlaces.enumerated().flatMap { index, stop in
+            [
                 MapMarker(
-                    id: candidate.id,
-                    coordinate: candidate.place.coordinate,
-                    kind: .category(candidate.place.category)
-                )
-            }
-        // 고른 물방울은 필터를 타지 않는다. 목록에서 사라져도 핀으로 해제할 수 있어야 한다
-        let candidatePins = places
-            .filter { selected.contains($0.id) }
-            .map { candidate in
+                    id: CourseMarkerID.existingCategory(stop.id),
+                    coordinate: stop.coordinate,
+                    kind: .category(stop.category)
+                ),
                 MapMarker(
-                    id: CourseMarkerID.candidate(candidate.id),
-                    coordinate: candidate.place.coordinate,
-                    kind: .candidate
-                )
-            }
-        return categoryPins + candidatePins
+                    id: CourseMarkerID.existingNumbered(stop.id),
+                    coordinate: stop.coordinate,
+                    kind: .numbered(index + 1)
+                ),
+            ]
+        }
+        let categoryPins = filteredPlaces.map { candidate in
+            MapMarker(
+                id: candidate.id,
+                coordinate: candidate.place.coordinate,
+                kind: .category(candidate.place.category)
+            )
+        }
+        // 숫자 핀은 필터를 타지 않는다. 목록에서 사라져도 핀으로 뺄 수 있어야 한다
+        let numberedPins = selectedPlaceIDs.enumerated().compactMap { index, placeID -> MapMarker? in
+            guard let candidate = places.first(where: { $0.id == placeID }) else { return nil }
+            return MapMarker(
+                id: CourseMarkerID.numbered(candidate.id),
+                coordinate: candidate.place.coordinate,
+                kind: .numbered(existingPlaces.count + index + 1)
+            )
+        }
+        return existingPins + categoryPins + numberedPins
+    }
+
+    /// 기존 코스 다음에 고른 순서대로 잇는 직선. 점이 둘 이상일 때만 긋는다
+    var routes: [MapRoute] {
+        let picked = selectedPlaceIDs.compactMap { placeID in
+            places.first { $0.id == placeID }?.place.coordinate
+        }
+        let coordinates = existingPlaces.map(\.coordinate) + picked
+        guard coordinates.count >= 2 else { return [] }
+        return [MapRoute(id: "course-pick", coordinates: coordinates)]
     }
 
     var selectedCount: Int { selectedPlaceIDs.count }
@@ -608,14 +708,18 @@ public extension CourseFeature.State {
 
     func badgeState(for id: String) -> PlaceNumberBadgeState {
         guard let index = selectedPlaceIDs.firstIndex(of: id) else { return .unselected }
-        return .number(index + 1)
+        // 장소 추가에서는 기존 코스 뒤에 붙으므로 그 다음 번호부터 센다
+        return .number(existingPlaces.count + index + 1)
     }
 }
 
 private extension CourseFeature {
 
-    /// 여러 장소를 보는 자리. 첫 행이 없으면 서울 시청이다
+    /// 여러 장소를 보는 자리. 장소 추가면 새 장소가 이어 붙을 기존 코스의 끝, 아니면 첫 행, 둘 다 없으면 서울 시청이다
     static func overview(of state: State) -> MapCamera {
+        if let last = state.existingPlaces.last {
+            return .focusing(last.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
         guard let first = state.filteredPlaces.first else { return .seoulCityHall }
         return .focusing(first.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
     }
