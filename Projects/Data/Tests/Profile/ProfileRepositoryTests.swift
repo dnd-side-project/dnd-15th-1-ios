@@ -198,6 +198,12 @@ final class ProfileRepositoryTests: XCTestCase {
     }
 
     private func makeRepository(network: StubNetworkClient) -> ProfileRepository {
-        ProfileRepository(profileRemote: ProfileRemoteDataSource(networkClient: network))
+        ProfileRepository(
+            profileRemote: ProfileRemoteDataSource(networkClient: network),
+            sessionStore: AuthSessionStore(
+                authLocal: AuthLocalDataSource(storage: StubKeychainStorage()),
+                plainRemote: AuthRemoteDataSource(networkClient: network)
+            )
+        )
     }
 }

@@ -16,13 +16,9 @@ public enum NetworkClientFactory {
 
     public static func authed(
         config: NetworkConfiguration,
-        tokenProvider: any TokenProviding,
-        tokenRefresher: any TokenRefreshing
+        sessionProvider: any AuthSessionProviding
     ) -> AFNetworkClient {
-        let interceptor = AuthRequestInterceptor(
-            tokenProvider: tokenProvider,
-            tokenRefresher: tokenRefresher
-        )
+        let interceptor = AuthRequestInterceptor(sessionProvider: sessionProvider)
         return AFNetworkClient(
             session: makeSession(timeout: config.timeout, interceptor: interceptor),
             baseURL: config.baseURL,

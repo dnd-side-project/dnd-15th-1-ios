@@ -3,9 +3,11 @@ import Foundation
 
 public struct ProfileRepository: Sendable {
     private let profileRemote: ProfileRemoteDataSource
+    private let sessionStore: AuthSessionStore
 
-    public init(profileRemote: ProfileRemoteDataSource) {
+    init(profileRemote: ProfileRemoteDataSource, sessionStore: AuthSessionStore) {
         self.profileRemote = profileRemote
+        self.sessionStore = sessionStore
     }
 
     public func member() async throws -> UserProfile {
@@ -26,6 +28,8 @@ public struct ProfileRepository: Sendable {
         } catch {
             throw ProfileErrorMapper.map(error)
         }
+        // 탈퇴는 서버에서 끝났다. 이 기기의 세션만 지운다. 푸시 해제와 서버 로그아웃은 보내지 않는다
+        await sessionStore.clearAfterWithdrawal()
     }
 
     // 온보딩과 달리 초기화 분기 없이 곧장 PATCH 한다. 프로필 수정 화면용.

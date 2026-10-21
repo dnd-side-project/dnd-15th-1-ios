@@ -116,4 +116,27 @@ final class MyPageFeatureTests: XCTestCase {
             $0.marketingAlarmOn = false
         }
     }
+
+    func test_탈퇴에_성공하면_로그아웃을_따로_부르지_않고_탈퇴_안내를_올린다() async {
+        let store = TestStore(
+            initialState: MyPageFeature.State(isSkeleton: false, isWithdrawModalPresented: true)
+        ) {
+            MyPageFeature()
+        } withDependencies: {
+            $0.profileClient.withdraw = {}
+            $0.authClient.logout = {
+                XCTFail("탈퇴한 뒤 로그아웃을 부르면 안 된다. 세션 정리는 탈퇴가 함께 한다")
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.withdrawConfirmed) {
+            $0.isWithdrawing = true
+        }
+        await store.receive(\.withdrawSucceeded) {
+            $0.isWithdrawing = false
+            $0.isWithdrawModalPresented = false
+        }
+        await store.receive(\.delegate.accountWithdrawn)
+    }
 }

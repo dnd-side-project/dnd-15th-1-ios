@@ -28,7 +28,8 @@ public enum ProfileClientFactory {
 
     private static func makeRepo(session: AuthSessionAssembly) -> ProfileRepository {
         ProfileRepository(
-            profileRemote: ProfileRemoteDataSource(networkClient: session.authedClient)
+            profileRemote: ProfileRemoteDataSource(networkClient: session.authedClient),
+            sessionStore: session.sessionStore
         )
     }
 }
