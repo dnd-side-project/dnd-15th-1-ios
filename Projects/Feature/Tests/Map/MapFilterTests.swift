@@ -30,7 +30,7 @@ final class PlaceOwnershipFilterTests: XCTestCase {
         for filter in PlaceOwnership.mapDisplayOrder {
             XCTAssertEqual(PlaceOwnership.fromDisplayName(filter.displayName), filter)
         }
-        XCTAssertEqual(PlaceOwnership.together.displayName, "함께 저장한")
+        XCTAssertEqual(PlaceOwnership.together.displayName, "전체")
         XCTAssertNil(PlaceOwnership.fromDisplayName("지역 선택"))
     }
 }
