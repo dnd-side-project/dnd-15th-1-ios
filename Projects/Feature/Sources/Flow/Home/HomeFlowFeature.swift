@@ -336,8 +336,8 @@ private extension HomeFlowFeature {
         state: inout State
     ) -> Effect<Action> {
         switch courseEditDelegate {
-        case let .placeAddRequested(excluding):
-            state.coursePlaceAdd = CourseFeature.State(mode: .pick(excluding: excluding))
+        case let .placeAddRequested(existing):
+            state.coursePlaceAdd = CourseFeature.State(mode: .pick(existing: existing))
             state.path.append(.coursePlaceAdd)
             return .none
 

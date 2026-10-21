@@ -35,6 +35,9 @@ public struct CoursePlacePickView: View {
     @State private var categoryMenuFrame: CGRect?
     @State private var grabFrames: [CGRect] = []
 
+    /// 핀을 누르면 리듀서의 요청대로 목록을 그 행까지 올린다
+    @State private var listScrollPosition = ScrollPosition(idType: String.self)
+
     public init(store: StoreOf<CourseFeature>) {
         self.store = store
     }
@@ -86,6 +89,7 @@ private extension CoursePlacePickView {
                 set: { store.send(.cameraChanged($0)) }
             ),
             pins: store.markers.map(MapMarkerStyle.pin(for:)),
+            routes: store.routes,
             onPinTap: { store.send(.markerTapped($0)) },
             collapsedSheetTop: collapsedSheetTop
         )
@@ -109,13 +113,21 @@ private extension CoursePlacePickView {
             // 끌기 시작하면 열린 메뉴를 닫는다. 열어둔 채 끌면 메뉴가 시트를 따라다녀 어색하다
             onDragBegan: { openFilterMenu = nil },
             gestureKind: .grabberOnly,
-            onCollapsedTopChange: { collapsedSheetTop = $0 }
+            onCollapsedTopChange: { collapsedSheetTop = $0 },
+            scrollPosition: $listScrollPosition
         ) {
             EmptyView()
         } header: {
             sheetHeader
         } content: {
             sheetContent
+        }
+        // 요청 번호까지 보므로 같은 행을 다시 요청해도 다시 맞춘다. 시트 높이는 건드리지 않는다
+        .onChange(of: store.rowScrollRequest) { _, request in
+            guard let request else { return }
+            withAnimation {
+                listScrollPosition.scrollTo(id: request.placeID, anchor: .top)
+            }
         }
     }
 
@@ -186,6 +198,8 @@ private extension CoursePlacePickView {
                 row(candidate, showsDivider: candidate.id != store.filteredPlaces.last?.id)
             }
         }
+        // 시트 스크롤이 ForEach 가 매긴 장소 id 로 행을 찾는다
+        .scrollTargetLayout()
         .padding(.top, Spacing.s8)
         .padding(.bottom, ctaCoverPadding)
     }
