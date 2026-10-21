@@ -213,7 +213,7 @@ final class MapFeatureFilterTests: XCTestCase {
         return TestStore(initialState: state) { MapFeature() }
     }
 
-    func test_함께저장한이_기본이고_전부_보인다() async {
+    func test_전체가_기본이고_전부_보인다() async {
         let store = loadedStore(mixed)
         XCTAssertEqual(store.state.selectedOwnership, .together)
         XCTAssertEqual(store.state.filteredPlaces.count, 3)
