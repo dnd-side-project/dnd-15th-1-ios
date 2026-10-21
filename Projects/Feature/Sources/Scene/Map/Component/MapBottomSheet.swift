@@ -76,6 +76,9 @@ struct MapBottomSheet<Above: View, Header: View, Content: View>: View {
     /// 손짓 주인이 시트로 정해지는 순간 한 번 불린다. 열린 메뉴를 닫는 데 쓴다
     private let onDragBegan: (() -> Void)?
 
+    /// 본문 스크롤 위치. 부르는 쪽이 목록을 특정 행으로 옮길 때만 넘긴다
+    private let scrollPosition: Binding<ScrollPosition>?
+
     private let above: Above
     private let header: Header
     private let content: Content
@@ -144,6 +147,7 @@ extension MapBottomSheet {
         onDragBegan: (() -> Void)? = nil,
         gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
+        scrollPosition: Binding<ScrollPosition>? = nil,
         @ViewBuilder above: () -> Above,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
@@ -155,6 +159,7 @@ extension MapBottomSheet {
         self.onDragBegan = onDragBegan
         self.gestureKind = gestureKind
         self.onCollapsedTopChange = onCollapsedTopChange
+        self.scrollPosition = scrollPosition
         self.above = above()
         self.header = header()
         self.content = content()
@@ -171,6 +176,7 @@ extension MapBottomSheet where Above == EmptyView {
         onDragBegan: (() -> Void)? = nil,
         gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
+        scrollPosition: Binding<ScrollPosition>? = nil,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
     ) {
@@ -182,6 +188,7 @@ extension MapBottomSheet where Above == EmptyView {
             onDragBegan: onDragBegan,
             gestureKind: gestureKind,
             onCollapsedTopChange: onCollapsedTopChange,
+            scrollPosition: scrollPosition,
             above: { EmptyView() },
             header: header,
             content: content
@@ -199,6 +206,7 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
         onDragBegan: (() -> Void)? = nil,
         gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
+        scrollPosition: Binding<ScrollPosition>? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.init(
@@ -209,6 +217,7 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
             onDragBegan: onDragBegan,
             gestureKind: gestureKind,
             onCollapsedTopChange: onCollapsedTopChange,
+            scrollPosition: scrollPosition,
             above: { EmptyView() },
             header: { EmptyView() },
             content: content
@@ -226,6 +235,7 @@ extension MapBottomSheet where Header == EmptyView {
         onDragBegan: (() -> Void)? = nil,
         gestureKind: SheetGestureKind = .followsContent,
         onCollapsedTopChange: ((CGFloat) -> Void)? = nil,
+        scrollPosition: Binding<ScrollPosition>? = nil,
         @ViewBuilder above: () -> Above,
         @ViewBuilder content: () -> Content
     ) {
@@ -237,6 +247,7 @@ extension MapBottomSheet where Header == EmptyView {
             onDragBegan: onDragBegan,
             gestureKind: gestureKind,
             onCollapsedTopChange: onCollapsedTopChange,
+            scrollPosition: scrollPosition,
             above: above,
             header: { EmptyView() },
             content: content
@@ -351,6 +362,7 @@ private extension MapBottomSheet {
             )
         )
         .contentMargins(.bottom, layout.hiddenHeight(for: selection), for: .scrollContent)
+        .modifier(SheetScrollPositionModifier(position: scrollPosition))
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, offset in
@@ -505,6 +517,23 @@ private extension MapBottomSheet {
                 extraFrames: grabFrames
             )
         )
+    }
+}
+
+// MARK: - Scroll Position
+
+/// 부르는 쪽이 스크롤 위치를 넘겼을 때만 `.scrollPosition` 을 붙인다.
+/// 안 넘긴 화면은 수식어가 없어 스크롤이 지금과 같다
+private struct SheetScrollPositionModifier: ViewModifier {
+    let position: Binding<ScrollPosition>?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let position {
+            content.scrollPosition(position)
+        } else {
+            content
+        }
     }
 }
 
