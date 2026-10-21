@@ -105,19 +105,4 @@ public struct AuthRepository: Sendable {
             throw AuthErrorMapper.map(error)
         }
     }
-
-    public func refreshSession() async throws -> AuthSession {
-        do {
-            guard let current = try await authLocal.loadSession() else {
-                throw AuthError.unauthorized
-            }
-
-            let refreshed = try await authRemote.reissue(refreshToken: current.refreshToken)
-            let rotated = AuthDTOMapper.toSessionDTO(token: refreshed, rotating: current)
-            try await authLocal.saveSession(rotated)
-            return AuthDTOMapper.toDomain(rotated)
-        } catch {
-            throw AuthErrorMapper.map(error)
-        }
-    }
 }
