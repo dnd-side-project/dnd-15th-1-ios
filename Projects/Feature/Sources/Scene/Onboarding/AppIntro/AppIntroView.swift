@@ -84,6 +84,8 @@ public struct AppIntroView: View {
                 .foregroundStyle(Color.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, PageMetric.titleHorizontalPadding)
+                // 없으면 스크롤 영역이 픽셀 반올림으로 1픽셀 줄 때 제목 둘째 줄을 지운다
+                .fixedSize(horizontal: false, vertical: true)
 
             item.image
                 .resizable()
