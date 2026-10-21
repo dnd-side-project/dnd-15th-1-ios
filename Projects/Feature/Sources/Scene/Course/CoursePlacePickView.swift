@@ -153,7 +153,7 @@ private extension CoursePlacePickView {
                 AppDropdown(
                     selection: categoryBinding,
                     isExpanded: filterMenuBinding(.category),
-                    placeholder: PlaceCategory.unfilteredName,
+                    placeholder: PlaceCategory.placeholderName,
                     options: [PlaceCategory.unfilteredName] + PlaceCategory.mapDisplayOrder.map(\.displayName),
                     onMenuFrameChange: { categoryMenuFrame = $0 }
                 )

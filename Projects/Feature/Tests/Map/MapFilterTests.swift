@@ -8,7 +8,7 @@ final class PlaceOwnershipFilterTests: XCTestCase {
         XCTAssertEqual(PlaceOwnership.mapDisplayOrder.first, .together)
     }
 
-    func test_함께저장한은_세종류를_다_통과시킨다() {
+    func test_전체는_세종류를_다_통과시킨다() {
         for ownership in PlaceOwnership.allCases {
             XCTAssertTrue(PlaceOwnership.together.matches(ownership), "\(ownership) 가 걸러졌다")
         }
@@ -30,7 +30,7 @@ final class PlaceOwnershipFilterTests: XCTestCase {
         for filter in PlaceOwnership.mapDisplayOrder {
             XCTAssertEqual(PlaceOwnership.fromDisplayName(filter.displayName), filter)
         }
-        XCTAssertEqual(PlaceOwnership.together.displayName, "함께 저장한")
+        XCTAssertEqual(PlaceOwnership.together.displayName, "전체")
         XCTAssertNil(PlaceOwnership.fromDisplayName("지역 선택"))
     }
 }

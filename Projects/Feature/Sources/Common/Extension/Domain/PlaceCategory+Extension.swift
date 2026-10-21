@@ -73,4 +73,7 @@ public extension PlaceCategory {
 
     /// 카테고리 드롭다운에서 특정 카테고리가 아니라 전부를 뜻하는 문구.
     static let unfilteredName = "전체"
+
+    /// 카테고리 드롭다운이 아무것도 안 골랐을 때 닫힌 칩에 보이는 문구.
+    static let placeholderName = "카테고리"
 }
