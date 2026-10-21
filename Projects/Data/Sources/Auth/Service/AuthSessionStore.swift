@@ -58,6 +58,26 @@ actor AuthSessionStore: AuthSessionProviding {
         return .awaitRefresh(joinOrStartRefresh(from: current))
     }
 
+    // MARK: - 세션 읽기·쓰기
+
+    func currentSession() async throws -> AuthSessionDTO? {
+        try await loadIfNeeded()
+        return session
+    }
+
+    /// 키체인 저장이 먼저다. 저장이 끝난 뒤에만 메모리를 바꾸고, 실패하면 메모리는 그대로다
+    func login(_ newSession: AuthSessionDTO) async throws {
+        try await enqueueWrite { try await self.saveAndAdopt(newSession) }
+    }
+
+    /// 플래그만 바꾼다. 토큰과 generation 은 그대로다
+    func updateOnboardingCompleted(_ value: Bool) async throws {
+        try await loadIfNeeded()
+        guard let current = session else { return }
+        session = current.with(isOnboardingCompleted: value)
+        try await persistMemory()
+    }
+
     // MARK: - 재발급
 
     private func joinOrStartRefresh(from current: AuthSessionDTO) -> Task<Bool, Never> {
@@ -189,5 +209,42 @@ actor AuthSessionStore: AuthSessionProviding {
         }
         lastWrite = Task { _ = await current.result }
         try await current.value
+    }
+}
+
+// MARK: - 로그아웃·탈퇴
+
+extension AuthSessionStore {
+    /// 진행 중인 재발급을 기다린 뒤 서버 로그아웃을 보내고 세션을 지운다.
+    /// 메모리를 비우고 generation 을 먼저 올린 뒤 키체인을 지운다. 키체인 삭제 실패는 실패로 알린다
+    func logout(sendingLogout send: @Sendable (String) async throws -> Void) async throws {
+        try await loadIfNeeded()
+        isLoggingOut = true
+        if let refreshTask {
+            _ = await refreshTask.value
+        }
+        if let current = session {
+            await sendLogout(refreshToken: current.refreshToken, send: send)
+        }
+        isLoggingOut = false
+        clearMemory()
+        try await persistMemory()
+    }
+
+    /// 로그아웃 요청은 인터셉터가 다시 보내지 않는다(판단이 로그아웃 중이면 실패다). 401 이면 여기서 재발급하고 한 번 더 보낸다
+    private func sendLogout(refreshToken: String, send: @Sendable (String) async throws -> Void) async {
+        do {
+            try await send(refreshToken)
+        } catch NetworkError.unauthorized {
+            guard let current = session,
+                  await joinOrStartRefresh(from: current).value,
+                  let rotated = session else {
+                return
+            }
+            try? await send(rotated.refreshToken)
+        } catch {
+            // 서버 로그아웃 실패는 무시한다. 이 기기의 세션은 지운다
+            return
+        }
     }
 }
