@@ -1,6 +1,7 @@
 import Domain
 import Feature
 import Foundation
+import SharedUtils
 import ThirdParty
 import XCTest
 
@@ -286,17 +287,17 @@ final class MapFlowCourseEditWiringTests: XCTestCase {
         XCTAssertEqual(store.state.courseResult?.course, saved)
     }
 
-    func test_장소_추가는_고르기_모드로_화면을_쌓는다() async {
+    func test_장소_추가는_기존_장소_좌표를_싣고_고르기_모드로_화면을_쌓는다() async {
         let store = flowStore(
             courseEdit: .init(dateCourseID: "1001"),
             path: [.courseResult, .courseEdit]
         )
         store.exhaustivity = .off
 
-        await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["101"]))))
+        await store.send(.courseEdit(.delegate(.placeAddRequested(existing: [existing101]))))
 
         XCTAssertEqual(store.state.path.last, .coursePlaceAdd)
-        XCTAssertEqual(store.state.coursePlaceAdd?.mode, .pick(excluding: ["101"]))
+        XCTAssertEqual(store.state.coursePlaceAdd?.mode, .pick(existing: [existing101]))
         XCTAssertNil(store.state.course)
     }
 
@@ -304,7 +305,7 @@ final class MapFlowCourseEditWiringTests: XCTestCase {
         let picked = [candidate102]
         let store = flowStore(
             courseEdit: .init(dateCourseID: "1001"),
-            coursePlaceAdd: .init(mode: .pick(excluding: ["101"])),
+            coursePlaceAdd: .init(mode: .pick(existing: [existing101])),
             path: [.courseResult, .courseEdit, .coursePlaceAdd]
         )
         store.exhaustivity = .off
@@ -328,7 +329,7 @@ final class MapFlowCourseEditWiringTests: XCTestCase {
         )
         store.exhaustivity = .off
 
-        await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["p0"]))))
+        await store.send(.courseEdit(.delegate(.placeAddRequested(existing: [existingP0]))))
         await store.send(.coursePlaceAdd(.delegate(.placesPicked([candidate102]))))
         await store.receive(\.pathChanged)
         await store.receive(\.courseEdit.placesAdded)
@@ -381,6 +382,18 @@ private let twoStopCourse = makeCourse(
 )
 
 private let candidate102 = SavedPlace.candidateFixture(id: "102")
+
+private let existing101 = ExistingCoursePlace(
+    id: "101",
+    category: .food,
+    coordinate: Coordinate(latitude: 37.31, longitude: 126.90)
+)
+
+private let existingP0 = ExistingCoursePlace(
+    id: "p0",
+    category: .food,
+    coordinate: Coordinate(latitude: 37.31, longitude: 126.90)
+)
 
 private func makeCourse(
     stopCount: Int,

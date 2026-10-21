@@ -389,16 +389,6 @@ final class CoursePlacePickTests: XCTestCase {
         XCTAssertEqual(store.state.badgeState(for: "b"), .unselected)
     }
 
-    func test_핀탭_행탭과같다() async {
-        let store = loadedStore()
-
-        await store.send(.markerTapped("a")) { $0.selectedPlaceIDs = ["a"] }
-        await store.send(.rowTapped("a")) { $0.selectedPlaceIDs = [] }
-
-        await store.send(.rowTapped("a")) { $0.selectedPlaceIDs = ["a"] }
-        await store.send(.markerTapped("a")) { $0.selectedPlaceIDs = [] }
-    }
-
     func test_장소를_담을_때만_이벤트를_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
         var initial = CourseFeature.State()
@@ -418,7 +408,7 @@ final class CoursePlacePickTests: XCTestCase {
         XCTAssertEqual(sent.value, [.placeAddedToCourse])
     }
 
-    func test_물방울핀으로_빼면_담기_이벤트를_안_보낸다() async {
+    func test_숫자핀으로_빼면_담기_이벤트를_안_보낸다() async {
         let sent = LockIsolated<[AnalyticsEvent]>([])
         var initial = CourseFeature.State()
         initial.places = savedPlaces
@@ -431,7 +421,7 @@ final class CoursePlacePickTests: XCTestCase {
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
-        await store.send(.markerTapped("candidate:a")) { $0.selectedPlaceIDs = [] }
+        await store.send(.markerTapped("numbered:a")) { $0.selectedPlaceIDs = [] }
         await store.finish()
 
         XCTAssertEqual(sent.value, [])
@@ -456,7 +446,7 @@ final class CoursePlacePickTests: XCTestCase {
         XCTAssertTrue(store.state.isCTAEnabled)
     }
 
-    func test_고른장소_카테고리핀_위에_물방울겹침() async {
+    func test_고른장소_카테고리핀_위에_숫자핀겹침() async {
         let store = loadedStore()
 
         XCTAssertEqual(store.state.markers.map(\.id), ["a", "b", "c"])
@@ -470,15 +460,15 @@ final class CoursePlacePickTests: XCTestCase {
 
         XCTAssertEqual(
             store.state.markers.map(\.id),
-            ["a", "b", "c", "candidate:a", "candidate:c"]
+            ["a", "b", "c", "numbered:a", "numbered:c"]
         )
         XCTAssertEqual(
             store.state.markers.map(\.kind),
-            [.category(.food), .category(.food), .category(.food), .candidate, .candidate]
+            [.category(.food), .category(.food), .category(.food), .numbered(1), .numbered(2)]
         )
     }
 
-    func test_고른장소_필터밖_물방울핀남음() async {
+    func test_고른장소_필터밖_숫자핀과_경로선남음() async {
         let places: [SavedPlace] = [
             .candidateFixture(id: "a", latitude: 37.31, longitude: 126.90, category: .food),
             .candidateFixture(id: "b", latitude: 37.32, longitude: 126.91, category: .cafe),
@@ -490,21 +480,19 @@ final class CoursePlacePickTests: XCTestCase {
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.rowTapped("a")) { $0.selectedPlaceIDs = ["a"] }
+        await store.send(.rowTapped("b")) { $0.selectedPlaceIDs = ["a", "b"] }
         await store.send(.categoryTapped(.cafe)) { $0.selectedCategory = .cafe }
 
         XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["b"])
-        XCTAssertEqual(store.state.markers.map(\.id), ["b", "candidate:a"])
+        XCTAssertEqual(store.state.markers.map(\.id), ["b", "numbered:a", "numbered:b"])
         XCTAssertEqual(
             store.state.markers.map(\.kind),
-            [.category(.cafe), .candidate]
+            [.category(.cafe), .numbered(1), .numbered(2)]
         )
-    }
-
-    func test_물방울핀탭_고른장소_해제() async {
-        let store = loadedStore()
-
-        await store.send(.rowTapped("a")) { $0.selectedPlaceIDs = ["a"] }
-        await store.send(.markerTapped("candidate:a")) { $0.selectedPlaceIDs = [] }
+        XCTAssertEqual(
+            store.state.routes,
+            [MapRoute(id: "course-pick", coordinates: places.map(\.place.coordinate))]
+        )
     }
 
     func test_코스짜기_delegate() async {
@@ -552,12 +540,205 @@ final class CoursePlacePickTests: XCTestCase {
 }
 
 @MainActor
+final class CoursePlacePickMapTests: XCTestCase {
+
+    func test_가운데를_빼면_뒤_숫자핀이_당겨진다() async {
+        let store = mapStore(selected: ["a", "b", "c"])
+
+        await store.send(.rowTapped("b")) {
+            $0.selectedPlaceIDs = ["a", "c"]
+            $0.camera = focused(candidateCoordinate("b"))
+        }
+
+        let numbered = store.state.markers.filter { $0.id.hasPrefix("numbered:") }
+        XCTAssertEqual(numbered.map(\.id), ["numbered:a", "numbered:c"])
+        XCTAssertEqual(numbered.map(\.kind), [.numbered(1), .numbered(2)])
+    }
+
+    func test_고른_순서대로_경로선을_잇는다() {
+        let state = mapState(selected: ["c", "a"])
+
+        XCTAssertEqual(
+            state.routes,
+            [MapRoute(id: "course-pick", coordinates: [candidateCoordinate("c"), candidateCoordinate("a")])]
+        )
+    }
+
+    func test_가운데를_빼면_경로선이_앞뒤를_바로_잇는다() async {
+        let store = mapStore(selected: ["a", "b", "c"])
+
+        await store.send(.rowTapped("b")) {
+            $0.selectedPlaceIDs = ["a", "c"]
+            $0.camera = focused(candidateCoordinate("b"))
+        }
+
+        XCTAssertEqual(
+            store.state.routes,
+            [MapRoute(id: "course-pick", coordinates: [candidateCoordinate("a"), candidateCoordinate("c")])]
+        )
+    }
+
+    func test_점이_둘보다_적으면_경로선이_없다() {
+        XCTAssertEqual(mapState().routes, [])
+        XCTAssertEqual(mapState(selected: ["a"]).routes, [])
+        XCTAssertEqual(mapState(mode: .pick(existing: [existingStops[0]])).routes, [])
+    }
+
+    func test_행을_눌러_고르면_카메라가_지금_줌으로_그_장소에_간다() async {
+        let store = mapStore()
+
+        await store.send(.rowTapped("b")) {
+            $0.selectedPlaceIDs = ["b"]
+            $0.camera = focused(candidateCoordinate("b"))
+        }
+        await store.finish()
+    }
+
+    func test_행을_눌러_빼도_카메라가_그_장소에_간다() async {
+        let store = mapStore(selected: ["b"])
+
+        await store.send(.rowTapped("b")) {
+            $0.selectedPlaceIDs = []
+            $0.camera = focused(candidateCoordinate("b"))
+        }
+    }
+
+    func test_핀을_눌러_고르면_목록을_그_행까지_올리고_카메라는_그대로다() async {
+        let store = mapStore()
+
+        await store.send(.markerTapped("b")) {
+            $0.selectedPlaceIDs = ["b"]
+            $0.rowScrollRequest = CourseFeature.RowScrollRequest(placeID: "b", sequence: 1)
+        }
+        await store.finish()
+    }
+
+    func test_숫자핀을_눌러_빼도_목록을_그_행까지_올리고_카메라는_그대로다() async {
+        let store = mapStore(selected: ["b"])
+
+        await store.send(.markerTapped("numbered:b")) {
+            $0.selectedPlaceIDs = []
+            $0.rowScrollRequest = CourseFeature.RowScrollRequest(placeID: "b", sequence: 1)
+        }
+    }
+
+    func test_같은_핀을_다시_눌러도_스크롤_요청이_새로_나간다() async {
+        let store = mapStore()
+
+        await store.send(.markerTapped("b")) {
+            $0.selectedPlaceIDs = ["b"]
+            $0.rowScrollRequest = CourseFeature.RowScrollRequest(placeID: "b", sequence: 1)
+        }
+        await store.send(.markerTapped("numbered:b")) {
+            $0.selectedPlaceIDs = []
+            $0.rowScrollRequest = CourseFeature.RowScrollRequest(placeID: "b", sequence: 2)
+        }
+        await store.send(.markerTapped("b")) {
+            $0.selectedPlaceIDs = ["b"]
+            $0.rowScrollRequest = CourseFeature.RowScrollRequest(placeID: "b", sequence: 3)
+        }
+        await store.finish()
+    }
+
+    func test_필터에_걸린_고른_장소의_숫자핀은_빼기만_한다() async {
+        let store = mapStore(selected: ["a"], category: .cafe)
+
+        await store.send(.markerTapped("numbered:a")) {
+            $0.selectedPlaceIDs = []
+        }
+    }
+}
+
+@MainActor
+final class CoursePlaceAddMapTests: XCTestCase {
+
+    func test_장소_추가는_불러오기_전부터_기존_코스의_마지막_장소를_본다() {
+        let state = CourseFeature.State(mode: .pick(existing: existingStops))
+
+        XCTAssertEqual(
+            state.camera,
+            .focusing(existingStops[1].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        )
+    }
+
+    func test_장소_추가는_기존_장소를_카테고리핀과_숫자핀_1부터_N으로_보인다() {
+        let state = mapState(mode: .pick(existing: existingStops))
+
+        XCTAssertEqual(
+            state.markers.map(\.id),
+            ["existing:p0", "existing-numbered:p0", "existing:p1", "existing-numbered:p1", "a", "b", "c"]
+        )
+        XCTAssertEqual(
+            state.markers.map(\.kind),
+            [
+                .category(.cafe), .numbered(1), .category(.food), .numbered(2),
+                .category(.food), .category(.cafe), .category(.tourism),
+            ]
+        )
+    }
+
+    func test_기존_장소_핀은_필터와_상관없이_보인다() {
+        let state = mapState(mode: .pick(existing: existingStops), category: .tourism)
+
+        XCTAssertEqual(
+            state.markers.map(\.id),
+            ["existing:p0", "existing-numbered:p0", "existing:p1", "existing-numbered:p1", "c"]
+        )
+    }
+
+    func test_장소_추가에서_새로_고른_장소는_N_다음_번호부터_센다() {
+        let state = mapState(mode: .pick(existing: existingStops), selected: ["c", "a"])
+
+        XCTAssertEqual(state.badgeState(for: "c"), .number(3))
+        XCTAssertEqual(state.badgeState(for: "a"), .number(4))
+        let numbered = state.markers.filter { $0.id.hasPrefix("numbered:") }
+        XCTAssertEqual(numbered.map(\.id), ["numbered:c", "numbered:a"])
+        XCTAssertEqual(numbered.map(\.kind), [.numbered(3), .numbered(4)])
+    }
+
+    func test_장소_추가의_경로선은_기존_장소_다음에_새로_고른_장소를_잇는다() {
+        let state = mapState(mode: .pick(existing: existingStops), selected: ["c", "a"])
+
+        XCTAssertEqual(
+            state.routes,
+            [
+                MapRoute(
+                    id: "course-pick",
+                    coordinates: existingStops.map(\.coordinate)
+                        + [candidateCoordinate("c"), candidateCoordinate("a")]
+                ),
+            ]
+        )
+    }
+
+    func test_저장한_장소이기도_한_기존_장소는_핀이_한_벌만_선다() {
+        let alsoSaved = ExistingCoursePlace(
+            id: "a",
+            category: .food,
+            coordinate: candidateCoordinate("a")
+        )
+        let state = mapState(mode: .pick(existing: [alsoSaved]))
+
+        XCTAssertEqual(state.filteredPlaces.map(\.id), ["b", "c"])
+        XCTAssertEqual(state.markers.map(\.id), ["existing:a", "existing-numbered:a", "b", "c"])
+    }
+
+    func test_기존_장소_핀을_눌러도_아무_일도_없다() async {
+        let store = mapStore(mode: .pick(existing: existingStops), selected: ["a"])
+
+        await store.send(.markerTapped("existing-numbered:p0"))
+        await store.send(.markerTapped("existing:p1"))
+        await store.finish()
+    }
+}
+
+@MainActor
 final class CoursePickModeTests: XCTestCase {
 
     func test_고르기_모드는_저장하지_않고_고른_것을_올린다() async {
         let places = pickModeCandidates
         let store = TestStore(
-            initialState: CourseFeature.State(mode: .pick(excluding: ["101"]))
+            initialState: CourseFeature.State(mode: .pick(existing: [existing101]))
         ) {
             CourseFeature()
         } withDependencies: {
@@ -578,7 +759,7 @@ final class CoursePickModeTests: XCTestCase {
         let sent = LockIsolated<[AnalyticsEvent]>([])
         let places = pickModeCandidates
         let store = TestStore(
-            initialState: CourseFeature.State(mode: .pick(excluding: ["101"]))
+            initialState: CourseFeature.State(mode: .pick(existing: [existing101]))
         ) {
             CourseFeature()
         } withDependencies: {
@@ -602,7 +783,7 @@ final class CoursePickModeTests: XCTestCase {
     func test_고르기_모드는_이미_담긴_장소를_안_보인다() async {
         let places = pickModeCandidates
         let store = TestStore(
-            initialState: CourseFeature.State(mode: .pick(excluding: ["101"]))
+            initialState: CourseFeature.State(mode: .pick(existing: [existing101]))
         ) {
             CourseFeature()
         } withDependencies: {
@@ -762,6 +943,61 @@ private let pickModeCandidates: [SavedPlace] = [
     .candidateFixture(id: "102", latitude: 37.32, longitude: 126.91),
 ]
 
+/// 저장한 장소 101 과 같은 장소가 기존 코스에 담겨 있다
+private let existing101 = ExistingCoursePlace(
+    id: "101",
+    category: .food,
+    coordinate: Coordinate(latitude: 37.31, longitude: 126.90)
+)
+
+/// 장소 추가로 들어올 때의 기존 코스 장소. 후보 a·b·c 에 없는 id 다
+private let existingStops: [ExistingCoursePlace] = [
+    ExistingCoursePlace(id: "p0", category: .cafe, coordinate: Coordinate(latitude: 37.40, longitude: 127.00)),
+    ExistingCoursePlace(id: "p1", category: .food, coordinate: Coordinate(latitude: 37.41, longitude: 127.01)),
+]
+
+/// 사용자가 줌을 바꿔 둔 카메라. 탭해도 줌이 그대로인지 보려고 기본 줌(14)과 다르게 둔다
+private let pannedCamera = MapCamera(
+    center: Coordinate(latitude: 37.5, longitude: 127.0),
+    zoomLevel: 17
+)
+
+/// 후보 a·b·c 를 받아 둔 장소 선택 화면
+private func mapState(
+    mode: CourseFeature.Mode = .create,
+    selected: [String] = [],
+    category: PlaceCategory? = nil
+) -> CourseFeature.State {
+    var state = CourseFeature.State(mode: mode)
+    state.places = PlaceFixtures.coursePlaceCandidates
+    state.loadState = .loaded
+    state.selectedPlaceIDs = selected
+    state.selectedCategory = category
+    state.camera = pannedCamera
+    return state
+}
+
+@MainActor
+private func mapStore(
+    mode: CourseFeature.Mode = .create,
+    selected: [String] = [],
+    category: PlaceCategory? = nil
+) -> TestStoreOf<CourseFeature> {
+    TestStore(initialState: mapState(mode: mode, selected: selected, category: category)) {
+        CourseFeature()
+    }
+}
+
+/// 지금 줌(17)을 그대로 둔 채 그 좌표로 간 카메라
+private func focused(_ coordinate: Coordinate) -> MapCamera {
+    .focusing(coordinate, zoomLevel: pannedCamera.zoomLevel)
+}
+
+private func candidateCoordinate(_ id: String) -> Coordinate {
+    PlaceFixtures.coursePlaceCandidates.first { $0.id == id }?.place.coordinate
+        ?? Coordinate(latitude: 0, longitude: 0)
+}
+
 @MainActor
 final class CoursePlacePickCameraTests: XCTestCase {
 
@@ -787,6 +1023,32 @@ final class CoursePlacePickCameraTests: XCTestCase {
             $0.places = []
             $0.loadState = .loaded
             $0.camera = .seoulCityHall
+        }
+    }
+
+    func test_장소_추가로_들어오면_기존_코스의_마지막_장소로_간다() async {
+        let candidates = PlaceFixtures.coursePlaceCandidates
+        let store = TestStore(initialState: CourseFeature.State(mode: .pick(existing: existingStops))) {
+            CourseFeature()
+        }
+
+        await store.send(.coursePlacesResponse(.success(candidates))) {
+            $0.places = candidates
+            $0.loadState = .loaded
+            $0.camera = .focusing(existingStops[1].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
+    func test_장소_추가에_기존_장소가_없으면_첫_행으로_간다() async {
+        let candidates = PlaceFixtures.coursePlaceCandidates
+        let store = TestStore(initialState: CourseFeature.State(mode: .pick(existing: []))) {
+            CourseFeature()
+        }
+
+        await store.send(.coursePlacesResponse(.success(candidates))) {
+            $0.places = candidates
+            $0.loadState = .loaded
+            $0.camera = .focusing(candidates[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
     }
 }
