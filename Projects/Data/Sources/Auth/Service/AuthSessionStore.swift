@@ -231,6 +231,12 @@ extension AuthSessionStore {
         try await persistMemory()
     }
 
+    /// 탈퇴는 서버에서 이미 끝났다. 세션만 지우고, 키체인 삭제 실패는 무시한다
+    func clearAfterWithdrawal() async {
+        clearMemory()
+        try? await persistMemory()
+    }
+
     /// 로그아웃 요청은 인터셉터가 다시 보내지 않는다(판단이 로그아웃 중이면 실패다). 401 이면 여기서 재발급하고 한 번 더 보낸다
     private func sendLogout(refreshToken: String, send: @Sendable (String) async throws -> Void) async {
         do {

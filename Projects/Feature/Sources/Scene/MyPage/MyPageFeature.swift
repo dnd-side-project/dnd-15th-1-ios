@@ -365,12 +365,11 @@ private extension MyPageFeature {
         }
     }
 
-    // 탈퇴 후 로컬 세션까지 정리. 서버 로그아웃 실패는 무시
+    // 탈퇴하면 이 기기의 세션 정리는 profileClient.withdraw 가 함께 한다. 로그아웃을 따로 부르지 않는다
     func withdraw() -> Effect<Action> {
-        .run { [profileClient, authClient] send in
+        .run { [profileClient] send in
             do {
                 try await profileClient.withdraw()
-                try? await authClient.logout()
                 await send(.withdrawSucceeded)
             } catch {
                 await send(.withdrawFailed(error as? ProfileError ?? .unknown))
