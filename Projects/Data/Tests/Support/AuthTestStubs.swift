@@ -77,7 +77,7 @@ extension SocialAuthCredentialProvider {
 }
 
 extension AuthRepository {
-    /// 프로덕션 조립처럼 profile 호출도 authed client 를 쓴다.
+    /// 프로덕션 조립처럼 profile 호출도 authed client 를 쓴다. 재발급은 plain client 로 간다.
     static func stub(
         plainClient: StubNetworkClient,
         authedClient: StubNetworkClient? = nil,
@@ -85,15 +85,33 @@ extension AuthRepository {
         socialAuth: SocialAuthCredentialProvider = .stub(),
         notificationRepository: NotificationRepository? = nil
     ) -> AuthRepository {
-        let authed = authedClient ?? plainClient
-        return AuthRepository(
+        stub(
+            plainClient: plainClient,
+            authedClient: authedClient ?? plainClient,
+            sessionStore: AuthSessionStore(
+                authLocal: authLocal,
+                plainRemote: AuthRemoteDataSource(plainClient: plainClient, authedClient: plainClient)
+            ),
+            socialAuth: socialAuth,
+            notificationRepository: notificationRepository
+        )
+    }
+
+    static func stub(
+        plainClient: any NetworkClient,
+        authedClient: any NetworkClient,
+        sessionStore: AuthSessionStore,
+        socialAuth: SocialAuthCredentialProvider = .stub(),
+        notificationRepository: NotificationRepository? = nil
+    ) -> AuthRepository {
+        AuthRepository(
             authRemote: AuthRemoteDataSource(
                 plainClient: plainClient,
-                authedClient: authed
+                authedClient: authedClient
             ),
-            authLocal: authLocal,
+            sessionStore: sessionStore,
             socialAuth: socialAuth,
-            profileRemote: ProfileRemoteDataSource(networkClient: authed),
+            profileRemote: ProfileRemoteDataSource(networkClient: authedClient),
             notificationRepository: notificationRepository
         )
     }
