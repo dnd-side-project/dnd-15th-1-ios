@@ -7,5 +7,9 @@ let project = ProjectFactory.framework(
         .sharedUtils,
         .thirdParty,
     ],
-    product: .framework
+    product: .framework,
+    includesTests: true,
+    testsDependencies: [
+        .sharedUtils,
+    ]
 )

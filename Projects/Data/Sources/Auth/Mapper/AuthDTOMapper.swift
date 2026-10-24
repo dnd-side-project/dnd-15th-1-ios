@@ -11,7 +11,7 @@ enum AuthDTOMapper {
         )
     }
 
-    /// 토큰 회전 경로. 기존 세션의 온보딩 플래그를 그대로 실어 보내야 다음 복원의 백업 값이 남는다.
+    /// 토큰 회전 경로. 토큰 두 개만 바꾸고 회원 식별자와 온보딩 플래그는 `current`(세션 주인의 지금 메모리 값)를 지킨다.
     static func toSessionDTO(token: AuthTokenDTO, rotating current: AuthSessionDTO) -> AuthSessionDTO {
         AuthSessionDTO(
             accessToken: token.accessToken,

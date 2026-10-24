@@ -27,52 +27,24 @@ final class RemoteImageRequestTests: XCTestCase {
         )
     }
 
-    func test_소수_포인트는_내리고_배율로_픽셀을_붙인다() throws {
+    func test_소수_포인트는_내리고_배율로_픽셀을_붙인다() async throws {
         let url = try XCTUnwrap(URL(string: "https://dulpick.test/photo.png"))
-        let floored = try XCTUnwrap(
+        let png = Self.makePNGData(width: 800, height: 800)
+        let pipeline = Self.makePipeline(data: png)
+        let request = try XCTUnwrap(
             RemoteImageRequest.make(
                 url: url,
-                size: CGSize(width: 88, height: 88),
-                scale: 2
-            )
-        )
-        let fractional = try XCTUnwrap(
-            RemoteImageRequest.make(
-                url: url,
-                size: CGSize(width: 88.7, height: 88.2),
-                scale: 2
+                size: CGSize(width: 88.9, height: 88.9),
+                scale: 3
             )
         )
 
-        XCTAssertEqual(
-            floored.userInfo[.thumbnailKey] as? ImageRequest.ThumbnailOptions,
-            fractional.userInfo[.thumbnailKey] as? ImageRequest.ThumbnailOptions
-        )
-        XCTAssertTrue(floored.processors.isEmpty)
-    }
+        let image = try await pipeline.image(for: request)
+        let pixels = image.size.width * image.scale
 
-    func test_같은_주소_다른_칸은_요청이_둘이다() throws {
-        let url = try XCTUnwrap(URL(string: "https://dulpick.test/photo.png"))
-        let small = try XCTUnwrap(
-            RemoteImageRequest.make(
-                url: url,
-                size: CGSize(width: 88, height: 88),
-                scale: 2
-            )
-        )
-        let large = try XCTUnwrap(
-            RemoteImageRequest.make(
-                url: url,
-                size: CGSize(width: 160, height: 160),
-                scale: 2
-            )
-        )
-
-        XCTAssertEqual(small.url, large.url)
-        XCTAssertNotEqual(
-            small.userInfo[.thumbnailKey] as? ImageRequest.ThumbnailOptions,
-            large.userInfo[.thumbnailKey] as? ImageRequest.ThumbnailOptions
-        )
+        // 88 포인트에 배율 3 을 곱한 값이다. 소수를 내리지 않으면 88.9 × 3 이라 267 픽셀이 된다
+        XCTAssertEqual(pixels, 264, accuracy: 1)
+        XCTAssertTrue(request.processors.isEmpty)
     }
 
     func test_작은_칸은_작은_비트맵으로_디코드한다() async throws {
@@ -94,6 +66,8 @@ final class RemoteImageRequestTests: XCTestCase {
             )
         )
 
+        // 같은 파이프라인에서 같은 주소를 두 크기로 차례로 받는다.
+        // 칸 크기가 캐시 키에 안 들어가면 둘째가 첫째의 비트맵으로 나온다
         let smallImage = try await pipeline.image(for: small)
         let largeImage = try await pipeline.image(for: large)
         let smallPixels = smallImage.size.width * smallImage.scale
@@ -123,59 +97,11 @@ private extension RemoteImageRequestTests {
 
     static func makePipeline(data: Data) -> ImagePipeline {
         var configuration = ImagePipeline.Configuration(
-            dataLoader: StubDataLoader(data: data, delay: 0)
+            dataLoader: StubDataLoader(data: data)
         )
         configuration.imageCache = ImageCache()
         configuration.dataCache = nil
         configuration.isRateLimiterEnabled = false
         return ImagePipeline(configuration: configuration)
-    }
-}
-
-private final class StubDataLoader: DataLoading, @unchecked Sendable {
-    private let data: Data
-    private let delay: TimeInterval
-
-    init(data: Data, delay: TimeInterval) {
-        self.data = data
-        self.delay = delay
-    }
-
-    func loadData(
-        with request: URLRequest,
-        didReceiveData: @escaping @Sendable (Data, URLResponse) -> Void,
-        completion: @escaping @Sendable (Error?) -> Void
-    ) -> any Cancellable {
-        let task = StubDataTask()
-        guard let url = request.url else {
-            completion(URLError(.badURL))
-            return task
-        }
-        let data = data
-        let response = URLResponse(
-            url: url,
-            mimeType: "image/png",
-            expectedContentLength: data.count,
-            textEncodingName: nil
-        )
-        DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
-            guard !task.isCancelled else { return }
-            didReceiveData(data, response)
-            completion(nil)
-        }
-        return task
-    }
-}
-
-private final class StubDataTask: Cancellable, @unchecked Sendable {
-    private let lock = NSLock()
-    private var cancelled = false
-
-    var isCancelled: Bool {
-        lock.withLock { cancelled }
-    }
-
-    func cancel() {
-        lock.withLock { cancelled = true }
     }
 }

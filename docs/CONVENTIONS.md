@@ -214,7 +214,7 @@ Domain·Data 폴더:
 4. 에러 타입은 개념마다 하나다. 이름은 폴더에 맞춘다 (`Content` → `ContentError`)
 5. 서버를 안 쓰는 개념 폴더도 하위 폴더(`Factory`, `Service` 등)를 둔다
 6. 개념이 없는 보조 코드(가짜 썸네일 주소 생성기 `MockThumbnailURL`)는 Domain 에 폴더를 만들지 않고 `SharedUtils` 에 둔다
-7. `Data/Tests` 도 같은 개념 폴더로 나눈다. 공용 스텁은 `Data/Tests/Support/` 에 둔다
+7. `Domain/Tests` 와 `Data/Tests` 도 같은 개념 폴더로 나눈다. 공용 스텁은 `Data/Tests/Support/` 에 둔다
 8. 예외 하나: 어느 개념에도 속하지 않고 개념 둘 이상이 함께 쓰는 Domain 모델은 `Domain/Sources/Common` 에 두고 Data 에 짝을 만들지 않는다. 서버 응답을 다루지 않아 Data 에 대응할 것이 없다. 지금 여기 있는 것은 페이지로 나뉜 목록 타입 `Page` 하나다. 페이지를 쓰는 개념이 새로 생기면 그 개념 폴더에 별칭을 한 줄 만든다 (`public typealias NoticePage = Page<Notice>`)
 
 ### 7. Import / DI
@@ -298,6 +298,7 @@ test_로그인성공_델리게이트_전달
 1. Feature 테스트에 Data/`Core/*` 구현을 끌어오지 않는다
 2. Domain/Data 단위 테스트는 기본 강제 없음
 3. 고위험 도메인만 보완 테스트 가능
+4. 있는 테스트는 CI 가 `Dulpick-Tests` 스킴으로 전부 돌린다. 통과가 머지 조건이다
 
 ### 10. 새 기능 체크
 

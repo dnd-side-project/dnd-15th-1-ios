@@ -4,12 +4,13 @@ import XCTest
 
 @testable import Data
 
-/// 전 `PlaceImportFeature.applyImport` 의 해석표다. 다음 동작을 먼저 보고, 없을 때만 작업 상태를 본다
+/// 전 `PlaceImportFeature.applyImport` 의 해석표다. 처리 중이면 다음 동작과 상관없이 기다리고,
+/// 끝났으면 다음 동작이, 다음 동작이 없거나 모르는 값이면 작업 상태가 정한다
 final class PlaceImportDTOMapperProgressTests: XCTestCase {
 
     func test_다음_동작이_WAIT면_처리_중이고_다시_물을_초를_옮긴다() {
         let result = PlaceImportDTOMapper.toDomain(
-            importDTO(status: "PROCESSING", nextAction: "WAIT", retryAfterSeconds: 3)
+            importDTO(status: "SOMETHING", nextAction: "WAIT", retryAfterSeconds: 3)
         )
 
         XCTAssertEqual(result.progress, .processing(retryAfterSeconds: 3))
@@ -17,7 +18,7 @@ final class PlaceImportDTOMapperProgressTests: XCTestCase {
 
     func test_다음_동작이_SELECT_PLACES면_검토_필요다() {
         let result = PlaceImportDTOMapper.toDomain(
-            importDTO(status: "REVIEW_REQUIRED", nextAction: "SELECT_PLACES", candidates: [candidateDTO(id: 1)])
+            importDTO(status: "SOMETHING", nextAction: "SELECT_PLACES", candidates: [candidateDTO(id: 1)])
         )
 
         guard case let .reviewRequired(candidates) = result.progress else {
@@ -28,7 +29,7 @@ final class PlaceImportDTOMapperProgressTests: XCTestCase {
 
     func test_다음_동작이_COMPLETED면_완료다() {
         let result = PlaceImportDTOMapper.toDomain(
-            importDTO(status: "COMPLETED", nextAction: "COMPLETED", candidates: [candidateDTO(id: 2)])
+            importDTO(status: "SOMETHING", nextAction: "COMPLETED", candidates: [candidateDTO(id: 2)])
         )
 
         guard case let .completed(candidates) = result.progress else {
@@ -71,20 +72,30 @@ final class PlaceImportDTOMapperProgressTests: XCTestCase {
         }
     }
 
-    func test_다음_동작이_RETRY면_실패다() {
+    func test_작업_상태가_완료여도_다음_동작이_RETRY면_실패다() {
         let progress = PlaceImportDTOMapper.progress(
-            status: "PROCESSING", nextAction: "RETRY", retryAfterSeconds: nil, candidates: []
+            status: "COMPLETED", nextAction: "RETRY", retryAfterSeconds: nil, candidates: []
         )
 
         XCTAssertEqual(progress, .failed)
     }
 
-    func test_모르는_다음_동작은_실패다() {
+    func test_모르는_다음_동작은_작업_상태로_정한다() {
         let progress = PlaceImportDTOMapper.progress(
             status: "COMPLETED", nextAction: "SOMETHING", retryAfterSeconds: nil, candidates: []
         )
 
-        XCTAssertEqual(progress, .failed)
+        XCTAssertEqual(progress, .completed([]))
+    }
+
+    func test_작업_상태가_처리_중이면_다음_동작이_무엇이든_기다린다() {
+        for nextAction in ["WAIT", "NONE", "SOMETHING", "RETRY", "COMPLETED"] {
+            let progress = PlaceImportDTOMapper.progress(
+                status: "PROCESSING", nextAction: nextAction, retryAfterSeconds: 2, candidates: []
+            )
+
+            XCTAssertEqual(progress, .processing(retryAfterSeconds: 2), nextAction)
+        }
     }
 
     func test_다음_동작이_없고_모르는_작업_상태는_실패다() {
@@ -134,7 +145,7 @@ final class PlaceImportDTOMapperTests: XCTestCase {
 
     func test_확인된_장소는_게시글_속_장소로_옮긴다() throws {
         let result = PlaceImportDTOMapper.toDomain(
-            importDTO(nextAction: "SELECT_PLACES", candidates: [candidateDTO(id: 1)])
+            importDTO(nextAction: "SELECT_PLACES", candidates: [candidateDTO(id: 1, roadAddress: "")])
         )
         guard case let .reviewRequired(candidates) = result.progress else {
             return XCTFail("\(result.progress)")
@@ -145,6 +156,7 @@ final class PlaceImportDTOMapperTests: XCTestCase {
         XCTAssertEqual(place.place.kakaoPlaceID, "kakao-1")
         XCTAssertEqual(place.place.category, .cafe)
         XCTAssertEqual(place.place.coordinate.latitude, 37.5, accuracy: 0.0001)
+        // 서버가 도로명 없음을 "" 로 주는 응답이 있다
         XCTAssertNil(place.place.roadAddress)
         XCTAssertNil(place.place.bookmarkCount)
         XCTAssertTrue(place.isSaved)
@@ -152,19 +164,6 @@ final class PlaceImportDTOMapperTests: XCTestCase {
             "https://example.com/t.jpg",
             "https://example.com/a.jpg",
         ])
-    }
-
-    // 서버가 도로명 없음을 "" 로 주는 응답이 있다. nil 과 같게 읽혀야 CandidateRow 의 주소 힌트 대체가 산다
-    func test_확인된_장소_도로명_빈_문자열은_nil이다() throws {
-        let result = PlaceImportDTOMapper.toDomain(
-            importDTO(nextAction: "SELECT_PLACES", candidates: [candidateDTO(id: 1, roadAddress: "")])
-        )
-        guard case let .reviewRequired(candidates) = result.progress else {
-            return XCTFail("\(result.progress)")
-        }
-        let place = try XCTUnwrap(candidates.first?.place)
-
-        XCTAssertNil(place.place.roadAddress)
     }
 
     func test_확인_못_한_후보는_장소가_없다() {

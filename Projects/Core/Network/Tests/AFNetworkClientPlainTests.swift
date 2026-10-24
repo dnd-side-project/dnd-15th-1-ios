@@ -7,7 +7,7 @@ final class AFNetworkClientPlainTests: XCTestCase {
         super.tearDown()
     }
 
-    func test_plain_요청_성공_디코딩() async throws {
+    func test_인증_없는_요청이_성공하면_응답을_디코딩해_돌려준다() async throws {
         URLProtocolStub.requestHandler = { request in
             XCTAssertEqual(request.httpMethod, "GET")
             XCTAssertEqual(request.url?.path, "/api/users/me")

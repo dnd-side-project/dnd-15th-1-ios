@@ -1,19 +1,13 @@
 import Foundation
 import ThirdPartyCore
 
-public final class AuthRequestInterceptor: RequestInterceptor, @unchecked Sendable {
-    private let tokenProvider: any TokenProviding
-    private let tokenRefresher: any TokenRefreshing
-    private let lock = NSLock()
-    private var refreshTask: Task<Void, Error>?
-    private var failedAccessToken: String?
+/// 인증 요청에 토큰을 붙이고, 401 을 받으면 그 요청이 보낸 토큰을 세션 주인에게 넘겨 다시 보낼지 묻는다.
+/// 판단과 재발급은 세션 주인이 맡는다. 여기는 상태를 갖지 않는다.
+public final class AuthRequestInterceptor: RequestInterceptor, Sendable {
+    private let sessionProvider: any AuthSessionProviding
 
-    public init(
-        tokenProvider: any TokenProviding,
-        tokenRefresher: any TokenRefreshing
-    ) {
-        self.tokenProvider = tokenProvider
-        self.tokenRefresher = tokenRefresher
+    public init(sessionProvider: any AuthSessionProviding) {
+        self.sessionProvider = sessionProvider
     }
 
     public func adapt(
@@ -21,7 +15,7 @@ public final class AuthRequestInterceptor: RequestInterceptor, @unchecked Sendab
         for session: Session,
         completion: @escaping @Sendable (Result<URLRequest, any Error>) -> Void
     ) {
-        let provider = tokenProvider
+        let provider = sessionProvider
         let request = urlRequest
         Task {
             do {
@@ -51,7 +45,7 @@ public final class AuthRequestInterceptor: RequestInterceptor, @unchecked Sendab
             return
         }
 
-        // 우리가 돌려준 거절을 Alamofire 가 감싸서 다시 물어온 것이다. 재발급을 또 하지 않는다.
+        // 우리가 돌려준 거절을 Alamofire 가 감싸서 다시 물어온 것이다. 세션에 또 묻지 않는다.
         if let afError = error as? AFError,
            case let .requestRetryFailed(retryError, _) = afError {
             completion(.doNotRetryWithError(retryError))
@@ -63,83 +57,26 @@ public final class AuthRequestInterceptor: RequestInterceptor, @unchecked Sendab
             return
         }
 
-        let sentAuthorization = request.request?.value(forHTTPHeaderField: "Authorization")
-        let interceptor = self
+        // 토큰을 다시 읽지 않는다. 판단에 쓰는 것은 이 요청이 실제로 보낸 토큰이다
+        let sentToken = Self.bearerToken(in: request.request)
+        let provider = sessionProvider
         Task {
-            let currentToken = try? await interceptor.tokenProvider.accessToken()
-
-            // 내가 보낸 토큰이 이미 갱신됐다. 재발급 없이 그대로 다시 보낸다.
-            if let currentToken,
-               currentToken.isEmpty == false,
-               "Bearer \(currentToken)" != sentAuthorization {
+            switch await provider.recover(afterUnauthorized: sentToken) {
+            case .retry:
                 completion(.retry)
-                return
-            }
-
-            // 이 토큰으로는 방금 재발급이 실패했다. 같은 요청을 또 낼 이유가 없다.
-            if interceptor.isKnownFailed(currentToken) {
-                completion(.doNotRetryWithError(NetworkError.unauthorized))
-                return
-            }
-
-            do {
-                try await interceptor.refreshSingleFlight(startedWith: currentToken)
-                completion(.retry)
-            } catch {
+            case .fail:
                 completion(.doNotRetryWithError(NetworkError.unauthorized))
             }
         }
     }
 
-    private func isKnownFailed(_ token: String?) -> Bool {
-        lock.withLock {
-            guard let failedAccessToken, let token else { return false }
-            return failedAccessToken == token
+    private static func bearerToken(in request: URLRequest?) -> String? {
+        let prefix = "Bearer "
+        guard let value = request?.value(forHTTPHeaderField: "Authorization"),
+              value.hasPrefix(prefix) else {
+            return nil
         }
-    }
-
-    private func refreshSingleFlight(startedWith token: String?) async throws {
-        let refresher = tokenRefresher
-        let (task, isOwner): (Task<Void, Error>, Bool) = lock.withLock {
-            if let existing = refreshTask {
-                return (existing, false)
-            }
-
-            let newTask = Task {
-                try await refresher.refresh()
-            }
-            refreshTask = newTask
-            return (newTask, true)
-        }
-
-        do {
-            try await task.value
-            if isOwner {
-                // Only the creator clears. New tasks are created only while refreshTask is nil,
-                // so owner cleanup cannot wipe a newer flight.
-                lock.withLock {
-                    refreshTask = nil
-                    failedAccessToken = nil
-                }
-            }
-        } catch {
-            if isOwner {
-                // 전송 실패까지 기억하면 회복이 막힌다. 기억을 지우는 길이 재발급 성공뿐이기 때문이다.
-                let isAuthenticationFailure = (error as? NetworkError) == .unauthorized
-                lock.withLock {
-                    refreshTask = nil
-                    failedAccessToken = isAuthenticationFailure ? token : nil
-                }
-            }
-            throw NetworkError.unauthorized
-        }
-    }
-}
-
-private extension NSLock {
-    func withLock<T>(_ body: () -> T) -> T {
-        lock()
-        defer { unlock() }
-        return body()
+        let token = String(value.dropFirst(prefix.count))
+        return token.isEmpty ? nil : token
     }
 }

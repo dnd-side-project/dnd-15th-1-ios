@@ -58,7 +58,7 @@ public struct MapFeature {
         public var places: [SavedPlace] = []
         public var loadState: LoadState = .loading
 
-        /// 커플이 연동되어야 저장자 칩이 보인다. 미연동이면 `함께 저장한`(전부) 으로 고정된다
+        /// 커플이 연동되어야 저장자 칩이 보인다. 미연동이면 `전체` 로 고정된다
         public var isCoupleConnected = false
 
         /// 연동된 상대 닉네임. 결과 화면 알리기 문구에 쓴다

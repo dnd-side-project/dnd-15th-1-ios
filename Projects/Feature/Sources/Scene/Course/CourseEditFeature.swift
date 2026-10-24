@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Domain
 import Foundation
 import SharedDesignSystem
+import SharedUtils
 
 // MARK: - CourseEditFeature
 
@@ -24,12 +25,21 @@ public struct CourseEditFeature {
         public let name: String
         public let category: PlaceCategory
         public let address: String
+        /// 장소 추가 화면이 기존 코스를 지도에 그릴 때 쓴다
+        public let coordinate: Coordinate
 
-        public init(id: String, name: String, category: PlaceCategory, address: String) {
+        public init(
+            id: String,
+            name: String,
+            category: PlaceCategory,
+            address: String,
+            coordinate: Coordinate
+        ) {
             self.id = id
             self.name = name
             self.category = category
             self.address = address
+            self.coordinate = coordinate
         }
     }
 
@@ -140,7 +150,8 @@ public struct CourseEditFeature {
 
         @CasePathable
         public enum Delegate: Equatable {
-            case placeAddRequested(excluding: [String])
+            /// 저장 전 순서와 범위 그대로의 기존 코스 장소를 싣는다
+            case placeAddRequested(existing: [ExistingCoursePlace])
             case saved(DateCourse)
             case dismissed
             case conflicted
@@ -304,7 +315,10 @@ private extension CourseEditFeature {
             return .none
 
         case .addPlaceTapped:
-            return .send(.delegate(.placeAddRequested(excluding: state.places.map(\.id))))
+            let existing = state.places.map { place in
+                ExistingCoursePlace(id: place.id, category: place.category, coordinate: place.coordinate)
+            }
+            return .send(.delegate(.placeAddRequested(existing: existing)))
 
         case let .placesAdded(candidates):
             let existing = Set(state.places.map(\.id))
@@ -440,7 +454,8 @@ extension CourseEditFeature.EditablePlace {
             id: stop.place.id,
             name: stop.place.name,
             category: stop.place.category,
-            address: stop.place.roadAddress ?? stop.place.address
+            address: stop.place.roadAddress ?? stop.place.address,
+            coordinate: stop.place.coordinate
         )
     }
 
@@ -449,7 +464,8 @@ extension CourseEditFeature.EditablePlace {
             id: candidate.id,
             name: candidate.place.name,
             category: candidate.place.category,
-            address: candidate.place.roadAddress ?? candidate.place.address
+            address: candidate.place.roadAddress ?? candidate.place.address,
+            coordinate: candidate.place.coordinate
         )
     }
 }

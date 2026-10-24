@@ -1,6 +1,7 @@
 import CoreStorage
 import Foundation
 
+/// 세션 키체인 입출력. 제품 코드에서는 세션 주인(`AuthSessionStore`)만 부른다.
 public struct AuthLocalDataSource: Sendable {
     private let storage: any KeychainStorage
     private let key = "auth-session"
@@ -15,13 +16,6 @@ public struct AuthLocalDataSource: Sendable {
 
     func saveSession(_ session: AuthSessionDTO) async throws {
         try await storage.save(session, forKey: key)
-    }
-
-    /// 온보딩 플래그만 바꾼다. 토큰은 저장된 최신 값을 그대로 둔다.
-    func updateOnboardingCompleted(_ value: Bool) async throws {
-        try await storage.update(forKey: key) { (session: AuthSessionDTO) in
-            session.with(isOnboardingCompleted: value)
-        }
     }
 
     func deleteSession() async throws {

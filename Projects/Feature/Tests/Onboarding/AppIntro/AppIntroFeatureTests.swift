@@ -22,16 +22,6 @@ final class AppIntroFeatureTests: XCTestCase {
         }
     }
 
-    func test_마지막_다음_완료델리게이트_전달() async {
-        let store = TestStore(initialState: AppIntroFeature.State(pageIndex: 2)) {
-            AppIntroFeature()
-        }
-        await store.send(.nextButtonTapped) {
-            $0.hasCompleted = true
-        }
-        await store.receive(\.delegate.completed)
-    }
-
     func test_마지막_다음_완료는_한번만() async {
         let store = TestStore(initialState: AppIntroFeature.State(pageIndex: 2)) {
             AppIntroFeature()

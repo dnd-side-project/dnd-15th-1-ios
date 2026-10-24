@@ -14,11 +14,6 @@ final class NoticeDetailFeatureTests: XCTestCase {
         createdAt: Date(timeIntervalSince1970: 1_785_943_800)
     )
 
-    func test_받은_공지를_그대로_들고_있다() {
-        let state = NoticeDetailFeature.State(notice: sample)
-        XCTAssertEqual(state.notice, sample)
-    }
-
     func test_뒤로가기는_위로_올린다() async {
         let store = TestStore(
             initialState: NoticeDetailFeature.State(notice: sample)

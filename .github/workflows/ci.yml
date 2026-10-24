@@ -194,11 +194,11 @@ jobs:
           echo "Using destination: $DESTINATION"
           echo "DESTINATION=$DESTINATION" >> "$GITHUB_ENV"
 
-      - name: Test Feature Reducers
+      - name: Test
         run: |
           xcodebuild \
             -workspace Dulpick.xcworkspace \
-            -scheme Feature \
+            -scheme Dulpick-Tests \
             -destination "$DESTINATION" \
             -derivedDataPath .derivedData \
             -skipMacroValidation \

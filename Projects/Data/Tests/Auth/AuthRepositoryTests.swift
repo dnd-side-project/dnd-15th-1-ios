@@ -197,44 +197,16 @@ final class AuthRepositoryTests: XCTestCase {
         XCTAssertNil(restored)
     }
 
-    func test_refresh_토큰을_회전하고_온보딩_플래그를_유지한다() async throws {
-        let network = StubNetworkClient()
-        network.responses[AuthStubFixture.reissuePath] = AuthTokenDTO(
+    func test_온보딩_플래그_저장이_재발급된_토큰을_덮지_않는다() async throws {
+        let plainNetwork = StubNetworkClient(name: "plain")
+        plainNetwork.responses[AuthStubFixture.reissuePath] = AuthTokenDTO(
             tokenType: "Bearer",
             accessToken: "new-access",
             refreshToken: "new-refresh",
             expiresIn: 900
         )
-        network.responses[AuthStubFixture.memberKey] = AuthStubFixture.member(
-            onboardingCompleted: true
-        )
-
-        let local = AuthLocalDataSource(storage: StubKeychainStorage())
-        try await local.saveStubSession(
-            accessToken: "old-access",
-            refreshToken: "old-refresh",
-            userID: "7",
-            isOnboardingCompleted: true
-        )
-
-        let repository = AuthRepository.stub(plainClient: network, authLocal: local)
-
-        let refreshed = try await repository.refreshSession()
-        XCTAssertEqual(refreshed.accessToken, "new-access")
-        XCTAssertEqual(refreshed.refreshToken, "new-refresh")
-        XCTAssertEqual(refreshed.userID, "7")
-
-        let rotated = try await local.loadSession()
-        XCTAssertEqual(rotated?.isOnboardingCompleted, true)
-
-        let restored = try await repository.restoreSession()
-        XCTAssertEqual(restored?.session, refreshed)
-        XCTAssertEqual(restored?.isOnboardingCompleted, true)
-    }
-
-    func test_온보딩_플래그_저장이_재발급된_토큰을_덮지_않는다() async throws {
-        let network = StubNetworkClient()
-        network.responses[AuthStubFixture.memberKey] = AuthStubFixture.member(
+        let authedNetwork = StubNetworkClient(name: "authed")
+        authedNetwork.responses[AuthStubFixture.memberKey] = AuthStubFixture.member(
             onboardingCompleted: true
         )
 
@@ -245,20 +217,21 @@ final class AuthRepositoryTests: XCTestCase {
             userID: "7",
             isOnboardingCompleted: nil
         )
+        let sessionStore = AuthSessionStore(
+            authLocal: local,
+            plainRemote: AuthRemoteDataSource(networkClient: plainNetwork)
+        )
 
-        // members/me 응답 직전에 인터셉터가 토큰을 회전시킨 상황을 만든다
-        network.onRequest = {
-            try? await local.saveSession(
-                AuthSessionDTO(
-                    accessToken: "new-access",
-                    refreshToken: "new-refresh",
-                    userID: "7",
-                    isOnboardingCompleted: nil
-                )
-            )
+        // members/me 응답 직전에 다른 요청의 401 로 세션 주인이 토큰을 회전시킨 상황을 만든다
+        authedNetwork.onRequest = {
+            _ = await sessionStore.recover(afterUnauthorized: "old-access")
         }
 
-        let repository = AuthRepository.stub(plainClient: network, authLocal: local)
+        let repository = AuthRepository.stub(
+            plainClient: plainNetwork,
+            authedClient: authedNetwork,
+            sessionStore: sessionStore
+        )
 
         let bootstrap = try await repository.restoreSession()
 

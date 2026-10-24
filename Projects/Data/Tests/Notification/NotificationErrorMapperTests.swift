@@ -5,7 +5,7 @@ import XCTest
 @testable import Data
 
 final class NotificationErrorMapperTests: XCTestCase {
-    func test_transport는_network다() {
+    func test_전송_에러를_network로_매핑한다() {
         XCTAssertEqual(NotificationErrorMapper.map(NetworkError.transport(message: "timeout")), .network)
     }
 

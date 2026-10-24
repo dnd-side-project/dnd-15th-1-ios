@@ -1,6 +1,7 @@
 import Domain
 import Feature
 import Foundation
+import SharedUtils
 import ThirdParty
 import XCTest
 
@@ -309,23 +310,23 @@ final class HomeFlowCourseEditWiringTests: XCTestCase {
         XCTAssertNil(store.state.courseEdit)
     }
 
-    func test_장소_추가는_고르기_모드로_화면을_쌓인다() async {
+    func test_장소_추가는_기존_장소_좌표를_싣고_고르기_모드로_화면을_쌓는다() async {
         let store = TestStore(initialState: editingCourseResultState()) {
             HomeFlowFeature()
         }
         store.exhaustivity = .off
 
-        await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["101"]))))
+        await store.send(.courseEdit(.delegate(.placeAddRequested(existing: [existing101]))))
 
         XCTAssertEqual(store.state.path.last, .coursePlaceAdd)
-        XCTAssertEqual(store.state.coursePlaceAdd?.mode, .pick(excluding: ["101"]))
+        XCTAssertEqual(store.state.coursePlaceAdd?.mode, .pick(existing: [existing101]))
         XCTAssertNotNil(store.state.course)
     }
 
     func test_고른_장소는_수정_화면으로_돌아간다() async {
         let picked = [SavedPlace.candidateFixture(id: "102")]
         var state = editingCourseResultState()
-        state.coursePlaceAdd = CourseFeature.State(mode: .pick(excluding: ["101"]))
+        state.coursePlaceAdd = CourseFeature.State(mode: .pick(existing: [existing101]))
         state.path.append(.coursePlaceAdd)
         let store = TestStore(initialState: state) {
             HomeFlowFeature()
@@ -346,7 +347,7 @@ final class HomeFlowCourseEditWiringTests: XCTestCase {
         }
         store.exhaustivity = .off
 
-        await store.send(.courseEdit(.delegate(.placeAddRequested(excluding: ["p0"]))))
+        await store.send(.courseEdit(.delegate(.placeAddRequested(existing: [existingP0]))))
         await store.send(.coursePlaceAdd(.delegate(.placesPicked([SavedPlace.candidateFixture(id: "102")]))))
         await store.receive(\.pathChanged)
         await store.receive(\.courseEdit.placesAdded)
@@ -368,6 +369,18 @@ private func editingCourseResultState() -> HomeFlowFeature.State {
 }
 
 // MARK: - Fixture
+
+private let existing101 = ExistingCoursePlace(
+    id: "101",
+    category: .food,
+    coordinate: Coordinate(latitude: 37.31, longitude: 126.90)
+)
+
+private let existingP0 = ExistingCoursePlace(
+    id: "p0",
+    category: .food,
+    coordinate: Coordinate(latitude: 37.31, longitude: 126.90)
+)
 
 private let bannerCourse = DateCourseSummary(
     id: "42",

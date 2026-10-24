@@ -14,7 +14,6 @@ final class ExpandableTextTests: XCTestCase {
         let height = measuredHeight(
             ExpandableText(text: longText, isExpanded: false, onToggle: {})
         )
-        print("EXPANDABLE_TEXT long collapsed: \(height)")
         // 버튼이 없으면 3줄만 남아 56 근처, 있으면 89 근처다. 그 사이에 둬 글자 값이 흔들려도 안 깨진다
         XCTAssertGreaterThanOrEqual(height, 70)
     }
@@ -26,7 +25,6 @@ final class ExpandableTextTests: XCTestCase {
         let expanded = measuredHeight(
             ExpandableText(text: longText, isExpanded: true, onToggle: {})
         )
-        print("EXPANDABLE_TEXT long collapsed: \(collapsed), expanded: \(expanded)")
         XCTAssertGreaterThan(expanded, collapsed)
     }
 
@@ -34,11 +32,11 @@ final class ExpandableTextTests: XCTestCase {
         let height = measuredHeight(
             ExpandableText(text: shortText, isExpanded: false, onToggle: {})
         )
-        print("EXPANDABLE_TEXT short collapsed: \(height)")
         XCTAssertLessThan(height, 70)
     }
 
-    /// `onGeometryChange` 는 레이아웃 한 바퀴 뒤에 온다. 값이 안정될 때까지 돌린다.
+    /// `onGeometryChange` 는 레이아웃 한 바퀴 뒤에 온다. 0.01초씩 쉬며 다시 재고,
+    /// 높이가 세 번 연속 같으면 그 값을 돌려준다. 50번 안에 안정되지 않으면 실패한다.
     private func measuredHeight(_ view: some View) -> CGFloat {
         let host = UIHostingController(rootView: AnyView(view))
         host.view.frame = CGRect(x: 0, y: 0, width: width, height: 10_000)
@@ -52,13 +50,16 @@ final class ExpandableTextTests: XCTestCase {
             ).height
         }
 
-        for _ in 0 ..< 4 {
+        var previous: CGFloat = -1
+        var sameCount = 0
+        for _ in 0 ..< 50 {
             pass()
+            sameCount = last == previous ? sameCount + 1 : 0
+            if sameCount == 2 { return last }
+            previous = last
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
         }
-        for _ in 0 ..< 2 {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-            pass()
-        }
+        XCTFail("높이가 안정되지 않았다")
         return last
     }
 }

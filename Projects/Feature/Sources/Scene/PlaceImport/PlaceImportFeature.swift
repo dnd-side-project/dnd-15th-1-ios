@@ -19,7 +19,6 @@ public struct PlaceImportFeature {
         public var selectedIDs: Set<String>
         var importID: String?
         var started = false
-        var pollCount = 0
 
         public enum Phase: Equatable {
             case loading
@@ -31,7 +30,7 @@ public struct PlaceImportFeature {
             guard case let .loaded(placeImport) = phase else { return [] }
             switch placeImport.progress {
             case let .reviewRequired(candidates), let .completed(candidates):
-                return candidates
+                return candidates.savable
             case .processing, .failed:
                 return []
             }
@@ -73,7 +72,6 @@ public struct PlaceImportFeature {
 
     // retryAfterSeconds 가 없을 때 쓰는 기본 폴링 간격
     private let fallbackDelay = 2
-    private let maxPollCount = 7
 
     @Dependency(\.placeImportClient) var placeImportClient
     @Dependency(\.analyticsClient) var analyticsClient
@@ -152,11 +150,7 @@ public struct PlaceImportFeature {
 
         switch placeImport.progress {
         case let .processing(retryAfterSeconds):
-            return waitAndPoll(
-                state: &state,
-                importID: placeImport.id,
-                retryAfterSeconds: retryAfterSeconds
-            )
+            return waitAndPoll(importID: placeImport.id, retryAfterSeconds: retryAfterSeconds)
 
         case let .reviewRequired(candidates):
             return showCandidates(
@@ -180,16 +174,9 @@ public struct PlaceImportFeature {
         }
     }
 
-    private func waitAndPoll(
-        state: inout State,
-        importID: String,
-        retryAfterSeconds: Int?
-    ) -> Effect<Action> {
-        guard state.pollCount < maxPollCount else {
-            state.phase = .failed
-            return .none
-        }
-        state.pollCount += 1
+    /// 서버가 처리 중이라고 하는 동안은 계속 다시 묻는다.
+    /// 횟수로 끊으면 아직 끝나지 않은 작업을 실패로 단정하게 된다
+    private func waitAndPoll(importID: String, retryAfterSeconds: Int?) -> Effect<Action> {
         let delay = retryAfterSeconds
             .flatMap { $0 > 0 ? $0 : nil }
             ?? fallbackDelay
@@ -202,12 +189,13 @@ public struct PlaceImportFeature {
         candidates: [ImportCandidate],
         failWhenEmpty: Bool
     ) -> Effect<Action> {
-        if failWhenEmpty, candidates.isEmpty {
+        let savable = candidates.savable
+        if failWhenEmpty, savable.isEmpty {
             state.phase = .failed
             return .none
         }
         state.phase = .loaded(placeImport)
-        state.selectedIDs = Set(candidates.map(\.id))
+        state.selectedIDs = Set(savable.map(\.id))
         return .run { [analyticsClient] _ in
             await analyticsClient.track(.placeSaveModalViewed)
         }
@@ -254,4 +242,12 @@ public struct PlaceImportFeature {
 
 private func mapError(_ error: Error) -> PlaceImportError {
     error as? PlaceImportError ?? .unknown
+}
+
+private extension [ImportCandidate] {
+    /// 둘픽이 확인하지 못한 후보는 장소 번호가 없어 저장할 수 없다.
+    /// 고를 수 없는 걸 보여주지 않도록 화면에도 내보내지 않는다
+    var savable: [ImportCandidate] {
+        filter { $0.place != nil }
+    }
 }

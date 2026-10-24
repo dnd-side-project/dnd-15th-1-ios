@@ -9,7 +9,7 @@ final class PlaceImportRepositoryTests: XCTestCase {
 
     func test_확정은_후보_번호를_숫자로_바꿔_보낸다() async throws {
         let network = StubNetworkClient()
-        let repository = PlaceImportRepository(remote: PlaceImportRemoteDataSource(networkClient: network))
+        let repository = makeRepository(network: network)
 
         try await repository.confirm(importID: "9", candidateIDs: ["1", "2"])
 
@@ -25,16 +25,15 @@ final class PlaceImportRepositoryTests: XCTestCase {
 
     func test_후보_번호가_숫자가_아니면_보내지_않고_unknown을_던진다() async {
         let network = StubNetworkClient()
-        let repository = PlaceImportRepository(remote: PlaceImportRemoteDataSource(networkClient: network))
+        let repository = makeRepository(network: network)
 
-        do {
+        await assertThrows(PlaceImportError.unknown) {
             try await repository.confirm(importID: "9", candidateIDs: ["abc"])
-            XCTFail("Expected unknown")
-        } catch let error as PlaceImportError {
-            XCTAssertEqual(error, .unknown)
-        } catch {
-            XCTFail("Expected PlaceImportError, got \(error)")
         }
         XCTAssertTrue(network.requestedKeys.isEmpty)
+    }
+
+    private func makeRepository(network: StubNetworkClient) -> PlaceImportRepository {
+        PlaceImportRepository(remote: PlaceImportRemoteDataSource(networkClient: network))
     }
 }

@@ -10,6 +10,7 @@ final class PlaceDTOMapperTests: XCTestCase {
         placeId: Int? = 42,
         categoryCode: String? = "CAFE",
         categoryName: String = "카페",
+        roadAddress: String? = "서울 성동구 아차산로 1",
         ownershipStatus: String? = "MINE",
         savedByMe: Bool = true,
         savedMemberCount: Int = 12
@@ -19,7 +20,7 @@ final class PlaceDTOMapperTests: XCTestCase {
             kakaoPlaceId: "998877",
             name: "성수 카페",
             address: "서울 성동구 성수동",
-            roadAddress: "서울 성동구 아차산로 1",
+            roadAddress: roadAddress,
             latitude: 37.5,
             longitude: 127.0,
             category: nil,
@@ -29,7 +30,7 @@ final class PlaceDTOMapperTests: XCTestCase {
             kakaoPlaceUrl: "https://place.map.kakao.com/998877",
             savedByMe: savedByMe,
             ownershipStatus: ownershipStatus,
-            thumbnailUrl: nil,
+            thumbnailUrl: "https://example.com/t.jpg",
             imageUrls: ["https://example.com/a.jpg"],
             savedMemberCount: savedMemberCount
         )
@@ -52,7 +53,7 @@ final class PlaceDTOMapperTests: XCTestCase {
             longitude: 127.0,
             categoryCode: categoryCode,
             categoryName: categoryName,
-            thumbnailUrl: nil,
+            thumbnailUrl: "https://example.com/t.jpg",
             imageUrls: ["https://example.com/a.jpg"]
         )
     }
@@ -80,75 +81,69 @@ final class PlaceDTOMapperTests: XCTestCase {
         )
     }
 
-    func test_상세의_savedMemberCount가_bookmarkCount로_간다() {
+    func test_상세의_저장_수를_옮긴다() {
         let detail = PlaceDTOMapper.toDomain(detailDTO(savedMemberCount: 12))
         XCTAssertEqual(detail.place.bookmarkCount, 12)
     }
 
-    func test_ownershipStatus가_nil이면_ownership도_nil이다() {
+    func test_상세에_저장_관계가_없으면_nil이다() {
         let detail = PlaceDTOMapper.toDomain(detailDTO(ownershipStatus: nil))
         XCTAssertNil(detail.ownership)
     }
 
-    func test_ownershipStatus가_있으면_소문자로_매핑한다() {
+    func test_상세의_저장_관계를_옮긴다() {
         let detail = PlaceDTOMapper.toDomain(detailDTO(ownershipStatus: "PARTNER"))
         XCTAssertEqual(detail.ownership, .partner)
     }
 
-    func test_placeId가_있으면_그것이_Place_id다() {
+    func test_상세의_장소_번호와_카카오_번호를_옮긴다() {
         let detail = PlaceDTOMapper.toDomain(detailDTO(placeId: 42))
-        XCTAssertEqual(detail.place.id, "42")
+        XCTAssertEqual(detail.place.placeID, "42")
+        XCTAssertEqual(detail.place.kakaoPlaceID, "998877")
     }
 
-    func test_placeId가_nil이면_kakaoPlaceId가_Place_id다() {
+    func test_상세에_장소_번호가_없으면_카카오_번호만_옮긴다() {
         let detail = PlaceDTOMapper.toDomain(detailDTO(placeId: nil))
-        XCTAssertEqual(detail.place.id, "998877")
+        XCTAssertNil(detail.place.placeID)
+        XCTAssertEqual(detail.place.kakaoPlaceID, "998877")
     }
 
-    func test_categoryCode가_있으면_코드로_매핑한다() {
-        // 코드와 한글이 어긋나게 두고 코드가 이기는지 본다
-        let detail = PlaceDTOMapper.toDomain(
-            detailDTO(categoryCode: "SHOPPING", categoryName: "카페")
-        )
-        XCTAssertEqual(detail.place.category, .shopping)
+    func test_상세의_카테고리와_사진을_옮기고_빈_도로명은_없음으로_읽는다() {
+        // 코드와 한글이 어긋나게 두고 코드가 넘어가는지 본다. 값마다의 결과는 PlaceDTOMapperFieldTests 가 본다
+        let place = PlaceDTOMapper.toDomain(
+            detailDTO(categoryCode: "SHOPPING", categoryName: "카페", roadAddress: "")
+        ).place
+        XCTAssertEqual(place.category, .shopping)
+        XCTAssertEqual(place.thumbnailURLs.map(\.absoluteString), [
+            "https://example.com/t.jpg",
+            "https://example.com/a.jpg",
+        ])
+        XCTAssertNil(place.roadAddress)
     }
 
-    func test_categoryCode가_nil이면_한글_이름으로_매핑한다() {
-        let detail = PlaceDTOMapper.toDomain(
-            detailDTO(categoryCode: nil, categoryName: "숙박")
-        )
-        XCTAssertEqual(detail.place.category, .accommodation)
-    }
-
-    func test_RESTAURANT는_food다() {
-        let detail = PlaceDTOMapper.toDomain(detailDTO(categoryCode: "RESTAURANT"))
-        XCTAssertEqual(detail.place.category, .food)
-    }
-
-    func test_모르는_코드는_한글_이름으로_넘어간다() {
-        let detail = PlaceDTOMapper.toDomain(
-            detailDTO(categoryCode: "SPACE_STATION", categoryName: "관광")
-        )
-        XCTAssertEqual(detail.place.category, .tourism)
-    }
-
-    func test_검색_항목의_categoryCode가_있으면_코드로_매핑한다() {
+    func test_검색_항목의_카테고리와_사진을_옮기고_빈_도로명은_없음으로_읽는다() throws {
         let page = PlaceDTOMapper.toSearchPage(
             PlaceSearchResponseDTO(
-                places: [searchItemDTO(categoryCode: "SHOPPING", categoryName: "카페")],
+                places: [searchItemDTO(categoryCode: "SHOPPING", categoryName: "카페", roadAddress: "")],
                 hasNext: false
             ),
             page: 0
         )
-        XCTAssertEqual(page.items.first?.category, .shopping)
+        let place = try XCTUnwrap(page.items.first)
+        XCTAssertEqual(place.category, .shopping)
+        XCTAssertEqual(place.thumbnailURLs.map(\.absoluteString), [
+            "https://example.com/t.jpg",
+            "https://example.com/a.jpg",
+        ])
+        XCTAssertNil(place.roadAddress)
     }
 
-    func test_저장_목록은_categoryCode가_없어_한글로_매핑한다() {
+    func test_저장_장소의_카테고리를_한글_이름으로_옮긴다() {
         let saved = PlaceDTOMapper.toDomain(savedPlaceDTO(categoryName: "숙박"))
         XCTAssertEqual(saved.place.category, .accommodation)
     }
 
-    func test_검색_항목의_placeId가_nil이면_kakaoPlaceId가_Place_id다() {
+    func test_검색_항목에_장소_번호가_없으면_카카오_번호만_옮긴다() throws {
         let page = PlaceDTOMapper.toSearchPage(
             PlaceSearchResponseDTO(
                 places: [searchItemDTO(placeId: nil, kakaoPlaceId: "998877")],
@@ -156,10 +151,12 @@ final class PlaceDTOMapperTests: XCTestCase {
             ),
             page: 0
         )
-        XCTAssertEqual(page.items.first?.id, "998877")
+        let place = try XCTUnwrap(page.items.first)
+        XCTAssertNil(place.placeID)
+        XCTAssertEqual(place.kakaoPlaceID, "998877")
     }
 
-    func test_page가_43이고_hasNext가_참이면_결과도_참이다() {
+    func test_43페이지에서_다음이_있다고_하면_다음_페이지가_있다() {
         let page = PlaceDTOMapper.toSearchPage(
             PlaceSearchResponseDTO(places: [searchItemDTO()], hasNext: true),
             page: 43
@@ -167,7 +164,7 @@ final class PlaceDTOMapperTests: XCTestCase {
         XCTAssertTrue(page.hasNext)
     }
 
-    func test_page가_44이고_hasNext가_참이어도_결과는_거짓이다() {
+    func test_44페이지면_다음이_있다고_해도_다음_페이지가_없다() {
         let page = PlaceDTOMapper.toSearchPage(
             PlaceSearchResponseDTO(places: [searchItemDTO()], hasNext: true),
             page: 44
@@ -175,7 +172,7 @@ final class PlaceDTOMapperTests: XCTestCase {
         XCTAssertFalse(page.hasNext)
     }
 
-    func test_page가_0이고_hasNext가_거짓이면_결과도_거짓이다() {
+    func test_다음이_없다고_하면_다음_페이지가_없다() {
         let page = PlaceDTOMapper.toSearchPage(
             PlaceSearchResponseDTO(places: [searchItemDTO()], hasNext: false),
             page: 0
@@ -183,13 +180,8 @@ final class PlaceDTOMapperTests: XCTestCase {
         XCTAssertFalse(page.hasNext)
     }
 
-    func test_상세의_savedByMe가_isSaved로_간다() {
+    func test_상세의_내_저장_여부를_옮긴다() {
         XCTAssertTrue(PlaceDTOMapper.toDomain(detailDTO(savedByMe: true)).isSaved)
-    }
-
-    func test_상세의_장소_번호를_placeID로_옮긴다() {
-        XCTAssertEqual(PlaceDTOMapper.toDomain(detailDTO(placeId: 42)).place.placeID, "42")
-        XCTAssertNil(PlaceDTOMapper.toDomain(detailDTO(placeId: nil)).place.placeID)
     }
 
     func test_검색_항목은_저장_수를_모른다() {
@@ -200,19 +192,13 @@ final class PlaceDTOMapperTests: XCTestCase {
         XCTAssertNil(page.items.first?.bookmarkCount)
     }
 
-    func test_검색_항목의_도로명이_없으면_nil로_둔다() {
-        let page = PlaceDTOMapper.toSearchPage(
-            PlaceSearchResponseDTO(places: [searchItemDTO(roadAddress: nil)], hasNext: false),
-            page: 0
-        )
-        XCTAssertNil(page.items.first?.roadAddress)
-    }
-
-    func test_검색_항목에_두_번호가_없으면_이름과_좌표로_id를_만든다() {
+    func test_검색_항목에_두_번호가_없으면_둘_다_비어_있다() throws {
         let page = PlaceDTOMapper.toSearchPage(
             PlaceSearchResponseDTO(places: [searchItemDTO(placeId: nil, kakaoPlaceId: nil)], hasNext: false),
             page: 0
         )
-        XCTAssertEqual(page.items.first?.id, "성수 카페|37.5|127.0")
+        let place = try XCTUnwrap(page.items.first)
+        XCTAssertNil(place.placeID)
+        XCTAssertNil(place.kakaoPlaceID)
     }
 }
