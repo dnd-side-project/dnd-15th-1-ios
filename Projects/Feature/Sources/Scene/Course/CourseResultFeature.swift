@@ -39,6 +39,8 @@ public struct CourseResultFeature {
         public var hasUserMovedCamera = false
         public var isNotifyingPartner = false
         public var toast: ToastState?
+        /// 내 위치 점. 위치 흐름만 채운다
+        public var userLocation: Coordinate?
 
         public init(
             course: DateCourse?,
@@ -63,6 +65,9 @@ public struct CourseResultFeature {
         case courseResponse(Result<DateCourse, CourseError>)
         case mapSizeChanged(width: CGFloat, visibleHeight: CGFloat)
         case cameraChanged(MapCamera)
+        /// 지도가 화면에 나타났다. 내 위치 흐름을 연다. 지도가 사라지면 뷰의 task 취소로 끊긴다
+        case mapAppeared
+        case userLocationChanged(Coordinate?)
         case notifyTapped
         case partnerNotified(CourseError?)
         case editTapped
@@ -83,11 +88,13 @@ public struct CourseResultFeature {
     private enum CancelID {
         case load
         case notify
+        case userLocation
     }
 
     @Dependency(\.courseClient) var courseClient
     @Dependency(\.analyticsClient) var analyticsClient
     @Dependency(\.authClient) var authClient
+    @Dependency(\.locationClient) var locationClient
 
     public init() {}
 
@@ -106,6 +113,8 @@ public struct CourseResultFeature {
             return notify(state: &state, action: action)
         case .editTapped, .backTapped:
             return raise(state: &state, action: action)
+        case .mapAppeared, .userLocationChanged:
+            return updateUserLocation(state: &state, action: action)
         case .delegate:
             return .none
         }
@@ -472,5 +481,31 @@ private enum CourseResultText {
 
     static func address(of place: Place) -> String {
         place.roadAddress ?? place.address
+    }
+}
+
+// MARK: - 내 위치
+
+private extension CourseResultFeature {
+    func updateUserLocation(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .mapAppeared:
+            // 다시 들어오면 새로 잡힌 좌표가 올 때까지 점을 안 보인다
+            state.userLocation = nil
+            return .run { [locationClient] send in
+                for await coordinate in locationClient.coordinateUpdates() {
+                    await send(.userLocationChanged(coordinate))
+                }
+            }
+            .cancellable(id: CancelID.userLocation, cancelInFlight: true)
+
+        case let .userLocationChanged(coordinate):
+            state.userLocation = coordinate
+            return .none
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
     }
 }

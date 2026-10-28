@@ -108,10 +108,14 @@ private extension CoursePlacePickView {
             ),
             pins: store.markers.map(MapMarkerStyle.pin(for:)),
             routes: store.routes,
+            userLocation: store.userLocation,
             onPinTap: { store.send(.markerTapped($0)) },
             collapsedSheetTop: collapsedSheetTop
         )
         .ignoresSafeArea()
+        // 지도가 보이는 동안만 내 위치를 받는다. 날짜 화면에는 지도가 없어 흐름이 안 열린다.
+        // 사라질 때 액션을 보내지 않는다. 뒤로 가면 상위가 상태를 먼저 지워 그 액션이 빈 자리에 닿는다
+        .task { await store.send(.mapAppeared).finish() }
     }
 
     /// 뒤로가기가 서치바 자리에 선다. 시트 펼침 한계가 그 자리를 기준으로 잡혀 있다

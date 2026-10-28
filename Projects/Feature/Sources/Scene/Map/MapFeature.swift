@@ -87,6 +87,9 @@ public struct MapFeature {
         /// 위치 권한이 거부된 채로 현재위치를 눌렀을 때 뜨는 설정 이동 안내
         public var isLocationPermissionModalPresented = false
 
+        /// 내 위치 점. 위치 흐름만 채운다. 현위치 버튼이 받은 좌표로는 바꾸지 않는다
+        public var userLocation: Coordinate?
+
         /// 지도 핀과 시트 목록이 함께 보는 하나의 배열이다. 둘이 어긋날 수 없다
         public var filteredPlaces: [SavedPlace] {
             places
@@ -131,6 +134,9 @@ public struct MapFeature {
         case locationAuthorizationResponse(LocationAuthorization)
         case currentLocationResponse(Result<Coordinate, LocationError>)
         case permissionModalDismissed
+        /// 지도가 화면에 나타났다. 권한과 상관없이 내 위치 흐름을 연다. 지도가 사라지면 뷰의 task 취소로 끊긴다
+        case mapAppeared
+        case userLocationChanged(Coordinate?)
         case retryTapped
         case dismissToast
         case searchResultsApplied(query: String, results: [PlaceSearchResult], isSavedOnly: Bool)
@@ -166,6 +172,7 @@ public struct MapFeature {
         case couple
         case currentCourse
         case location
+        case userLocation
         case delete(String)
     }
 
@@ -200,6 +207,8 @@ public struct MapFeature {
             return updateSearch(state: &state, action: action)
         case .aliasSaved:
             return applyAlias(state: &state, action: action)
+        case .mapAppeared, .userLocationChanged:
+            return updateUserLocation(state: &state, action: action)
         case .delegate:
             return .none
         }
@@ -726,5 +735,32 @@ private extension MapFeature {
             return place.coordinate
         }
         return state.places.first { $0.id == id }?.place.coordinate
+    }
+}
+
+// MARK: - 내 위치
+
+private extension MapFeature {
+    func updateUserLocation(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .mapAppeared:
+            // 다시 들어오면 새로 잡힌 좌표가 올 때까지 점을 안 보인다
+            state.userLocation = nil
+            return .run { [locationClient] send in
+                for await coordinate in locationClient.coordinateUpdates() {
+                    await send(.userLocationChanged(coordinate))
+                }
+            }
+            .cancellable(id: CancelID.userLocation, cancelInFlight: true)
+
+        case let .userLocationChanged(coordinate):
+            state.userLocation = coordinate
+            return .none
+
+        default:
+            // core 가 이 묶음으로 안 보내는 액션이라 도달하지 않는다
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
     }
 }
