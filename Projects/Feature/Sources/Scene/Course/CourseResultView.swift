@@ -28,6 +28,9 @@ public struct CourseResultView: View {
     @State private var collapsedSheetTop: CGFloat = 0
     @State private var grabFrames: [CGRect] = []
 
+    /// 카카오맵 길찾기를 여는 통로. 앱이 안 받으면 웹으로 보낸다
+    @Environment(\.openURL) private var openURL
+
     public init(store: StoreOf<CourseResultFeature>) {
         self.store = store
     }
@@ -121,29 +124,34 @@ private extension CourseResultView {
     }
 
     var sheetHeader: some View {
-        VStack(alignment: .leading, spacing: Spacing.s8) {
-            HStack(alignment: .top, spacing: Spacing.s8) {
+        // 시안은 제목·요약이 한 묶음이고 수정 버튼은 그 옆에 위로 맞춰 따로 선다.
+        // 버튼을 제목과 한 줄로 두면 줄 높이를 버튼이 정해 요약이 내려간다.
+        // 한 줄짜리 Text 는 행간을 얹지 않아, 시안 글자 상자(30 · 19.6)를 최소 높이로 잡는다
+        HStack(alignment: .top, spacing: Spacing.s8) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(store.course?.title ?? "")
                     .typography(.title3SB)
                     .foregroundStyle(Color.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: Typography.title3SB.lineHeight)
 
-                // 지난 데이트로 들어오면 수정을 안 낸다. 제목이 그 폭을 가져간다
-                if store.showsEditButton {
-                    AppButton("수정", style: .outlined, size: .sm) {
-                        store.send(.editTapped)
-                    }
+                if let summaryText = store.summaryText {
+                    Text(summaryText)
+                        .typography(.body2M)
+                        .foregroundStyle(Color.textTertiary)
+                        .frame(minHeight: Typography.body2M.lineHeight)
                 }
             }
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
-                if grabFrames != [$0] { grabFrames = [$0] }
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let summaryText = store.summaryText {
-                Text(summaryText)
-                    .typography(.body2M)
-                    .foregroundStyle(Color.textTertiary)
+            // 지난 데이트로 들어오면 수정을 안 낸다. 제목이 그 폭을 가져간다
+            if store.showsEditButton {
+                AppButton("수정", style: .outlined, size: .sm) {
+                    store.send(.editTapped)
+                }
             }
+        }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+            if grabFrames != [$0] { grabFrames = [$0] }
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.bottom, Spacing.s8)
@@ -162,9 +170,22 @@ private extension CourseResultView {
     }
 
     var timeline: some View {
-        CourseTimeline(stops: store.timelineStops, legs: store.timelineLegs)
-            .padding(.horizontal, Spacing.s24)
-            .padding(.bottom, store.showsNotifyButton ? ctaCoverPadding : Spacing.s20)
+        CourseTimeline(stops: store.timelineStops, legs: store.timelineLegs) { index in
+            openDirections(forLegAt: index)
+        }
+        .padding(.horizontal, Spacing.s24)
+        .padding(.bottom, store.showsNotifyButton ? ctaCoverPadding : Spacing.s20)
+    }
+
+    /// 「지도」 버튼(`PlaceDetailView.mapButton`)과 같은 방식이다.
+    /// 앱 주소를 먼저 열고, 앱이 안 받으면 웹 주소를 연다. 그래서 Info.plist 에 스킴을 등록하지 않는다
+    func openDirections(forLegAt index: Int) {
+        let directions = store.legDirections
+        guard directions.indices.contains(index), let target = directions[index] else { return }
+        openURL(target.appURL) { accepted in
+            guard !accepted else { return }
+            openURL(target.webURL)
+        }
     }
 
     var skeleton: some View {
@@ -226,6 +247,12 @@ private enum CourseResultPreviewData {
     static let scheduledTime = DateComponents(hour: 13, minute: 0)
     static let shortLeg = Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500)
     static let longLeg = Domain.CourseLeg(walkingMinutes: 80, distanceMeters: 5300)
+    /// 시안 4992:25865 첫 구간. 도보는 길지만 서버가 대중교통을 줬다
+    static let transitLeg = Domain.CourseLeg(
+        walkingMinutes: 80,
+        distanceMeters: 5300,
+        transit: Domain.CourseTransit(minutes: 20, distanceMeters: 1500, path: [])
+    )
 
     static let stops: [Domain.CourseStop] = [
         Domain.CourseStop(place: .preview(id: "p0", latitude: 37.3128, longitude: 126.9040)),
@@ -254,6 +281,17 @@ private enum CourseResultPreviewData {
         stops: stops,
         legs: [nil, longLeg]
     )
+
+    static let mixedTransit = DateCourse(
+        id: "1",
+        title: title,
+        scheduledDate: scheduledDate,
+        scheduledTime: scheduledTime,
+        status: .confirmed,
+        version: 1,
+        stops: stops,
+        legs: [transitLeg, longLeg]
+    )
 }
 
 @MainActor
@@ -269,7 +307,7 @@ private func courseResultStore(course: DateCourse) -> StoreOf<CourseResultFeatur
     }
 }
 
-// c01 · c02 — 장소 3곳, 둘째 구간만 이동이 길다. 시트는 접힘만
+// c01 · c02 — 장소 3곳, 도보만. 시트는 접힘만
 #Preview("3곳") {
     KakaoMapPreviewContainer {
         CourseResultView(store: courseResultStore(course: CourseResultPreviewData.threeStops))
@@ -280,6 +318,13 @@ private func courseResultStore(course: DateCourse) -> StoreOf<CourseResultFeatur
 #Preview("도보 값 없는 구간") {
     KakaoMapPreviewContainer {
         CourseResultView(store: courseResultStore(course: CourseResultPreviewData.missingFirstLeg))
+    }
+}
+
+// 4992:25865 — 첫 구간 대중교통, 둘째 구간 도보. 요약이 「이동 약 · 총」 으로 바뀐다
+#Preview("대중교통 섞임") {
+    KakaoMapPreviewContainer {
+        CourseResultView(store: courseResultStore(course: CourseResultPreviewData.mixedTransit))
     }
 }
 

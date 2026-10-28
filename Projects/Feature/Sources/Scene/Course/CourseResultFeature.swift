@@ -3,15 +3,12 @@ import CoreKakaoMap
 import Domain
 import Foundation
 import SharedDesignSystem
+import SharedUtils
 
 // MARK: - CourseResultFeature
 
 @Reducer
 public struct CourseResultFeature {
-
-    /// 이 분을 넘는 구간에 `이동이 긴 구간입니다` 를 붙인다.
-    /// 시안 `c02` 는 20분에 안 붙고 1시간 20분에 붙는다. 그 사이를 30분으로 잡았다
-    public static let longLegMinutes = 30
 
     public enum LoadState: Equatable {
         case loading
@@ -177,7 +174,8 @@ private extension CourseResultFeature {
         switch action {
         case let .mapSizeChanged(width, visibleHeight):
             guard !state.hasUserMovedCamera else { return .none }
-            let coordinates = state.stops.map(\.place.coordinate)
+            // 경로 선이 장소 바깥으로 돌아도 잘리지 않게 선 좌표까지 담는다
+            let coordinates = state.routeCoordinates
             guard let anchor = coordinates.first else { return .none }
             let zoom = MapZoom.fit(
                 coordinates: coordinates,
@@ -286,12 +284,20 @@ public extension CourseResultFeature.State {
 
     var stops: [Domain.CourseStop] { course?.stops ?? [] }
 
-    /// 장소가 없으면 요약 줄이 없다
+    /// 장소가 없으면 요약 줄이 없다.
+    /// 숫자는 구간 행에 보이는 값의 합이다. 사용자가 화면에서 직접 맞춰 볼 수 있는 숫자다
     var summaryText: String? {
         guard let course, !course.stops.isEmpty else { return nil }
-        let duration = CourseResultText.duration(course.totalWalkingMinutes)
-        let distance = CourseResultText.summaryDistance(course.totalDistanceMeters)
-        return "\(course.stops.count)곳 · 도보 약 \(duration) · 총 이동 \(distance)"
+        let legs = course.legs.compactMap(\.self)
+        let minutes = legs.reduce(0) { $0 + $1.travelMinutes }
+        let tenths = legs.reduce(0) { $0 + CourseResultText.tenthsOfKilometer($1.travelDistanceMeters) }
+        let duration = CourseResultText.duration(minutes)
+        let distance = CourseResultText.summaryDistance(tenths: tenths)
+        // 대중교통이 섞인 시간을 「도보」 라 부르지 않고, 「이동」 을 한 줄에 두 번 쓰지 않는다
+        guard legs.contains(where: { $0.travelMode == .transit }) else {
+            return "\(course.stops.count)곳 · 도보 약 \(duration) · 총 이동 \(distance)"
+        }
+        return "\(course.stops.count)곳 · 이동 약 \(duration) · 총 \(distance)"
     }
 
     /// 지난 데이트는 고칠 이유가 없다. 서버는 안 막으니 화면이 막는다
@@ -324,9 +330,21 @@ public extension CourseResultFeature.State {
         }
     }
 
+    /// 장소 → 구간 경로 좌표 → 다음 장소 순서로 잇는다.
+    /// 경로 좌표가 비었거나 값을 못 받은 구간은 장소끼리 직선이다
+    var routeCoordinates: [Coordinate] {
+        let legs = course?.legs ?? []
+        return stops.enumerated().flatMap { index, stop -> [Coordinate] in
+            guard legs.indices.contains(index), let leg = legs[index] else {
+                return [stop.place.coordinate]
+            }
+            return [stop.place.coordinate] + leg.travelPath
+        }
+    }
+
     var routes: [MapRoute] {
         guard stops.count >= 2 else { return [] }
-        return [MapRoute(id: "course-\(dateCourseID)", coordinates: stops.map(\.place.coordinate))]
+        return [MapRoute(id: "course-\(dateCourseID)", coordinates: routeCoordinates)]
     }
 }
 
@@ -346,14 +364,76 @@ extension CourseResultFeature.State {
     var timelineLegs: [CourseLeg] {
         (course?.legs ?? []).map { (leg: Domain.CourseLeg?) in
             guard let leg else {
-                return CourseLeg(duration: "", distance: "", isLong: false)
+                return CourseLeg(mode: .unavailable, duration: "", distance: "이동 정보를 불러오지 못했어요")
             }
-            return CourseLeg(
-                duration: "도보 \(CourseResultText.duration(leg.walkingMinutes))",
-                distance: CourseResultText.legDistance(leg.distanceMeters),
-                isLong: leg.walkingMinutes > CourseResultFeature.longLegMinutes
+            let duration = CourseResultText.duration(leg.travelMinutes)
+            let distance = CourseResultText.legDistance(
+                tenths: CourseResultText.tenthsOfKilometer(leg.travelDistanceMeters)
+            )
+            switch leg.travelMode {
+            case .walking:
+                return CourseLeg(mode: .walk, duration: "도보 \(duration)", distance: distance)
+            case .transit:
+                return CourseLeg(mode: .transit, duration: "대중교통 \(duration)", distance: distance)
+            }
+        }
+    }
+
+    /// 구간마다 앞 장소 → 다음 장소 카카오맵 길찾기 주소. 구간 수(`stops.count - 1`)만큼이다.
+    /// 값을 못 받은 구간은 대중교통으로 연다. 대개 너무 멀어서 값이 비므로 도보 길찾기는 쓸모가 없다
+    var legDirections: [CourseDirections?] {
+        guard stops.count >= 2 else { return [] }
+        let legs = course?.legs ?? []
+        return (0 ..< stops.count - 1).map { index in
+            let leg = legs.indices.contains(index) ? legs[index] : nil
+            return CourseDirections(
+                from: stops[index].place,
+                to: stops[index + 1].place,
+                mode: leg?.travelMode ?? .transit
             )
         }
+    }
+}
+
+// MARK: - Directions
+
+/// 구간 하나의 카카오맵 길찾기 주소. 앱을 먼저 열고, 앱이 안 받으면 웹을 연다
+struct CourseDirections: Equatable {
+    let appURL: URL
+    let webURL: URL
+
+    /// 주소를 만들지 못하면 nil
+    init?(from origin: Place, to destination: Place, mode: CourseTravelMode) {
+        let appMode: String
+        let webMode: String
+        switch mode {
+        case .walking:
+            appMode = "foot"
+            webMode = "walk"
+        case .transit:
+            appMode = "publictransit"
+            webMode = "traffic"
+        }
+        let start = origin.coordinate
+        let end = destination.coordinate
+        let app = "kakaomap://route"
+            + "?sp=\(start.latitude),\(start.longitude)"
+            + "&ep=\(end.latitude),\(end.longitude)"
+            + "&by=\(appMode)"
+        let web = "https://map.kakao.com/link/by/\(webMode)/"
+            + "\(Self.webPoint(origin))/\(Self.webPoint(destination))"
+        guard let appURL = URL(string: app), let webURL = URL(string: web) else { return nil }
+        self.appURL = appURL
+        self.webURL = webURL
+    }
+
+    /// `이름,위도,경도`. 쉼표·슬래시는 웹 주소의 구분자라 이름에서 공백으로 바꾼다
+    private static func webPoint(_ place: Place) -> String {
+        let name = place.name
+            .replacingOccurrences(of: ",", with: " ")
+            .replacingOccurrences(of: "/", with: " ")
+        let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""
+        return "\(encoded),\(place.coordinate.latitude),\(place.coordinate.longitude)"
     }
 }
 
@@ -373,16 +453,21 @@ private enum CourseResultText {
         return "\(minutes)분"
     }
 
-    static func summaryDistance(_ meters: Int) -> String {
-        "\(kilometers(meters))km"
+    /// 0.1km 단위로 반올림한 거리. 행과 요약이 이 값 하나를 써서 요약이 행의 합과 같다
+    static func tenthsOfKilometer(_ meters: Int) -> Int {
+        Int((Double(meters) / 100).rounded())
     }
 
-    static func legDistance(_ meters: Int) -> String {
-        "\(kilometers(meters)) km"
+    static func summaryDistance(tenths: Int) -> String {
+        "\(kilometers(tenths: tenths))km"
     }
 
-    private static func kilometers(_ meters: Int) -> String {
-        String(format: "%.1f", Double(meters) / 1_000)
+    static func legDistance(tenths: Int) -> String {
+        "\(kilometers(tenths: tenths)) km"
+    }
+
+    private static func kilometers(tenths: Int) -> String {
+        "\(tenths / 10).\(tenths % 10)"
     }
 
     static func address(of place: Place) -> String {
