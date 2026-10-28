@@ -140,11 +140,12 @@ private struct BottomSheetContainer<Content: View>: View {
         }
     }
 
+    /// 잡는 칸은 위 여백 8 + 막대 4 + 아래 여백 8 = 20 이다. 지도 위 시트(`MapBottomSheet`)와 같은 값이다
     private var handle: some View {
         Capsule()
             .fill(Color.gray100)
-            .frame(width: 50, height: 6)
-            .padding(.top, 14)
-            .padding(.bottom, 13)
+            .frame(width: 50, height: 4)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
     }
 }
