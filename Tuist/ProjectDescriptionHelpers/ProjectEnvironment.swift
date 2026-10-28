@@ -8,7 +8,7 @@ public enum ProjectEnvironment {
     public static let productName = "Dulpick"
     public static let displayName = "둘픽"
 
-    public static let appVersion = "1.0.3"
+    public static let appVersion = "1.1.0"
     public static let appBuildNumber = "1"
 
     public static let swiftVersion = "6"
