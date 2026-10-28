@@ -18,6 +18,8 @@ private enum PlaceSearchMetric {
     static let skeletonRowCount = 3
     /// 상단줄 아래 여백
     static let topBarBottomInset: CGFloat = 10
+    /// 저장한 곳만 보기 줄 아래 띠
+    static let savedOnlyDividerHeight: CGFloat = 4
     /// 최근 검색어 제목 줄 위아래 여백
     static let recentHeaderVerticalInset: CGFloat = 17
     /// 빈 화면 그림
@@ -41,6 +43,10 @@ public struct PlaceSearchView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             topBar
+            // 커플이 없으면 서버가 404 를 준다. 지도 탭 저장자 필터처럼 줄째 감춘다
+            if store.isCoupleConnected {
+                savedOnlyToggleRow
+            }
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -79,6 +85,28 @@ public struct PlaceSearchView: View {
         .padding(.leading, BackButtonMetric.leadingInset)
         .padding(.trailing, Spacing.s20)
         .padding(.bottom, PlaceSearchMetric.topBarBottomInset)
+    }
+
+    /// 검색창 아래 오른쪽. 아래 띠가 목록과 가른다
+    private var savedOnlyToggleRow: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Spacer()
+
+                Toggle(isOn: $store.isSavedOnly) {
+                    Text("저장한 곳만 보기")
+                        .typography(.body2M)
+                        .foregroundStyle(Color.textPrimary)
+                }
+                .toggleStyle(AppToggleStyle())
+            }
+            .padding(.horizontal, Spacing.s20)
+            .padding(.vertical, Spacing.s8)
+
+            Rectangle()
+                .fill(Color.borderWeak)
+                .frame(height: PlaceSearchMetric.savedOnlyDividerHeight)
+        }
     }
 
     @ViewBuilder
@@ -213,19 +241,22 @@ public struct PlaceSearchView: View {
         .onTapGesture { store.send(.recentSearchTapped(term)) }
     }
 
-    /// 검색 화면의 행은 사진과 우측 슬롯을 안 쓴다
+    /// 검색 화면의 행은 사진과 우측 슬롯을 안 쓴다.
+    /// 커플이 저장한 곳은 빨간 북마크, 아닌 곳은 회색 핀이다. 별칭이 있으면 이름 대신 별칭을 보이고 녹화에서 가린다
     private var resultList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(Array(store.results.enumerated()), id: \.element.id) { index, place in
+                ForEach(Array(store.results.enumerated()), id: \.element.id) { index, result in
                     PlaceListRow(
-                        icon: place.category.icon,
-                        name: place.name,
-                        address: place.address,
-                        showsDivider: place.id != store.results.last?.id
+                        icon: result.ownership == nil ? Image.mapPin : Image.bookmarkFilled,
+                        name: result.alias ?? result.place.name,
+                        address: result.place.address,
+                        isNameSensitive: result.alias != nil,
+                        iconTint: result.ownership == nil ? Color.gray200 : nil,
+                        category: result.place.category.displayName
                     )
                     .contentShape(Rectangle())
-                    .onTapGesture { store.send(.rowTapped(place.id)) }
+                    .onTapGesture { store.send(.rowTapped(result.id)) }
                     .onAppear {
                         if index == max(0, store.results.count - 3) {
                             store.send(.reachedEnd)
@@ -234,7 +265,8 @@ public struct PlaceSearchView: View {
                 }
             }
         }
-        .padding(.top, Spacing.s8)
+        // 토글 줄이 있으면 그 아래 띠에 바로 붙는다
+        .padding(.top, store.isCoupleConnected ? 0 : Spacing.s8)
     }
 
     private var skeleton: some View {
@@ -245,7 +277,8 @@ public struct PlaceSearchView: View {
             }
         }
         .padding(.horizontal, Spacing.s20)
-        .padding(.top, Spacing.s8)
+        // 결과 목록과 같은 자리에 서야 로딩이 끝날 때 내용이 튀지 않는다
+        .padding(.top, store.isCoupleConnected ? 0 : Spacing.s8)
         .frame(maxHeight: .infinity, alignment: .top)
     }
 }
