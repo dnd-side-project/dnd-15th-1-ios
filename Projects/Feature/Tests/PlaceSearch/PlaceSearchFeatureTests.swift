@@ -357,6 +357,178 @@ final class PlaceSearchFeaturePaginationTests: XCTestCase {
             $0.loadState = .loaded
         }
     }
+
+    func test_첫_페이지가_비어도_다음이_있으면_로딩을_보이며_곧바로_다음_페이지를_부른다() async {
+        let clock = TestClock()
+        let second = Place.mocks.prefix(2).map(PlaceSearchResult.unsaved)
+        let store = TestStore(initialState: PlaceSearchFeature.State()) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.placeClient.searchPlaces = { _, page in
+                guard page == 0 else {
+                    XCTAssertEqual(page, 1)
+                    return Page(items: second, hasNext: false)
+                }
+                return Page(items: [], hasNext: true)
+            }
+        }
+
+        await store.send(.binding(.set(\.query, "성수"))) {
+            $0.query = "성수"
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.queryChangeDebounced) {
+            $0.loadState = .loading
+        }
+        await store.receive(\.searchResponse.success) {
+            $0.hasNext = true
+            $0.loadState = .loaded
+            $0.isLoadingMore = true
+        }
+        XCTAssertTrue(store.state.isAwaitingResults)
+        XCTAssertFalse(store.state.isEmptyResult)
+
+        await store.receive(\.moreResponse.success) {
+            $0.results = second
+            $0.page = 1
+            $0.hasNext = false
+            $0.isLoadingMore = false
+        }
+        XCTAssertFalse(store.state.isAwaitingResults)
+    }
+
+    func test_빈_페이지가_이어지면_결과가_나올_때까지_이어_부른다() async {
+        let third = Place.mocks.prefix(1).map(PlaceSearchResult.unsaved)
+        var state = PlaceSearchFeature.State(query: "성수")
+        state.loadState = .loading
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.placeClient.searchPlaces = { _, page in
+                guard page == 1 else {
+                    XCTAssertEqual(page, 2)
+                    return Page(items: third, hasNext: false)
+                }
+                return Page(items: [], hasNext: true)
+            }
+        }
+
+        await store.send(.searchResponse(.success(Page(items: [], hasNext: true)))) {
+            $0.hasNext = true
+            $0.loadState = .loaded
+            $0.isLoadingMore = true
+        }
+        await store.receive(\.moreResponse.success) {
+            $0.page = 1
+        }
+        await store.receive(\.moreResponse.success) {
+            $0.results = third
+            $0.page = 2
+            $0.hasNext = false
+            $0.isLoadingMore = false
+        }
+    }
+
+    func test_짧은_페이지_뒤에도_끝에_닿으면_다음_페이지를_부른다() async {
+        let first = Place.mocks.prefix(2).map(PlaceSearchResult.unsaved)
+        let third = Place.mocks.suffix(1).map(PlaceSearchResult.unsaved)
+        var state = PlaceSearchFeature.State(query: "성수")
+        state.results = first
+        state.hasNext = true
+        state.loadState = .loaded
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.placeClient.searchPlaces = { _, page in
+                guard page == 1 else {
+                    XCTAssertEqual(page, 2)
+                    return Page(items: third, hasNext: false)
+                }
+                return Page(items: [], hasNext: true)
+            }
+        }
+
+        await store.send(.reachedEnd) {
+            $0.isLoadingMore = true
+        }
+        // 이미 결과가 있으면 리듀서가 이어 부르지 않는다. 화면의 끝 표시가 다시 나타나 부른다
+        await store.receive(\.moreResponse.success) {
+            $0.page = 1
+            $0.isLoadingMore = false
+        }
+        await store.send(.reachedEnd) {
+            $0.isLoadingMore = true
+        }
+        await store.receive(\.moreResponse.success) {
+            $0.results = first + third
+            $0.page = 2
+            $0.hasNext = false
+            $0.isLoadingMore = false
+        }
+    }
+
+    func test_결과가_빈_채_이어_부른_요청이_실패하면_실패_상태다() async {
+        var state = PlaceSearchFeature.State(query: "성수")
+        state.loadState = .loading
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.placeClient.searchPlaces = { _, _ in throw PlaceError.network }
+        }
+
+        await store.send(.searchResponse(.success(Page(items: [], hasNext: true)))) {
+            $0.hasNext = true
+            $0.loadState = .loaded
+            $0.isLoadingMore = true
+        }
+        await store.receive(\.moreResponse.failure) {
+            $0.isLoadingMore = false
+            $0.loadState = .failed
+        }
+        XCTAssertFalse(store.state.isAwaitingResults)
+    }
+
+    func test_결과가_빈_채_이어_부른_요청에서_세션이_만료되면_위로_올린다() async {
+        var state = PlaceSearchFeature.State(query: "성수")
+        state.loadState = .loading
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.placeClient.searchPlaces = { _, _ in throw PlaceError.unauthorized }
+        }
+
+        await store.send(.searchResponse(.success(Page(items: [], hasNext: true)))) {
+            $0.hasNext = true
+            $0.loadState = .loaded
+            $0.isLoadingMore = true
+        }
+        await store.receive(\.moreResponse.failure) {
+            $0.isLoadingMore = false
+            $0.loadState = .failed
+        }
+        await store.receive(\.delegate.sessionExpired)
+    }
+
+    func test_결과가_있을_때_더_불러오기가_실패하면_결과를_남긴다() async {
+        let first = Place.mocks.prefix(2).map(PlaceSearchResult.unsaved)
+        var state = PlaceSearchFeature.State(query: "성수")
+        state.results = first
+        state.hasNext = true
+        state.loadState = .loaded
+        let store = TestStore(initialState: state) {
+            PlaceSearchFeature()
+        } withDependencies: {
+            $0.placeClient.searchPlaces = { _, _ in throw PlaceError.network }
+        }
+
+        await store.send(.reachedEnd) {
+            $0.isLoadingMore = true
+        }
+        await store.receive(\.moreResponse.failure) {
+            $0.isLoadingMore = false
+        }
+    }
 }
 
 @MainActor
