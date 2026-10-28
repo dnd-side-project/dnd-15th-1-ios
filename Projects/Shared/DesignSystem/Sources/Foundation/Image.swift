@@ -157,4 +157,7 @@ public extension Image {
     static var brandLockup: Image { Asset.brandLockup.swiftUIImage }
     static var brandMark: Image { Asset.brandMark.swiftUIImage }
     static var brandWordmark: Image { Asset.brandWordmark.swiftUIImage }
+    /// 지도 앱 로고. 원으로 잘라 둔 그림이라 24×24 로 그리기만 한다
+    static var naverMap: Image { Asset.naverMap.swiftUIImage }
+    static var kakaoMap: Image { Asset.kakaoMap.swiftUIImage }
 }
