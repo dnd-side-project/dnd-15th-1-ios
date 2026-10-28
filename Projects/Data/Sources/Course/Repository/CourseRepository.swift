@@ -40,6 +40,14 @@ public struct CourseRepository: Sendable {
         }
     }
 
+    public func searchCoursePlaces(query: String?, page: Int) async throws -> Page<SavedPlace> {
+        do {
+            return CourseDTOMapper.toSearchPage(try await remote.searchPlaces(query: query, page: page))
+        } catch {
+            throw CourseErrorMapper.map(error)
+        }
+    }
+
     public func course(id: String) async throws -> DateCourse {
         do {
             return try CourseDTOMapper.toDomain(try await remote.detail(id: id))

@@ -18,7 +18,9 @@ public struct MapFeature {
         /// 지도가 무엇을 그리고 있는지. 검색 결과가 들어오면 저장 장소를 잠시 덮는다
         public enum Mode: Equatable, Sendable {
             case saved
-            case searchResult(query: String, places: [Place])
+            /// 검색 화면이 깐 결과. `isSavedOnly` 는 「저장한 곳만 보기」로 찾은 결과인지다.
+            /// 시트 행을 열 때와 검색 화면으로 돌아갈 때 이 값을 본다
+            case searchResult(query: String, results: [PlaceSearchResult], isSavedOnly: Bool)
             /// 게시글 상세가 올린 장소들. 검색 UI 없이 핀만 얹는다
             case content(places: [Place])
         }
@@ -51,7 +53,7 @@ public struct MapFeature {
         public var camera: MapCamera = .seoulCityHall
         public var mode: Mode = .saved
 
-        /// 저장 여부 표시. 탭하면 먼저 뒤집고, 서버 실패 시 되돌린다
+        /// 저장 여부 표시. 저장 목록을 받을 때와 검색 결과를 깔 때 서버 값으로 맞춘다
         public var bookmarkedPlaceIDs: Set<String> = []
         /// 저장 응답이 준 장소 번호. 검색 행 id 는 카카오 번호일 수 있어 삭제엔 이걸 쓴다
         public var savedPlaceIDs: [String: String] = [:]
@@ -131,16 +133,12 @@ public struct MapFeature {
         case permissionModalDismissed
         case retryTapped
         case dismissToast
-        case searchResultsApplied(query: String, places: [Place])
+        case searchResultsApplied(query: String, results: [PlaceSearchResult], isSavedOnly: Bool)
         case contentPlacesApplied(places: [Place])
         /// 상세를 닫고 이전 지도 상태로 되돌린다. 선택 핀이 있으면 그 장소를 가운데 잡는다
         case modeRestored(State.Mode)
         case searchClearTapped
         case searchBackTapped
-        case bookmarkTapped(String)
-        case bookmarkSaved(id: String, saved: SavedPlace)
-        case bookmarkRemoved(id: String)
-        case bookmarkFailed(id: String, wasBookmarked: Bool)
         /// 별칭 시트가 저장한 뒤 목록을 갈아 끼운다
         case aliasSaved(SavedPlace)
         case delegate(Delegate)
@@ -168,7 +166,6 @@ public struct MapFeature {
         case couple
         case currentCourse
         case location
-        case bookmark(String)
         case delete(String)
     }
 
@@ -177,7 +174,6 @@ public struct MapFeature {
     @Dependency(\.courseClient) var courseClient
     @Dependency(\.locationClient) var locationClient
     @Dependency(\.analyticsClient) var analyticsClient
-    @Dependency(\.authClient) var authClient
 
     public init() {}
 
@@ -200,8 +196,7 @@ public struct MapFeature {
             return raise(state: &state, action: action)
         case .deleteTapped, .deleteSucceeded, .deleteFailed:
             return updateDelete(state: &state, action: action)
-        case .searchResultsApplied, .contentPlacesApplied, .modeRestored, .searchClearTapped, .searchBackTapped,
-             .bookmarkTapped, .bookmarkSaved, .bookmarkRemoved, .bookmarkFailed:
+        case .searchResultsApplied, .contentPlacesApplied, .modeRestored, .searchClearTapped, .searchBackTapped:
             return updateSearch(state: &state, action: action)
         case .aliasSaved:
             return applyAlias(state: &state, action: action)
@@ -483,11 +478,12 @@ private extension MapFeature {
 
     func updateSearch(state: inout State, action: Action) -> Effect<Action> {
         switch action {
-        case let .searchResultsApplied(query, places):
-            state.mode = .searchResult(query: query, places: places)
+        case let .searchResultsApplied(query, results, isSavedOnly):
+            state.mode = .searchResult(query: query, results: results, isSavedOnly: isSavedOnly)
             state.menuTargetPlaceID = nil
-            if let first = places.first {
-                state.camera = .focusing(first.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+            state.syncBookmarks(with: results)
+            if let first = results.first {
+                state.camera = .focusing(first.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
             }
             return .none
         case let .contentPlacesApplied(places):
@@ -512,91 +508,10 @@ private extension MapFeature {
         case .searchBackTapped:
             guard let query = state.searchQuery else { return .none }
             return .send(.delegate(.searchReopenRequested(query: query)))
-        case .bookmarkTapped, .bookmarkSaved, .bookmarkRemoved, .bookmarkFailed:
-            return updateBookmark(state: &state, action: action)
         default:
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
-    }
-
-    func updateBookmark(state: inout State, action: Action) -> Effect<Action> {
-        switch action {
-        case let .bookmarkTapped(id):
-            return toggleBookmark(state: &state, id: id)
-        case let .bookmarkSaved(id, saved):
-            state.savedPlaceIDs[id] = saved.place.id
-            state.applySavedPlace(saved)
-            return .run { [analyticsClient, authClient] _ in
-                let userID = (try? await authClient.currentSession())?.userID
-                await analyticsClient.track(.placeSaveCompleted(saveSource: .inApp, userID: userID))
-            }
-        case let .bookmarkRemoved(id):
-            let serverID = state.savedPlaceIDs[id] ?? id
-            state.places.removeAll { $0.id == serverID }
-            return .none
-        case let .bookmarkFailed(id, wasBookmarked):
-            if wasBookmarked {
-                state.bookmarkedPlaceIDs.insert(id)
-            } else {
-                state.bookmarkedPlaceIDs.remove(id)
-            }
-            return .none
-        default:
-            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
-            return .none
-        }
-    }
-
-    func toggleBookmark(state: inout State, id: String) -> Effect<Action> {
-        guard let place = state.searchResults.first(where: { $0.id == id }) else { return .none }
-        let wasBookmarked = state.bookmarkedPlaceIDs.contains(id)
-        if !wasBookmarked, place.kakaoPlaceID == nil { return .none }
-        if wasBookmarked {
-            state.bookmarkedPlaceIDs.remove(id)
-        } else {
-            state.bookmarkedPlaceIDs.insert(id)
-        }
-        return runBookmark(
-            id: id,
-            place: place,
-            serverID: state.savedPlaceIDs[id],
-            wasBookmarked: wasBookmarked
-        )
-    }
-
-    func runBookmark(
-        id: String,
-        place: Place,
-        serverID: String?,
-        wasBookmarked: Bool
-    ) -> Effect<Action> {
-        let request = Effect<Action>.run { [placeClient] send in
-            do {
-                if wasBookmarked {
-                    // 삭제는 장소 번호로 한다. 둘 다 없으면 저장이 끝나기 전에 다시 누른 경우라 부르지 않고 되돌린다
-                    guard let placeID = serverID ?? place.placeID else {
-                        await send(.bookmarkFailed(id: id, wasBookmarked: wasBookmarked))
-                        return
-                    }
-                    try await placeClient.removePlace(placeID)
-                    await send(.bookmarkRemoved(id: id))
-                } else if let kakaoID = place.kakaoPlaceID {
-                    let saved = try await placeClient.savePlace(kakaoID, place.name, nil, nil)
-                    await send(.bookmarkSaved(id: id, saved: saved))
-                }
-            } catch {
-                await send(.bookmarkFailed(id: id, wasBookmarked: wasBookmarked))
-            }
-        }
-        .cancellable(id: CancelID.bookmark(id), cancelInFlight: true)
-        guard !wasBookmarked else { return request }
-        return .merge(
-            .run { [analyticsClient] _ in
-                await analyticsClient.track(.placeSaveStarted(saveSource: .inApp))
-            },
-            request
-        )
     }
 
     func updateDelete(state: inout State, action: Action) -> Effect<Action> {
@@ -685,8 +600,8 @@ public extension MapFeature.State {
         switch mode {
         case .saved:
             markers = filteredPlaces.map { categoryMarker($0.place) }
-        case let .searchResult(_, places):
-            markers = places.map(categoryMarker)
+        case let .searchResult(_, results, _):
+            markers = results.map { categoryMarker($0.place) }
         case let .content(places):
             markers = places.map(categoryMarker)
         }
@@ -739,13 +654,19 @@ public extension MapFeature.State {
     }
 
     var searchQuery: String? {
-        if case let .searchResult(query, _) = mode { return query }
+        if case let .searchResult(query, _, _) = mode { return query }
         return nil
     }
 
-    var searchResults: [Place] {
-        if case let .searchResult(_, places) = mode { return places }
+    var searchResults: [PlaceSearchResult] {
+        if case let .searchResult(_, results, _) = mode { return results }
         return []
+    }
+
+    /// 지금 깔린 결과가 「저장한 곳만 보기」로 찾은 것인지. 검색 화면을 다시 열 때 토글을 이어받는다
+    var searchIsSavedOnly: Bool {
+        if case let .searchResult(_, _, isSavedOnly) = mode { return isSavedOnly }
+        return false
     }
 
     /// 게시글 핀 모드에서 지도에 얹힌 장소들. 핀 탭으로 상세를 열 때 여기서 찾는다
@@ -768,6 +689,18 @@ extension MapFeature.State {
             places.insert(saved, at: 0)
         }
     }
+
+    /// 검색 응답의 저장 여부가 저장 목록보다 최근이다. 저장했다는 곳은 더하고 아니라는 곳은 뺀다.
+    /// 안 맞추면 검색 행과 시트·상세가 같은 장소를 다르게 보인다
+    mutating func syncBookmarks(with results: [PlaceSearchResult]) {
+        for result in results {
+            if result.ownership == nil {
+                bookmarkedPlaceIDs.remove(result.id)
+            } else {
+                bookmarkedPlaceIDs.insert(result.id)
+            }
+        }
+    }
 }
 
 private extension MapFeature {
@@ -786,8 +719,8 @@ private extension MapFeature {
 
     /// 검색 결과와 저장 목록 어느 쪽에서든 그 id 의 좌표를 찾는다
     static func coordinate(of id: String, in state: State) -> Coordinate? {
-        if let place = state.searchResults.first(where: { $0.id == id }) {
-            return place.coordinate
+        if let result = state.searchResults.first(where: { $0.id == id }) {
+            return result.place.coordinate
         }
         if let place = state.contentPlaces.first(where: { $0.id == id }) {
             return place.coordinate

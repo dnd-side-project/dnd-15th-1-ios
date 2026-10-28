@@ -23,6 +23,10 @@ public struct CourseRemoteDataSource: Sendable {
         try await networkClient.request(CourseEndpoint.placePool)
     }
 
+    func searchPlaces(query: String?, page: Int) async throws -> DateCoursePlaceSearchPageResponseDTO {
+        try await networkClient.request(CourseEndpoint.placeSearch(query: query, page: page))
+    }
+
     func detail(id: String) async throws -> DateCourseResponseDTO {
         try await networkClient.request(CourseEndpoint.detail(id))
     }

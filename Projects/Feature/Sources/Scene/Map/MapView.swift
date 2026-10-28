@@ -318,38 +318,46 @@ private extension MapView {
         }
     }
 
-    /// 검색 결과 행. 사진을 안 넘기고 우측에 북마크를 둔다
+    /// 검색 결과 행. 사진을 안 넘기고 우측에 저장 여부 그림을 둔다.
+    /// 토글 결과는 별칭이 있으면 이름 대신 별칭을 보이고 녹화에서 가린다
     var searchResultList: some View {
         LazyVStack(spacing: 0) {
-            ForEach(store.searchResults) { place in
+            ForEach(store.searchResults) { result in
                 PlaceListRow(
-                    icon: place.category.icon,
-                    name: place.name,
-                    address: place.address,
-                    showsDivider: place.id != store.searchResults.last?.id
+                    icon: result.place.category.icon,
+                    name: result.alias ?? result.place.name,
+                    address: result.place.address,
+                    showsDivider: result.id != store.searchResults.last?.id,
+                    isNameSensitive: result.alias != nil
                 ) {
-                    bookmarkButton(place.id)
+                    bookmarkMark(result.id)
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { store.send(.rowTapped(place.id)) }
+                .onTapGesture { store.send(.rowTapped(result.id)) }
             }
         }
         .padding(.top, Spacing.s8)
         .padding(.bottom, Spacing.s20 + bottomInset)
     }
 
-    func bookmarkButton(_ id: String) -> some View {
-        Button {
-            store.send(.bookmarkTapped(id))
-        } label: {
-            (store.bookmarkedPlaceIDs.contains(id) ? Image.bookmarkFilled : Image.bookmarkEmpty)
-                .resizable()
-                .frame(
-                    width: MapViewMetric.menuIconSize,
-                    height: MapViewMetric.menuIconSize
-                )
+    /// 저장 여부만 보인다. 누를 수 없다. 저장과 취소는 상세에서만 한다
+    func bookmarkMark(_ id: String) -> some View {
+        Group {
+            if store.bookmarkedPlaceIDs.contains(id) {
+                Image.bookmarkFilled
+                    .resizable()
+            } else {
+                // 빈 북마크 에셋은 상세·게시글도 검정으로 쓴다. 누를 수 없는 이 자리만 연하게 칠한다
+                Image.bookmarkEmpty
+                    .renderingMode(.template)
+                    .resizable()
+                    .foregroundStyle(Color.textTertiary)
+            }
         }
-        .buttonStyle(.plain)
+        .frame(
+            width: MapViewMetric.menuIconSize,
+            height: MapViewMetric.menuIconSize
+        )
     }
 
     /// 알림 띠는 3초 뒤 스스로 사라진다. 띠만 믿으면 재시도할 길이 없어져 본문에도 길을 둔다

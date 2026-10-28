@@ -281,10 +281,19 @@ private extension MapFlowFeature {
         case let .placeDetailRequested(id):
             return presentDetail(state: &state, id: id)
         case .searchRequested:
-            state.placeSearch = PlaceSearchFeature.State()
+            // 저장 목록에서 열면 토글이 꺼진 채다. 검색 결과에서 검색창을 누르면 그 결과의 토글을 이어받는다
+            state.placeSearch = PlaceSearchFeature.State(
+                isSavedOnly: state.map.searchIsSavedOnly,
+                isCoupleConnected: state.map.isCoupleConnected
+            )
             return applyPath(state.path + [.search], state: &state)
         case let .searchReopenRequested(query):
-            state.placeSearch = PlaceSearchFeature.State(query: query)
+            // 시트에 보이던 결과와 검색 화면 목록이 같아지게 토글도 이어받는다
+            state.placeSearch = PlaceSearchFeature.State(
+                query: query,
+                isSavedOnly: state.map.searchIsSavedOnly,
+                isCoupleConnected: state.map.isCoupleConnected
+            )
             guard !state.path.contains(.search) else { return .none }
             return applyPath(state.path + [.search], state: &state)
         case .courseRequested:
@@ -438,19 +447,33 @@ private extension MapFlowFeature {
                 .send(.pathChanged([])),
                 .send(.map(.searchClearTapped))
             )
-        case let .searchConfirmed(query, places):
+        case let .searchConfirmed(query, results, isSavedOnly):
             // 새 결과 목록을 열면 보고 있던 장소 상세는 내린다. 안 내리면 결과 시트를 덮는다
             dismissDetail(state: &state)
             return .merge(
                 .send(.pathChanged([])),
-                .send(.map(.searchResultsApplied(query: query, places: places)))
+                .send(.map(.searchResultsApplied(query: query, results: results, isSavedOnly: isSavedOnly)))
             )
-        case let .placeSelected(place, query):
+        case let .placeSelected(result, query):
             // 고른 장소 하나를 지도에 올리고 시트만 상세로 바꾼다. 상세는 밀린 화면이 아니다
-            let loadDetail = presentDetail(state: &state, place: place, query: query)
+            let loadDetail = presentDetail(state: &state, place: result.place, query: query)
             return .concatenate(
                 .send(.pathChanged([])),
-                .send(.map(.searchResultsApplied(query: place.name, places: [place]))),
+                .send(.map(.searchResultsApplied(query: result.place.name, results: [result], isSavedOnly: false))),
+                loadDetail
+            )
+        case let .savedPlaceSelected(saved):
+            // 토글 결과는 카카오 번호가 없다. 저장 목록에서 연 것처럼 장소 번호로 조회한다
+            let loadDetail = presentDetail(state: &state, savedPlace: saved)
+            // 커플이 저장한 곳이라 켠 채로 연다. 지도 저장 집합은 아래 결과 적용이 맞춘다
+            state.detail?.isBookmarked = true
+            return .concatenate(
+                .send(.pathChanged([])),
+                .send(.map(.searchResultsApplied(
+                    query: saved.place.name,
+                    results: [PlaceSearchResult(savedPlace: saved)],
+                    isSavedOnly: true
+                ))),
                 loadDetail
             )
         case .sessionExpired:
@@ -614,9 +637,13 @@ private extension MapFlowFeature {
         case .saved:
             guard let saved = state.map.places.first(where: { $0.id == id }) else { return .none }
             return presentDetail(state: &state, savedPlace: saved)
-        case .searchResult:
-            guard let place = state.map.searchResults.first(where: { $0.id == id }) else { return .none }
-            return presentDetail(state: &state, place: place, query: state.map.searchQuery ?? "")
+        case let .searchResult(query, results, isSavedOnly):
+            guard let result = results.first(where: { $0.id == id }) else { return .none }
+            // 토글 결과는 카카오 번호가 없다. 저장 목록에서 연 것처럼 장소 번호로 조회한다
+            if isSavedOnly, let saved = result.savedPlace {
+                return presentDetail(state: &state, savedPlace: saved)
+            }
+            return presentDetail(state: &state, place: result.place, query: query)
         case .content:
             // 지도 핀 탭도 리스트 탭과 똑같이 게시글을 남겨 둔다. 장소를 닫으면 게시글로 돌아간다
             return focusContentPlaceDetail(state: &state, id: id)

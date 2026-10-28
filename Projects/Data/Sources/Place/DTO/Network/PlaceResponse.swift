@@ -40,11 +40,14 @@ struct PlaceSearchItemDTO: Decodable, Sendable {
     let name: String
     let address: String
     let roadAddress: String?
-    let latitude: Double
-    let longitude: Double
+    /// 명세가 nullable 이다. 좌표가 없는 항목은 매퍼가 버린다
+    let latitude: Double?
+    let longitude: Double?
     /// 검색 응답에는 ASCII 코드가 실려 온다. 한글 이름보다 이쪽을 먼저 본다
     let categoryCode: String?
     let categoryName: String
+    /// 커플 기준 저장 관계(`MINE`·`PARTNER`·`TOGETHER`). null 이면 커플 누구도 저장하지 않았다
+    let ownershipStatus: String?
     let thumbnailUrl: String?
     let imageUrls: [String]
 }

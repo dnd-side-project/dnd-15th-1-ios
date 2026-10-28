@@ -432,7 +432,7 @@ final class MapFeatureLoadTests: XCTestCase {
     func test_연결됐어도_검색중이면_코스버튼이_안_보인다() async {
         var state = MapFeature.State()
         state.isCoupleConnected = true
-        state.mode = .searchResult(query: "카페", places: [])
+        state.mode = .searchResult(query: "카페", results: [], isSavedOnly: false)
         let store = TestStore(initialState: state) { MapFeature() }
         XCTAssertFalse(store.state.showsCourseButton)
     }
@@ -766,7 +766,7 @@ final class MapFeatureChildTests: XCTestCase {
     func test_검색_결과에서_행을_누르면_상세_요청을_올린다() async {
         let place = Place.fixture(id: "s1", name: "검색 장소")
         var state = MapFeature.State()
-        state.mode = .searchResult(query: "카페", places: [place])
+        state.mode = .searchResult(query: "카페", results: [.unsaved(place)], isSavedOnly: false)
         let store = TestStore(initialState: state) { MapFeature() }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -948,12 +948,12 @@ final class MapCameraMoveTests: XCTestCase {
     }
 
     func test_검색_결과를_적용하면_첫_결과로_여러_장소용_줌으로_간다() async {
-        let results = PlaceFixtures.savedPlaces.map(\.place)
+        let results = PlaceFixtures.savedPlaces.map(\.place).map(PlaceSearchResult.unsaved)
         let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
 
-        await store.send(.searchResultsApplied(query: "카페", places: results)) {
-            $0.mode = .searchResult(query: "카페", places: results)
-            $0.camera = .focusing(results[0].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        await store.send(.searchResultsApplied(query: "카페", results: results, isSavedOnly: false)) {
+            $0.mode = .searchResult(query: "카페", results: results, isSavedOnly: false)
+            $0.camera = .focusing(results[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
     }
 

@@ -64,6 +64,10 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
     private let hasTrailing: Bool
     /// 별칭처럼 개인정보인 이름만 녹화에서 가린다. 일반 장소 이름은 가리지 않는다.
     private let isNameSensitive: Bool
+    /// 아이콘을 한 색으로 칠할 때만 넘긴다. `nil` 이면 에셋 색 그대로다
+    private let iconTint: Color?
+    /// 장소명 바로 옆에 붙는 분류 글자. 검색 화면만 쓴다
+    private let category: String?
     @Environment(\.isSheetDragging) private var isSheetDragging
 
     init(
@@ -85,7 +89,9 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
             isNameSensitive: isNameSensitive,
             thumbnail: thumbnail,
             trailing: trailing(),
-            hasTrailing: true
+            hasTrailing: true,
+            iconTint: nil,
+            category: nil
         )
     }
 
@@ -98,7 +104,9 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         isNameSensitive: Bool,
         thumbnail: @escaping (URL) -> Thumbnail,
         trailing: Trailing,
-        hasTrailing: Bool
+        hasTrailing: Bool,
+        iconTint: Color?,
+        category: String?
     ) {
         self.icon = icon
         self.name = name
@@ -109,6 +117,8 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
         self.thumbnail = thumbnail
         self.trailing = trailing
         self.hasTrailing = hasTrailing
+        self.iconTint = iconTint
+        self.category = category
     }
 
     var body: some View {
@@ -135,16 +145,25 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: Spacing.s12) {
-            icon
-                .resizable()
-                .frame(width: PlaceListRowMetric.iconSize, height: PlaceListRowMetric.iconSize)
+            iconView
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(name)
-                    .typography(.body1SB)
-                    .foregroundStyle(Color.textPrimary)
-                    .lineLimit(1)
-                    .analyticsMasked(isNameSensitive)
+                HStack(alignment: .center, spacing: Spacing.s8) {
+                    Text(name)
+                        .typography(.body1SB)
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(1)
+                        .analyticsMasked(isNameSensitive)
+
+                    if let category {
+                        // 장소명이 길면 장소명이 먼저 줄어든다. 분류는 다 보인다
+                        Text(category)
+                            .typography(.body2M)
+                            .foregroundStyle(Color.textTertiary)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
 
                 Text(address)
                     .typography(.caption1R)
@@ -165,6 +184,21 @@ struct PlaceListRow<Thumbnail: View, Trailing: View>: View {
             }
         }
         .padding(.horizontal, Spacing.s20)
+    }
+
+    @ViewBuilder
+    private var iconView: some View {
+        if let iconTint {
+            icon
+                .renderingMode(.template)
+                .resizable()
+                .frame(width: PlaceListRowMetric.iconSize, height: PlaceListRowMetric.iconSize)
+                .foregroundStyle(iconTint)
+        } else {
+            icon
+                .resizable()
+                .frame(width: PlaceListRowMetric.iconSize, height: PlaceListRowMetric.iconSize)
+        }
     }
 
     private var thumbnails: some View {
@@ -244,7 +278,9 @@ extension PlaceListRow where Trailing == EmptyView {
             isNameSensitive: isNameSensitive,
             thumbnail: thumbnail,
             trailing: EmptyView(),
-            hasTrailing: false
+            hasTrailing: false,
+            iconTint: nil,
+            category: nil
         )
     }
 }
@@ -252,13 +288,15 @@ extension PlaceListRow where Trailing == EmptyView {
 // MARK: - 썸네일도 우측 슬롯도 없는 행
 
 extension PlaceListRow where Thumbnail == EmptyView, Trailing == EmptyView {
-    /// 아이콘 · 장소명 · 주소만 있는 가장 짧은 행.
+    /// 아이콘 · 장소명 · 주소만 있는 가장 짧은 행. 검색 화면은 아이콘 색과 분류 글자를 더 넘긴다.
     init(
         icon: Image,
         name: String,
         address: String,
         showsDivider: Bool = true,
-        isNameSensitive: Bool = false
+        isNameSensitive: Bool = false,
+        iconTint: Color? = nil,
+        category: String? = nil
     ) {
         self.init(
             icon: icon,
@@ -269,7 +307,9 @@ extension PlaceListRow where Thumbnail == EmptyView, Trailing == EmptyView {
             isNameSensitive: isNameSensitive,
             thumbnail: { _ in EmptyView() },
             trailing: EmptyView(),
-            hasTrailing: false
+            hasTrailing: false,
+            iconTint: iconTint,
+            category: category
         )
     }
 }

@@ -23,9 +23,10 @@ enum PlaceDTOMapper {
 
     private static let maxPage = 44
 
-    static func toSearchPage(_ dto: PlaceSearchResponseDTO, page: Int) -> PlacePage {
-        PlacePage(
-            items: dto.places.map(toPlace),
+    static func toSearchPage(_ dto: PlaceSearchResponseDTO, page: Int) -> Page<PlaceSearchResult> {
+        Page(
+            // 좌표가 없는 항목은 지도에 못 올린다. 그 항목만 버리고 나머지는 보인다
+            items: dto.places.compactMap(toSearchResult),
             // 명세의 page 최대값이 44 다. 45 를 요청하면 서버가 400 을 준다.
             // 여기서 끊어 화면이 서버 제약을 몰라도 되게 한다
             hasNext: dto.hasNext && page < maxPage
@@ -43,18 +44,25 @@ enum PlaceDTOMapper {
     }
 
     // 미저장 장소는 placeId 가 null 로 온다. id 는 Place 가 카카오 번호·이름·좌표로 계산한다
-    private static func toPlace(_ dto: PlaceSearchItemDTO) -> Place {
-        Place(
-            placeID: dto.placeId.map(String.init),
-            kakaoPlaceID: dto.kakaoPlaceId,
-            name: dto.name,
-            category: category(code: dto.categoryCode, name: dto.categoryName),
-            address: dto.address,
-            roadAddress: roadAddress(dto.roadAddress),
-            coordinate: Coordinate(latitude: dto.latitude, longitude: dto.longitude),
-            // 검색 응답에는 저장 수가 없다
-            bookmarkCount: nil,
-            thumbnailURLs: photoURLs(thumbnailURL: dto.thumbnailUrl, imageURLs: dto.imageUrls)
+    private static func toSearchResult(_ dto: PlaceSearchItemDTO) -> PlaceSearchResult? {
+        guard let latitude = dto.latitude, let longitude = dto.longitude else { return nil }
+        return PlaceSearchResult(
+            place: Place(
+                placeID: dto.placeId.map(String.init),
+                kakaoPlaceID: dto.kakaoPlaceId,
+                name: dto.name,
+                category: category(code: dto.categoryCode, name: dto.categoryName),
+                address: dto.address,
+                roadAddress: roadAddress(dto.roadAddress),
+                coordinate: Coordinate(latitude: latitude, longitude: longitude),
+                // 검색 응답에는 저장 수가 없다
+                bookmarkCount: nil,
+                thumbnailURLs: photoURLs(thumbnailURL: dto.thumbnailUrl, imageURLs: dto.imageUrls)
+            ),
+            // null 이면 커플 누구도 저장하지 않았다. 모르는 값도 저장 안 한 것으로 본다
+            ownership: dto.ownershipStatus.flatMap { ownership($0) },
+            // 지도 검색 응답에는 별칭이 없다
+            alias: nil
         )
     }
 

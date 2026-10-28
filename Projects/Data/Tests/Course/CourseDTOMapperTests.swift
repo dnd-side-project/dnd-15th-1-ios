@@ -550,3 +550,45 @@ final class CourseDTOMapperPastTests: XCTestCase {
         }
     }
 }
+
+final class CourseDTOMapperSearchPageTests: XCTestCase {
+
+    func test_장소_검색_페이지는_후보와_같은_변환으로_옮긴다() {
+        let page = CourseDTOMapper.toSearchPage(searchPage(page: 0, hasNext: true))
+
+        XCTAssertEqual(page.items, [CourseDTOMapper.toDomain(candidate())])
+        XCTAssertTrue(page.hasNext)
+    }
+
+    func test_99페이지에서_다음이_있다고_하면_다음_페이지가_있다() {
+        XCTAssertTrue(CourseDTOMapper.toSearchPage(searchPage(page: 99, hasNext: true)).hasNext)
+    }
+
+    func test_100페이지면_다음이_있다고_해도_다음_페이지가_없다() {
+        XCTAssertFalse(CourseDTOMapper.toSearchPage(searchPage(page: 100, hasNext: true)).hasNext)
+    }
+
+    func test_다음이_없다고_하면_다음_페이지가_없다() {
+        XCTAssertFalse(CourseDTOMapper.toSearchPage(searchPage(page: 0, hasNext: false)).hasNext)
+    }
+
+    private func searchPage(page: Int, hasNext: Bool) -> DateCoursePlaceSearchPageResponseDTO {
+        DateCoursePlaceSearchPageResponseDTO(places: [candidate()], page: page, size: 10, hasNext: hasNext)
+    }
+
+    private func candidate() -> DateCoursePlaceCandidateResponseDTO {
+        DateCoursePlaceCandidateResponseDTO(
+            placeId: 7,
+            name: "장소명",
+            address: "주소",
+            roadAddress: nil,
+            latitude: 37.5,
+            longitude: 127.0,
+            categoryName: "카페",
+            ownershipStatus: "TOGETHER",
+            alias: "우리 카페",
+            thumbnailUrl: nil,
+            imageUrls: []
+        )
+    }
+}
