@@ -16,7 +16,7 @@ final class SearchFeatureTests: XCTestCase {
             $0.contentClient.searchContents = { _, _, _, _ in ContentPage(items: [], hasNext: false) }
             $0.placeClient.searchPlaces = { query, page in
                 requested.withValue { $0.append("\(query)#\(page)") }
-                return PlacePage(items: [place], hasNext: true)
+                return Page(items: [PlaceSearchResult.unsaved(place)], hasNext: true)
             }
         }
 
@@ -46,7 +46,7 @@ final class SearchFeatureTests: XCTestCase {
         } withDependencies: {
             $0.placeClient.searchPlaces = { _, page in
                 XCTAssertEqual(page, 1)
-                return PlacePage(items: next, hasNext: false)
+                return Page(items: next.map(PlaceSearchResult.unsaved), hasNext: false)
             }
         }
 

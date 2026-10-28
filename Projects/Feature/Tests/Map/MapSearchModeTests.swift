@@ -9,16 +9,16 @@ import XCTest
 @MainActor
 final class MapSearchModeTests: XCTestCase {
     func test_검색결과를_받으면_핀이_결과로_바뀐다() async {
-        let places = [
-            Place.fixture(id: "s1", latitude: 37.5000, longitude: 127.0000),
-            Place.fixture(id: "s2", latitude: 37.5100, longitude: 127.0100),
+        let results = [
+            PlaceSearchResult.unsaved(.fixture(id: "s1", latitude: 37.5000, longitude: 127.0000)),
+            PlaceSearchResult.unsaved(.fixture(id: "s2", latitude: 37.5100, longitude: 127.0100)),
         ]
         let store = TestStore(initialState: MapFeature.State()) {
             MapFeature()
         }
 
-        await store.send(.searchResultsApplied(query: "음식점", places: places)) {
-            $0.mode = .searchResult(query: "음식점", places: places)
+        await store.send(.searchResultsApplied(query: "음식점", results: results, isSavedOnly: false)) {
+            $0.mode = .searchResult(query: "음식점", results: results, isSavedOnly: false)
             $0.camera.center = Coordinate(latitude: 37.5000, longitude: 127.0000)
         }
 
@@ -28,9 +28,9 @@ final class MapSearchModeTests: XCTestCase {
     }
 
     func test_검색을_끄면_저장장소로_돌아온다() async {
-        let places = [Place.fixture(id: "s1", latitude: 37.5, longitude: 127.0)]
+        let results = [PlaceSearchResult.unsaved(.fixture(id: "s1", latitude: 37.5, longitude: 127.0))]
         var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: places)
+        state.mode = .searchResult(query: "음식점", results: results, isSavedOnly: false)
 
         let store = TestStore(initialState: state) { MapFeature() }
 
@@ -44,9 +44,9 @@ final class MapSearchModeTests: XCTestCase {
     }
 
     func test_검색모드에서_뒤로가면_검색어와_함께_다시열기를_올린다() async {
-        let places = [Place.fixture(id: "s1", latitude: 37.5, longitude: 127.0)]
+        let results = [PlaceSearchResult.unsaved(.fixture(id: "s1", latitude: 37.5, longitude: 127.0))]
         var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: places)
+        state.mode = .searchResult(query: "음식점", results: results, isSavedOnly: false)
 
         let store = TestStore(initialState: state) { MapFeature() }
 
@@ -61,130 +61,18 @@ final class MapSearchModeTests: XCTestCase {
     }
 
     func test_검색모드에서는_저장자_필터가_핀에_안_걸린다() async {
-        let places = [
-            Place.fixture(id: "s1", latitude: 37.5, longitude: 127.0),
-            Place.fixture(id: "s2", latitude: 37.51, longitude: 127.01),
+        let results = [
+            PlaceSearchResult.unsaved(.fixture(id: "s1", latitude: 37.5, longitude: 127.0)),
+            PlaceSearchResult.unsaved(.fixture(id: "s2", latitude: 37.51, longitude: 127.01)),
         ]
         var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: places)
+        state.mode = .searchResult(query: "음식점", results: results, isSavedOnly: false)
         state.selectedOwnership = .mine
         state.selectedCategory = .cafe
 
         let store = TestStore(initialState: state) { MapFeature() }
 
         XCTAssertEqual(store.state.markers.count, 2)
-    }
-
-    func test_검색_행을_저장하면_savePlace를_부르고_서버id를_남긴다() async {
-        let place = searchPlace()
-        var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: [place])
-
-        let saved = SavedPlace.mocks[0]
-        let kakaoIDArg = LockIsolated<String?>(nil)
-        let queryArg = LockIsolated<String?>(nil)
-        let aliasArg = LockIsolated<String?>(nil)
-        let memoArg = LockIsolated<String?>(nil)
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.savePlace = { kakaoID, query, alias, memo in
-                kakaoIDArg.setValue(kakaoID)
-                queryArg.setValue(query)
-                aliasArg.setValue(alias)
-                memoArg.setValue(memo)
-                return saved
-            }
-            $0.authClient.currentSession = {
-                AuthSession(accessToken: "a", refreshToken: "r", userID: "user")
-            }
-        }
-
-        await store.send(.bookmarkTapped("s1")) {
-            $0.bookmarkedPlaceIDs = ["s1"]
-        }
-        XCTAssertTrue(store.state.isBookmarked("s1"))
-
-        await store.receive(.bookmarkSaved(id: "s1", saved: saved)) {
-            $0.savedPlaceIDs = ["s1": saved.place.id]
-            $0.places = [saved]
-        }
-        XCTAssertEqual(kakaoIDArg.value, "kakao-s1")
-        XCTAssertEqual(queryArg.value, "검색 장소")
-        XCTAssertNil(aliasArg.value)
-        XCTAssertNil(memoArg.value)
-    }
-
-    func test_북마크된_검색_행을_다시_누르면_서버id로_지운다() async {
-        let place = searchPlace()
-        let saved = SavedPlace.mocks[0]
-        let serverID = saved.place.id
-        var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: [place])
-        state.bookmarkedPlaceIDs = ["s1"]
-        state.savedPlaceIDs = ["s1": serverID]
-        state.places = [saved]
-
-        let removedID = LockIsolated<String?>(nil)
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.removePlace = { placeID in
-                removedID.setValue(placeID)
-            }
-        }
-
-        await store.send(.bookmarkTapped("s1")) {
-            $0.bookmarkedPlaceIDs = []
-        }
-        await store.receive(.bookmarkRemoved(id: "s1")) {
-            $0.places = []
-        }
-
-        XCTAssertFalse(store.state.isBookmarked("s1"))
-        XCTAssertEqual(removedID.value, serverID)
-        XCTAssertFalse(store.state.places.contains { $0.id == serverID })
-    }
-
-    func test_저장이_실패하면_북마크_표시를_되돌린다() async {
-        let place = searchPlace()
-        var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: [place])
-
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.savePlace = { _, _, _, _ in throw PlaceError.network }
-        }
-
-        await store.send(.bookmarkTapped("s1")) {
-            $0.bookmarkedPlaceIDs = ["s1"]
-        }
-        await store.receive(.bookmarkFailed(id: "s1", wasBookmarked: false)) {
-            $0.bookmarkedPlaceIDs = []
-        }
-        XCTAssertFalse(store.state.isBookmarked("s1"))
-        XCTAssertTrue(store.state.places.isEmpty)
-    }
-
-    func test_카카오id가_없으면_저장하지_않는다() async {
-        let place = Place.fixture(id: "s1", latitude: 37.5, longitude: 127.0)
-        var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: [place])
-
-        let saveCalled = LockIsolated(false)
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.savePlace = { _, _, _, _ in
-                saveCalled.setValue(true)
-                return SavedPlace.mocks[0]
-            }
-        }
-
-        await store.send(.bookmarkTapped("s1"))
-        XCTAssertTrue(store.state.bookmarkedPlaceIDs.isEmpty)
-        XCTAssertFalse(saveCalled.value)
     }
 
     func test_저장장소를_불러오면_북마크가_채워진다() async {
@@ -203,176 +91,35 @@ final class MapSearchModeTests: XCTestCase {
         }
     }
 
-    private func searchPlace() -> Place {
-        Place(
-            placeID: "s1",
-            kakaoPlaceID: "kakao-s1",
-            name: "검색 장소",
-            category: .cafe,
-            address: "경기도 안산시 상록구 건건동 1",
-            roadAddress: "경기도 안산시 상록구 건건로 1",
-            coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
-            bookmarkCount: 0,
-            thumbnailURLs: []
+    func test_검색_결과를_깔면_서버가_저장했다는_곳은_북마크에_더하고_아니라는_곳은_뺀다() async {
+        let saved = PlaceSearchResult(
+            place: .fixture(id: "s1", latitude: 37.5, longitude: 127.0),
+            ownership: .partner,
+            alias: nil
         )
-    }
-}
-
-@MainActor
-final class MapSearchModeAnalyticsTests: XCTestCase {
-    func test_검색_결과_북마크_저장_성공이면_앱안_저장완료_이벤트를_보낸다() async {
-        let place = searchPlaceForAnalytics()
-        let saved = SavedPlace.mocks[0]
+        let unsaved = PlaceSearchResult.unsaved(.fixture(id: "s2", latitude: 37.51, longitude: 127.01))
         var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: [place])
+        state.bookmarkedPlaceIDs = ["s2", "other"]
+        let store = TestStore(initialState: state) { MapFeature() }
 
-        let sent = LockIsolated<[AnalyticsEvent]>([])
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.savePlace = { _, _, _, _ in saved }
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
-            $0.authClient.currentSession = {
-                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
-            }
+        await store.send(.searchResultsApplied(query: "성수", results: [saved, unsaved], isSavedOnly: false)) {
+            $0.mode = .searchResult(query: "성수", results: [saved, unsaved], isSavedOnly: false)
+            $0.bookmarkedPlaceIDs = ["s1", "other"]
+            $0.camera = .focusing(saved.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
-
-        await store.send(.bookmarkTapped("s1")) {
-            $0.bookmarkedPlaceIDs = ["s1"]
-        }
-        await store.receive(.bookmarkSaved(id: "s1", saved: saved)) {
-            $0.savedPlaceIDs = ["s1": saved.place.id]
-            $0.places = [saved]
-        }
-        await store.finish()
-        XCTAssertEqual(
-            sent.value,
-            [
-                .placeSaveStarted(saveSource: .inApp),
-                .placeSaveCompleted(saveSource: .inApp, userID: "user-42"),
-            ]
-        )
     }
 
-    func test_검색_결과_북마크_저장이_실패해도_앱안_저장시작_이벤트는_보낸다() async {
-        let place = searchPlaceForAnalytics()
-        var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: [place])
+    func test_토글_결과를_깔면_모두_북마크에_더하고_토글_상태를_남긴다() async {
+        let results = [
+            PlaceSearchResult(savedPlace: .candidateFixture(id: "a", latitude: 37.5, longitude: 127.0)),
+        ]
+        let store = TestStore(initialState: MapFeature.State()) { MapFeature() }
 
-        let sent = LockIsolated<[AnalyticsEvent]>([])
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.savePlace = { _, _, _, _ in throw PlaceError.network }
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
-            $0.authClient.currentSession = {
-                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
-            }
+        await store.send(.searchResultsApplied(query: "성수", results: results, isSavedOnly: true)) {
+            $0.mode = .searchResult(query: "성수", results: results, isSavedOnly: true)
+            $0.bookmarkedPlaceIDs = ["a"]
+            $0.camera = .focusing(results[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
-
-        await store.send(.bookmarkTapped("s1")) {
-            $0.bookmarkedPlaceIDs = ["s1"]
-        }
-        await store.receive(.bookmarkFailed(id: "s1", wasBookmarked: false)) {
-            $0.bookmarkedPlaceIDs = []
-        }
-        await store.finish()
-        XCTAssertEqual(sent.value, [.placeSaveStarted(saveSource: .inApp)])
-    }
-
-    func test_카카오id가_없으면_저장시작_이벤트를_안_보낸다() async {
-        let place = Place.fixture(id: "s1", latitude: 37.5, longitude: 127.0)
-        var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: [place])
-
-        let sent = LockIsolated<[AnalyticsEvent]>([])
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.savePlace = { _, _, _, _ in SavedPlace.mocks[0] }
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
-        }
-
-        await store.send(.bookmarkTapped("s1"))
-        await store.finish()
-        XCTAssertTrue(sent.value.isEmpty)
-    }
-
-    func test_검색_결과_북마크를_끄면_저장완료_이벤트를_안_보낸다() async {
-        let place = searchPlaceForAnalytics()
-        let saved = SavedPlace.mocks[0]
-        let serverID = saved.place.id
-        var state = MapFeature.State()
-        state.mode = .searchResult(query: "음식점", places: [place])
-        state.bookmarkedPlaceIDs = ["s1"]
-        state.savedPlaceIDs = ["s1": serverID]
-        state.places = [saved]
-
-        let sent = LockIsolated<[AnalyticsEvent]>([])
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.removePlace = { _ in }
-            $0.analyticsClient.track = { event in sent.withValue { $0.append(event) } }
-            $0.authClient.currentSession = {
-                AuthSession(accessToken: "a", refreshToken: "r", userID: "user-42")
-            }
-        }
-
-        await store.send(.bookmarkTapped("s1")) {
-            $0.bookmarkedPlaceIDs = []
-        }
-        await store.receive(.bookmarkRemoved(id: "s1")) {
-            $0.places = []
-        }
-        await store.finish()
-        XCTAssertTrue(sent.value.isEmpty)
-    }
-
-    private func searchPlaceForAnalytics() -> Place {
-        Place(
-            placeID: "s1",
-            kakaoPlaceID: "kakao-s1",
-            name: "검색 장소",
-            category: .cafe,
-            address: "경기도 안산시 상록구 건건동 1",
-            roadAddress: "경기도 안산시 상록구 건건로 1",
-            coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
-            bookmarkCount: 0,
-            thumbnailURLs: []
-        )
-    }
-}
-
-// 위 두 클래스가 type_body_length 한계라 장소 번호를 모르는 삭제는 따로 둔다
-@MainActor
-final class MapSearchModeRemoveTests: XCTestCase {
-    func test_장소_번호를_모르는_검색_장소는_저장_취소를_서버에_보내지_않고_되돌린다() async {
-        let place = Place(
-            placeID: nil,
-            kakaoPlaceID: "kakao-s9",
-            name: "검색 장소",
-            category: .cafe,
-            address: "주소",
-            roadAddress: nil,
-            coordinate: Coordinate(latitude: 37.5, longitude: 127.0),
-            bookmarkCount: nil,
-            thumbnailURLs: []
-        )
-        var state = MapFeature.State()
-        state.mode = .searchResult(query: "검색", places: [place])
-        state.bookmarkedPlaceIDs = [place.id]
-        let store = TestStore(initialState: state) {
-            MapFeature()
-        } withDependencies: {
-            $0.placeClient.removePlace = { _ in XCTFail("장소 번호 없이 삭제를 부르면 안 된다") }
-        }
-
-        await store.send(.bookmarkTapped(place.id)) {
-            $0.bookmarkedPlaceIDs = []
-        }
-        await store.receive(.bookmarkFailed(id: place.id, wasBookmarked: true)) {
-            $0.bookmarkedPlaceIDs = [place.id]
-        }
+        XCTAssertTrue(store.state.searchIsSavedOnly)
     }
 }

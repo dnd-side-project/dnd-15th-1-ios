@@ -141,3 +141,10 @@ enum PlaceFixtures {
         .candidateFixture(id: "c", latitude: 37.33, longitude: 126.92, category: .tourism),
     ]
 }
+
+extension PlaceSearchResult {
+    /// 지도 검색이 준 아무도 저장하지 않은 장소. 저장 관계도 별칭도 없다
+    static func unsaved(_ place: Place) -> PlaceSearchResult {
+        PlaceSearchResult(place: place, ownership: nil, alias: nil)
+    }
+}
