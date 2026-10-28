@@ -23,7 +23,7 @@ struct CourseLeg: Equatable {
     enum Mode: Equatable {
         case walk
         case transit
-        /// 값을 못 받은 구간. 아이콘은 발자국이고 길찾기는 대중교통으로 연다(먼 구간이라 걷기는 쓸모가 없다)
+        /// 값을 못 받은 구간. 아이콘은 회색 느낌표 원이고 길찾기는 대중교통으로 연다(먼 구간이라 걷기는 쓸모가 없다)
         case unavailable
     }
 
@@ -308,7 +308,8 @@ private extension CourseTimeline {
 
     func legIcon(_ mode: CourseLeg.Mode) -> some View {
         legImage(mode)
-            .renderingMode(.template)
+            // 느낌표 아이콘은 에셋에 색이 박혀 있어 물들이지 않는다. 물들이면 흰 느낌표가 사라진다
+            .renderingMode(mode == .unavailable ? .original : .template)
             .resizable()
             .frame(
                 width: CourseTimelineMetric.legIconSize,
@@ -319,8 +320,9 @@ private extension CourseTimeline {
 
     func legImage(_ mode: CourseLeg.Mode) -> Image {
         switch mode {
-        case .walk, .unavailable: Image.walk
+        case .walk: Image.walk
         case .transit: Image.bus
+        case .unavailable: Image.errorGray
         }
     }
 }
@@ -384,6 +386,14 @@ private struct CourseTimelinePreviewHost: View {
     CourseTimelinePreviewHost(
         stops: [.preview(0), .preview(1)],
         legs: [CourseLeg(mode: .transit, duration: "대중교통 10시간 20분", distance: "123.4 km")]
+    )
+}
+
+// 이동 정보를 못 받은 구간. 아이콘이 회색 느낌표 원으로 바뀌고 안내 문구만 보인다
+#Preview("이동 정보 없음") {
+    CourseTimelinePreviewHost(
+        stops: [.preview(0), .preview(1)],
+        legs: [CourseLeg(mode: .unavailable, duration: "", distance: "이동 정보를 불러오지 못했어요")]
     )
 }
 #endif
