@@ -14,6 +14,14 @@ private enum CoursePlacePickMetric {
     static let ctaButtonHeight: CGFloat = 56
     /// 목록 마지막 행과 CTA 버튼 윗면 사이
     static let listGapAboveCTA: CGFloat = 20
+
+    /// 시트 중간 단계 비율. 기기 화면 전체 높이 대비다.
+    /// 사용자가 써 본 뒤 1%p 씩 올려 정한다. 시안 대조에서 확정
+    static let sheetMiddleRatio: CGFloat = 0.70
+
+    /// 최소 시트에서 필터 아래 끝과 버튼 영역 위 끝 사이. 시안 대조에서 확정.
+    /// 시안 `4991:20653` 에서 필터 칩 아래 끝 698 · 버튼 영역(위 그라데이션 포함) 위 끝 706 사이가 8 이다
+    static let filterGapAboveCTA: CGFloat = Spacing.s8
 }
 
 // MARK: - CoursePlacePickView
@@ -24,10 +32,20 @@ private enum CoursePlacePickMetric {
 public struct CoursePlacePickView: View {
     @Bindable private var store: StoreOf<CourseFeature>
 
-    /// 시트 단계. 시트가 접혀 있는지 펼쳐져 있는지다
+    /// 시트 단계. 처음은 중간(`collapsed`, 화면 높이의 70%)이다. 지도를 끌어도 안 바뀐다
     @State private var sheetDetent: SheetDetent = .collapsed
 
     @State private var collapsedSheetTop: CGFloat = 0
+
+    /// 시트 위 끝에서 잰 필터 줄 아래 끝. 최소 단계 높이의 근거다
+    @State private var filterBottomInSheet: CGFloat = 0
+
+    /// 필터 아래 끝을 화면 픽셀 자리로 반올림하는 근거
+    @Environment(\.displayScale) private var displayScale
+
+    /// 아래 버튼 영역(위 그라데이션 36 포함) 높이. 최소 단계 높이의 근거다.
+    /// 버튼 영역과 시트가 둘 다 안전영역 바닥에 붙어, 이 높이가 곧 시트 바닥에서 버튼 영역 위 끝까지다
+    @State private var ctaHeight: CGFloat = 0
 
     /// 지금 열린 필터 메뉴. 하나만 열린다
     @State private var openFilterMenu: FilterMenu?
@@ -108,6 +126,8 @@ private extension CoursePlacePickView {
             selection: $sheetDetent,
             // 이 화면엔 서치바가 없다. 뒤로가기 버튼이 같은 높이에 있어 그 아래 8 에서 멈춘다
             expandLimit: .belowSearchBar,
+            collapsedRatio: CoursePlacePickMetric.sheetMiddleRatio,
+            minimumHeight: minimumSheetHeight,
             openMenuFrames: [ownershipMenuFrame, categoryMenuFrame].compactMap { $0 },
             grabFrames: grabFrames,
             // 끌기 시작하면 열린 메뉴를 닫는다. 열어둔 채 끌면 메뉴가 시트를 따라다녀 어색하다
@@ -138,6 +158,9 @@ private extension CoursePlacePickView {
                 store.send(.buildTapped)
             }
             .disabled(!store.isCTAEnabled)
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            ctaHeight = height
         }
     }
 
@@ -170,6 +193,15 @@ private extension CoursePlacePickView {
                     onMenuFrameChange: { categoryMenuFrame = $0 }
                 )
             }
+        }
+        // 최소 단계 높이의 근거. 제목부터 필터 줄 아래 끝까지의 크기를 잰다.
+        // 카드 안 자리는 시트가 오르내리는 동안 바뀌어 크기로 잰다. 크기는 .offset 이동에 영향받지 않는다
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            filterBottomInSheet = SheetLayout.filterBottomInSheet(
+                grabberAreaHeight: MapBottomSheetMetric.grabberAreaHeight,
+                headerHeightToFilter: height,
+                displayScale: displayScale
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Spacing.s20)
@@ -264,11 +296,20 @@ private extension CoursePlacePickView {
         .padding(.bottom, ctaCoverPadding)
     }
 
-    /// 메뉴 하나의 열림 바인딩. 하나를 열면 다른 하나가 저절로 닫힌다
+    /// 메뉴 하나의 열림 바인딩. 하나를 열면 다른 하나가 저절로 닫힌다.
+    /// 최소에서 열면 시트를 중간으로 올린다. 드롭다운이 필터 아래로 펼쳐져 버튼 영역에 가리기 때문이다
     func filterMenuBinding(_ menu: FilterMenu) -> Binding<Bool> {
         Binding(
             get: { openFilterMenu == menu },
-            set: { isOpen in openFilterMenu = isOpen ? menu : nil }
+            set: { isOpen in
+                if isOpen {
+                    let next = SheetLayout.detentForOpeningMenu(sheetDetent)
+                    if sheetDetent != next {
+                        sheetDetent = next
+                    }
+                }
+                openFilterMenu = isOpen ? menu : nil
+            }
         )
     }
 
@@ -311,6 +352,15 @@ private extension CoursePlacePickView {
                     store.send(.toastDismissed)
                 }
             }
+        )
+    }
+
+    /// 최소 단계 높이. 필터 아래 끝과 버튼 영역 위 끝 사이가 시안 간격이 된다. 둘 중 하나를 아직 못 쟀으면 `nil` 이다
+    var minimumSheetHeight: CGFloat? {
+        SheetLayout.minimumHeight(
+            filterBottomInSheet: filterBottomInSheet,
+            gap: CoursePlacePickMetric.filterGapAboveCTA,
+            obstacleHeight: ctaHeight
         )
     }
 }
