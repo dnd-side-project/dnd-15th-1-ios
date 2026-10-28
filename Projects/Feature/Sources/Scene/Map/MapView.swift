@@ -19,8 +19,20 @@ private enum RowMenuOption: String, CaseIterable {
 public struct MapView: View {
     @Bindable public var store: StoreOf<MapFeature>
 
-    /// 시트 단계. 시트가 접혀 있는지 펼쳐져 있는지다
+    /// 시트 단계. 처음은 중간(`collapsed`)이다. 지도를 손으로 끌면 최소로 내려간다
     @State private var sheetDetent: SheetDetent = .collapsed
+
+    /// 시트 위 끝에서 잰 필터 줄 아래 끝. 최소 단계 높이의 근거다.
+    /// 검색 결과 시트에는 필터가 없어, 저장한 장소 시트에서 잰 값을 그대로 쓴다
+    @State private var filterBottomInSheet: CGFloat = 0
+
+    /// 필터 아래 끝을 화면 픽셀 자리로 반올림하는 근거
+    @Environment(\.displayScale) private var displayScale
+
+    /// 화면 바닥에서 탭바 위 끝까지. 최소 단계 높이의 근거다.
+    /// 검색 결과 · 상세 · 별칭에서는 탭바가 숨어 아래 안전영역이 홈 인디케이터만 남는다.
+    /// 탭바 높이는 기기마다 고정이라 지금까지 잰 값 가운데 가장 큰 값을 쓴다
+    @State private var tabBarHeight: CGFloat = 0
 
     /// 아래 안전영역(탭바 + 홈 인디케이터). 시트가 그 뒤로 이어지므로 목록 아래 여백에 더한다
     @State private var bottomInset: CGFloat = 0
@@ -53,6 +65,7 @@ public struct MapView: View {
         // 자리에서만 실제 값이 나오므로, 그 층만 아래 뭉치 밖에 형제로 세운다
         ZStack {
             bottomInsetProbe
+            tabBarProbe
             mapLayers
         }
     }
@@ -91,12 +104,20 @@ private extension MapView {
             )
         }
         .onAppear { store.send(.onAppear) }
+        // 검색 결과가 들어오면 중간으로 연다. 최소에서 검색하면 결과가 거의 안 보인다.
+        // 게시글 상세를 닫아 검색 결과로 되돌아온 것은 새 결과가 아니라, 보던 단계를 지킨다
+        .onChange(of: store.mode) { old, new in
+            guard case .searchResult = new else { return }
+            if case .content = old { return }
+            sheetDetent = .collapsed
+        }
     }
 
     /// 상세가 뜨면 목록을 치운다. 접힘 위에 목록이 남으면 시안 a06·a07 과 어긋난다.
     /// 상세 시트는 `MapFlowView` 가 같은 스프링으로 얹는다.
-    /// 껍데기에 숨김 단계가 없어(`SheetDetent` 가 접힘·펼침 둘뿐) 시트를 통째로 갈아
+    /// 껍데기에 숨김 단계가 없어(`SheetDetent` 는 최소 · 접힘 · 펼침) 시트를 통째로 갈아
     /// 내려갔다 올라오게 만든다. 스프링은 껍데기의 `MapBottomSheetMetric.settle` 이다.
+    /// 시트가 빠져도 단계는 이 뷰의 `sheetDetent` 가 들고 있어, 상세를 닫으면 보던 단계로 돌아온다
     @ViewBuilder
     var sheetSwap: some View {
         ZStack(alignment: .bottom) {
@@ -122,6 +143,20 @@ private extension MapView {
             // Color.clear 도 탭을 받는다. 지도보다 아래층이지만 확실히 비켜둔다
             .allowsHitTesting(false)
     }
+
+    /// 탭바 높이를 재는 층. 키보드는 빼고 잰다.
+    /// 별칭 입력 키보드 높이를 탭바로 읽으면 최소 시트가 키보드만큼 뜬 채 굳는다
+    var tabBarProbe: some View {
+        Color.clear
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { inset in
+                if inset > tabBarHeight {
+                    tabBarHeight = inset
+                }
+            }
+            // 재는 수식어 바깥에 걸어야 안쪽에서 읽는 안전영역에 키보드가 빠진다
+            .ignoresSafeArea(.keyboard)
+            .allowsHitTesting(false)
+    }
 }
 
 // MARK: - 지도
@@ -136,6 +171,7 @@ private extension MapView {
             pins: store.markers.map(MapMarkerStyle.pin(for:)),
             onPinTap: { store.send(.markerTapped($0)) },
             onMapTap: { store.send(.rowMenuDismissed) },
+            onUserGestureBegan: { mapGestureBegan() },
             collapsedSheetTop: collapsedSheetTop
         )
         .ignoresSafeArea()
@@ -235,12 +271,10 @@ private extension MapView {
         MapBottomSheet(
             selection: $sheetDetent,
             expandLimit: store.isSearching ? .belowSearchBar : .safeAreaTop,
+            minimumHeight: minimumSheetHeight,
             openMenuFrames: [ownershipMenuFrame, categoryMenuFrame, rowMenu?.frame].compactMap { $0 },
             // 끌기 시작하면 열린 메뉴를 닫는다. 열어둔 채 끌면 메뉴가 시트를 따라다녀 어색하다
-            onDragBegan: {
-                openFilterMenu = nil
-                store.send(.rowMenuDismissed)
-            },
+            onDragBegan: { closeMenus() },
             gestureKind: .followsContent,
             onCollapsedTopChange: { collapsedSheetTop = $0 }
         ) {
@@ -287,6 +321,15 @@ private extension MapView {
                     onMenuFrameChange: { categoryMenuFrame = $0 }
                 )
             }
+        }
+        // 최소 단계 높이의 근거. 제목부터 필터 줄 아래 끝까지의 크기를 잰다.
+        // 카드 안 자리는 시트가 오르내리는 동안 바뀌어 크기로 잰다. 크기는 .offset 이동에 영향받지 않는다
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            filterBottomInSheet = SheetLayout.filterBottomInSheet(
+                grabberAreaHeight: MapBottomSheetMetric.grabberAreaHeight,
+                headerHeightToFilter: height,
+                displayScale: displayScale
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Spacing.s20)
@@ -473,14 +516,61 @@ private extension MapView {
     }
 }
 
+// MARK: - 시트 단계
+
+private extension MapView {
+    /// 최소 단계 높이. 필터 아래 끝이 탭바 위 끝보다 20 위에 선다. 둘 중 하나를 아직 못 쟀으면 `nil` 이다
+    var minimumSheetHeight: CGFloat? {
+        SheetLayout.minimumHeight(
+            filterBottomInSheet: filterBottomInSheet,
+            gap: MapViewMetric.filterGapAboveTabBar,
+            obstacleHeight: tabBarHeight
+        )
+    }
+
+    /// 사용자가 손으로 지도를 움직이기 시작했다. 한 손짓에 여러 번 올 수 있다.
+    /// 열린 메뉴를 닫고, 보이는 중간 시트만 최소로 내린다
+    func mapGestureBegan() {
+        closeMenus()
+        let next = SheetLayout.detentAfterMapGesture(
+            sheetDetent,
+            isSheetShown: store.showsSavedSheet,
+            hasMinimum: minimumSheetHeight != nil
+        )
+        if sheetDetent != next {
+            sheetDetent = next
+        }
+    }
+
+    /// 열린 필터 메뉴와 행 메뉴를 닫는다. 시트를 끌 때와 지도를 끌 때 쓴다.
+    /// 지도 끌기는 한 손짓에 여러 번 오므로 열려 있을 때만 바꾼다
+    func closeMenus() {
+        if openFilterMenu != nil {
+            openFilterMenu = nil
+        }
+        if store.menuTargetPlaceID != nil {
+            store.send(.rowMenuDismissed)
+        }
+    }
+}
+
 // MARK: - Binding
 
 private extension MapView {
-    /// 메뉴 하나의 열림 바인딩. 하나를 열면 다른 하나가 저절로 닫힌다
+    /// 메뉴 하나의 열림 바인딩. 하나를 열면 다른 하나가 저절로 닫힌다.
+    /// 최소에서 열면 시트를 중간으로 올린다. 드롭다운이 필터 아래로 펼쳐져 탭바에 가리기 때문이다
     func filterMenuBinding(_ menu: FilterMenu) -> Binding<Bool> {
         Binding(
             get: { openFilterMenu == menu },
-            set: { isOpen in openFilterMenu = isOpen ? menu : nil }
+            set: { isOpen in
+                if isOpen {
+                    let next = SheetLayout.detentForOpeningMenu(sheetDetent)
+                    if sheetDetent != next {
+                        sheetDetent = next
+                    }
+                }
+                openFilterMenu = isOpen ? menu : nil
+            }
         )
     }
 
@@ -556,6 +646,9 @@ private enum MapViewMetric {
 
     /// 안전영역 상단에서 검색바 바닥까지
     static let searchBarBottom: CGFloat = 48
+
+    /// 최소 시트에서 필터 아래 끝과 탭바 위 끝 사이 (시안 10.21 `4968:16614`)
+    static let filterGapAboveTabBar: CGFloat = 20
 }
 
 #if DEBUG
