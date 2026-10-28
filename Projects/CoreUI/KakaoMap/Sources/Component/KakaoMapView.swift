@@ -275,13 +275,14 @@ extension KakaoMapRepresentable {
                     zOrder: 10_000
                 )
             )
+            // 점과 장소 핀이 겹치면 핀이 위다. 마커 레이어(10_000) 아래, 경로 레이어(1_000) 위에 둔다
             _ = manager.addLabelLayer(
                 option: LabelLayerOptions(
                     layerID: Layout.userLocationLayerID,
                     competitionType: .none,
                     competitionUnit: .symbolFirst,
                     orderType: .rank,
-                    zOrder: 20_000
+                    zOrder: 5_000
                 )
             )
 
