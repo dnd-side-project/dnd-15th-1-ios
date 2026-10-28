@@ -16,8 +16,10 @@ enum CourseDTOMapper {
         let legs = sorted.dropLast().map { place -> CourseLeg? in
             guard let walk = place.walkToNext else { return nil }
             return CourseLeg(
-                walkingMinutes: Int((Double(walk.durationSeconds) / 60).rounded()),
-                distanceMeters: walk.distanceMeters
+                walkingMinutes: minutes(seconds: walk.durationSeconds),
+                distanceMeters: walk.distanceMeters,
+                walkingPath: walk.path.map { mapCoordinate($0) },
+                transit: walk.transit.map { mapTransit($0) }
             )
         }
         return DateCourse(
@@ -88,6 +90,24 @@ enum CourseDTOMapper {
             // 여기서 끊어 화면이 서버 제약을 몰라도 되게 한다
             hasNext: dto.hasNext && dto.page < maxSearchPage
         )
+    }
+
+    /// 대중교통 합계와, 구간들의 좌표를 이동 순서대로 이어 붙인 경로
+    private static func mapTransit(_ dto: TransitToNextResponseDTO) -> CourseTransit {
+        CourseTransit(
+            minutes: minutes(seconds: dto.durationSeconds),
+            distanceMeters: dto.distanceMeters,
+            path: dto.legs.flatMap(\.path).map { mapCoordinate($0) }
+        )
+    }
+
+    private static func mapCoordinate(_ dto: RoutePointResponseDTO) -> Coordinate {
+        Coordinate(latitude: dto.latitude, longitude: dto.longitude)
+    }
+
+    /// 서버는 초를 준다. 분으로 반올림한다. 도보·대중교통이 같은 방식이다
+    private static func minutes(seconds: Int) -> Int {
+        Int((Double(seconds) / 60).rounded())
     }
 
     private static func mapPlace(_ dto: DateCoursePlaceResponseDTO) -> Place {

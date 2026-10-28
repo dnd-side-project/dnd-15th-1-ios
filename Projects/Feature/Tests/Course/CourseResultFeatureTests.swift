@@ -27,23 +27,41 @@ final class CourseResultSummaryTests: XCTestCase {
         XCTAssertEqual(store.state.timelineLegs.count, 1)
     }
 
-    func test_30분_넘는_구간에만_긴_구간_표시가_붙는다() async {
-        let store = resultStore(course: threeStopCourse)
-        XCTAssertEqual(store.state.timelineLegs.map(\.isLong), [false, true])
+    func test_대중교통_값이_오면_대중교통만_보인다() async {
+        let store = resultStore(course: transitCourse)
+        XCTAssertEqual(store.state.timelineLegs.map(\.mode), [.walk, .transit])
+        XCTAssertEqual(store.state.timelineLegs.map(\.duration), ["도보 20분", "대중교통 45분"])
+        XCTAssertEqual(store.state.timelineLegs.map(\.distance), ["1.5 km", "5.2 km"])
     }
 
-    func test_도보값을_못_받은_구간은_글자만_비운다() async {
+    func test_대중교통이_1시간을_넘으면_시간과_분으로_보인다() async {
+        let store = resultStore(course: longTransitCourse)
+        XCTAssertEqual(store.state.timelineLegs.map(\.duration), ["대중교통 1시간 40분"])
+    }
+
+    func test_대중교통이_섞이면_요약이_이동_약과_총으로_바뀐다() async {
+        let store = resultStore(course: transitCourse)
+        // 20분 + 45분, 1.5km + 5.2km
+        XCTAssertEqual(store.state.summaryText, "3곳 · 이동 약 1시간 5분 · 총 6.7km")
+    }
+
+    func test_요약_거리는_구간마다_반올림한_거리의_합이다() async {
+        let store = resultStore(course: roundingCourse)
+        // 1250m 둘. 미터를 먼저 더하면 2.5km 지만 행에 보이는 1.3 + 1.3 이 맞다
+        XCTAssertEqual(store.state.timelineLegs.map(\.distance), ["1.3 km", "1.3 km"])
+        XCTAssertEqual(store.state.summaryText, "3곳 · 도보 약 20분 · 총 이동 2.6km")
+    }
+
+    func test_값을_못_받은_구간은_안내_문구를_보인다() async {
         let store = resultStore(course: missingFirstLegCourse)
         XCTAssertEqual(store.state.timelineLegs.count, 3)
+        XCTAssertEqual(store.state.timelineLegs[0].mode, .unavailable)
         XCTAssertEqual(store.state.timelineLegs[0].duration, "")
-        XCTAssertEqual(store.state.timelineLegs[0].distance, "")
-        XCTAssertFalse(store.state.timelineLegs[0].isLong)
+        XCTAssertEqual(store.state.timelineLegs[0].distance, "이동 정보를 불러오지 못했어요")
         XCTAssertEqual(store.state.timelineLegs[1].duration, "도보 20분")
         XCTAssertEqual(store.state.timelineLegs[1].distance, "1.5 km")
-        XCTAssertFalse(store.state.timelineLegs[1].isLong)
         XCTAssertEqual(store.state.timelineLegs[2].duration, "도보 1시간 20분")
         XCTAssertEqual(store.state.timelineLegs[2].distance, "5.3 km")
-        XCTAssertTrue(store.state.timelineLegs[2].isLong)
         XCTAssertEqual(store.state.summaryText, "4곳 · 도보 약 1시간 40분 · 총 이동 6.8km")
     }
 
@@ -161,6 +179,57 @@ final class CourseResultMapTests: XCTestCase {
         XCTAssertTrue(store.state.markers.isEmpty)
         XCTAssertTrue(store.state.routes.isEmpty)
     }
+
+    func test_경로선이_장소와_구간_경로를_순서대로_잇는다() async {
+        let store = resultStore(course: routedCourse)
+        let stops = routedCourse.stops.map(\.place.coordinate)
+        XCTAssertEqual(
+            store.state.routes.first?.coordinates,
+            [stops[0], walkPointA, walkPointB, stops[1], transitPointA, transitPointB, stops[2]]
+        )
+    }
+
+    func test_대중교통_좌표가_비면_도보_경로_대신_장소끼리_직선이다() async {
+        let store = resultStore(course: emptyTransitPathCourse)
+        XCTAssertEqual(
+            store.state.routes.first?.coordinates,
+            emptyTransitPathCourse.stops.map(\.place.coordinate)
+        )
+    }
+
+    func test_값을_못_받은_구간은_장소끼리_직선이다() async {
+        let store = resultStore(course: nilLegRoutedCourse)
+        let stops = nilLegRoutedCourse.stops.map(\.place.coordinate)
+        XCTAssertEqual(
+            store.state.routes.first?.coordinates,
+            [stops[0], stops[1], walkPointA, stops[2]]
+        )
+    }
+
+    func test_첫_화면이_경로_선_전체를_담는다() async {
+        let store = resultStore(course: detourCourse)
+        await store.send(.mapSizeChanged(width: 390, visibleHeight: 400))
+        let stops = detourCourse.stops.map(\.place.coordinate)
+        let withRoute = MapZoom.fit(
+            coordinates: [stops[0], detourPoint, stops[1]],
+            anchor: stops[0],
+            viewWidth: 390,
+            visibleHeight: 400,
+            maximum: MapCamera.multiPlaceZoom,
+            focusRatio: MapZoom.mapFocusRatio
+        )
+        let stopsOnly = MapZoom.fit(
+            coordinates: stops,
+            anchor: stops[0],
+            viewWidth: 390,
+            visibleHeight: 400,
+            maximum: MapCamera.multiPlaceZoom,
+            focusRatio: MapZoom.mapFocusRatio
+        )
+        XCTAssertEqual(store.state.camera.center, stops[0])
+        XCTAssertEqual(store.state.camera.zoomLevel, withRoute)
+        XCTAssertNotEqual(withRoute, stopsOnly)
+    }
 }
 
 @MainActor
@@ -272,6 +341,125 @@ final class CourseResultDelegateTests: XCTestCase {
         let store = resultStore(course: threeStopCourse)
         await store.send(.backTapped)
         await store.receive(.delegate(.dismissed))
+    }
+}
+
+@MainActor
+final class CourseResultDirectionsTests: XCTestCase {
+
+    func test_도보_구간을_누르면_도보_길찾기를_연다() {
+        let state = CourseResultFeature.State(
+            course: directionsCourse(names: ["성수 카페", "서점", "역삼"], legs: [walkLeg, transitLeg]),
+            dateCourseID: "1"
+        )
+
+        XCTAssertEqual(state.legDirections.count, 2)
+        XCTAssertEqual(
+            state.legDirections[0]?.appURL.absoluteString,
+            "kakaomap://route?sp=37.5446,127.0557&ep=37.5172,127.0473&by=foot"
+        )
+        XCTAssertEqual(
+            state.legDirections[0]?.webURL.absoluteString,
+            "https://map.kakao.com/link/by/walk/"
+                + "%EC%84%B1%EC%88%98%20%EC%B9%B4%ED%8E%98,37.5446,127.0557/"
+                + "%EC%84%9C%EC%A0%90,37.5172,127.0473"
+        )
+    }
+
+    func test_대중교통_구간을_누르면_대중교통_길찾기를_연다() {
+        let state = CourseResultFeature.State(
+            course: directionsCourse(names: ["성수 카페", "서점", "역삼"], legs: [walkLeg, transitLeg]),
+            dateCourseID: "1"
+        )
+
+        XCTAssertEqual(
+            state.legDirections[1]?.appURL.absoluteString,
+            "kakaomap://route?sp=37.5172,127.0473&ep=37.4979,127.0276&by=publictransit"
+        )
+        XCTAssertEqual(
+            state.legDirections[1]?.webURL.absoluteString,
+            "https://map.kakao.com/link/by/traffic/"
+                + "%EC%84%9C%EC%A0%90,37.5172,127.0473/"
+                + "%EC%97%AD%EC%82%BC,37.4979,127.0276"
+        )
+    }
+
+    func test_값을_못_받은_구간은_대중교통_길찾기를_연다() {
+        let state = CourseResultFeature.State(
+            course: directionsCourse(names: ["성수 카페", "서점", "역삼"], legs: [nil, transitLeg]),
+            dateCourseID: "1"
+        )
+
+        XCTAssertEqual(
+            state.legDirections[0]?.appURL.absoluteString,
+            "kakaomap://route?sp=37.5446,127.0557&ep=37.5172,127.0473&by=publictransit"
+        )
+        XCTAssertEqual(
+            state.legDirections[0]?.webURL.absoluteString,
+            "https://map.kakao.com/link/by/traffic/"
+                + "%EC%84%B1%EC%88%98%20%EC%B9%B4%ED%8E%98,37.5446,127.0557/"
+                + "%EC%84%9C%EC%A0%90,37.5172,127.0473"
+        )
+    }
+
+    func test_장소_이름의_쉼표와_슬래시는_공백으로_바꾼다() {
+        let state = CourseResultFeature.State(
+            course: directionsCourse(names: ["성수, 카페/2층", "서점", "역삼"], legs: [walkLeg, transitLeg]),
+            dateCourseID: "1"
+        )
+
+        XCTAssertEqual(
+            state.legDirections[0]?.webURL.absoluteString,
+            "https://map.kakao.com/link/by/walk/"
+                + "%EC%84%B1%EC%88%98%20%20%EC%B9%B4%ED%8E%98%202%EC%B8%B5,37.5446,127.0557/"
+                + "%EC%84%9C%EC%A0%90,37.5172,127.0473"
+        )
+    }
+
+    func test_길찾기_링크는_구간_수단을_읽어준다() {
+        let state = CourseResultFeature.State(
+            course: directionsCourse(names: ["성수 카페", "서점", "역삼"], legs: [walkLeg, transitLeg]),
+            dateCourseID: "1"
+        )
+        XCTAssertEqual(
+            state.timelineLegs.map(\.directionsAccessibilityLabel),
+            ["도보 길찾기를 카카오맵으로 보기", "대중교통 길찾기를 카카오맵으로 보기"]
+        )
+
+        // 값을 못 받은 구간은 대중교통으로 열린다
+        let missing = CourseResultFeature.State(
+            course: directionsCourse(names: ["성수 카페", "서점", "역삼"], legs: [nil, transitLeg]),
+            dateCourseID: "1"
+        )
+        XCTAssertEqual(missing.timelineLegs[0].directionsAccessibilityLabel, "대중교통 길찾기를 카카오맵으로 보기")
+    }
+
+    func test_길찾기_링크가_읽어주는_수단과_여는_수단이_같다() {
+        // 도보 · 대중교통 · 값 없음을 다 거친다
+        let states = [[walkLeg, transitLeg], [nil, transitLeg]].map { legs in
+            CourseResultFeature.State(
+                course: directionsCourse(names: ["성수 카페", "서점", "역삼"], legs: legs),
+                dateCourseID: "1"
+            )
+        }
+        let labelModes = states.flatMap(\.timelineLegs).map { leg in
+            leg.directionsAccessibilityLabel.hasPrefix("대중교통") ? "publictransit" : "foot"
+        }
+        let urlModes = states.flatMap(\.legDirections).map { directions in
+            directions?.appURL.absoluteString.components(separatedBy: "&by=").last ?? ""
+        }
+
+        XCTAssertEqual(labelModes, ["foot", "publictransit", "publictransit", "publictransit"])
+        XCTAssertEqual(urlModes, labelModes)
+    }
+
+    func test_장소가_1곳이면_길찾기가_없다() {
+        let state = CourseResultFeature.State(
+            course: directionsCourse(names: ["성수 카페"], legs: []),
+            dateCourseID: "1"
+        )
+
+        XCTAssertTrue(state.legDirections.isEmpty)
     }
 }
 
@@ -414,6 +602,136 @@ private let missingFirstLegCourse = makeCourse(
         Domain.CourseLeg(walkingMinutes: 80, distanceMeters: 5300),
     ]
 )
+
+private let transitCourse = makeCourse(
+    stopCount: 3,
+    legs: [
+        Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500),
+        Domain.CourseLeg(
+            walkingMinutes: 80,
+            distanceMeters: 5300,
+            transit: Domain.CourseTransit(minutes: 45, distanceMeters: 5200, path: [])
+        ),
+    ]
+)
+
+private let longTransitCourse = makeCourse(
+    stopCount: 2,
+    legs: [
+        Domain.CourseLeg(
+            walkingMinutes: 150,
+            distanceMeters: 9800,
+            transit: Domain.CourseTransit(minutes: 100, distanceMeters: 9100, path: [])
+        ),
+    ]
+)
+
+private let roundingCourse = makeCourse(
+    stopCount: 3,
+    legs: [
+        Domain.CourseLeg(walkingMinutes: 10, distanceMeters: 1250),
+        Domain.CourseLeg(walkingMinutes: 10, distanceMeters: 1250),
+    ]
+)
+
+private let walkPointA = Coordinate(latitude: 37.312, longitude: 126.905)
+private let walkPointB = Coordinate(latitude: 37.315, longitude: 126.908)
+private let transitPointA = Coordinate(latitude: 37.322, longitude: 126.915)
+private let transitPointB = Coordinate(latitude: 37.326, longitude: 126.918)
+/// 대중교통이 있는 구간에서는 그리면 안 되는 도보 경로 점
+private let ignoredWalkPoint = Coordinate(latitude: 37.400, longitude: 127.000)
+
+private let routedCourse = makeCourse(
+    stopCount: 3,
+    legs: [
+        Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500, walkingPath: [walkPointA, walkPointB]),
+        Domain.CourseLeg(
+            walkingMinutes: 80,
+            distanceMeters: 5300,
+            walkingPath: [ignoredWalkPoint],
+            transit: Domain.CourseTransit(
+                minutes: 45,
+                distanceMeters: 5200,
+                path: [transitPointA, transitPointB]
+            )
+        ),
+    ]
+)
+
+private let emptyTransitPathCourse = makeCourse(
+    stopCount: 2,
+    legs: [
+        Domain.CourseLeg(
+            walkingMinutes: 80,
+            distanceMeters: 5300,
+            walkingPath: [ignoredWalkPoint],
+            transit: Domain.CourseTransit(minutes: 45, distanceMeters: 5200, path: [])
+        ),
+    ]
+)
+
+private let nilLegRoutedCourse = makeCourse(
+    stopCount: 3,
+    legs: [
+        nil,
+        Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500, walkingPath: [walkPointA]),
+    ]
+)
+
+/// 두 장소보다 한참 남쪽으로 도는 경로 점. 장소만으로 맞춘 줌이면 잘린다
+private let detourPoint = Coordinate(latitude: 37.5000, longitude: 126.9780)
+
+private let detourCourse = DateCourse(
+    id: "1",
+    title: "26.08.05 데이트",
+    scheduledDate: Date(timeIntervalSince1970: 0),
+    scheduledTime: nil,
+    status: .confirmed,
+    version: 1,
+    stops: [
+        Domain.CourseStop(place: .fixture(id: "p0", latitude: 37.5665, longitude: 126.9780)),
+        Domain.CourseStop(place: .fixture(id: "p1", latitude: 37.5565, longitude: 126.9780)),
+    ],
+    legs: [
+        Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500, walkingPath: [detourPoint]),
+    ]
+)
+
+private let walkLeg = Domain.CourseLeg(walkingMinutes: 20, distanceMeters: 1500)
+
+private let transitLeg = Domain.CourseLeg(
+    walkingMinutes: 80,
+    distanceMeters: 5300,
+    transit: Domain.CourseTransit(minutes: 45, distanceMeters: 5200, path: [])
+)
+
+/// 좌표를 리터럴로 고정해 주소 글자를 그대로 맞춰 본다
+private func directionsCourse(names: [String], legs: [Domain.CourseLeg?]) -> DateCourse {
+    let coordinates = [
+        Coordinate(latitude: 37.5446, longitude: 127.0557),
+        Coordinate(latitude: 37.5172, longitude: 127.0473),
+        Coordinate(latitude: 37.4979, longitude: 127.0276),
+    ]
+    return DateCourse(
+        id: "1",
+        title: "26.08.05 데이트",
+        scheduledDate: Date(timeIntervalSince1970: 0),
+        scheduledTime: nil,
+        status: .confirmed,
+        version: 1,
+        stops: zip(names, coordinates).enumerated().map { index, pair in
+            Domain.CourseStop(
+                place: .fixture(
+                    id: "p\(index)",
+                    name: pair.0,
+                    latitude: pair.1.latitude,
+                    longitude: pair.1.longitude
+                )
+            )
+        },
+        legs: legs
+    )
+}
 
 private let mixedCategoryCourse = DateCourse(
     id: "1",
