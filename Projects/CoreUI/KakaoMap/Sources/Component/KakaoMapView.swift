@@ -275,13 +275,14 @@ extension KakaoMapRepresentable {
                     zOrder: 10_000
                 )
             )
+            // 점과 장소 핀이 겹치면 핀이 위다. 마커 레이어(10_000) 아래, 경로 레이어(1_000) 위에 둔다
             _ = manager.addLabelLayer(
                 option: LabelLayerOptions(
                     layerID: Layout.userLocationLayerID,
                     competitionType: .none,
                     competitionUnit: .symbolFirst,
                     orderType: .rank,
-                    zOrder: 20_000
+                    zOrder: 5_000
                 )
             )
 
@@ -710,7 +711,8 @@ private extension KakaoMapRepresentable {
         static let viewName = "dulpick.map"
         static let markerLayerID = "dulpick.map.marker"
         static let userLocationLayerID = "dulpick.map.userLocation"
-        static let userLocationStyleID = "dulpick.map.style.userLocation"
+        /// 점 모양을 바꾸면 이름도 바꾼다. 이미 등록한 이름은 다시 등록하지 않는다
+        static let userLocationStyleID = "dulpick.map.style.userLocation.dot"
         static let routeLayerID = "dulpick.map.route"
         static let routeStyleID = "dulpick.map.style.route"
         /// 시안 c01. 물방울 폭 26 을 자로 재면 칠이 약 4
@@ -755,10 +757,41 @@ private extension KakaoMapRepresentable {
 // MARK: - 경로·현재위치 심볼
 
 private let routeColor = SharedDesignSystemAsset.brandPrimary.color
-let userLocationColor = UIColor(red: 0.16, green: 0.47, blue: 0.96, alpha: 1.0)
 
+/// 내 위치 점. 시안 `4980:26311` 의 40×40 한 장이고, 가운데가 좌표에 놓인다
+@MainActor
 func userLocationImage() -> UIImage {
-    MapPinImage.circle(diameter: 18, fill: userLocationColor)
+    // 그림자는 반지름 19(흰 원 10 + 퍼짐 1 + 흐림 8)에서 끝나 40 안에 든다. 여백을 두지 않는다.
+    // 바깥 원 흐림이 40 밖으로 1 만큼 번지는 부분(알파 15/255 이하)은 40×40 에 맞춰 잘린다
+    MapPinImage.rendered(UserLocationDot(), padding: 0)
+}
+
+/// 바깥 원 40 · 흰 원 20 · 빨간 원 14 를 겹친다. 시안의 세 색은 모두 `brandPrimary`(#F6465F) 다
+private struct UserLocationDot: View {
+    var body: some View {
+        let brand = SharedDesignSystemAsset.brandPrimary.swiftUIColor
+        ZStack {
+            // 시안 투명도 15% · 흐림 1
+            Circle()
+                .fill(brand.opacity(0.15))
+                .frame(width: 40, height: 40)
+                .blur(radius: 0.5)
+            // 흰 원의 그림자. Figma 설정값 80% · 흐림 8 · 퍼짐 1 을 따른다.
+            // SwiftUI 그림자에는 퍼짐이 없어 퍼짐 1 만큼 큰 지름 22 원을 흐려 아래에 깐다.
+            // 흐림 반지름 3.75 는 같은 값의 CSS box-shadow(0 0 8px 1px) 그림과 고리별 알파를 비교해 정했다
+            Circle()
+                .fill(brand.opacity(0.8))
+                .frame(width: 22, height: 22)
+                .blur(radius: 3.75)
+            Circle()
+                .fill(Color.commonWhite)
+                .frame(width: 20, height: 20)
+            Circle()
+                .fill(brand)
+                .frame(width: 14, height: 14)
+        }
+        .frame(width: 40, height: 40)
+    }
 }
 
 // 경로선 위에 일정 간격으로 찍히는 점. SDK 가 선을 따라 반복해 그린다

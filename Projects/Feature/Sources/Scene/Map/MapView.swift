@@ -169,12 +169,15 @@ private extension MapView {
                 set: { store.send(.cameraChanged($0)) }
             ),
             pins: store.markers.map(MapMarkerStyle.pin(for:)),
+            userLocation: store.userLocation,
             onPinTap: { store.send(.markerTapped($0)) },
             onMapTap: { store.send(.rowMenuDismissed) },
             onUserGestureBegan: { mapGestureBegan() },
             collapsedSheetTop: collapsedSheetTop
         )
         .ignoresSafeArea()
+        // 지도가 보이는 동안만 내 위치를 받는다. 다른 탭이나 다음 화면으로 가면 끊는다.
+        .task { await store.send(.mapAppeared).finish() }
     }
 }
 

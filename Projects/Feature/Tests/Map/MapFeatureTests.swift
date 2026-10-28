@@ -971,3 +971,103 @@ private let mapCurrentCourse = DateCourseSummary(
     status: .confirmed,
     totalPlaceCount: 5
 )
+
+// MARK: - 내 위치 점
+
+@MainActor
+final class MapUserLocationTests: XCTestCase {
+
+    func test_지도가_보이면_흐름의_좌표로_점을_그린다() async {
+        let here = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let (stream, continuation) = AsyncStream<Coordinate?>.makeStream()
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.coordinateUpdates = { stream }
+        }
+
+        await store.send(.mapAppeared)
+        continuation.yield(here)
+        await store.receive(\.userLocationChanged) {
+            $0.userLocation = here
+        }
+
+        continuation.finish()
+        await store.finish()
+    }
+
+    func test_흐름이_없음을_보내면_점을_숨긴다() async {
+        let here = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let (stream, continuation) = AsyncStream<Coordinate?>.makeStream()
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.coordinateUpdates = { stream }
+        }
+
+        await store.send(.mapAppeared)
+        continuation.yield(here)
+        await store.receive(\.userLocationChanged) {
+            $0.userLocation = here
+        }
+        continuation.yield(nil)
+        await store.receive(\.userLocationChanged) {
+            $0.userLocation = nil
+        }
+
+        continuation.finish()
+        await store.finish()
+    }
+
+    func test_지도가_사라지면_흐름을_끊는다() async {
+        let here = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let (stream, continuation) = AsyncStream<Coordinate?>.makeStream()
+        let store = TestStore(initialState: MapFeature.State()) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.coordinateUpdates = { stream }
+        }
+
+        let task = await store.send(.mapAppeared)
+        continuation.yield(here)
+        await store.receive(\.userLocationChanged) {
+            $0.userLocation = here
+        }
+
+        // 흐름은 아직 열려 있다. 뷰의 task 가 취소되어 효과가 끊겨야 이 테스트가 끝난다
+        await task.cancel()
+    }
+
+    func test_다시_들어오면_새_좌표가_올_때까지_점을_지운다() async {
+        let here = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let (stream, continuation) = AsyncStream<Coordinate?>.makeStream()
+        var state = MapFeature.State()
+        state.userLocation = here
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        } withDependencies: {
+            $0.locationClient.coordinateUpdates = { stream }
+        }
+
+        let task = await store.send(.mapAppeared) {
+            $0.userLocation = nil
+        }
+
+        continuation.finish()
+        await task.finish()
+    }
+
+    func test_현위치_버튼의_좌표로는_점을_옮기지_않는다() async {
+        let dot = Coordinate(latitude: 37.5665, longitude: 126.9780)
+        let button = Coordinate(latitude: 37.5006, longitude: 127.0366)
+        var state = MapFeature.State()
+        state.userLocation = dot
+        let store = TestStore(initialState: state) {
+            MapFeature()
+        }
+
+        await store.send(.currentLocationResponse(.success(button))) {
+            $0.camera = .focusing(button, zoomLevel: MapCamera.singlePlaceZoom)
+        }
+    }
+}

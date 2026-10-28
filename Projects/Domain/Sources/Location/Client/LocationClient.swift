@@ -10,6 +10,9 @@ public struct LocationClient: Sendable {
     public var requestAuthorization: @Sendable () async -> LocationAuthorization = { .notDetermined }
     /// 좌표를 한 번 읽는다. 따라다니지 않는다
     public var currentCoordinate: @Sendable () async throws -> Coordinate
+    /// 내 위치를 계속 흘린다. 권한을 요청하지 않는다.
+    /// 쓸 수 있는 좌표면 그 값을, 권한이 없거나 대략적 위치면 `nil` 을 보낸다. 구독을 끊으면 갱신이 멈춘다
+    public var coordinateUpdates: @Sendable () -> AsyncStream<Coordinate?> = { AsyncStream { $0.finish() } }
 }
 
 extension LocationClient: TestDependencyKey {

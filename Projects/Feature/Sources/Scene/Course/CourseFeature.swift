@@ -78,6 +78,8 @@ public struct CourseFeature {
         public var camera: MapCamera = .seoulCityHall
         /// 핀을 누르면 들어간다. 뷰가 받아 목록을 그 행까지 올린다
         public var rowScrollRequest: RowScrollRequest?
+        /// 내 위치 점. 장소 고르기 화면의 지도에만 그린다
+        public var userLocation: Coordinate?
 
         public init(now: Date = Date(), mode: Mode = .create) {
             var seoul = Calendar(identifier: .gregorian)
@@ -126,6 +128,9 @@ public struct CourseFeature {
         case buildTapped
         case retryTapped
         case backTapped
+        /// 장소 고르기 화면의 지도가 나타났다. 날짜 화면은 이 액션을 안 보낸다
+        case mapAppeared
+        case userLocationChanged(Coordinate?)
 
         case delegate(Delegate)
 
@@ -146,11 +151,13 @@ public struct CourseFeature {
         case createCourse
         case saveCourse
         case reloadCourse
+        case userLocation
     }
 
     @Dependency(\.courseClient) var courseClient
     @Dependency(\.coupleClient) var coupleClient
     @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.locationClient) var locationClient
 
     public init() {}
 
@@ -172,6 +179,8 @@ public struct CourseFeature {
             return raise(state: &state, action: action)
         case .buildTapped, .courseSaved, .conflictReloaded, .conflictAlertDismissed:
             return save(state: &state, action: action)
+        case .mapAppeared, .userLocationChanged:
+            return updateUserLocation(state: &state, action: action)
         case .delegate:
             return .none
         }
@@ -722,5 +731,32 @@ private extension CourseFeature {
         }
         guard let first = state.filteredPlaces.first else { return .seoulCityHall }
         return .focusing(first.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+    }
+}
+
+// MARK: - 내 위치
+
+private extension CourseFeature {
+    /// `.onAppear` 는 날짜 화면도 보낸다. 흐름은 장소 고르기 지도가 보이는 동안에만 연다
+    func updateUserLocation(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .mapAppeared:
+            // 다시 들어오면 새로 잡힌 좌표가 올 때까지 점을 안 보인다
+            state.userLocation = nil
+            return .run { [locationClient] send in
+                for await coordinate in locationClient.coordinateUpdates() {
+                    await send(.userLocationChanged(coordinate))
+                }
+            }
+            .cancellable(id: CancelID.userLocation, cancelInFlight: true)
+
+        case let .userLocationChanged(coordinate):
+            state.userLocation = coordinate
+            return .none
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
     }
 }
