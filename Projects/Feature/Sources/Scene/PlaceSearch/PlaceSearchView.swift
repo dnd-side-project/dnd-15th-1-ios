@@ -136,7 +136,9 @@ public struct PlaceSearchView: View {
                 message: "잠시 뒤 다시 시도해주세요"
             )
         case .loaded:
-            if store.results.isEmpty {
+            if store.isAwaitingResults {
+                skeleton
+            } else if store.results.isEmpty {
                 emptyState(
                     title: "검색 결과가 없어요",
                     message: "다른 검색어를 입력해주세요"
@@ -262,6 +264,14 @@ public struct PlaceSearchView: View {
                             store.send(.reachedEnd)
                         }
                     }
+                }
+                // 걸러져 짧아진 페이지는 위 기준 행이 이미 보인 행이라 다시 안 불린다.
+                // 페이지마다 새로 나타나는 끝 표시로 받친다
+                if store.hasNext {
+                    Color.clear
+                        .frame(height: 1)
+                        .id(store.page)
+                        .onAppear { store.send(.reachedEnd) }
                 }
             }
         }

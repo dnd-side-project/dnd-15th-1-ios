@@ -43,7 +43,12 @@ public struct PlaceSearchFeature {
 
         /// 다 불러온 뒤 결과가 없는 상태
         public var isEmptyResult: Bool {
-            !showsRecent && loadState == .loaded && results.isEmpty
+            !showsRecent && loadState == .loaded && results.isEmpty && !hasNext
+        }
+
+        /// 받은 페이지가 걸러져 비었지만 다음 페이지가 남은 상태. 화면은 로딩을 보인다
+        public var isAwaitingResults: Bool {
+            !showsRecent && loadState == .loaded && results.isEmpty && hasNext
         }
 
         public init(query: String = "", isSavedOnly: Bool = false, isCoupleConnected: Bool = false) {
@@ -160,7 +165,7 @@ public struct PlaceSearchFeature {
             state.hasNext = page.hasNext
             state.page = 0
             state.loadState = .loaded
-            return .none
+            return loadMoreIfBlank(state: &state)
 
         case let .searchResponse(.failure(failure)):
             state.results = []
@@ -176,12 +181,16 @@ public struct PlaceSearchFeature {
             state.hasNext = page.hasNext
             state.page += 1
             state.isLoadingMore = false
-            return .none
+            return loadMoreIfBlank(state: &state)
 
-        case .moreResponse(.failure):
+        case let .moreResponse(.failure(failure)):
             // 첫 페이지는 화면에 남긴다. hasNext 를 끄면 일시 실패가 영구 정지가 된다
             state.isLoadingMore = false
-            return .none
+            // 보일 결과가 하나도 없으면 첫 페이지 실패와 같게 다룬다
+            guard state.results.isEmpty else { return .none }
+            state.loadState = .failed
+            guard failure == .unauthorized else { return .none }
+            return .send(.delegate(.sessionExpired))
 
         default:
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
@@ -322,6 +331,12 @@ private extension PlaceSearchFeature {
             await send(.moreResponse(result))
         }
         .cancellable(id: CancelID.more, cancelInFlight: true)
+    }
+
+    /// 결과가 걸러져 비면 화면에 행이 없어 끝에 닿을 일도 없다. 남은 페이지가 있으면 여기서 이어 부른다
+    func loadMoreIfBlank(state: inout State) -> Effect<Action> {
+        guard state.results.isEmpty, state.hasNext else { return .none }
+        return loadMore(state: &state)
     }
 
     func remember(_ query: String) -> Effect<Action> {
