@@ -45,8 +45,11 @@ public struct PlaceDetailFeature {
         /// 저장 응답이 준 장소 번호. 검색 장소는 장소 번호가 없을 수 있어 삭제엔 이걸 먼저 쓴다
         public var savedServerID: String?
 
-        /// 카카오맵 앱이 없을 때 열 웹 주소. 상세 조회가 끝나면 채워진다
+        /// 카카오맵 웹 주소. 카카오 번호가 있을 때 앱이 없으면 이것을 연다. 상세 조회가 끝나면 채워진다
         public var kakaoPlaceURL: URL?
+
+        /// 카카오 분류에서 고른 세부 분류. 상세 조회가 끝나야 생긴다
+        public var detailCategory: String?
 
         /// 서버가 아는 공용 장소 번호. 이것이 없으면 게시물을 못 부른다
         public var serverPlaceID: String?
@@ -58,25 +61,32 @@ public struct PlaceDetailFeature {
 
         public var isAddressExpanded = false
 
+        /// 지도 앱을 고르는 시트
+        public var isMapSheetPresented = false
+
+        /// 전체 화면 사진 뷰어. 열려 있을 때만 있다
+        var photoViewer: PlacePhotoViewerState?
+
         /// 상세 조회를 이미 시작했는지. 흐름과 화면이 각자 `onAppear` 를 보내 두 번 오는 걸 여기서 막는다
         var didStartLoad = false
 
         public var title: String { alias ?? place.name }
 
-        public var kakaoMapAppURL: URL? {
-            guard let kakaoPlaceID = place.kakaoPlaceID else { return nil }
-            return URL(string: "kakaomap://place?id=\(kakaoPlaceID)")
+        /// 지도 시트 줄 하나가 여는 주소. 검색어는 별칭이 아니라 실제 이름이다
+        func mapLink(for app: PlaceMapApp, bundleID: String) -> PlaceMapLink? {
+            PlaceMapLink.make(
+                app: app,
+                name: place.name,
+                kakaoPlaceID: place.kakaoPlaceID,
+                kakaoPlaceURL: kakaoPlaceURL,
+                bundleID: bundleID
+            )
         }
 
-        /// 앱이 없을 때 여는 웹 주소. 서버가 준 값이 먼저다
-        public var kakaoMapWebURL: URL? {
-            if let kakaoPlaceURL { return kakaoPlaceURL }
-            guard let kakaoPlaceID = place.kakaoPlaceID else { return nil }
-            return URL(string: "https://place.map.kakao.com/\(kakaoPlaceID)")
+        /// 둘째 줄에 붙일 세부 분류 글자. 둘픽 분류와 같은 말이면 nil 이다
+        var detailCategoryText: String? {
+            PlaceDetailCategoryText.make(detailCategory: detailCategory, category: place.category)
         }
-
-        /// 앱이든 웹이든 열 곳이 있는지. 없으면 지도 버튼이 안 눌린다
-        public var canOpenKakaoMap: Bool { kakaoMapAppURL != nil || kakaoMapWebURL != nil }
 
         public init(savedPlace: SavedPlace) {
             id = savedPlace.place.id
@@ -122,6 +132,12 @@ public struct PlaceDetailFeature {
         case bookmarkRemoved(serverID: String)
         case bookmarkFailed(wasBookmarked: Bool)
         case addressToggled
+        case mapButtonTapped
+        case mapAppTapped(PlaceMapApp)
+        case mapSheetDismissed
+        case photoTapped(Int)
+        case photoViewerPageChanged(Int)
+        case photoViewerDismissed
         case contentTapped(String)
         case moreTapped
         case closeTapped
@@ -160,6 +176,10 @@ public struct PlaceDetailFeature {
             return handleContents(state: &state, action: action)
         case .bookmarkTapped, .bookmarkSaved, .bookmarkRemoved, .bookmarkFailed:
             return updateBookmark(state: &state, action: action)
+        case .mapButtonTapped, .mapAppTapped, .mapSheetDismissed:
+            return updateMapSheet(state: &state, action: action)
+        case .photoTapped, .photoViewerPageChanged, .photoViewerDismissed:
+            return updatePhotoViewer(state: &state, action: action)
         case .addressToggled, .contentTapped, .closeTapped, .delegate:
             return updateSheet(state: &state, action: action)
         }
@@ -175,6 +195,7 @@ public struct PlaceDetailFeature {
             state.place = detail.place
             state.bookmarkCount = detail.place.bookmarkCount
             state.kakaoPlaceURL = detail.kakaoPlaceURL
+            state.detailCategory = detail.detailCategory
             // 조회 중에 북마크를 눌렀으면 응답의 isSaved 는 이미 낡은 값이다
             if !state.didToggleBookmark {
                 state.isBookmarked = detail.isSaved
@@ -379,5 +400,39 @@ private extension PlaceDetailFeature {
             },
             request
         )
+    }
+
+    /// 지도 앱 고르기 시트. 고른 앱은 기억하지 않는다. 주소를 여는 일은 뷰의 `openURL` 이 한다
+    func updateMapSheet(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .mapButtonTapped:
+            state.isMapSheetPresented = true
+        case .mapAppTapped, .mapSheetDismissed:
+            state.isMapSheetPresented = false
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+        }
+        return .none
+    }
+
+    /// 사진 뷰어. 연 순간의 목록을 든다. 닫아도 사진 줄은 움직이지 않는다
+    func updatePhotoViewer(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .photoTapped(index):
+            let urls = state.place.thumbnailURLs
+            guard urls.indices.contains(index) else { return .none }
+            state.photoViewer = PlacePhotoViewerState(urls: urls, currentIndex: index)
+
+        case let .photoViewerPageChanged(index):
+            guard let viewer = state.photoViewer, viewer.urls.indices.contains(index) else { return .none }
+            state.photoViewer?.currentIndex = index
+
+        case .photoViewerDismissed:
+            state.photoViewer = nil
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+        }
+        return .none
     }
 }
