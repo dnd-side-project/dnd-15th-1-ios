@@ -17,7 +17,8 @@ struct SavedPlaceResponseDTO: Decodable, Sendable {
     let roadAddress: String?
     let latitude: Double
     let longitude: Double
-    let category: String
+    /// 카카오 분류 경로. 명세가 null 을 허용한다. 매퍼는 이 값을 쓰지 않는다
+    let category: String?
     let categoryName: String
     let ownershipStatus: String
     let alias: String?
