@@ -76,4 +76,28 @@ final class MapZoomTests: XCTestCase {
         )
         XCTAssertLessThan(mapped, centered)
     }
+
+    func test_실측_코스는_한_단계_더_줌아웃한다() {
+        // iPhone 16 · iOS 26.4 에서 잰 코스. 레벨 12 면 3번 장소가 시트 밑으로 내려갔다
+        let start = Coordinate(latitude: 37.5609408, longitude: 126.9255944)
+        let coordinates = [
+            start,
+            Coordinate(latitude: 37.5455685, longitude: 126.9465100),
+            Coordinate(latitude: 37.5202405, longitude: 126.9264063),
+            Coordinate(latitude: 37.5396211, longitude: 126.9487309),
+            // 경로 극점: 북 · 동 · 서
+            Coordinate(latitude: 37.5624340, longitude: start.longitude),
+            Coordinate(latitude: start.latitude, longitude: 126.9514511),
+            Coordinate(latitude: start.latitude, longitude: 126.9243979),
+        ]
+        let level = MapZoom.fit(
+            coordinates: coordinates,
+            anchor: start,
+            viewWidth: 393,
+            visibleHeight: 434.6,
+            maximum: MapCamera.multiPlaceZoom,
+            focusRatio: MapZoom.mapFocusRatio
+        )
+        XCTAssertEqual(level, 11)
+    }
 }
