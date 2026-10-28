@@ -315,19 +315,43 @@ final class PlaceDetailFeatureSavedServerIDTests: XCTestCase {
 
 @MainActor
 final class PlaceDetailFeatureMapTests: XCTestCase {
-    func test_카카오_장소ID_가_있으면_앱_주소를_만든다() {
-        let state = PlaceDetailFeature.State(savedPlace: .fixture(id: "7"))
+    func test_지도로_보기를_누르면_지도_시트가_열린다() async {
+        let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7"))) {
+            PlaceDetailFeature()
+        }
 
-        XCTAssertEqual(state.kakaoMapAppURL, URL(string: "kakaomap://place?id=kakao-7"))
-        XCTAssertTrue(state.canOpenKakaoMap)
+        await store.send(.mapButtonTapped) { $0.isMapSheetPresented = true }
     }
 
-    func test_카카오_장소ID_가_없으면_앱_주소가_없고_버튼이_안_눌린다() {
-        let state = PlaceDetailFeature.State(place: .fixture(id: "s1"), query: "검색어")
+    func test_지도_앱을_고르면_시트가_닫힌다() async {
+        let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7"))) {
+            PlaceDetailFeature()
+        }
 
-        XCTAssertNil(state.kakaoMapAppURL)
-        XCTAssertNil(state.kakaoMapWebURL)
-        XCTAssertFalse(state.canOpenKakaoMap)
+        await store.send(.mapButtonTapped) { $0.isMapSheetPresented = true }
+        await store.send(.mapAppTapped(.naver)) { $0.isMapSheetPresented = false }
+    }
+
+    func test_시트를_그냥_닫으면_시트만_닫힌다() async {
+        let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: .fixture(id: "7"))) {
+            PlaceDetailFeature()
+        }
+
+        await store.send(.mapButtonTapped) { $0.isMapSheetPresented = true }
+        await store.send(.mapSheetDismissed) { $0.isMapSheetPresented = false }
+    }
+
+    func test_별칭이_있어도_지도_검색어는_실제_이름이다() throws {
+        let state = PlaceDetailFeature.State(
+            savedPlace: .fixture(id: "7", alias: "우리 단골", name: "성수 카페")
+        )
+
+        let link = try XCTUnwrap(state.mapLink(for: .naver, bundleID: "com.dulpick.debug"))
+
+        XCTAssertEqual(
+            link.appURL.absoluteString,
+            "nmap://search?query=%EC%84%B1%EC%88%98%20%EC%B9%B4%ED%8E%98&appname=com.dulpick.debug"
+        )
     }
 
     func test_서버가_준_웹_주소를_그대로_쓴다() async {
@@ -362,17 +386,7 @@ final class PlaceDetailFeatureMapTests: XCTestCase {
             $0.contentsLoadState = .loaded
         }
 
-        XCTAssertEqual(store.state.kakaoMapWebURL, serverURL)
-    }
-
-    func test_서버가_웹_주소를_안_주면_장소ID_로_만든다() {
-        let state = PlaceDetailFeature.State(savedPlace: .fixture(id: "7"))
-
-        XCTAssertNil(state.kakaoPlaceURL)
-        XCTAssertEqual(
-            state.kakaoMapWebURL,
-            URL(string: "https://place.map.kakao.com/kakao-7")
-        )
+        XCTAssertEqual(store.state.mapLink(for: .kakao, bundleID: "com.dulpick.debug")?.webURL, serverURL)
     }
 
     func test_조회가_실패하면_웹_주소를_장소ID_로_만든다() async {
@@ -399,18 +413,9 @@ final class PlaceDetailFeatureMapTests: XCTestCase {
 
         XCTAssertNil(store.state.kakaoPlaceURL)
         XCTAssertEqual(
-            store.state.kakaoMapWebURL,
+            store.state.mapLink(for: .kakao, bundleID: "com.dulpick.debug")?.webURL,
             URL(string: "https://place.map.kakao.com/kakao-7")
         )
-    }
-
-    func test_앱_주소가_없어도_웹_주소가_있으면_버튼이_눌린다() {
-        var state = PlaceDetailFeature.State(place: .fixture(id: "s1"), query: "검색어")
-        state.kakaoPlaceURL = URL(string: "https://place.map.kakao.com/26338954")
-
-        XCTAssertNil(state.kakaoMapAppURL)
-        XCTAssertEqual(state.kakaoMapWebURL, URL(string: "https://place.map.kakao.com/26338954"))
-        XCTAssertTrue(state.canOpenKakaoMap)
     }
 }
 
@@ -952,5 +957,155 @@ final class PlaceDetailFeatureRemoveTests: XCTestCase {
 
         XCTAssertEqual(state.source, .server(placeID: "7"))
         XCTAssertEqual(state.serverPlaceID, "7")
+    }
+}
+
+@MainActor
+final class PlaceDetailFeatureDetailCategoryTests: XCTestCase {
+    func test_상세_조회가_끝나면_세부_분류가_붙는다() async {
+        let saved = SavedPlace.fixture(id: "7", category: .cafe, bookmarkCount: 1)
+        let detail = PlaceDetail(
+            place: saved.place,
+            isSaved: true,
+            ownership: .mine,
+            detailCategory: "커피전문점"
+        )
+        let store = TestStore(initialState: PlaceDetailFeature.State(savedPlace: saved)) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.placeClient.placeDetail = { _ in detail }
+            $0.contentClient.placeContents = { _, _, _ in
+                ContentPage(items: [], hasNext: false)
+            }
+        }
+
+        await store.send(.onAppear) { $0.didStartLoad = true }
+        await store.receive(\.detailLoaded) {
+            $0.detailCategory = "커피전문점"
+            $0.savedServerID = "7"
+            $0.contentsLoadState = .loading
+        }
+        await store.receive(\.contentsResponse) {
+            $0.contentsPage = 1
+            $0.hasNextContents = false
+            $0.contentsLoadState = .loaded
+        }
+
+        XCTAssertEqual(store.state.detailCategoryText, "커피전문점")
+    }
+}
+
+@MainActor
+final class PlaceDetailFeaturePhotoViewerTests: XCTestCase {
+    private static let photos = [
+        URL(string: "https://example.com/1.jpg"),
+        URL(string: "https://example.com/2.jpg"),
+        URL(string: "https://example.com/3.jpg"),
+    ].compactMap { $0 }
+
+    private func photoPlace(_ urls: [URL]) -> Place {
+        Place(
+            placeID: "7",
+            kakaoPlaceID: "kakao-7",
+            name: "장소 7",
+            category: .cafe,
+            address: "경기도 안산시 상록구 건건동 7",
+            roadAddress: nil,
+            coordinate: Coordinate(latitude: 37.3, longitude: 126.9),
+            bookmarkCount: 0,
+            thumbnailURLs: urls
+        )
+    }
+
+    private func photoState(_ urls: [URL]) -> PlaceDetailFeature.State {
+        PlaceDetailFeature.State(
+            savedPlace: SavedPlace(
+                place: photoPlace(urls),
+                ownership: .mine,
+                alias: nil,
+                memo: nil,
+                savedAt: nil
+            )
+        )
+    }
+
+    func test_사진을_누르면_누른_사진부터_뷰어가_열린다() async {
+        let photos = Self.photos
+        let store = TestStore(initialState: photoState(photos)) {
+            PlaceDetailFeature()
+        }
+
+        await store.send(.photoTapped(1)) {
+            $0.photoViewer = PlacePhotoViewerState(urls: photos, currentIndex: 1)
+        }
+    }
+
+    func test_없는_순번을_누르면_뷰어를_열지_않는다() async {
+        let store = TestStore(initialState: photoState(Self.photos)) {
+            PlaceDetailFeature()
+        }
+
+        await store.send(.photoTapped(3))
+    }
+
+    func test_넘기면_지금_사진_순번이_바뀌고_없는_순번은_버린다() async {
+        let photos = Self.photos
+        let store = TestStore(initialState: photoState(photos)) {
+            PlaceDetailFeature()
+        }
+
+        await store.send(.photoTapped(0)) {
+            $0.photoViewer = PlacePhotoViewerState(urls: photos, currentIndex: 0)
+        }
+        await store.send(.photoViewerPageChanged(2)) {
+            $0.photoViewer?.currentIndex = 2
+        }
+        await store.send(.photoViewerPageChanged(5))
+    }
+
+    func test_열린_동안_상세가_와도_연_순간의_사진_목록을_쓴다() async {
+        let photos = Self.photos
+        let newPlace = photoPlace([photos[2]])
+        let detail = PlaceDetail(place: newPlace, isSaved: false, ownership: nil)
+        let store = TestStore(initialState: photoState(photos)) {
+            PlaceDetailFeature()
+        } withDependencies: {
+            $0.contentClient.placeContents = { _, _, _ in
+                ContentPage(items: [], hasNext: false)
+            }
+        }
+
+        await store.send(.photoTapped(0)) {
+            $0.photoViewer = PlacePhotoViewerState(urls: photos, currentIndex: 0)
+        }
+        await store.send(.detailLoaded(detail)) {
+            $0.place = newPlace
+            $0.isBookmarked = false
+            $0.contentsLoadState = .loading
+        }
+        await store.receive(\.contentsResponse) {
+            $0.contentsPage = 1
+            $0.hasNextContents = false
+            $0.contentsLoadState = .loaded
+        }
+
+        XCTAssertEqual(store.state.photoViewer?.urls, photos)
+    }
+
+    func test_닫으면_뷰어만_닫히고_사진_줄_상태는_그대로다() async {
+        let photos = Self.photos
+        let store = TestStore(initialState: photoState(photos)) {
+            PlaceDetailFeature()
+        }
+
+        await store.send(.photoTapped(0)) {
+            $0.photoViewer = PlacePhotoViewerState(urls: photos, currentIndex: 0)
+        }
+        await store.send(.photoViewerPageChanged(2)) {
+            $0.photoViewer?.currentIndex = 2
+        }
+        await store.send(.photoViewerDismissed) {
+            $0.photoViewer = nil
+        }
     }
 }

@@ -8,6 +8,7 @@ final class PlaceDTOMapperTests: XCTestCase {
 
     private func detailDTO(
         placeId: Int? = 42,
+        category: String? = nil,
         categoryCode: String? = "CAFE",
         categoryName: String = "카페",
         roadAddress: String? = "서울 성동구 아차산로 1",
@@ -23,7 +24,7 @@ final class PlaceDTOMapperTests: XCTestCase {
             roadAddress: roadAddress,
             latitude: 37.5,
             longitude: 127.0,
-            category: nil,
+            category: category,
             categoryCode: categoryCode,
             categoryName: categoryName,
             phone: "02-000-0000",
@@ -123,6 +124,40 @@ final class PlaceDTOMapperTests: XCTestCase {
             "https://example.com/a.jpg",
         ])
         XCTAssertNil(place.roadAddress)
+    }
+
+    func test_상세의_카카오_분류_경로에서_세부_분류를_옮긴다() {
+        // 경로마다의 결과는 PlaceDTOMapperFieldTests 가 본다. 여기서는 상세 변환이 그 값을 싣는지만 본다
+        let detail = PlaceDTOMapper.toDomain(detailDTO(category: "음식점 > 카페 > 커피전문점"))
+        XCTAssertEqual(detail.detailCategory, "커피전문점")
+    }
+
+    func test_저장_목록의_카카오_분류_경로가_null이어도_읽는다() throws {
+        let json = Data("""
+        {
+          "memberId": 1,
+          "placeId": 42,
+          "kakaoPlaceId": "998877",
+          "name": "성수 카페",
+          "address": "서울 성동구 성수동",
+          "roadAddress": null,
+          "latitude": 37.5,
+          "longitude": 127.0,
+          "category": null,
+          "categoryName": "카페",
+          "ownershipStatus": "MINE",
+          "alias": null,
+          "savedAt": "2026-08-17T01:27:55.129814",
+          "thumbnailUrl": null,
+          "imageUrls": [],
+          "savedMemberCount": 3
+        }
+        """.utf8)
+
+        let dto = try JSONDecoder().decode(SavedPlaceResponseDTO.self, from: json)
+
+        XCTAssertNil(dto.category)
+        XCTAssertEqual(PlaceDTOMapper.toDomain(dto).place.category, .cafe)
     }
 
     func test_검색_항목의_카테고리와_사진을_옮기고_빈_도로명은_없음으로_읽는다() throws {

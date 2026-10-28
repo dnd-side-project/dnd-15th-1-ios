@@ -39,7 +39,8 @@ enum PlaceDTOMapper {
             isSaved: dto.savedByMe,
             ownership: dto.ownershipStatus.flatMap { ownership($0) },
             phone: dto.phone,
-            kakaoPlaceURL: dto.kakaoPlaceUrl.flatMap(URL.init(string:))
+            kakaoPlaceURL: dto.kakaoPlaceUrl.flatMap(URL.init(string:)),
+            detailCategory: detailCategory(dto.category)
         )
     }
 
@@ -158,6 +159,18 @@ enum PlaceDTOMapper {
     // 여기서 빈 문자열도 nil 로 합쳐 둔다. 코스·게시글·가져오기 매퍼도 이 함수 하나를 쓴다
     static func roadAddress(_ raw: String?) -> String? {
         raw.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// 카카오 분류 경로(`음식점 > 카페 > 커피전문점`)에서 세부 분류 하나를 고른다.
+    /// 셋째 단계가 있으면 셋째, 없으면 둘째다. 넷째 단계는 대개 상호명이라 쓰지 않는다.
+    /// 1단계뿐이거나 비었거나 없으면 nil 이다. 각 단계의 앞뒤 공백은 버린다
+    static func detailCategory(_ path: String?) -> String? {
+        let steps = (path ?? "")
+            .split(separator: ">")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard steps.count >= 2 else { return nil }
+        return steps[min(steps.count, 3) - 1]
     }
 
     // "2026-08-17T01:27:55.129814" 처럼 타임존 없는 형식이라 초 단위까지만 파싱.

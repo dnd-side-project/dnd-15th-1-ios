@@ -7,13 +7,14 @@ import ComposableArchitecture
 import CoreUserAnalytics
 import Domain
 import SharedDesignSystem
+import SharedUtils
 import SwiftUI
 import ThirdParty
 
 public struct PlaceDetailView: View {
     public let store: StoreOf<PlaceDetailFeature>
 
-    /// 카카오맵을 여는 통로. 앱이 없으면 웹으로 보낸다
+    /// 지도 앱을 여는 통로. 앱이 없으면 그 지도의 웹으로 보낸다
     @Environment(\.openURL) private var openURL
 
     /// 탭바 + 홈 인디케이터. `ignoresSafeArea` 안쪽이라 여기서 재면 0 이다
@@ -40,6 +41,12 @@ public struct PlaceDetailView: View {
             content
         }
         .onAppear { store.send(.onAppear) }
+        .bottomSheet(isPresented: mapSheetBinding) {
+            mapSheet
+        }
+        .fullScreenCover(isPresented: photoViewerBinding) {
+            photoViewer
+        }
     }
 }
 
@@ -58,41 +65,104 @@ private extension PlaceDetailView {
 
                     subtitle
                 }
+                // 시안 「text area」 만 위아래 5 를 둔다. 닫기 버튼은 줄 맨 위에 붙는다
+                .padding(.vertical, PlaceDetailMetric.headerVerticalPadding)
 
                 Spacer(minLength: Spacing.s8)
 
-                bookmarkButton
                 closeButton
             }
-            .padding(.leading, Spacing.s20)
-            .padding(.trailing, Spacing.s12)
-            .padding(.vertical, PlaceDetailMetric.headerVerticalPadding)
 
-            mapButton
+            HStack(spacing: 0) {
+                bookmarkButton
+                Spacer(minLength: Spacing.s8)
+                mapButton
+            }
         }
+        .padding(.leading, Spacing.s20)
+        .padding(.trailing, Spacing.s12)
     }
 
-    /// `장소 카테고리 · 저장한 사람 124` — 숫자만 강조색이다. 저장 수를 모르면 카테고리만 보인다
+    /// `둘픽 분류 · 세부 분류 · 저장한 사람 124` — 숫자만 강조색이다. 저장 수를 모르면 그 조각이 빠진다.
+    /// 한 줄을 넘으면 「저장한 사람 N」 을 다음 줄로 내리고, 첫 줄도 넘치면 세부 분류 끝을 말줄임한다
     var subtitle: some View {
-        HStack(spacing: 0) {
-            Text(store.place.category.displayName)
-                .foregroundStyle(Color.textTertiary)
-            if let bookmarkCount = store.bookmarkCount {
-                Text(" · 저장한 사람 ")
-                    .foregroundStyle(Color.textTertiary)
-                Text("\(bookmarkCount)")
-                    .foregroundStyle(Color.brandPrimary)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 0) {
+                categoryLine
+                if let bookmarkCount = store.bookmarkCount {
+                    Text(" · ")
+                        .foregroundStyle(Color.textTertiary)
+                    bookmarkLine(bookmarkCount)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
+                categoryLine
+                if let bookmarkCount = store.bookmarkCount {
+                    bookmarkLine(bookmarkCount)
+                }
             }
         }
         .typography(.body2M)
     }
 
-    var bookmarkButton: some View {
-        headerIconButton(
-            icon: store.isBookmarked ? Image.bookmarkFilled : Image.bookmarkEmpty
-        ) {
-            store.send(.bookmarkTapped)
+    /// 「둘픽 분류 · 세부 분류」. 넘치면 세부 분류 끝만 말줄임한다
+    var categoryLine: some View {
+        HStack(spacing: 0) {
+            Text(store.place.category.displayName)
+                .fixedSize()
+            if let detail = store.detailCategoryText {
+                Text(" · \(detail)")
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
+        .foregroundStyle(Color.textTertiary)
+    }
+
+    /// 「저장한 사람 N」. 글자와 숫자가 갈라지지 않게 한 덩어리로 둔다
+    func bookmarkLine(_ count: Int) -> some View {
+        HStack(spacing: 0) {
+            Text("저장한 사람 ")
+                .foregroundStyle(Color.textTertiary)
+            Text("\(count)")
+                .foregroundStyle(Color.brandPrimary)
+        }
+        .fixedSize()
+    }
+
+    /// 저장 전에는 빈 아이콘을 회색으로 칠하고, 저장 뒤에는 분홍 채움 아이콘을 원래 색으로 쓴다
+    /// 지도로 보기와 함께 `Button` 대신 탭 제스처를 쓴다. `Button` 은 시트를 끌어 올린 뒤 손을 떼도 눌린다
+    var bookmarkButton: some View {
+        HStack(spacing: Spacing.s4) {
+            Group {
+                if store.isBookmarked {
+                    Image.bookmarkFilled
+                        .resizable()
+                } else {
+                    Image.bookmarkEmpty
+                        .renderingMode(.template)
+                        .resizable()
+                        .foregroundStyle(Color.textTertiary)
+                }
+            }
+            .frame(width: 16, height: 16)
+
+            Text("저장")
+                .typography(.caption1M)
+                .foregroundStyle(Color.textSecondary)
+        }
+        .padding(.horizontal, Spacing.s16)
+        .frame(height: 32)
+        .background(Color.commonWhite)
+        .overlay {
+            RoundedRectangle(cornerRadius: PlaceDetailMetric.buttonCornerRadius)
+                .stroke(Color.gray200, lineWidth: 1)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { store.send(.bookmarkTapped) }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 
     var closeButton: some View {
@@ -101,55 +171,119 @@ private extension PlaceDetailView {
         }
     }
 
+    /// 저장·지도로 보기와 같은 까닭으로 `Button` 대신 탭 제스처를 쓴다
     func headerIconButton(icon: Image, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            icon
-                .resizable()
-                .frame(width: 24, height: 24)
-                .padding(8)
-                .frame(
-                    width: PlaceDetailMetric.headerActionSize,
-                    height: PlaceDetailMetric.headerActionSize
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(StaticButtonStyle())
+        icon
+            .renderingMode(.template)
+            .resizable()
+            .frame(width: 24, height: 24)
+            .foregroundStyle(Color.textTertiary)
+            .padding(8)
+            .frame(
+                width: PlaceDetailMetric.headerActionSize,
+                height: PlaceDetailMetric.headerActionSize
+            )
+            .contentShape(Rectangle())
+            .onTapGesture(perform: action)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
     }
 
     var mapButton: some View {
-        Button {
-            if let appURL = store.kakaoMapAppURL {
-                let webURL = store.kakaoMapWebURL
-                openURL(appURL) { accepted in
-                    guard !accepted, let webURL else { return }
-                    openURL(webURL)
-                }
-            } else if let webURL = store.kakaoMapWebURL {
-                openURL(webURL)
-            }
-        } label: {
-            HStack(spacing: Spacing.s4) {
-                Image.mapPin
-                    .renderingMode(.template)
-                    .resizable()
-                    .frame(width: 16, height: 16)
-                Text("지도")
-                    .typography(.caption1M)
-            }
-            .foregroundStyle(store.canOpenKakaoMap ? Color.textSecondary : Color.textDisabled)
-            .frame(width: PlaceDetailMetric.mapButtonWidth, height: 32)
-            .background(Color.commonWhite)
-            .overlay {
-                RoundedRectangle(cornerRadius: PlaceDetailMetric.buttonCornerRadius)
-                    .stroke(
-                        store.canOpenKakaoMap ? Color.gray200 : Color.gray100,
-                        lineWidth: 1
-                    )
-            }
+        HStack(spacing: Spacing.s4) {
+            Image.map
+                .renderingMode(.template)
+                .resizable()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(Color.gray50)
+            Text("지도로 보기")
+                .typography(.caption1M)
+                .foregroundStyle(Color.commonWhite)
         }
-        .buttonStyle(StaticButtonStyle())
-        .disabled(!store.canOpenKakaoMap)
-        .padding(.leading, Spacing.s20)
+        .padding(.horizontal, Spacing.s16)
+        .frame(height: 32)
+        .background(
+            Color.gray900,
+            in: RoundedRectangle(cornerRadius: PlaceDetailMetric.buttonCornerRadius)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: PlaceDetailMetric.buttonCornerRadius))
+        .onTapGesture { store.send(.mapButtonTapped) }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+// MARK: - 지도 시트
+
+private extension PlaceDetailView {
+    /// 바깥을 눌러 닫으면 `false` 가 들어온다. 줄을 고르면 리듀서가 닫는다
+    var mapSheetBinding: Binding<Bool> {
+        Binding(
+            get: { store.isMapSheetPresented },
+            set: { isPresented in
+                if !isPresented { store.send(.mapSheetDismissed) }
+            }
+        )
+    }
+
+    var mapSheet: some View {
+        PlaceMapSheet(
+            title: store.title,
+            isAlias: store.alias != nil,
+            onSelect: { openMap($0) },
+            onClose: { store.send(.mapSheetDismissed) }
+        )
+        // 장소 상세 층이 아래 안전 영역을 지워서, 시트가 홈 표시줄을 스스로 비키지 못한다
+        .padding(.bottom, bottomInset)
+    }
+
+    /// 시트를 닫고 고른 지도 앱을 연다. 앱이 없어 열기가 실패하면 같은 지도의 웹을 연다
+    func openMap(_ app: PlaceMapApp) {
+        let link = store.state.mapLink(for: app, bundleID: AppInfo.bundleID)
+        store.send(.mapAppTapped(app))
+        guard let link else { return }
+        openURL(link.appURL) { accepted in
+            guard !accepted else { return }
+            openURL(link.webURL)
+        }
+    }
+}
+
+// MARK: - 사진 뷰어
+
+private extension PlaceDetailView {
+    var photoViewerBinding: Binding<Bool> {
+        Binding(
+            get: { store.photoViewer != nil },
+            set: { isPresented in
+                if !isPresented { store.send(.photoViewerDismissed) }
+            }
+        )
+    }
+
+    @ViewBuilder
+    var photoViewer: some View {
+        if let viewer = store.photoViewer {
+            PlacePhotoViewer(
+                urls: viewer.urls,
+                initialIndex: viewer.currentIndex,
+                title: store.place.name,
+                onPageChanged: { store.send(.photoViewerPageChanged($0)) },
+                onClose: { sendWithoutAnimation(.photoViewerDismissed) }
+            )
+            .ignoresSafeArea()
+            .presentationBackground(.clear)
+            // 시안은 검은 배경 위 흰 상태 표시줄이다. 상태 표시줄은 덮개가 정하고 UIKit 쪽 스타일은 묻지 않는다.
+            // 이 모드는 이 덮개에만 걸리고, 닫히면 원래대로 돌아온다
+            .preferredColorScheme(.dark)
+        }
+    }
+
+    /// 사진 뷰어는 스스로 흐려지며 열리고 닫힌다. 전체 화면 덮개의 밀어 올리기를 끈다
+    func sendWithoutAnimation(_ action: PlaceDetailFeature.Action) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        store.send(action, transaction: transaction)
     }
 }
 
@@ -162,7 +296,10 @@ private extension PlaceDetailView {
             header
 
             if hasPhotos {
-                PlacePhotoStrip(urls: store.place.thumbnailURLs)
+                PlacePhotoStrip(
+                    urls: store.place.thumbnailURLs,
+                    onTap: { sendWithoutAnimation(.photoTapped($0)) }
+                )
                     .padding(.bottom, Spacing.s12)
             }
 
@@ -198,26 +335,28 @@ private extension PlaceDetailView {
     /// 시안 a07. 화살표를 누르면 `[지번] …` 이 한 줄 아래로 붙는다
     var addressRow: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            Button { store.send(.addressToggled) } label: {
-                HStack(alignment: .center, spacing: Spacing.s8) {
-                    Image.mapPin
-                        .renderingMode(.template)
-                        .resizable()
-                        .frame(width: 20, height: 20)
+            // 저장·지도로 보기와 같은 까닭으로 `Button` 대신 탭 제스처를 쓴다
+            HStack(alignment: .center, spacing: Spacing.s8) {
+                Image.mapPin
+                    .renderingMode(.template)
+                    .resizable()
+                    .frame(width: 20, height: 20)
 
-                    Text(store.place.roadAddress ?? "")
-                        .typography(.body2M)
-                        .multilineTextAlignment(.leading)
+                Text(store.place.roadAddress ?? "")
+                    .typography(.body2M)
+                    .multilineTextAlignment(.leading)
 
-                    (store.isAddressExpanded ? Image.chevronUp : Image.chevronDown)
-                        .renderingMode(.template)
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                }
-                .foregroundStyle(Color.textSecondary)
-                .padding(.vertical, Spacing.s4)
+                (store.isAddressExpanded ? Image.chevronUp : Image.chevronDown)
+                    .renderingMode(.template)
+                    .resizable()
+                    .frame(width: 16, height: 16)
             }
-            .buttonStyle(StaticButtonStyle())
+            .foregroundStyle(Color.textSecondary)
+            .padding(.vertical, Spacing.s4)
+            .contentShape(Rectangle())
+            .onTapGesture { store.send(.addressToggled) }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
 
             if store.isAddressExpanded {
                 Text("[지번] \(store.place.address)")
@@ -318,7 +457,6 @@ private enum PlaceDetailMetric {
     static let headerVerticalPadding: CGFloat = 5
     static let headerActionSize: CGFloat = 40
     static let buttonCornerRadius: CGFloat = 8
-    static let mapButtonWidth: CGFloat = 75
     static let moreButtonWidth: CGFloat = 66
     static let jibunLeading: CGFloat = 28
 }
