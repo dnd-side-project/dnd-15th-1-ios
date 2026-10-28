@@ -15,6 +15,11 @@ public struct CourseClient: Sendable {
     /// 코스에 담을 수 있는 저장 장소. 장소 번호가 늘 있다
     public var coursePlaces: @Sendable () async throws -> [SavedPlace]
 
+    /// 커플이 저장한 장소를 검색어로 찾는다. 장소명·별칭·주소에 부분 일치한다.
+    /// 검색어가 nil 이거나 비면 거르지 않는다. 한 페이지 10건이고 page 는 0 부터 100 까지다.
+    /// 커플이 없으면 notFound 다
+    public var searchCoursePlaces: @Sendable (_ query: String?, _ page: Int) async throws -> Page<SavedPlace>
+
     /// GET /api/v1/date-courses/{dateCourseId}
     public var course: @Sendable (_ id: String) async throws -> DateCourse
 

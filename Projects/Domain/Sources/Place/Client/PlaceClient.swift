@@ -6,8 +6,9 @@ public struct PlaceClient: Sendable {
     public var savedPlaces: @Sendable () async throws -> [SavedPlace]
     /// 최근에 저장한 순서로 size 개. 홈 미리보기가 쓴다
     public var recentSavedPlaces: @Sendable (_ size: Int) async throws -> [SavedPlace]
-    /// 서버가 한 페이지 10건을 고정으로 준다. page 는 0 부터 44 까지다
-    public var searchPlaces: @Sendable (_ query: String, _ page: Int) async throws -> PlacePage
+    /// 서버가 한 페이지 10건을 고정으로 준다. page 는 0 부터 44 까지다.
+    /// 커플 가운데 누가 저장했는지가 함께 온다. 별칭은 오지 않는다
+    public var searchPlaces: @Sendable (_ query: String, _ page: Int) async throws -> Page<PlaceSearchResult>
     public var savePlace: @Sendable (
         _ kakaoPlaceID: String, _ query: String, _ alias: String?, _ memo: String?
     ) async throws -> SavedPlace

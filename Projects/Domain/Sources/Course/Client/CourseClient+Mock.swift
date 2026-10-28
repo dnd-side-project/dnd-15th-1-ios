@@ -16,6 +16,18 @@ public extension CourseClient {
             )
         },
         coursePlaces: { SavedPlace.mocks },
+        searchCoursePlaces: { query, _ in
+            let keyword = (query ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !keyword.isEmpty else { return Page(items: SavedPlace.mocks, hasNext: false) }
+
+            return Page(
+                items: SavedPlace.mocks.filter {
+                    $0.place.name.localizedCaseInsensitiveContains(keyword)
+                        || ($0.alias?.localizedCaseInsensitiveContains(keyword) ?? false)
+                },
+                hasNext: false
+            )
+        },
         course: { id in
             mockCourse(
                 id: id,
