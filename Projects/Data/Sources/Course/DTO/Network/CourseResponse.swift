@@ -62,6 +62,16 @@ struct DateCoursePlacePoolResponseDTO: Decodable, Sendable {
     let places: [DateCoursePlaceCandidateResponseDTO]
 }
 
+/// 코스 장소 검색 한 페이지(GET /date-courses/places/search). 항목은 코스 후보와 같은 모양이다
+struct DateCoursePlaceSearchPageResponseDTO: Decodable, Sendable {
+    let places: [DateCoursePlaceCandidateResponseDTO]
+    /// 0 부터 센다
+    let page: Int
+    /// 지금 화면이 안 읽는다. 서버가 한 페이지 10건을 준다
+    let size: Int
+    let hasNext: Bool
+}
+
 /// `region` · `savedAt` · `category`(카카오 분류 단계값) 는 담지 않는다.
 /// 지금 코스 장소 선택 화면이 안 읽는다
 struct DateCoursePlaceCandidateResponseDTO: Decodable, Sendable {

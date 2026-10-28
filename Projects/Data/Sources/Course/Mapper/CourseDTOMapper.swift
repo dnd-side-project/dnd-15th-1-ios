@@ -78,6 +78,18 @@ enum CourseDTOMapper {
         )
     }
 
+    private static let maxSearchPage = 100
+
+    /// 코스 장소 검색 한 페이지. 항목은 코스 후보와 같아 같은 변환을 쓴다
+    static func toSearchPage(_ dto: DateCoursePlaceSearchPageResponseDTO) -> Page<SavedPlace> {
+        Page(
+            items: dto.places.map { toDomain($0) },
+            // 명세의 page 최대값이 100 이다. 101 을 요청하면 서버가 400 을 준다.
+            // 여기서 끊어 화면이 서버 제약을 몰라도 되게 한다
+            hasNext: dto.hasNext && dto.page < maxSearchPage
+        )
+    }
+
     private static func mapPlace(_ dto: DateCoursePlaceResponseDTO) -> Place {
         Place(
             placeID: String(dto.placeId),
