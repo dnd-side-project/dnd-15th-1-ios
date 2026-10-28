@@ -18,6 +18,7 @@ public extension Image {
     static var bookmarkEmpty: Image { Asset.bookmarkEmpty.swiftUIImage }
     static var bookmarkFilled: Image { Asset.bookmarkFilled.swiftUIImage }
     static var bookmarkFilledBlack: Image { Asset.bookmarkFilledBlack.swiftUIImage }
+    static var bus: Image { Asset.bus.swiftUIImage }
     static var calendar: Image { Asset.calendar.swiftUIImage }
     static var calendarHeart: Image { Asset.calendarHeart.swiftUIImage }
     static var cancel: Image { Asset.cancel.swiftUIImage }
