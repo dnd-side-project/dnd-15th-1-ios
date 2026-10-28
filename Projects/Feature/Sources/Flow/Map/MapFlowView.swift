@@ -100,7 +100,7 @@ private extension MapFlowView {
             }
         }
         // 탭바는 저장한 장소 시트일 때만 보인다. 나머지 다섯은 숨긴다
-        // (분해 문서 `2026-08-13-map-course-ui-split.md:194-200` 표가 SSOT)
+        // (분해 문서 `2026-08-13-map-course-ui-split.md:213-220` 표가 SSOT)
         .toolbar(isTabBarShown ? .automatic : .hidden, for: .tabBar)
         // 키보드 영역까지 지운 지도 층 밖에 건다. 안에 걸면 저장 버튼이 키보드에 가린다
         .bottomSheet(

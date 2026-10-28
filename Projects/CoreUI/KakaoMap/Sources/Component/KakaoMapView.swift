@@ -13,6 +13,9 @@ public struct KakaoMapView: View {
     public var userLocation: Coordinate?
     public var onPinTap: (String) -> Void
     public var onMapTap: () -> Void
+    /// 사용자가 손으로 지도를 움직이기 시작하면 불린다. 밀기 · 확대 · 축소 · 회전 · 기울이기 · 두 번 탭 모두다.
+    /// 앱이 카메라를 옮길 때는 안 불린다. 한 손짓에 여러 번 올 수 있다
+    public var onUserGestureBegan: () -> Void
     /// 접힘 시트 윗면의 화면 전체(global) 좌표 y.
     /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 `focusRatio` 지점에 놓는다.
     /// `0` 이면 화면 한가운데에 그대로 둔다
@@ -25,6 +28,7 @@ public struct KakaoMapView: View {
         userLocation: Coordinate? = nil,
         onPinTap: @escaping (String) -> Void = { _ in },
         onMapTap: @escaping () -> Void = {},
+        onUserGestureBegan: @escaping () -> Void = {},
         collapsedSheetTop: CGFloat = 0
     ) {
         _camera = camera
@@ -33,6 +37,7 @@ public struct KakaoMapView: View {
         self.userLocation = userLocation
         self.onPinTap = onPinTap
         self.onMapTap = onMapTap
+        self.onUserGestureBegan = onUserGestureBegan
         self.collapsedSheetTop = collapsedSheetTop
     }
 
@@ -44,6 +49,7 @@ public struct KakaoMapView: View {
             userLocation: userLocation,
             onPinTap: onPinTap,
             onMapTap: onMapTap,
+            onUserGestureBegan: onUserGestureBegan,
             collapsedSheetTop: collapsedSheetTop
         )
     }
@@ -60,6 +66,8 @@ struct KakaoMapRepresentable: UIViewRepresentable {
     var userLocation: Coordinate?
     var onPinTap: (String) -> Void
     var onMapTap: () -> Void
+    /// 사용자가 손으로 지도를 움직이기 시작하면 불린다. 앱이 옮긴 이동에는 안 불린다
+    var onUserGestureBegan: () -> Void
     /// 접힘 시트 윗면의 화면 전체(global) 좌표 y.
     /// 이 뷰가 화면 전체를 덮는다고 가정한다. 목표 좌표를 이 값의 `focusRatio` 지점에 놓는다.
     /// `0` 이면 화면 한가운데에 그대로 둔다
@@ -72,6 +80,7 @@ struct KakaoMapRepresentable: UIViewRepresentable {
         userLocation: Coordinate? = nil,
         onPinTap: @escaping (String) -> Void = { _ in },
         onMapTap: @escaping () -> Void = {},
+        onUserGestureBegan: @escaping () -> Void = {},
         collapsedSheetTop: CGFloat = 0
     ) {
         _camera = camera
@@ -80,6 +89,7 @@ struct KakaoMapRepresentable: UIViewRepresentable {
         self.userLocation = userLocation
         self.onPinTap = onPinTap
         self.onMapTap = onMapTap
+        self.onUserGestureBegan = onUserGestureBegan
         self.collapsedSheetTop = collapsedSheetTop
     }
 
@@ -99,6 +109,7 @@ struct KakaoMapRepresentable: UIViewRepresentable {
 
         coordinator.onPinTap = onPinTap
         coordinator.onMapTap = onMapTap
+        coordinator.onUserGestureBegan = onUserGestureBegan
         coordinator.onCameraChanged = { binding.wrappedValue = $0 }
         coordinator.apply(
             camera: camera,
@@ -123,6 +134,7 @@ extension KakaoMapRepresentable {
     final class Coordinator: NSObject {
         var onPinTap: (String) -> Void = { _ in }
         var onMapTap: () -> Void = {}
+        var onUserGestureBegan: () -> Void = {}
         var onCameraChanged: (MapCamera) -> Void = { _ in }
 
         private var controller: KMController?
@@ -327,30 +339,6 @@ extension KakaoMapRepresentable {
             }
         }
 
-        private func drawUserLocation(_ map: KakaoMap) {
-            let manager = map.getLabelManager()
-            guard let layer = manager.getLabelLayer(layerID: Layout.userLocationLayerID) else {
-                Logger.shared.error(
-                    "사용자 위치 레이어 조회 실패. layer=\(Layout.userLocationLayerID)",
-                    category: .feature
-                )
-                return
-            }
-
-            layer.clearAllItems()
-
-            guard let userLocation = desiredUserLocation else { return }
-
-            registerUserLocationStyleIfNeeded(manager: manager)
-
-            let options = PoiOptions(
-                styleID: Layout.userLocationStyleID,
-                poiID: Layout.userLocationStyleID
-            )
-            options.clickable = false
-            layer.addPoi(option: options, at: userLocation.mapPoint)?.show()
-        }
-
         private func registerPinStyleIfNeeded(
             pin: MapPin,
             manager: LabelManager
@@ -374,26 +362,6 @@ extension KakaoMapRepresentable {
                 )
             )
             registeredPoiStyleIDs.insert(styleID)
-        }
-
-        private func registerUserLocationStyleIfNeeded(manager: LabelManager) {
-            guard !registeredPoiStyleIDs.contains(Layout.userLocationStyleID) else { return }
-
-            manager.addPoiStyle(
-                PoiStyle(
-                    styleID: Layout.userLocationStyleID,
-                    styles: [
-                        PerLevelPoiStyle(
-                            iconStyle: PoiIconStyle(
-                                symbol: userLocationImage(),
-                                anchorPoint: CGPoint(x: 0.5, y: 0.5)
-                            ),
-                            level: 0
-                        ),
-                    ]
-                )
-            )
-            registeredPoiStyleIDs.insert(Layout.userLocationStyleID)
         }
 
         fileprivate func mapDidBecomeReady() {
@@ -540,6 +508,54 @@ private extension KakaoMapRepresentable.Coordinator {
     }
 }
 
+// MARK: - 현재위치
+
+private extension KakaoMapRepresentable.Coordinator {
+    func drawUserLocation(_ map: KakaoMap) {
+        let manager = map.getLabelManager()
+        guard let layer = manager.getLabelLayer(layerID: KakaoMapRepresentable.Layout.userLocationLayerID) else {
+            Logger.shared.error(
+                "사용자 위치 레이어 조회 실패. layer=\(KakaoMapRepresentable.Layout.userLocationLayerID)",
+                category: .feature
+            )
+            return
+        }
+
+        layer.clearAllItems()
+
+        guard let userLocation = desiredUserLocation else { return }
+
+        registerUserLocationStyleIfNeeded(manager: manager)
+
+        let options = PoiOptions(
+            styleID: KakaoMapRepresentable.Layout.userLocationStyleID,
+            poiID: KakaoMapRepresentable.Layout.userLocationStyleID
+        )
+        options.clickable = false
+        layer.addPoi(option: options, at: userLocation.mapPoint)?.show()
+    }
+
+    func registerUserLocationStyleIfNeeded(manager: LabelManager) {
+        guard !registeredPoiStyleIDs.contains(KakaoMapRepresentable.Layout.userLocationStyleID) else { return }
+
+        manager.addPoiStyle(
+            PoiStyle(
+                styleID: KakaoMapRepresentable.Layout.userLocationStyleID,
+                styles: [
+                    PerLevelPoiStyle(
+                        iconStyle: PoiIconStyle(
+                            symbol: userLocationImage(),
+                            anchorPoint: CGPoint(x: 0.5, y: 0.5)
+                        ),
+                        level: 0
+                    ),
+                ]
+            )
+        )
+        registeredPoiStyleIDs.insert(KakaoMapRepresentable.Layout.userLocationStyleID)
+    }
+}
+
 // MARK: - 카메라
 
 private extension KakaoMapRepresentable.Coordinator {
@@ -660,13 +676,30 @@ extension KakaoMapRepresentable.Coordinator: @preconcurrency KakaoMapEventDelega
         onMapTap()
     }
 
+    func cameraWillMove(kakaoMap: KakaoMap, by: MoveBy) {
+        // 우리가 `moveCamera` 로 옮기는 이동은 손짓이 아니다. 받으면 핀만 눌러도 시트가 내려간다
+        guard KakaoMapRepresentable.isUserMove(by) else { return }
+
+        onUserGestureBegan()
+    }
+
     func cameraDidStopped(kakaoMap: KakaoMap, by: MoveBy) {
         // `.notUserAction` 은 우리가 `moveCamera` 로 옮긴 결과다.
         // 그대로 받으면 화면 중심을 역산한 값이 State 를 덮고 `.cameraChanged` 가 한 번 더 돈다.
         // 사용자가 손으로 민 경우만 되돌려준다
-        guard by != .notUserAction else { return }
+        guard KakaoMapRepresentable.isUserMove(by) else { return }
 
         reportCamera(of: kakaoMap)
+    }
+}
+
+// MARK: - 이동 원인
+
+extension KakaoMapRepresentable {
+    /// 사용자가 손으로 옮긴 이동인지.
+    /// 앱이 `animateCamera` 로 옮긴 이동은 SDK 가 `.notUserAction` 으로 보낸다
+    static func isUserMove(_ by: MoveBy) -> Bool {
+        by != .notUserAction
     }
 }
 
