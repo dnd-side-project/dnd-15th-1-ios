@@ -32,6 +32,7 @@ public extension Image {
     static var clock: Image { Asset.clock.swiftUIImage }
     static var edit: Image { Asset.edit.swiftUIImage }
     static var error: Image { Asset.error.swiftUIImage }
+    static var errorGray: Image { Asset.errorGray.swiftUIImage }
     static var explore: Image { Asset.explore.swiftUIImage }
     static var heart: Image { Asset.heart.swiftUIImage }
     static var heartBordered: Image { Asset.heartBordered.swiftUIImage }
