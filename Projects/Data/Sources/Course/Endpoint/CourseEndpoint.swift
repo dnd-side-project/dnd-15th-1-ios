@@ -53,6 +53,8 @@ enum CourseEndpoint: APIEndpoint {
         }
     }
 
+    // 목록 · 검색 모두 region · category 를 보내지 않는다. 지역 필터 화면이 없고,
+    // 카테고리 · 저장자는 화면이 받은 목록과 검색 결과에서 직접 거른다
     var queryItems: [URLQueryItem] {
         switch self {
         case let .placeSearch(query, page):
@@ -69,8 +71,6 @@ enum CourseEndpoint: APIEndpoint {
         }
     }
 
-    // region · category 필터는 안 보낸다. 지역 필터 UI 를 안 만들고,
-    // 카테고리는 화면이 받아온 목록에서 직접 거른다
     var body: Data? {
         switch self {
         case let .create(request):

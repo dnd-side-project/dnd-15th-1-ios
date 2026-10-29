@@ -1039,6 +1039,17 @@ final class CoursePlacePickCameraTests: XCTestCase {
         }
     }
 
+    func test_검색_중에_목록을_다시_받아도_검색_결과가_아니라_받아_둔_목록의_첫_행으로_간다() async {
+        let candidates = PlaceFixtures.coursePlaceCandidates
+        let store = TestStore(initialState: searchedState(isFieldOpen: false)) {
+            CourseFeature()
+        }
+
+        await store.send(.coursePlacesResponse(.success(candidates))) {
+            $0.camera = .focusing(candidates[0].place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
+        }
+    }
+
     func test_장소_추가에_기존_장소가_없으면_첫_행으로_간다() async {
         let candidates = PlaceFixtures.coursePlaceCandidates
         let store = TestStore(initialState: CourseFeature.State(mode: .pick(existing: []))) {
@@ -1323,5 +1334,790 @@ final class CoursePlacePickUserLocationTests: XCTestCase {
 
         continuation.finish()
         await task.finish()
+    }
+}
+
+// MARK: - Search Fixture
+
+/// 받아 둔 목록(a·b·c)에 없는 장소. 목록을 받은 뒤 저장해 검색에만 나온다. 내가 저장한 음식점이다
+private let searchOnlyD = SavedPlace.candidateFixture(
+    id: "d",
+    latitude: 37.34,
+    longitude: 126.93,
+    category: .food,
+    ownership: .mine
+)
+
+/// 상대가 저장한 음식점
+private let searchOnlyE = SavedPlace.candidateFixture(
+    id: "e",
+    latitude: 37.35,
+    longitude: 126.94,
+    category: .food,
+    ownership: .partner
+)
+
+/// 둘이 저장한 카페
+private let searchOnlyF = SavedPlace.candidateFixture(
+    id: "f",
+    latitude: 37.36,
+    longitude: 126.95,
+    category: .cafe
+)
+
+/// a·b·c 를 받아 둔 화면에서 검색어를 넣고 결과를 받은 상태
+private func searchedState(
+    query: String = "칼국",
+    results: [SavedPlace] = [searchOnlyD],
+    isFieldOpen: Bool = true,
+    selected: [String] = [],
+    mode: CourseFeature.Mode = .create
+) -> CourseFeature.State {
+    var state = mapState(mode: mode, selected: selected)
+    state.search.isFieldOpen = isFieldOpen
+    state.search.query = query
+    state.search.results = results
+    state.search.foundPlaces = results
+    state.search.loadState = .loaded
+    return state
+}
+
+/// 받은 검색 요청을 "검색어#페이지" 로 적는다
+private func recordingSearch(
+    _ requested: LockIsolated<[String]>,
+    pages: [Int: Page<SavedPlace>]
+) -> @Sendable (String?, Int) async throws -> Page<SavedPlace> {
+    { query, page in
+        requested.withValue { $0.append("\(query ?? "nil")#\(page)") }
+        return pages[page] ?? Page(items: [], hasNext: false)
+    }
+}
+
+/// 받은 요청을 적고 `delay` 만큼 붙잡은 뒤 그 검색어의 결과를 준다. 응답 전에 끊기는지 볼 때 쓴다
+private func slowSearch(
+    _ requested: LockIsolated<[String]>,
+    clock: TestClock<Duration>,
+    delay: Duration = .seconds(1),
+    results: [String: [SavedPlace]]
+) -> @Sendable (String?, Int) async throws -> Page<SavedPlace> {
+    { query, page in
+        requested.withValue { $0.append("\(query ?? "nil")#\(page)") }
+        try await clock.sleep(for: delay)
+        return Page(items: results[query ?? ""] ?? [], hasNext: false)
+    }
+}
+
+/// 요청이 `count` 개 나갈 때까지 실제 시간으로 최대 1초 기다린다.
+/// 이펙트가 도는 스레드는 TestClock 이 앞당기지 못해, 바쁜 CI 에서도 버티게 10ms 씩 다시 본다
+private func waitForRequests(_ requested: LockIsolated<[String]>, count: Int) async {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(1))
+    while requested.value.count < count && ContinuousClock.now < deadline {
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    XCTAssertEqual(requested.value.count, count, "검색 요청 \(count)개가 1초 안에 나가야 한다")
+}
+
+// MARK: - Search Input
+
+@MainActor
+final class CoursePlaceSearchInputTests: XCTestCase {
+
+    func test_목록이_뜨기_전에는_검색칩을_눌러도_검색창이_안_열린다() async {
+        var loading = mapState()
+        loading.loadState = .loading
+        var failed = mapState()
+        failed.loadState = .failed
+        XCTAssertFalse(loading.isSearchAvailable)
+        XCTAssertFalse(failed.isSearchAvailable)
+        XCTAssertTrue(mapState().isSearchAvailable)
+
+        let store = TestStore(initialState: loading) { CourseFeature() }
+        await store.send(.searchChipTapped)
+
+        let failedStore = TestStore(initialState: failed) { CourseFeature() }
+        await failedStore.send(.searchChipTapped)
+    }
+
+    func test_목록이_뜬_뒤_검색칩을_누르면_검색창이_열린다() async {
+        let store = TestStore(initialState: mapState()) { CourseFeature() }
+
+        await store.send(.searchChipTapped) {
+            $0.search.isFieldOpen = true
+        }
+    }
+
+    func test_검색어를_치고_300ms_멈추면_공백을_뺀_검색어만_보내_찾는다() async {
+        let clock = TestClock()
+        let requested = LockIsolated<[String]>([])
+        var initial = mapState()
+        initial.search.isFieldOpen = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.courseClient.searchCoursePlaces = recordingSearch(
+                requested,
+                pages: [0: Page(items: [searchOnlyD], hasNext: false)]
+            )
+        }
+
+        await store.send(.searchQueryChanged("칼국 ")) {
+            $0.search.query = "칼국 "
+        }
+        await clock.advance(by: .milliseconds(299))
+        XCTAssertEqual(requested.value, [])
+
+        await clock.advance(by: .milliseconds(1))
+        await store.receive(\.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await store.receive(\.searchResponse.success) {
+            $0.search.results = [searchOnlyD]
+            $0.search.foundPlaces = [searchOnlyD]
+            $0.search.loadState = .loaded
+        }
+        XCTAssertEqual(requested.value, ["칼국#0"])
+        // 지도는 걸러진 결과만 그리고, 화면 위치는 그대로다
+        XCTAssertEqual(store.state.markers.map(\.id), ["d"])
+        XCTAssertEqual(store.state.camera, pannedCamera)
+    }
+
+    func test_검색어를_바꾸면_기다리던_검색을_끊고_마지막_검색어로만_찾는다() async {
+        let clock = TestClock()
+        let requested = LockIsolated<[String]>([])
+        var initial = mapState()
+        initial.search.isFieldOpen = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.courseClient.searchCoursePlaces = recordingSearch(
+                requested,
+                pages: [0: Page(items: [searchOnlyD], hasNext: false)]
+            )
+        }
+
+        await store.send(.searchQueryChanged("칼")) {
+            $0.search.query = "칼"
+        }
+        await clock.advance(by: .milliseconds(200))
+        await store.send(.searchQueryChanged("칼국")) {
+            $0.search.query = "칼국"
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await store.receive(\.searchResponse.success) {
+            $0.search.results = [searchOnlyD]
+            $0.search.foundPlaces = [searchOnlyD]
+            $0.search.loadState = .loaded
+        }
+        XCTAssertEqual(requested.value, ["칼국#0"])
+    }
+
+    func test_검색어를_지우면_서버를_부르지_않고_받아_둔_목록_전체로_돌아간다() async {
+        let store = TestStore(initialState: searchedState()) { CourseFeature() }
+
+        await store.send(.searchQueryChanged("  ")) {
+            $0.search.query = "  "
+            $0.search.results = []
+            $0.search.loadState = .idle
+        }
+        XCTAssertFalse(store.state.isSearching)
+        XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["a", "b", "c"])
+    }
+
+    func test_검색을_기다리는_중에_취소하면_서버를_부르지_않는다() async {
+        let clock = TestClock()
+        let requested = LockIsolated<[String]>([])
+        var initial = mapState()
+        initial.search.isFieldOpen = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.courseClient.searchCoursePlaces = recordingSearch(requested, pages: [:])
+        }
+
+        await store.send(.searchQueryChanged("칼국")) {
+            $0.search.query = "칼국"
+        }
+        await store.send(.searchCancelTapped) {
+            $0.search.isFieldOpen = false
+            $0.search.query = ""
+        }
+        await clock.advance(by: .milliseconds(300))
+        XCTAssertEqual(requested.value, [])
+    }
+
+    func test_검색어가_있는_채로_키보드가_내려가면_검색어_칩이_된다() async {
+        let store = TestStore(initialState: searchedState(query: "칼국수")) { CourseFeature() }
+
+        await store.send(.searchFieldDismissed) {
+            $0.search.isFieldOpen = false
+        }
+        XCTAssertTrue(store.state.isSearching)
+        XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["d"])
+    }
+
+    func test_빈_검색어로_키보드가_내려가면_검색칩으로_돌아간다() async {
+        var initial = mapState()
+        initial.search.isFieldOpen = true
+        initial.search.query = " "
+        let store = TestStore(initialState: initial) { CourseFeature() }
+
+        await store.send(.searchFieldDismissed) {
+            $0.search.isFieldOpen = false
+            $0.search.query = ""
+        }
+    }
+
+    func test_검색창이_닫힌_뒤_늦게_온_키보드_내려감은_무시한다() async {
+        let store = TestStore(initialState: searchedState(isFieldOpen: false)) { CourseFeature() }
+
+        await store.send(.searchFieldDismissed)
+    }
+
+    func test_취소를_누르면_검색을_풀고_받아_둔_목록_전체로_돌아간다() async {
+        var initial = searchedState()
+        initial.search.hasNext = true
+        initial.search.page = 2
+        let store = TestStore(initialState: initial) { CourseFeature() }
+
+        await store.send(.searchCancelTapped) {
+            $0.search.isFieldOpen = false
+            $0.search.query = ""
+            $0.search.results = []
+            $0.search.loadState = .idle
+            $0.search.page = 0
+            $0.search.hasNext = false
+        }
+        XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["a", "b", "c"])
+    }
+
+    func test_검색어_칩의_X를_누르면_검색을_풀고_받아_둔_목록_전체로_돌아간다() async {
+        let store = TestStore(initialState: searchedState(query: "칼국수", isFieldOpen: false)) {
+            CourseFeature()
+        }
+
+        await store.send(.searchChipClearTapped) {
+            $0.search.query = ""
+            $0.search.results = []
+            $0.search.loadState = .idle
+        }
+        XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["a", "b", "c"])
+    }
+
+    func test_검색어_칩을_누르면_검색어가_든_채로_검색창이_다시_열린다() async {
+        let store = TestStore(initialState: searchedState(query: "칼국수", isFieldOpen: false)) {
+            CourseFeature()
+        }
+
+        await store.send(.searchChipTapped) {
+            $0.search.isFieldOpen = true
+        }
+        XCTAssertEqual(store.state.search.query, "칼국수")
+        XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["d"])
+    }
+}
+
+// MARK: - Search Request
+
+/// 검색어가 바뀌는 사이 기다림 화면과, 돌던 요청을 끊는 것
+@MainActor
+final class CoursePlaceSearchRequestTests: XCTestCase {
+
+    func test_검색어를_바꾸면_기다리는_동안_앞_검색어의_빈_결과_대신_가짜_행을_보인다() async {
+        let clock = TestClock()
+        // 카페만 보는데 음식점만 와서 다음 페이지를 이어 부르던 중이다
+        var initial = searchedState(query: "칼국")
+        initial.selectedCategory = .cafe
+        initial.search.hasNext = true
+        initial.search.isLoadingMore = true
+        XCTAssertEqual(initial.listContent, .skeleton)
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+        }
+
+        await store.send(.searchQueryChanged("칼국수")) {
+            $0.search.query = "칼국수"
+            $0.search.hasNext = false
+            $0.search.isLoadingMore = false
+            $0.search.loadState = .idle
+        }
+        XCTAssertEqual(store.state.listContent, .skeleton)
+        await store.skipInFlightEffects()
+    }
+
+    func test_검색이_실패한_뒤_검색어를_바꾸면_기다리는_동안_가짜_행을_보인다() async {
+        let clock = TestClock()
+        var initial = searchedState(results: [])
+        initial.search.loadState = .failed
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+        }
+
+        await store.send(.searchQueryChanged("칼국수")) {
+            $0.search.query = "칼국수"
+            $0.search.loadState = .idle
+        }
+        XCTAssertEqual(store.state.listContent, .skeleton)
+        await store.skipInFlightEffects()
+    }
+
+    func test_다듬은_검색어가_같으면_다시_찾지_않는다() async {
+        let clock = TestClock()
+        let requested = LockIsolated<[String]>([])
+        var initial = searchedState(query: "칼국")
+        initial.search.hasNext = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.courseClient.searchCoursePlaces = recordingSearch(requested, pages: [:])
+        }
+
+        await store.send(.searchQueryChanged("칼국 ")) {
+            $0.search.query = "칼국 "
+        }
+        await store.send(.searchQueryChanged("칼국 "))
+        await clock.advance(by: .milliseconds(300))
+        XCTAssertEqual(requested.value, [])
+        XCTAssertEqual(store.state.listContent, .list)
+    }
+
+    func test_검색_요청이_도는_중에_검색어를_바꾸면_옛_응답을_버린다() async {
+        let clock = TestClock()
+        let requested = LockIsolated<[String]>([])
+        var initial = mapState()
+        initial.search.isFieldOpen = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            // 새 검색어의 300ms 기다림보다 빨리 끝나는 요청이다. 새 요청이 옛 요청을 덮기 전에 옛 응답이 온다
+            $0.courseClient.searchCoursePlaces = slowSearch(
+                requested,
+                clock: clock,
+                delay: .milliseconds(100),
+                results: ["칼국": [searchOnlyD], "칼국수": [searchOnlyE]]
+            )
+        }
+
+        await store.send(.searchQueryChanged("칼국")) {
+            $0.search.query = "칼국"
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await waitForRequests(requested, count: 1)
+
+        await store.send(.searchQueryChanged("칼국수")) {
+            $0.search.query = "칼국수"
+            $0.search.loadState = .idle
+        }
+        // 끊기지 않았다면 기다리는 사이 「칼국」 응답이 온다
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await clock.advance(by: .milliseconds(100))
+        await store.receive(\.searchResponse.success) {
+            $0.search.results = [searchOnlyE]
+            $0.search.foundPlaces = [searchOnlyE]
+            $0.search.loadState = .loaded
+        }
+        XCTAssertEqual(requested.value, ["칼국#0", "칼국수#0"])
+    }
+
+    func test_다음_페이지_요청이_도는_중에_검색어를_바꾸면_옛_응답을_버린다() async {
+        let clock = TestClock()
+        let requested = LockIsolated<[String]>([])
+        var initial = searchedState()
+        initial.search.hasNext = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.courseClient.searchCoursePlaces = slowSearch(
+                requested,
+                clock: clock,
+                results: ["칼국": [searchOnlyF], "칼국수": [searchOnlyE]]
+            )
+        }
+
+        await store.send(.searchReachedEnd) {
+            $0.search.isLoadingMore = true
+        }
+        await waitForRequests(requested, count: 1)
+
+        await store.send(.searchQueryChanged("칼국수")) {
+            $0.search.query = "칼국수"
+            $0.search.hasNext = false
+            $0.search.isLoadingMore = false
+            $0.search.loadState = .idle
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        // 끊기지 않았다면 여기서 「칼국」 의 다음 페이지 응답이 먼저 온다
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.searchResponse.success) {
+            $0.search.results = [searchOnlyE]
+            $0.search.foundPlaces = [searchOnlyD, searchOnlyE]
+            $0.search.loadState = .loaded
+        }
+        XCTAssertEqual(requested.value, ["칼국#1", "칼국수#0"])
+    }
+
+    func test_검색_요청이_도는_중에_취소하면_옛_응답을_버린다() async {
+        let clock = TestClock()
+        let requested = LockIsolated<[String]>([])
+        var initial = mapState()
+        initial.search.isFieldOpen = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.courseClient.searchCoursePlaces = slowSearch(
+                requested,
+                clock: clock,
+                results: ["칼국": [searchOnlyD]]
+            )
+        }
+
+        await store.send(.searchQueryChanged("칼국")) {
+            $0.search.query = "칼국"
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await waitForRequests(requested, count: 1)
+
+        await store.send(.searchCancelTapped) {
+            $0.search.isFieldOpen = false
+            $0.search.query = ""
+            $0.search.loadState = .idle
+        }
+        // 끊기지 않았다면 여기서 「칼국」 응답이 온다
+        await clock.advance(by: .seconds(1))
+        XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["a", "b", "c"])
+    }
+}
+
+// MARK: - Search Result
+
+@MainActor
+final class CoursePlaceSearchResultTests: XCTestCase {
+
+    func test_검색_결과에도_카테고리와_저장자와_코스에_있는_장소_빼기가_함께_걸린다() {
+        let takenA = ExistingCoursePlace(id: "a", category: .food, coordinate: candidateCoordinate("a"))
+        let candidates = PlaceFixtures.coursePlaceCandidates
+        var state = searchedState(
+            query: "카",
+            results: [candidates[0], candidates[1], searchOnlyD, searchOnlyE],
+            mode: .pick(existing: [takenA])
+        )
+        XCTAssertEqual(state.filteredPlaces.map(\.id), ["b", "d", "e"])
+
+        state.selectedOwnership = .mine
+        state.selectedCategory = .food
+        XCTAssertEqual(state.filteredPlaces.map(\.id), ["d"])
+    }
+
+    func test_앱이_걸러_한_페이지가_비면_다음_페이지를_이어_부른다() async {
+        let requested = LockIsolated<[String]>([])
+        var initial = searchedState(query: "카", results: [])
+        initial.search.loadState = .idle
+        initial.selectedCategory = .cafe
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.searchCoursePlaces = recordingSearch(
+                requested,
+                pages: [
+                    0: Page(items: [searchOnlyD], hasNext: true),
+                    1: Page(items: [searchOnlyF], hasNext: false),
+                ]
+            )
+        }
+
+        await store.send(.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await store.receive(\.searchResponse.success) {
+            $0.search.results = [searchOnlyD]
+            $0.search.foundPlaces = [searchOnlyD]
+            $0.search.hasNext = true
+            $0.search.loadState = .loaded
+            // 카페만 보는데 음식점 한 곳만 와서 보일 행이 없다
+            $0.search.isLoadingMore = true
+        }
+        await store.receive(\.searchMoreResponse.success) {
+            $0.search.results = [searchOnlyD, searchOnlyF]
+            $0.search.foundPlaces = [searchOnlyD, searchOnlyF]
+            $0.search.page = 1
+            $0.search.hasNext = false
+            $0.search.isLoadingMore = false
+        }
+        XCTAssertEqual(requested.value, ["카#0", "카#1"])
+        XCTAssertEqual(store.state.filteredPlaces.map(\.id), ["f"])
+    }
+
+    func test_검색_결과_끝에_닿으면_다음_페이지를_붙인다() async {
+        let requested = LockIsolated<[String]>([])
+        var initial = searchedState()
+        initial.search.hasNext = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.searchCoursePlaces = recordingSearch(
+                requested,
+                pages: [1: Page(items: [searchOnlyE], hasNext: false)]
+            )
+        }
+
+        await store.send(.searchReachedEnd) {
+            $0.search.isLoadingMore = true
+        }
+        await store.receive(\.searchMoreResponse.success) {
+            $0.search.results = [searchOnlyD, searchOnlyE]
+            $0.search.foundPlaces = [searchOnlyD, searchOnlyE]
+            $0.search.page = 1
+            $0.search.hasNext = false
+            $0.search.isLoadingMore = false
+        }
+        XCTAssertEqual(requested.value, ["칼국#1"])
+    }
+
+    func test_다음_페이지가_없으면_끝에_닿아도_부르지_않는다() async {
+        let store = TestStore(initialState: searchedState()) { CourseFeature() }
+
+        await store.send(.searchReachedEnd)
+    }
+
+    func test_검색_중_필터를_바꿔_보일_행이_없어지면_다음_페이지를_부른다() async {
+        var initial = searchedState()
+        initial.search.hasNext = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.searchCoursePlaces = { _, page in
+                XCTAssertEqual(page, 1)
+                return Page(items: [searchOnlyF], hasNext: false)
+            }
+        }
+
+        await store.send(.categoryTapped(.cafe)) {
+            $0.selectedCategory = .cafe
+            $0.search.isLoadingMore = true
+        }
+        await store.receive(\.searchMoreResponse.success) {
+            $0.search.results = [searchOnlyD, searchOnlyF]
+            $0.search.foundPlaces = [searchOnlyD, searchOnlyF]
+            $0.search.page = 1
+            $0.search.hasNext = false
+            $0.search.isLoadingMore = false
+        }
+    }
+
+    func test_검색이_실패하면_실패_상태가_되고_다시_치면_다시_찾는다() async {
+        let clock = TestClock()
+        let shouldFail = LockIsolated(true)
+        let store = TestStore(initialState: searchedState()) {
+            CourseFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.courseClient.searchCoursePlaces = { _, _ in
+                if shouldFail.value { throw CourseError.network }
+                return Page(items: [searchOnlyD], hasNext: false)
+            }
+        }
+
+        await store.send(.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await store.receive(\.searchResponse.failure) {
+            $0.search.results = []
+            $0.search.loadState = .failed
+        }
+        XCTAssertEqual(store.state.listContent, .searchFailed)
+
+        shouldFail.setValue(false)
+        await store.send(.searchQueryChanged("칼국수")) {
+            $0.search.query = "칼국수"
+            $0.search.loadState = .idle
+        }
+        await clock.advance(by: .milliseconds(300))
+        await store.receive(\.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await store.receive(\.searchResponse.success) {
+            $0.search.results = [searchOnlyD]
+            $0.search.loadState = .loaded
+        }
+    }
+
+    func test_검색에서_세션이_만료되면_위로_올린다() async {
+        let store = TestStore(initialState: searchedState()) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.searchCoursePlaces = { _, _ in throw CourseError.unauthorized }
+        }
+
+        await store.send(.searchDebounced) {
+            $0.search.loadState = .loading
+        }
+        await store.receive(\.searchResponse.failure) {
+            $0.search.results = []
+            $0.search.loadState = .failed
+        }
+        await store.receive(\.delegate.sessionExpired)
+    }
+
+    func test_다음_페이지에서_세션이_만료돼도_위로_올린다() async {
+        var initial = searchedState()
+        initial.search.hasNext = true
+        let store = TestStore(initialState: initial) {
+            CourseFeature()
+        } withDependencies: {
+            $0.courseClient.searchCoursePlaces = { _, _ in throw CourseError.unauthorized }
+        }
+
+        await store.send(.searchReachedEnd) {
+            $0.search.isLoadingMore = true
+        }
+        await store.receive(\.searchMoreResponse.failure) {
+            $0.search.isLoadingMore = false
+        }
+        await store.receive(\.delegate.sessionExpired)
+    }
+}
+
+// MARK: - Search List Content
+
+@MainActor
+final class CoursePlaceSearchListContentTests: XCTestCase {
+
+    func test_검색_결과를_기다리는_동안_가짜_행을_보인다() {
+        var state = searchedState(results: [])
+        // 300ms 기다리는 중
+        state.search.loadState = .idle
+        XCTAssertEqual(state.listContent, .skeleton)
+
+        state.search.loadState = .loading
+        XCTAssertEqual(state.listContent, .skeleton)
+
+        // 걸러져 비었지만 다음 페이지를 이어 부르는 중
+        state.search.loadState = .loaded
+        state.search.results = [searchOnlyD]
+        state.selectedCategory = .cafe
+        state.search.hasNext = true
+        XCTAssertEqual(state.listContent, .skeleton)
+    }
+
+    func test_검색_결과가_없거나_실패하면_그에_맞는_화면을_보인다() {
+        var state = searchedState(results: [])
+        XCTAssertEqual(state.listContent, .noSearchResult)
+
+        state.search.loadState = .failed
+        XCTAssertEqual(state.listContent, .searchFailed)
+
+        state.search.loadState = .loaded
+        state.search.results = [searchOnlyD]
+        XCTAssertEqual(state.listContent, .list)
+    }
+
+    func test_검색하지_않을_때는_목록_상태를_그대로_보인다() {
+        var state = mapState()
+        XCTAssertEqual(state.listContent, .list)
+
+        state.selectedCategory = .accommodation
+        XCTAssertEqual(state.listContent, .noMatch)
+
+        state.places = []
+        XCTAssertEqual(state.listContent, .noSavedPlace)
+
+        state.loadState = .loading
+        XCTAssertEqual(state.listContent, .skeleton)
+
+        state.loadState = .failed
+        XCTAssertEqual(state.listContent, .loadFailed)
+    }
+}
+
+// MARK: - Search Selection
+
+@MainActor
+final class CoursePlaceSearchSelectionTests: XCTestCase {
+
+    func test_입력_중에_행을_누르면_고르고_키보드가_내려가면_검색어_칩이_된다() async {
+        let store = TestStore(initialState: searchedState()) { CourseFeature() }
+
+        await store.send(.rowTapped("d")) {
+            $0.selectedPlaceIDs = ["d"]
+            $0.camera = focused(searchOnlyD.place.coordinate)
+        }
+        await store.send(.searchFieldDismissed) {
+            $0.search.isFieldOpen = false
+        }
+        XCTAssertEqual(store.state.search.query, "칼국")
+        await store.finish()
+    }
+
+    func test_검색을_풀어도_고른_장소의_선택과_번호와_핀과_경로가_그대로다() async {
+        let store = TestStore(initialState: searchedState(isFieldOpen: false, selected: ["a"])) {
+            CourseFeature()
+        }
+
+        await store.send(.rowTapped("d")) {
+            $0.selectedPlaceIDs = ["a", "d"]
+            $0.camera = focused(searchOnlyD.place.coordinate)
+        }
+        await store.send(.searchChipClearTapped) {
+            $0.search.query = ""
+            $0.search.results = []
+            $0.search.loadState = .idle
+        }
+
+        XCTAssertEqual(store.state.badgeState(for: "a"), .number(1))
+        XCTAssertEqual(store.state.badgeState(for: "d"), .number(2))
+        let numbered = store.state.markers.filter { $0.id.hasPrefix("numbered:") }
+        XCTAssertEqual(numbered.map(\.id), ["numbered:a", "numbered:d"])
+        XCTAssertEqual(numbered.map(\.kind), [.numbered(1), .numbered(2)])
+        XCTAssertEqual(
+            store.state.routes,
+            [MapRoute(id: "course-pick", coordinates: [candidateCoordinate("a"), searchOnlyD.place.coordinate])]
+        )
+        await store.finish()
+    }
+
+    func test_고르기_모드는_검색으로만_찾은_장소도_올린다() async {
+        let store = TestStore(
+            initialState: searchedState(isFieldOpen: false, mode: .pick(existing: []))
+        ) {
+            CourseFeature()
+        }
+
+        await store.send(.rowTapped("d")) {
+            $0.selectedPlaceIDs = ["d"]
+            $0.camera = focused(searchOnlyD.place.coordinate)
+        }
+        await store.send(.searchChipClearTapped) {
+            $0.search.query = ""
+            $0.search.results = []
+            $0.search.loadState = .idle
+        }
+        await store.send(.buildTapped)
+        await store.receive(.delegate(.placesPicked([searchOnlyD])))
+        await store.finish()
     }
 }

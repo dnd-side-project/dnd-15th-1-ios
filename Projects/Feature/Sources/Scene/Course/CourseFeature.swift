@@ -80,6 +80,8 @@ public struct CourseFeature {
         public var rowScrollRequest: RowScrollRequest?
         /// 내 위치 점. 장소 고르기 화면의 지도에만 그린다
         public var userLocation: Coordinate?
+        /// 시트의 장소 검색. 검색어만 서버에 보내고 카테고리·저장자·코스에 있는 장소는 앱이 건다
+        public var search = Search()
 
         public init(now: Date = Date(), mode: Mode = .create) {
             var seoul = Calendar(identifier: .gregorian)
@@ -132,6 +134,18 @@ public struct CourseFeature {
         case mapAppeared
         case userLocationChanged(Coordinate?)
 
+        // 장소 검색
+        case searchChipTapped
+        case searchQueryChanged(String)
+        case searchDebounced
+        case searchResponse(Result<Page<SavedPlace>, CourseError>)
+        case searchReachedEnd
+        case searchMoreResponse(Result<Page<SavedPlace>, CourseError>)
+        /// 키보드가 내려갔다. 검색 키 · 화면 탭 · 목록 스크롤 · 행 누름 어느 것이든 같다
+        case searchFieldDismissed
+        case searchCancelTapped
+        case searchChipClearTapped
+
         case delegate(Delegate)
 
         @CasePathable
@@ -152,12 +166,16 @@ public struct CourseFeature {
         case saveCourse
         case reloadCourse
         case userLocation
+        case searchDebounce
+        case searchRequest
+        case searchMore
     }
 
     @Dependency(\.courseClient) var courseClient
     @Dependency(\.coupleClient) var coupleClient
     @Dependency(\.analyticsClient) var analyticsClient
     @Dependency(\.locationClient) var locationClient
+    @Dependency(\.continuousClock) var clock
 
     public init() {}
 
@@ -181,9 +199,64 @@ public struct CourseFeature {
             return save(state: &state, action: action)
         case .mapAppeared, .userLocationChanged:
             return updateUserLocation(state: &state, action: action)
+        case .searchChipTapped, .searchQueryChanged, .searchDebounced, .searchFieldDismissed,
+             .searchCancelTapped, .searchChipClearTapped:
+            return updateSearchInput(state: &state, action: action)
+        case .searchResponse, .searchReachedEnd, .searchMoreResponse:
+            return updateSearchResult(state: &state, action: action)
         case .delegate:
             return .none
         }
+    }
+}
+
+// MARK: - Search
+
+public extension CourseFeature {
+
+    enum SearchLoadState: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed
+    }
+
+    /// 「저장한 장소」 시트의 장소 검색
+    struct Search: Equatable {
+        /// 검색창이 열려 키보드가 올라와 있다. 닫히면 칩 줄로 돌아간다
+        public var isFieldOpen = false
+        public var query = ""
+        /// 지금 검색어의 결과. 받은 페이지를 이어 붙인다
+        public var results: [SavedPlace] = []
+        /// 이 화면에서 검색으로 받은 장소 전부. 검색을 풀어도 남아 고른 장소를 찾는 데 쓴다.
+        /// 목록을 받은 뒤 새로 저장한 장소는 여기에만 있다
+        public var foundPlaces: [SavedPlace] = []
+        public var loadState: SearchLoadState = .idle
+        /// 지금까지 받은 마지막 페이지 번호. 0 부터 센다
+        public var page = 0
+        public var hasNext = false
+        public var isLoadingMore = false
+
+        public init() {}
+
+        /// 앞뒤 공백을 뺀 검색어. 서버에는 이 값을 보낸다
+        public var trimmedQuery: String {
+            query.trimmingCharacters(in: .whitespaces)
+        }
+    }
+
+    /// 시트 목록 자리에 보일 것
+    enum PlaceListContent: Equatable {
+        /// 가짜 행 3줄. 목록이나 검색 결과를 기다린다
+        case skeleton
+        /// 목록을 못 받았다. 「다시 시도」 를 보인다
+        case loadFailed
+        case noSavedPlace
+        /// 필터에 맞는 장소가 없다
+        case noMatch
+        case noSearchResult
+        case searchFailed
+        case list
     }
 }
 
@@ -323,17 +396,17 @@ private extension CourseFeature {
         switch action {
         case let .ownershipSelected(ownership):
             state.selectedOwnership = ownership
-            return .none
+            return loadMoreSearchIfBlank(state: &state)
 
         case let .categoryTapped(category):
             // 같은 값 재탭은 해제로 읽는다. 지도 탭과 같은 규칙이다
             state.selectedCategory = state.selectedCategory == category ? nil : category
-            return .none
+            return loadMoreSearchIfBlank(state: &state)
 
         case let .rowTapped(placeID):
             let wasSelected = state.selectedPlaceIDs.contains(placeID)
             toggle(&state, placeID: placeID)
-            if let candidate = state.places.first(where: { $0.id == placeID }) {
+            if let candidate = state.savedPlace(id: placeID) {
                 focus(&state, on: candidate.place.coordinate)
             }
             return trackAdded(wasSelected: wasSelected)
@@ -373,9 +446,8 @@ private extension CourseFeature {
         switch action {
         case .buildTapped:
             if case .pick = state.mode {
-                let picked = state.selectedPlaceIDs.compactMap { id in
-                    state.places.first { $0.id == id }
-                }
+                // 검색으로만 찾은 장소도 고른 순서대로 올린다
+                let picked = state.selectedPlaceIDs.compactMap { state.savedPlace(id: $0) }
                 return .send(.delegate(.placesPicked(picked)))
             }
             return startSaveCourse(state: &state)
@@ -575,6 +647,200 @@ private extension CourseFeature {
     }
 }
 
+// MARK: - Search Reduce
+
+private extension CourseFeature {
+
+    func updateSearchInput(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .searchChipTapped:
+            // 목록이 뜨기 전에는 열지 않는다. 목록 실패 화면과 검색 화면이 섞이지 않게 한다.
+            // 검색어 칩을 누른 것이면 검색어가 든 채로 다시 열린다
+            guard state.isSearchAvailable else { return .none }
+            state.search.isFieldOpen = true
+            return .none
+
+        case let .searchQueryChanged(query):
+            let previous = state.search.trimmedQuery
+            state.search.query = query
+            // 공백만 늘었거나 바인딩이 같은 값을 다시 넣었다. 돌던 요청을 끊지 않는다
+            guard state.search.trimmedQuery != previous else { return .none }
+            return debounceSearch(state: &state)
+
+        case .searchDebounced:
+            return startSearch(state: &state)
+
+        case .searchFieldDismissed:
+            return dismissSearchField(state: &state)
+
+        case .searchCancelTapped, .searchChipClearTapped:
+            return clearSearch(state: &state)
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    func updateSearchResult(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .searchResponse(.success(page)):
+            state.search.results = page.items
+            remember(page.items, in: &state)
+            state.search.hasNext = page.hasNext
+            state.search.page = 0
+            state.search.loadState = .loaded
+            return loadMoreSearchIfBlank(state: &state)
+
+        case let .searchResponse(.failure(error)):
+            state.search.results = []
+            state.search.loadState = .failed
+            return error == .unauthorized ? .send(.delegate(.sessionExpired)) : .none
+
+        case .searchReachedEnd:
+            return loadMoreSearch(state: &state)
+
+        case let .searchMoreResponse(.success(page)):
+            state.search.results += page.items
+            remember(page.items, in: &state)
+            state.search.hasNext = page.hasNext
+            state.search.page += 1
+            state.search.isLoadingMore = false
+            return loadMoreSearchIfBlank(state: &state)
+
+        case let .searchMoreResponse(.failure(error)):
+            return failMoreSearch(state: &state, error: error)
+
+        default:
+            assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
+            return .none
+        }
+    }
+
+    /// 빈 검색어로 키보드가 내려가면 「검색」 칩으로 돌아간다. 검색어가 있으면 검색어 칩이 된다
+    func dismissSearchField(state: inout State) -> Effect<Action> {
+        // 「취소」 로 이미 닫힌 뒤 입력칸 포커스가 늦게 풀려 한 번 더 올 수 있다
+        guard state.search.isFieldOpen else { return .none }
+        state.search.isFieldOpen = false
+        guard state.search.trimmedQuery.isEmpty else { return .none }
+        return clearSearch(state: &state)
+    }
+
+    /// 검색을 푼다. 받아 둔 목록 전체로 돌아가고, 고른 장소와 찾은 장소 기록은 그대로 둔다
+    func clearSearch(state: inout State) -> Effect<Action> {
+        state.search.isFieldOpen = false
+        state.search.query = ""
+        resetSearchResults(&state)
+        return cancelSearch()
+    }
+
+    func resetSearchResults(_ state: inout State) {
+        state.search.results = []
+        state.search.loadState = .idle
+        state.search.page = 0
+        state.search.hasNext = false
+        state.search.isLoadingMore = false
+    }
+
+    func cancelSearch() -> Effect<Action> {
+        .merge(
+            .cancel(id: CancelID.searchDebounce),
+            .cancel(id: CancelID.searchRequest),
+            .cancel(id: CancelID.searchMore)
+        )
+    }
+
+    /// 검색어가 비면 서버를 부르지 않고 받아 둔 목록으로 돌아간다
+    func debounceSearch(state: inout State) -> Effect<Action> {
+        guard !state.search.trimmedQuery.isEmpty else {
+            resetSearchResults(&state)
+            return cancelSearch()
+        }
+        // 옛 검색어의 다음 페이지를 새 검색어로 부르지 않게 끊는다
+        state.search.hasNext = false
+        state.search.isLoadingMore = false
+        // 기다리는 동안 앞 검색어의 0건 · 실패 문구 대신 가짜 행을 보인다
+        state.search.loadState = .idle
+        // 새 검색어를 치면 돌던 요청도 끊는다. 안 끊으면 옛 응답이 새 검색어 화면에 얹힌다
+        return .merge(
+            .cancel(id: CancelID.searchRequest),
+            .cancel(id: CancelID.searchMore),
+            .run { [clock] send in
+                try await clock.sleep(for: .milliseconds(300))
+                await send(.searchDebounced)
+            }
+            .cancellable(id: CancelID.searchDebounce, cancelInFlight: true)
+        )
+    }
+
+    func startSearch(state: inout State) -> Effect<Action> {
+        let query = state.search.trimmedQuery
+        guard !query.isEmpty else { return .none }
+        state.search.page = 0
+        state.search.hasNext = false
+        state.search.isLoadingMore = false
+        state.search.loadState = .loading
+        return .run { [courseClient] send in
+            let result = await Self.searchPage(query: query, page: 0, courseClient: courseClient)
+            await send(.searchResponse(result))
+        }
+        .cancellable(id: CancelID.searchRequest, cancelInFlight: true)
+    }
+
+    func loadMoreSearch(state: inout State) -> Effect<Action> {
+        let query = state.search.trimmedQuery
+        guard !query.isEmpty,
+              state.search.hasNext,
+              !state.search.isLoadingMore,
+              state.search.loadState == .loaded
+        else { return .none }
+        let next = state.search.page + 1
+        state.search.isLoadingMore = true
+        return .run { [courseClient] send in
+            let result = await Self.searchPage(query: query, page: next, courseClient: courseClient)
+            await send(.searchMoreResponse(result))
+        }
+        .cancellable(id: CancelID.searchMore, cancelInFlight: true)
+    }
+
+    /// 앱이 걸러 보일 행이 없으면 끝에 닿을 행도 없다. 남은 페이지가 있으면 여기서 이어 부른다
+    func loadMoreSearchIfBlank(state: inout State) -> Effect<Action> {
+        guard state.isSearching, state.filteredPlaces.isEmpty, state.search.hasNext else { return .none }
+        return loadMoreSearch(state: &state)
+    }
+
+    func failMoreSearch(state: inout State, error: CourseError) -> Effect<Action> {
+        state.search.isLoadingMore = false
+        guard error != .unauthorized else { return .send(.delegate(.sessionExpired)) }
+        // 받은 행은 화면에 남긴다. hasNext 를 끄면 일시 실패가 영구 정지가 된다.
+        // 보일 행이 하나도 없으면 첫 페이지 실패와 같게 다룬다
+        if state.filteredPlaces.isEmpty {
+            state.search.loadState = .failed
+        }
+        return .none
+    }
+
+    /// 받은 검색 결과를 찾은 장소 기록에 더한다. 같은 장소는 한 번만 둔다
+    func remember(_ items: [SavedPlace], in state: inout State) {
+        let known = Set(state.search.foundPlaces.map(\.id))
+        state.search.foundPlaces += items.filter { !known.contains($0.id) }
+    }
+
+    static func searchPage(
+        query: String,
+        page: Int,
+        courseClient: CourseClient
+    ) async -> Result<Page<SavedPlace>, CourseError> {
+        do {
+            return .success(try await courseClient.searchCoursePlaces(query, page))
+        } catch let error as CourseError {
+            return .failure(error)
+        } catch {
+            return .failure(.unknown)
+        }
+    }
+}
+
 // MARK: - Marker ID
 
 /// 핀 id. 같은 장소에 카테고리 핀과 숫자 핀이 함께 서서 앞붙이로 가른다. 같은 id 면 지도가 하나를 버린다
@@ -625,12 +891,9 @@ public extension CourseFeature.State {
         return []
     }
 
+    /// 검색 중이면 검색 결과, 아니면 받아 둔 목록에 지금 필터를 건다. 서버에는 검색어만 보낸다
     var filteredPlaces: [SavedPlace] {
-        let taken = Set(existingPlaces.map(\.id))
-        return places
-            .filter { selectedOwnership.matches($0.ownership) }
-            .filter { selectedCategory == nil || $0.place.category == selectedCategory }
-            .filter { !taken.contains($0.id) }
+        applyingFilters(to: isSearching ? search.results : places)
     }
 
     /// 기존 코스 핀, 목록의 카테고리 핀, 고른 숫자 핀 순서다.
@@ -659,7 +922,7 @@ public extension CourseFeature.State {
         }
         // 숫자 핀은 필터를 타지 않는다. 목록에서 사라져도 핀으로 뺄 수 있어야 한다
         let numberedPins = selectedPlaceIDs.enumerated().compactMap { index, placeID -> MapMarker? in
-            guard let candidate = places.first(where: { $0.id == placeID }) else { return nil }
+            guard let candidate = savedPlace(id: placeID) else { return nil }
             return MapMarker(
                 id: CourseMarkerID.numbered(candidate.id),
                 coordinate: candidate.place.coordinate,
@@ -672,7 +935,7 @@ public extension CourseFeature.State {
     /// 기존 코스 다음에 고른 순서대로 잇는 직선. 점이 둘 이상일 때만 긋는다
     var routes: [MapRoute] {
         let picked = selectedPlaceIDs.compactMap { placeID in
-            places.first { $0.id == placeID }?.place.coordinate
+            savedPlace(id: placeID)?.place.coordinate
         }
         let coordinates = existingPlaces.map(\.coordinate) + picked
         guard coordinates.count >= 2 else { return [] }
@@ -690,9 +953,38 @@ public extension CourseFeature.State {
 
     var isCTAEnabled: Bool { selectedCount >= 1 && !isSavingCourse }
 
-    var isEmpty: Bool { loadState == .loaded && filteredPlaces.isEmpty }
+    /// 검색어가 있으면 검색 중이다. 목록 · 지도 핀이 검색 결과로 바뀐다
+    var isSearching: Bool { !search.trimmedQuery.isEmpty }
 
-    var hasNoSavedPlace: Bool { loadState == .loaded && places.isEmpty }
+    /// 「검색」 칩을 누를 수 있는지. 목록이 뜬 뒤에만 열린다
+    var isSearchAvailable: Bool { loadState == .loaded }
+
+    /// 고른 장소를 찾는다. 받아 둔 목록에 없으면 이 화면에서 받은 검색 결과에서 찾는다
+    func savedPlace(id: String) -> SavedPlace? {
+        places.first { $0.id == id } ?? search.foundPlaces.first { $0.id == id }
+    }
+
+    var listContent: CourseFeature.PlaceListContent {
+        switch loadState {
+        case .loading: return .skeleton
+        case .failed: return .loadFailed
+        case .loaded: break
+        }
+        guard isSearching else {
+            if places.isEmpty { return .noSavedPlace }
+            return filteredPlaces.isEmpty ? .noMatch : .list
+        }
+        switch search.loadState {
+        case .idle, .loading:
+            return .skeleton
+        case .failed:
+            return .searchFailed
+        case .loaded:
+            if !filteredPlaces.isEmpty { return .list }
+            // 걸러져 비었지만 다음 페이지를 이어 부르는 중이다
+            return search.hasNext ? .skeleton : .noSearchResult
+        }
+    }
 
     /// `2026.08.05`
     var dateText: String? {
@@ -729,7 +1021,8 @@ private extension CourseFeature {
         if let last = state.existingPlaces.last {
             return .focusing(last.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
-        guard let first = state.filteredPlaces.first else { return .seoulCityHall }
+        // 검색 중이어도 받아 둔 목록을 본다. 검색이 지도 위치를 옮기지 않게 한다
+        guard let first = state.applyingFilters(to: state.places).first else { return .seoulCityHall }
         return .focusing(first.place.coordinate, zoomLevel: MapCamera.multiPlaceZoom)
     }
 }
@@ -758,5 +1051,17 @@ private extension CourseFeature {
             assertionFailure("이 묶음이 안 받는 액션이다: \(action)")
             return .none
         }
+    }
+}
+
+private extension CourseFeature.State {
+
+    /// 저장자 · 카테고리 필터를 걸고 코스에 이미 있는 장소를 뺀다
+    func applyingFilters(to source: [SavedPlace]) -> [SavedPlace] {
+        let taken = Set(existingPlaces.map(\.id))
+        return source
+            .filter { selectedOwnership.matches($0.ownership) }
+            .filter { selectedCategory == nil || $0.place.category == selectedCategory }
+            .filter { !taken.contains($0.id) }
     }
 }

@@ -282,17 +282,13 @@ private extension MapFlowFeature {
             return presentDetail(state: &state, id: id)
         case .searchRequested:
             // 저장 목록에서 열면 토글이 꺼진 채다. 검색 결과에서 검색창을 누르면 그 결과의 토글을 이어받는다
-            state.placeSearch = PlaceSearchFeature.State(
-                isSavedOnly: state.map.searchIsSavedOnly,
-                isCoupleConnected: state.map.isCoupleConnected
-            )
+            state.placeSearch = PlaceSearchFeature.State(isSavedOnly: state.map.searchIsSavedOnly)
             return applyPath(state.path + [.search], state: &state)
         case let .searchReopenRequested(query):
             // 시트에 보이던 결과와 검색 화면 목록이 같아지게 토글도 이어받는다
             state.placeSearch = PlaceSearchFeature.State(
                 query: query,
-                isSavedOnly: state.map.searchIsSavedOnly,
-                isCoupleConnected: state.map.isCoupleConnected
+                isSavedOnly: state.map.searchIsSavedOnly
             )
             guard !state.path.contains(.search) else { return .none }
             return applyPath(state.path + [.search], state: &state)
