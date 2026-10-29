@@ -584,13 +584,12 @@ private enum SavedOnlyFixture {
 
 @MainActor
 final class PlaceSearchSavedOnlyTests: XCTestCase {
-    func test_커플이_없으면_토글을_켠_채로_만들어도_꺼져_있다() {
-        XCTAssertFalse(PlaceSearchFeature.State(isSavedOnly: true, isCoupleConnected: false).isSavedOnly)
-        XCTAssertTrue(PlaceSearchFeature.State(isSavedOnly: true, isCoupleConnected: true).isSavedOnly)
+    func test_커플이_없어도_토글을_켠_채로_만들면_켜져_있다() {
+        XCTAssertTrue(PlaceSearchFeature.State(isSavedOnly: true).isSavedOnly)
     }
 
     func test_토글을_켜면_기다리지_않고_코스_장소_검색으로_다시_찾는다() async {
-        var state = PlaceSearchFeature.State(query: "성수", isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수")
         state.results = [PlaceSearchResult.unsaved(.fixture(id: "1"))]
         state.loadState = .loaded
         let requested = LockIsolated<[String]>([])
@@ -617,7 +616,7 @@ final class PlaceSearchSavedOnlyTests: XCTestCase {
     }
 
     func test_토글을_끄면_지도_검색으로_다시_찾는다() async {
-        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true, isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true)
         state.results = [SavedOnlyFixture.result]
         state.loadState = .loaded
         let unsaved = [PlaceSearchResult.unsaved(.fixture(id: "1"))]
@@ -644,7 +643,7 @@ final class PlaceSearchSavedOnlyTests: XCTestCase {
     func test_토글을_바꾸면_돌던_지도_검색_요청을_끊는다() async {
         let clock = TestClock()
         let mapSearchStarted = LockIsolated(false)
-        let store = TestStore(initialState: PlaceSearchFeature.State(isCoupleConnected: true)) {
+        let store = TestStore(initialState: PlaceSearchFeature.State()) {
             PlaceSearchFeature()
         } withDependencies: {
             $0.continuousClock = clock
@@ -684,7 +683,7 @@ final class PlaceSearchSavedOnlyTests: XCTestCase {
     }
 
     func test_토글을_켜도_검색어가_비면_최근_검색어를_보이고_서버를_부르지_않는다() async {
-        let store = TestStore(initialState: PlaceSearchFeature.State(isCoupleConnected: true)) {
+        let store = TestStore(initialState: PlaceSearchFeature.State()) {
             PlaceSearchFeature()
         }
 
@@ -697,7 +696,7 @@ final class PlaceSearchSavedOnlyTests: XCTestCase {
     func test_토글이_켜진_채로_검색어를_바꾸면_토글을_유지하고_코스_장소_검색을_부른다() async {
         let clock = TestClock()
         let store = TestStore(
-            initialState: PlaceSearchFeature.State(isSavedOnly: true, isCoupleConnected: true)
+            initialState: PlaceSearchFeature.State(isSavedOnly: true)
         ) {
             PlaceSearchFeature()
         } withDependencies: {
@@ -723,14 +722,13 @@ final class PlaceSearchSavedOnlyTests: XCTestCase {
     }
 
     func test_토글_결과_검색이_실패하면_실패_상태다() async {
-        var state = PlaceSearchFeature.State(query: "성수", isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수")
         state.results = [PlaceSearchResult.unsaved(.fixture(id: "1"))]
         state.loadState = .loaded
         let store = TestStore(initialState: state) {
             PlaceSearchFeature()
         } withDependencies: {
-            // 커플 연결이 끊기면 서버가 404 를 준다
-            $0.courseClient.searchCoursePlaces = { _, _ in throw CourseError.notFound }
+            $0.courseClient.searchCoursePlaces = { _, _ in throw CourseError.network }
         }
 
         await store.send(.binding(.set(\.isSavedOnly, true))) {
@@ -744,7 +742,7 @@ final class PlaceSearchSavedOnlyTests: XCTestCase {
     }
 
     func test_토글_결과_검색에서_세션이_만료되면_위로_올린다() async {
-        var state = PlaceSearchFeature.State(query: "성수", isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수")
         state.loadState = .loaded
         let store = TestStore(initialState: state) {
             PlaceSearchFeature()
@@ -766,7 +764,7 @@ final class PlaceSearchSavedOnlyTests: XCTestCase {
 @MainActor
 final class PlaceSearchSavedOnlySelectionTests: XCTestCase {
     func test_토글_결과_행을_누르면_저장_목록처럼_올린다() async {
-        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true, isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true)
         state.results = [SavedOnlyFixture.result]
         state.loadState = .loaded
         let store = TestStore(initialState: state) {
@@ -784,7 +782,7 @@ final class PlaceSearchSavedOnlySelectionTests: XCTestCase {
 
     func test_토글을_끈_결과는_저장한_곳도_카카오_상세로_올린다() async {
         let savedOnMap = PlaceSearchResult(place: .fixture(id: "1"), ownership: .mine, alias: nil)
-        var state = PlaceSearchFeature.State(query: "성수", isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수")
         state.results = [savedOnMap]
         state.loadState = .loaded
         let store = TestStore(initialState: state) {
@@ -801,7 +799,7 @@ final class PlaceSearchSavedOnlySelectionTests: XCTestCase {
     }
 
     func test_토글_결과로_엔터하면_토글_상태를_같이_올린다() async {
-        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true, isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true)
         state.results = [SavedOnlyFixture.result]
         state.loadState = .loaded
         let store = TestStore(initialState: state) {
@@ -820,7 +818,7 @@ final class PlaceSearchSavedOnlySelectionTests: XCTestCase {
     }
 
     func test_토글을_바꾼_뒤_로딩_중에_엔터하면_아무것도_안_올린다() async {
-        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true, isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true)
         state.results = [SavedOnlyFixture.result]
         state.loadState = .loaded
         let unsaved = [PlaceSearchResult.unsaved(.fixture(id: "1"))]
@@ -852,7 +850,7 @@ final class PlaceSearchSavedOnlySelectionTests: XCTestCase {
 
     func test_토글_결과에서_끝에_닿으면_코스_장소_검색의_다음_페이지를_붙인다() async {
         let next = SavedPlace.candidateFixture(id: "b")
-        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true, isCoupleConnected: true)
+        var state = PlaceSearchFeature.State(query: "성수", isSavedOnly: true)
         state.results = [SavedOnlyFixture.result]
         state.hasNext = true
         state.loadState = .loaded

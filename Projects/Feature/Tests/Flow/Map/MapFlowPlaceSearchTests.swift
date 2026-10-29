@@ -188,24 +188,21 @@ private enum SavedOnlySearchFixture {
 
 @MainActor
 final class MapFlowSavedOnlySearchTests: XCTestCase {
-    func test_저장_목록에서_검색_버튼으로_열면_토글이_꺼진_채_커플_여부를_넘긴다() async {
-        var map = MapFeature.State()
-        map.isCoupleConnected = true
-        let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
+    func test_저장_목록에서_검색_버튼으로_열면_토글이_꺼진_채다() async {
+        let store = TestStore(initialState: MapFlowFeature.State()) {
             MapFlowFeature()
         }
         store.exhaustivity = .off
 
         await store.send(.map(.searchBarTapped))
         await store.receive(\.map.delegate.searchRequested) {
-            $0.placeSearch = PlaceSearchFeature.State(isSavedOnly: false, isCoupleConnected: true)
+            $0.placeSearch = PlaceSearchFeature.State(isSavedOnly: false)
             $0.path = [.search]
         }
     }
 
-    func test_토글_결과에서_검색창을_누르면_토글을_이어받는다() async {
+    func test_커플이_없어도_토글_결과에서_검색창을_누르면_토글을_이어받는다() async {
         var map = MapFeature.State()
-        map.isCoupleConnected = true
         map.mode = .searchResult(
             query: "성수",
             results: [PlaceSearchResult(savedPlace: SavedOnlySearchFixture.saved)],
@@ -218,14 +215,14 @@ final class MapFlowSavedOnlySearchTests: XCTestCase {
 
         await store.send(.map(.searchBarTapped))
         await store.receive(\.map.delegate.searchRequested) {
-            $0.placeSearch = PlaceSearchFeature.State(isSavedOnly: true, isCoupleConnected: true)
+            $0.placeSearch = PlaceSearchFeature.State(isSavedOnly: true)
             $0.path = [.search]
         }
+        XCTAssertEqual(store.state.placeSearch?.isSavedOnly, true)
     }
 
     func test_토글_결과에서_뒤로가면_검색어와_토글을_이어받는다() async {
         var map = MapFeature.State()
-        map.isCoupleConnected = true
         map.mode = .searchResult(
             query: "성수",
             results: [PlaceSearchResult(savedPlace: SavedOnlySearchFixture.saved)],
@@ -238,7 +235,7 @@ final class MapFlowSavedOnlySearchTests: XCTestCase {
 
         await store.send(.map(.searchBackTapped))
         await store.receive(\.map.delegate.searchReopenRequested) {
-            $0.placeSearch = PlaceSearchFeature.State(query: "성수", isSavedOnly: true, isCoupleConnected: true)
+            $0.placeSearch = PlaceSearchFeature.State(query: "성수", isSavedOnly: true)
             $0.path = [.search]
         }
     }
@@ -246,7 +243,7 @@ final class MapFlowSavedOnlySearchTests: XCTestCase {
     func test_토글_결과로_엔터하면_지도에_토글_상태째_깐다() async {
         let results = [PlaceSearchResult(savedPlace: SavedOnlySearchFixture.saved)]
         var state = MapFlowFeature.State()
-        state.placeSearch = PlaceSearchFeature.State(query: "성수", isSavedOnly: true, isCoupleConnected: true)
+        state.placeSearch = PlaceSearchFeature.State(query: "성수", isSavedOnly: true)
         state.path = [.search]
         let store = TestStore(initialState: state) {
             MapFlowFeature()
@@ -266,7 +263,7 @@ final class MapFlowSavedOnlySearchTests: XCTestCase {
     func test_검색_화면에서_토글_결과를_고르면_저장_목록처럼_상세가_채워진다() async {
         let saved = SavedOnlySearchFixture.saved
         var state = MapFlowFeature.State()
-        state.placeSearch = PlaceSearchFeature.State(query: "성수", isSavedOnly: true, isCoupleConnected: true)
+        state.placeSearch = PlaceSearchFeature.State(query: "성수", isSavedOnly: true)
         state.path = [.search]
         let requestedID = LockIsolated<String?>(nil)
         let store = TestStore(initialState: state) {
