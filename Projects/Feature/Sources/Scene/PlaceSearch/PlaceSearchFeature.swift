@@ -17,7 +17,7 @@ public struct PlaceSearchFeature {
     public enum SearchFailure: Error, Equatable, Sendable {
         /// 세션 만료. 위로 올려 로그인으로 보낸다
         case unauthorized
-        /// 그 밖의 실패. 커플 연결이 끊겨 온 404 도 여기다. 화면은 실패 문구 하나만 보인다
+        /// 그 밖의 실패. 화면은 실패 문구 하나만 보인다
         case other
     }
 
@@ -31,10 +31,9 @@ public struct PlaceSearchFeature {
         public var page = 0
         public var hasNext = false
         public var isLoadingMore = false
-        /// 「저장한 곳만 보기」. 켜면 커플이 저장한 장소만 코스 장소 검색으로 찾는다
+        /// 「저장한 곳만 보기」. 켜면 저장한 장소만 코스 장소 검색으로 찾는다.
+        /// 커플이 저장한 장소이고, 커플 연결 전에는 내가 저장한 장소다
         public var isSavedOnly = false
-        /// 커플이 연결돼야 토글 줄이 보인다. 커플이 없으면 서버가 404 를 준다
-        public var isCoupleConnected = false
 
         /// 검색어가 비면 최근 검색어를 보여준다. 토글이 켜져 있어도 같다
         public var showsRecent: Bool {
@@ -51,11 +50,9 @@ public struct PlaceSearchFeature {
             !showsRecent && loadState == .loaded && results.isEmpty && hasNext
         }
 
-        public init(query: String = "", isSavedOnly: Bool = false, isCoupleConnected: Bool = false) {
+        public init(query: String = "", isSavedOnly: Bool = false) {
             self.query = query
-            self.isCoupleConnected = isCoupleConnected
-            // 토글 줄이 없는 사람이 켜진 토글을 물려받으면 끌 길이 없다
-            self.isSavedOnly = isCoupleConnected && isSavedOnly
+            self.isSavedOnly = isSavedOnly
         }
     }
 
@@ -345,7 +342,7 @@ private extension PlaceSearchFeature {
         }
     }
 
-    /// 토글이 켜져 있으면 커플 저장 장소 검색을, 꺼져 있으면 지도 검색을 부른다. 두 결과를 한 모양으로 돌려준다
+    /// 토글이 켜져 있으면 저장 장소 검색을, 꺼져 있으면 지도 검색을 부른다. 두 결과를 한 모양으로 돌려준다
     static func fetchPage(
         query: String,
         page: Int,

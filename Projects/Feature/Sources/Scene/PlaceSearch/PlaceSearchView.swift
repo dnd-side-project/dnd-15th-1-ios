@@ -43,10 +43,7 @@ public struct PlaceSearchView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             topBar
-            // 커플이 없으면 서버가 404 를 준다. 지도 탭 저장자 필터처럼 줄째 감춘다
-            if store.isCoupleConnected {
-                savedOnlyToggleRow
-            }
+            savedOnlyToggleRow
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -244,7 +241,7 @@ public struct PlaceSearchView: View {
     }
 
     /// 검색 화면의 행은 사진과 우측 슬롯을 안 쓴다.
-    /// 커플이 저장한 곳은 빨간 북마크, 아닌 곳은 회색 핀이다. 별칭이 있으면 이름 대신 별칭을 보이고 녹화에서 가린다
+    /// 저장한 곳은 빨간 북마크, 아닌 곳은 회색 핀이다. 별칭이 있으면 이름 대신 별칭을 보이고 녹화에서 가린다
     private var resultList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
@@ -275,8 +272,6 @@ public struct PlaceSearchView: View {
                 }
             }
         }
-        // 토글 줄이 있으면 그 아래 띠에 바로 붙는다
-        .padding(.top, store.isCoupleConnected ? 0 : Spacing.s8)
     }
 
     private var skeleton: some View {
@@ -287,8 +282,6 @@ public struct PlaceSearchView: View {
             }
         }
         .padding(.horizontal, Spacing.s20)
-        // 결과 목록과 같은 자리에 서야 로딩이 끝날 때 내용이 튀지 않는다
-        .padding(.top, store.isCoupleConnected ? 0 : Spacing.s8)
         .frame(maxHeight: .infinity, alignment: .top)
     }
 }
