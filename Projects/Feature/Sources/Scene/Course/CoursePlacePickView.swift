@@ -327,7 +327,7 @@ private extension CoursePlacePickView {
     }
 
     var placeList: some View {
-        VStack(spacing: 0) {
+        LazyVStack(spacing: 0) {
             ForEach(store.filteredPlaces) { candidate in
                 row(candidate, showsDivider: candidate.id != store.filteredPlaces.last?.id)
             }
@@ -342,7 +342,6 @@ private extension CoursePlacePickView {
     }
 
     /// 검색 결과 목록 끝. 스크롤 영역 안에 들어오면 다음 페이지를 부른다.
-    /// 시트 목록은 게으르지 않은 `VStack` 이라 행의 `onAppear` 가 처음에 한꺼번에 불려 끝을 못 잰다.
     /// 페이지마다 새 id 를 받아, 받은 페이지가 짧아 끝이 계속 보이면 처음 값으로 다시 부른다
     var searchEndMarker: some View {
         Color.clear
