@@ -8,6 +8,7 @@ final class PlaceDTOMapperTests: XCTestCase {
 
     private func detailDTO(
         placeId: Int? = 42,
+        category: String? = nil,
         categoryCode: String? = "CAFE",
         categoryName: String = "카페",
         roadAddress: String? = "서울 성동구 아차산로 1",
@@ -23,7 +24,7 @@ final class PlaceDTOMapperTests: XCTestCase {
             roadAddress: roadAddress,
             latitude: 37.5,
             longitude: 127.0,
-            category: nil,
+            category: category,
             categoryCode: categoryCode,
             categoryName: categoryName,
             phone: "02-000-0000",
@@ -41,7 +42,10 @@ final class PlaceDTOMapperTests: XCTestCase {
         kakaoPlaceId: String? = "998877",
         categoryCode: String? = "CAFE",
         categoryName: String = "카페",
-        roadAddress: String? = "서울 성동구 아차산로 1"
+        roadAddress: String? = "서울 성동구 아차산로 1",
+        latitude: Double? = 37.5,
+        longitude: Double? = 127.0,
+        ownershipStatus: String? = nil
     ) -> PlaceSearchItemDTO {
         PlaceSearchItemDTO(
             placeId: placeId,
@@ -49,10 +53,11 @@ final class PlaceDTOMapperTests: XCTestCase {
             name: "성수 카페",
             address: "서울 성동구 성수동",
             roadAddress: roadAddress,
-            latitude: 37.5,
-            longitude: 127.0,
+            latitude: latitude,
+            longitude: longitude,
             categoryCode: categoryCode,
             categoryName: categoryName,
+            ownershipStatus: ownershipStatus,
             thumbnailUrl: "https://example.com/t.jpg",
             imageUrls: ["https://example.com/a.jpg"]
         )
@@ -121,6 +126,40 @@ final class PlaceDTOMapperTests: XCTestCase {
         XCTAssertNil(place.roadAddress)
     }
 
+    func test_상세의_카카오_분류_경로에서_세부_분류를_옮긴다() {
+        // 경로마다의 결과는 PlaceDTOMapperFieldTests 가 본다. 여기서는 상세 변환이 그 값을 싣는지만 본다
+        let detail = PlaceDTOMapper.toDomain(detailDTO(category: "음식점 > 카페 > 커피전문점"))
+        XCTAssertEqual(detail.detailCategory, "커피전문점")
+    }
+
+    func test_저장_목록의_카카오_분류_경로가_null이어도_읽는다() throws {
+        let json = Data("""
+        {
+          "memberId": 1,
+          "placeId": 42,
+          "kakaoPlaceId": "998877",
+          "name": "성수 카페",
+          "address": "서울 성동구 성수동",
+          "roadAddress": null,
+          "latitude": 37.5,
+          "longitude": 127.0,
+          "category": null,
+          "categoryName": "카페",
+          "ownershipStatus": "MINE",
+          "alias": null,
+          "savedAt": "2026-08-17T01:27:55.129814",
+          "thumbnailUrl": null,
+          "imageUrls": [],
+          "savedMemberCount": 3
+        }
+        """.utf8)
+
+        let dto = try JSONDecoder().decode(SavedPlaceResponseDTO.self, from: json)
+
+        XCTAssertNil(dto.category)
+        XCTAssertEqual(PlaceDTOMapper.toDomain(dto).place.category, .cafe)
+    }
+
     func test_검색_항목의_카테고리와_사진을_옮기고_빈_도로명은_없음으로_읽는다() throws {
         let page = PlaceDTOMapper.toSearchPage(
             PlaceSearchResponseDTO(
@@ -129,7 +168,7 @@ final class PlaceDTOMapperTests: XCTestCase {
             ),
             page: 0
         )
-        let place = try XCTUnwrap(page.items.first)
+        let place = try XCTUnwrap(page.items.first?.place)
         XCTAssertEqual(place.category, .shopping)
         XCTAssertEqual(place.thumbnailURLs.map(\.absoluteString), [
             "https://example.com/t.jpg",
@@ -151,7 +190,7 @@ final class PlaceDTOMapperTests: XCTestCase {
             ),
             page: 0
         )
-        let place = try XCTUnwrap(page.items.first)
+        let place = try XCTUnwrap(page.items.first?.place)
         XCTAssertNil(place.placeID)
         XCTAssertEqual(place.kakaoPlaceID, "998877")
     }
@@ -189,7 +228,7 @@ final class PlaceDTOMapperTests: XCTestCase {
             PlaceSearchResponseDTO(places: [searchItemDTO()], hasNext: false),
             page: 0
         )
-        XCTAssertNil(page.items.first?.bookmarkCount)
+        XCTAssertNil(page.items.first?.place.bookmarkCount)
     }
 
     func test_검색_항목에_두_번호가_없으면_둘_다_비어_있다() throws {
@@ -197,8 +236,42 @@ final class PlaceDTOMapperTests: XCTestCase {
             PlaceSearchResponseDTO(places: [searchItemDTO(placeId: nil, kakaoPlaceId: nil)], hasNext: false),
             page: 0
         )
-        let place = try XCTUnwrap(page.items.first)
+        let place = try XCTUnwrap(page.items.first?.place)
         XCTAssertNil(place.placeID)
         XCTAssertNil(place.kakaoPlaceID)
+    }
+
+    func test_검색_항목의_저장_관계를_옮기고_별칭은_없다() throws {
+        let page = PlaceDTOMapper.toSearchPage(
+            PlaceSearchResponseDTO(places: [searchItemDTO(ownershipStatus: "PARTNER")], hasNext: false),
+            page: 0
+        )
+        let result = try XCTUnwrap(page.items.first)
+        XCTAssertEqual(result.ownership, .partner)
+        XCTAssertNil(result.alias)
+    }
+
+    func test_검색_항목에_저장_관계가_없으면_아무도_저장하지_않은_것이다() throws {
+        let page = PlaceDTOMapper.toSearchPage(
+            PlaceSearchResponseDTO(places: [searchItemDTO(ownershipStatus: nil)], hasNext: false),
+            page: 0
+        )
+        XCTAssertNil(try XCTUnwrap(page.items.first).ownership)
+    }
+
+    func test_좌표가_없는_검색_항목은_버리고_나머지는_옮긴다() {
+        let page = PlaceDTOMapper.toSearchPage(
+            PlaceSearchResponseDTO(
+                places: [
+                    searchItemDTO(placeId: 1, latitude: nil),
+                    searchItemDTO(placeId: 2),
+                    searchItemDTO(placeId: 3, longitude: nil),
+                ],
+                hasNext: true
+            ),
+            page: 0
+        )
+        XCTAssertEqual(page.items.map(\.place.placeID), ["2"])
+        XCTAssertTrue(page.hasNext)
     }
 }

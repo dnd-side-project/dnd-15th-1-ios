@@ -258,9 +258,12 @@ public struct SearchFeature {
             .run { [contentClient, placeClient] send in
                 async let contents = contentClient.searchContents(query, .popular, 0, Self.pageSize)
                 async let places = placeClient.searchPlaces(query, 0)
+                // 탐색 검색은 장소만 쓴다. 저장 관계는 이 화면에 안 보인다
+                let found = try await places
+                let placePage = PlacePage(items: found.items.map(\.place), hasNext: found.hasNext)
                 // 로딩 → 결과/빈상태 전환을 페이드로 부드럽게 한다
                 await send(
-                    .searchResponse(try await contents, try await places),
+                    .searchResponse(try await contents, placePage),
                     animation: .easeInOut(duration: 0.2)
                 )
             } catch: { error, send in
@@ -304,8 +307,8 @@ public struct SearchFeature {
         let page = state.placesPage
         return .run { [placeClient] send in
             do {
-                let result = try await placeClient.searchPlaces(query, page)
-                await send(.morePlacesLoaded(result))
+                let found = try await placeClient.searchPlaces(query, page)
+                await send(.morePlacesLoaded(PlacePage(items: found.items.map(\.place), hasNext: found.hasNext)))
             } catch {
                 if error is CancellationError { return }
                 await send(.searchFailed)

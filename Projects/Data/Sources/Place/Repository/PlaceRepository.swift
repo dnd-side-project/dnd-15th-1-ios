@@ -31,7 +31,7 @@ public struct PlaceRepository: Sendable {
         }
     }
 
-    public func searchPlaces(query: String, page: Int, size: Int) async throws -> PlacePage {
+    public func searchPlaces(query: String, page: Int, size: Int) async throws -> Page<PlaceSearchResult> {
         do {
             return PlaceDTOMapper.toSearchPage(
                 try await remote.searchPlaces(query: query, page: page, size: size),

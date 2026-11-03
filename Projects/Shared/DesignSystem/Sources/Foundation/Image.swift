@@ -18,6 +18,7 @@ public extension Image {
     static var bookmarkEmpty: Image { Asset.bookmarkEmpty.swiftUIImage }
     static var bookmarkFilled: Image { Asset.bookmarkFilled.swiftUIImage }
     static var bookmarkFilledBlack: Image { Asset.bookmarkFilledBlack.swiftUIImage }
+    static var bus: Image { Asset.bus.swiftUIImage }
     static var calendar: Image { Asset.calendar.swiftUIImage }
     static var calendarHeart: Image { Asset.calendarHeart.swiftUIImage }
     static var cancel: Image { Asset.cancel.swiftUIImage }
@@ -31,6 +32,7 @@ public extension Image {
     static var clock: Image { Asset.clock.swiftUIImage }
     static var edit: Image { Asset.edit.swiftUIImage }
     static var error: Image { Asset.error.swiftUIImage }
+    static var errorGray: Image { Asset.errorGray.swiftUIImage }
     static var explore: Image { Asset.explore.swiftUIImage }
     static var heart: Image { Asset.heart.swiftUIImage }
     static var heartBordered: Image { Asset.heartBordered.swiftUIImage }
@@ -156,4 +158,7 @@ public extension Image {
     static var brandLockup: Image { Asset.brandLockup.swiftUIImage }
     static var brandMark: Image { Asset.brandMark.swiftUIImage }
     static var brandWordmark: Image { Asset.brandWordmark.swiftUIImage }
+    /// 지도 앱 로고. 원으로 잘라 둔 그림이라 24×24 로 그리기만 한다
+    static var naverMap: Image { Asset.naverMap.swiftUIImage }
+    static var kakaoMap: Image { Asset.kakaoMap.swiftUIImage }
 }

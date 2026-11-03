@@ -36,12 +36,3 @@ public struct DateCourse: Equatable, Identifiable, Sendable {
         self.legs = legs
     }
 }
-
-public extension DateCourse {
-    var totalWalkingMinutes: Int {
-        legs.compactMap(\.self).reduce(0) { $0 + $1.walkingMinutes }
-    }
-    var totalDistanceMeters: Int {
-        legs.compactMap(\.self).reduce(0) { $0 + $1.distanceMeters }
-    }
-}

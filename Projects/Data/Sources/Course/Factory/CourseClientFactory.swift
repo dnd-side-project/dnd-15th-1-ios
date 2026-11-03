@@ -20,6 +20,9 @@ public enum CourseClientFactory {
             coursePlaces: {
                 try await repository.coursePlaces()
             },
+            searchCoursePlaces: { query, page in
+                try await repository.searchCoursePlaces(query: query, page: page)
+            },
             course: { try await repository.course(id: $0) },
             currentCourse: { try await repository.currentCourse() },
             latestPastCourses: { size in

@@ -113,6 +113,34 @@ final class PlaceDTOMapperFieldTests: XCTestCase {
         XCTAssertNil(PlaceDTOMapper.roadAddress(nil))
     }
 
+    func test_세부_분류는_카카오_분류_경로의_셋째_단계다() {
+        XCTAssertEqual(PlaceDTOMapper.detailCategory("음식점 > 카페 > 커피전문점"), "커피전문점")
+    }
+
+    func test_셋째_단계가_없으면_둘째_단계다() {
+        XCTAssertEqual(PlaceDTOMapper.detailCategory("음식점 > 카페"), "카페")
+    }
+
+    func test_넷째_단계는_쓰지_않는다() {
+        XCTAssertEqual(PlaceDTOMapper.detailCategory("여행 > 숙박 > 호텔 > 롯데호텔"), "호텔")
+    }
+
+    func test_1단계뿐이거나_비었거나_없으면_세부_분류가_없다() {
+        XCTAssertNil(PlaceDTOMapper.detailCategory("음식점"))
+        XCTAssertNil(PlaceDTOMapper.detailCategory(""))
+        XCTAssertNil(PlaceDTOMapper.detailCategory("   "))
+        XCTAssertNil(PlaceDTOMapper.detailCategory(nil))
+    }
+
+    func test_단계_앞뒤_공백은_버린다() {
+        XCTAssertEqual(PlaceDTOMapper.detailCategory("  음식점>카페 >   커피전문점  "), "커피전문점")
+    }
+
+    // 쉼표를 「/」 로 바꾸는 것은 화면 형식이라 Feature 가 한다
+    func test_쉼표가_든_세부_분류는_그대로_옮긴다() {
+        XCTAssertEqual(PlaceDTOMapper.detailCategory("음식점 > 술집 > 호프,요리주점"), "호프,요리주점")
+    }
+
     func test_저장_장소는_응답의_저장_수를_읽는다() {
         let saved = PlaceDTOMapper.toDomain(savedPlaceDTO(ownershipStatus: "MINE", savedMemberCount: 7))
 

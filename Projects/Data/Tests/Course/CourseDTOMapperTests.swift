@@ -340,8 +340,6 @@ final class CourseDTOMapperLegTests: XCTestCase {
         XCTAssertEqual(course.legs[1]?.distanceMeters, 1500)
         XCTAssertEqual(course.legs[2]?.walkingMinutes, 80)
         XCTAssertEqual(course.legs[2]?.distanceMeters, 5300)
-        XCTAssertEqual(course.totalWalkingMinutes, 100)
-        XCTAssertEqual(course.totalDistanceMeters, 6800)
     }
 
     func test_도보_초는_분으로_반올림한다() throws {
@@ -382,6 +380,263 @@ final class CourseDTOMapperLegTests: XCTestCase {
             walkToNext: walk.map {
                 WalkToNextResponseDTO(distanceMeters: $0.0, durationSeconds: $0.1)
             }
+        )
+    }
+}
+
+final class CourseDTOMapperRouteTests: XCTestCase {
+
+    func test_도보_경로_좌표를_옮긴다() throws {
+        let walk = WalkToNextResponseDTO(
+            distanceMeters: 1500,
+            durationSeconds: 1200,
+            path: [
+                RoutePointResponseDTO(latitude: 37.5446, longitude: 127.0557),
+                RoutePointResponseDTO(latitude: 37.5440, longitude: 127.0560),
+            ]
+        )
+
+        let legs = try course(walk: walk).legs
+        let leg = try XCTUnwrap(legs[0])
+
+        XCTAssertEqual(
+            leg.walkingPath.map { [$0.latitude, $0.longitude] },
+            [[37.5446, 127.0557], [37.5440, 127.0560]]
+        )
+        XCTAssertNil(leg.transit)
+    }
+
+    func test_대중교통_합계와_구간_좌표를_이어_붙여_옮긴다() throws {
+        let walk = WalkToNextResponseDTO(
+            distanceMeters: 5300,
+            durationSeconds: 4800,
+            path: [RoutePointResponseDTO(latitude: 37.50, longitude: 127.00)],
+            transit: TransitToNextResponseDTO(
+                distanceMeters: 5200,
+                durationSeconds: 2730,
+                legs: [
+                    TransitLegResponseDTO(path: [
+                        RoutePointResponseDTO(latitude: 37.51, longitude: 127.01),
+                        RoutePointResponseDTO(latitude: 37.52, longitude: 127.02),
+                    ]),
+                    TransitLegResponseDTO(path: []),
+                    TransitLegResponseDTO(path: [
+                        RoutePointResponseDTO(latitude: 37.53, longitude: 127.03),
+                    ]),
+                ]
+            )
+        )
+
+        let legs = try course(walk: walk).legs
+        let leg = try XCTUnwrap(legs[0])
+        let transit = try XCTUnwrap(leg.transit)
+
+        // 2730초 = 45.5분 → 46
+        XCTAssertEqual(transit.minutes, 46)
+        XCTAssertEqual(transit.distanceMeters, 5200)
+        XCTAssertEqual(
+            transit.path.map { [$0.latitude, $0.longitude] },
+            [[37.51, 127.01], [37.52, 127.02], [37.53, 127.03]]
+        )
+        // 도보 값과 도보 경로는 대중교통이 있어도 그대로 담는다
+        XCTAssertEqual(leg.walkingMinutes, 80)
+        XCTAssertEqual(leg.distanceMeters, 5300)
+        XCTAssertEqual(leg.walkingPath.map { [$0.latitude, $0.longitude] }, [[37.50, 127.00]])
+    }
+
+    func test_경로_키가_없으면_빈_배열로_읽는다() throws {
+        let json = Data("""
+        {
+          "dateCourseId": 1, "title": "t", "date": "2026-08-05", "time": null,
+          "status": "CONFIRMED", "version": 1, "totalPlaceCount": 2,
+          "places": [
+            {
+              "order": 1, "placeId": 10, "name": "장소10", "address": "주소",
+              "latitude": 37.5, "longitude": 127.0,
+              "walkToNext": {
+                "distanceMeters": 5300, "durationSeconds": 4800,
+                "transit": {
+                  "type": "BUS", "distanceMeters": 5200, "durationSeconds": 2700,
+                  "transfers": 0, "fare": null,
+                  "legs": [
+                    {
+                      "type": "WALKING", "guidance": "걷기",
+                      "distanceMeters": 300, "durationSeconds": 240, "stops": []
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "order": 2, "placeId": 11, "name": "장소11", "address": "주소",
+              "latitude": 37.51, "longitude": 127.01
+            }
+          ]
+        }
+        """.utf8)
+
+        let dto = try JSONDecoder().decode(DateCourseResponseDTO.self, from: json)
+        let legs = try CourseDTOMapper.toDomain(dto).legs
+        let leg = try XCTUnwrap(legs[0])
+
+        XCTAssertTrue(leg.walkingPath.isEmpty)
+        XCTAssertEqual(leg.transit?.minutes, 45)
+        XCTAssertEqual(leg.transit?.path.isEmpty, true)
+    }
+
+    func test_대중교통이_null_이면_없음으로_읽는다() throws {
+        let json = Data("""
+        {
+          "dateCourseId": 1, "title": "t", "date": "2026-08-05", "time": null,
+          "status": "CONFIRMED", "version": 1, "totalPlaceCount": 2,
+          "places": [
+            {
+              "order": 1, "placeId": 10, "name": "장소10", "address": "주소",
+              "latitude": 37.5, "longitude": 127.0,
+              "walkToNext": {
+                "distanceMeters": 1500, "durationSeconds": 1200,
+                "path": [], "transit": null
+              }
+            },
+            {
+              "order": 2, "placeId": 11, "name": "장소11", "address": "주소",
+              "latitude": 37.51, "longitude": 127.01
+            }
+          ]
+        }
+        """.utf8)
+
+        let dto = try JSONDecoder().decode(DateCourseResponseDTO.self, from: json)
+        let legs = try CourseDTOMapper.toDomain(dto).legs
+        let leg = try XCTUnwrap(legs[0])
+
+        XCTAssertNil(leg.transit)
+        XCTAssertEqual(leg.walkingMinutes, 20)
+    }
+
+    func test_경로_형식이_틀리면_빈_배열로_읽고_코스는_연다() throws {
+        let leg = try decodedLeg(walkToNext: """
+        { "distanceMeters": 1500, "durationSeconds": 1200, "path": "x" }
+        """)
+
+        XCTAssertTrue(leg.walkingPath.isEmpty)
+        XCTAssertEqual(leg.walkingMinutes, 20)
+    }
+
+    func test_대중교통_필수_값이_빠지면_도보로_읽는다() throws {
+        let leg = try decodedLeg(walkToNext: """
+        {
+          "distanceMeters": 1500, "durationSeconds": 1200,
+          "transit": { "durationSeconds": 2700, "legs": [] }
+        }
+        """)
+
+        XCTAssertNil(leg.transit)
+        XCTAssertEqual(leg.walkingMinutes, 20)
+    }
+
+    func test_대중교통_형식이_틀리면_도보로_읽는다() throws {
+        let leg = try decodedLeg(walkToNext: """
+        { "distanceMeters": 1500, "durationSeconds": 1200, "transit": "BUS" }
+        """)
+
+        XCTAssertNil(leg.transit)
+        XCTAssertEqual(leg.walkingMinutes, 20)
+    }
+
+    func test_대중교통_한_구간_경로_형식이_틀리면_그_구간_좌표만_뺀다() throws {
+        let leg = try decodedLeg(walkToNext: """
+        {
+          "distanceMeters": 5300, "durationSeconds": 4800,
+          "transit": {
+            "distanceMeters": 5200, "durationSeconds": 2700,
+            "legs": [
+              { "path": "x" },
+              { "path": [{ "latitude": 37.53, "longitude": 127.03 }] }
+            ]
+          }
+        }
+        """)
+        let transit = try XCTUnwrap(leg.transit)
+
+        XCTAssertEqual(transit.minutes, 45)
+        XCTAssertEqual(transit.path.map { [$0.latitude, $0.longitude] }, [[37.53, 127.03]])
+    }
+
+    func test_대중교통_구간_목록_형식이_틀리면_좌표_없이_대중교통을_남긴다() throws {
+        let leg = try decodedLeg(walkToNext: """
+        {
+          "distanceMeters": 5300, "durationSeconds": 4800,
+          "transit": { "distanceMeters": 5200, "durationSeconds": 2700, "legs": "x" }
+        }
+        """)
+        let transit = try XCTUnwrap(leg.transit)
+
+        XCTAssertEqual(transit.minutes, 45)
+        XCTAssertTrue(transit.path.isEmpty)
+    }
+
+    func test_도보_필수_값이_빠지면_읽기에_실패한다() {
+        XCTAssertThrowsError(try decodedLeg(walkToNext: """
+        { "durationSeconds": 1200, "path": [] }
+        """))
+    }
+
+    /// 첫 장소의 `walkToNext` 만 바꿔 끼운 코스 응답을 JSON 으로 읽어 첫 구간을 돌려준다
+    private func decodedLeg(walkToNext: String) throws -> CourseLeg {
+        let json = Data("""
+        {
+          "dateCourseId": 1, "title": "t", "date": "2026-08-05", "time": null,
+          "status": "CONFIRMED", "version": 1, "totalPlaceCount": 2,
+          "places": [
+            {
+              "order": 1, "placeId": 10, "name": "장소10", "address": "주소",
+              "latitude": 37.5, "longitude": 127.0,
+              "walkToNext": \(walkToNext)
+            },
+            {
+              "order": 2, "placeId": 11, "name": "장소11", "address": "주소",
+              "latitude": 37.51, "longitude": 127.01
+            }
+          ]
+        }
+        """.utf8)
+
+        let dto = try JSONDecoder().decode(DateCourseResponseDTO.self, from: json)
+        return try XCTUnwrap(CourseDTOMapper.toDomain(dto).legs[0])
+    }
+
+    private func course(walk: WalkToNextResponseDTO) throws -> DateCourse {
+        let dto = DateCourseResponseDTO(
+            dateCourseId: 1,
+            title: "t",
+            date: "2026-08-05",
+            time: nil,
+            status: "CONFIRMED",
+            version: 1,
+            totalPlaceCount: 2,
+            places: [
+                stop(order: 1, id: 10, walk: walk),
+                stop(order: 2, id: 11, walk: nil),
+            ]
+        )
+        return try CourseDTOMapper.toDomain(dto)
+    }
+
+    private func stop(order: Int, id: Int64, walk: WalkToNextResponseDTO?) -> DateCoursePlaceResponseDTO {
+        DateCoursePlaceResponseDTO(
+            order: order,
+            placeId: id,
+            name: "장소\(id)",
+            address: "주소",
+            roadAddress: "도로명",
+            latitude: 37.5,
+            longitude: 127.0,
+            category: nil,
+            categoryName: "카페",
+            thumbnailUrl: nil,
+            imageUrls: nil,
+            walkToNext: walk
         )
     }
 }
@@ -548,5 +803,47 @@ final class CourseDTOMapperPastTests: XCTestCase {
         XCTAssertThrowsError(try CourseDTOMapper.toPage(dto)) { error in
             XCTAssertEqual(error as? CourseError, .unknown)
         }
+    }
+}
+
+final class CourseDTOMapperSearchPageTests: XCTestCase {
+
+    func test_장소_검색_페이지는_후보와_같은_변환으로_옮긴다() {
+        let page = CourseDTOMapper.toSearchPage(searchPage(page: 0, hasNext: true))
+
+        XCTAssertEqual(page.items, [CourseDTOMapper.toDomain(candidate())])
+        XCTAssertTrue(page.hasNext)
+    }
+
+    func test_99페이지에서_다음이_있다고_하면_다음_페이지가_있다() {
+        XCTAssertTrue(CourseDTOMapper.toSearchPage(searchPage(page: 99, hasNext: true)).hasNext)
+    }
+
+    func test_100페이지면_다음이_있다고_해도_다음_페이지가_없다() {
+        XCTAssertFalse(CourseDTOMapper.toSearchPage(searchPage(page: 100, hasNext: true)).hasNext)
+    }
+
+    func test_다음이_없다고_하면_다음_페이지가_없다() {
+        XCTAssertFalse(CourseDTOMapper.toSearchPage(searchPage(page: 0, hasNext: false)).hasNext)
+    }
+
+    private func searchPage(page: Int, hasNext: Bool) -> DateCoursePlaceSearchPageResponseDTO {
+        DateCoursePlaceSearchPageResponseDTO(places: [candidate()], page: page, size: 10, hasNext: hasNext)
+    }
+
+    private func candidate() -> DateCoursePlaceCandidateResponseDTO {
+        DateCoursePlaceCandidateResponseDTO(
+            placeId: 7,
+            name: "장소명",
+            address: "주소",
+            roadAddress: nil,
+            latitude: 37.5,
+            longitude: 127.0,
+            categoryName: "카페",
+            ownershipStatus: "TOGETHER",
+            alias: "우리 카페",
+            thumbnailUrl: nil,
+            imageUrls: []
+        )
     }
 }

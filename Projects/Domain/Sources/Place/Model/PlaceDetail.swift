@@ -14,18 +14,22 @@ public struct PlaceDetail: Equatable, Identifiable, Sendable {
     public let phone: String?
     /// 카카오맵 앱이 없을 때 여는 웹 주소
     public let kakaoPlaceURL: URL?
+    /// 카카오 분류에서 고른 가장 구체적인 업종(예: 커피전문점). 모르면 nil
+    public let detailCategory: String?
 
     public init(
         place: Place,
         isSaved: Bool,
         ownership: PlaceOwnership?,
         phone: String? = nil,
-        kakaoPlaceURL: URL? = nil
+        kakaoPlaceURL: URL? = nil,
+        detailCategory: String? = nil
     ) {
         self.place = place
         self.isSaved = isSaved
         self.ownership = ownership
         self.phone = phone
         self.kakaoPlaceURL = kakaoPlaceURL
+        self.detailCategory = detailCategory
     }
 }

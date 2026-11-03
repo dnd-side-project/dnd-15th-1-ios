@@ -5,10 +5,13 @@ import SwiftUI
 
 enum MapBottomSheetMetric {
     static let cornerRadius: CGFloat = 32
+    /// 잡는 칸은 위 여백 8 + 막대 4 + 아래 여백 8 = 20 이다 (시안 10.21)
     static let grabberWidth: CGFloat = 50
-    static let grabberHeight: CGFloat = 6
-    static let grabberTopInset: CGFloat = 14
-    static let grabberBottomInset: CGFloat = 13
+    static let grabberHeight: CGFloat = 4
+    static let grabberTopInset: CGFloat = 8
+    static let grabberBottomInset: CGFloat = 8
+    /// 잡는 칸 전체 높이. 헤더는 이 바로 아래에서 시작한다
+    static let grabberAreaHeight: CGFloat = grabberTopInset + grabberHeight + grabberBottomInset
     static let shadowRadius: CGFloat = 6
     static let shadowOpacity: CGFloat = 0.05
     static let shadowOffsetY: CGFloat = -4
@@ -20,6 +23,16 @@ enum MapBottomSheetMetric {
 
     /// 손 뗀 뒤 단계에 붙는 움직임
     static let settle: Animation = .spring(response: 0.22, dampingFraction: 0.90)
+
+    /// 3단계 화면에서 손 뗀 뒤 단계에 붙는 넘침 없는 스프링의 길이. 손 속도를 이어받는다
+    static let threeStepDragSettleDuration: TimeInterval = 0.3
+
+    /// 이어받을 상대 속도의 한도. 넘침 없는 스프링은 이보다 빠르게 출발하면 목표를 지나친다
+    static let threeStepDragSettleVelocityLimit: CGFloat = 2 * .pi / threeStepDragSettleDuration
+
+    /// 3단계 화면에서 코드가 단계를 바꿀 때의 움직임.
+    /// 코드로 단계를 바꾸면 손 속도가 없어 `settle` 같은 짧은 스프링은 뚝 떨어져 보인다
+    static let threeStepCodeSettle: Animation = .spring(response: 0.4, dampingFraction: 1.0)
 
     /// 스크롤을 맨 위로 보는 여유. 부동소수 오차와 튕김 잔여를 넘긴다
     static let contentTopTolerance: CGFloat = 0.5
@@ -34,17 +47,18 @@ enum MapBottomSheetMetric {
 ///
 /// `BottomSheet.swift` 와 따로 둔다. 이름은 닮았지만 다른 물건이다.
 /// `BottomSheet` 는 `.bottomSheet(isPresented:)` 수식어로, 딤을 깔고 바깥을 탭하면 닫히는
-/// 모달이며 높이가 내용에 맞춰 고정된다. 껍데기 값(모서리 32, 잡이 막대 50 × 6)은 맞춰뒀다.
+/// 모달이며 높이가 내용에 맞춰 고정된다. 껍데기 값(모서리 32, 잡는 칸 20, 잡이 막대 50 × 4)은 맞춰뒀다.
 ///
-/// 단계는 접힘과 펼침 둘뿐이다. 접힘은 기기 화면 전체 높이의 50%, 펼침은 `expandLimit` 이 정한다.
-/// 손을 떼면 가까운 단계로 붙는다.
+/// 단계는 접힘과 펼침 둘이고, 부르는 쪽이 `minimumHeight` 를 넘기면 최소가 더해져 셋이 된다.
+/// 접힘은 기기 화면 전체 높이의 `collapsedRatio`(기본 45%), 펼침은 `expandLimit` 이 정한다.
+/// 3단계 화면에서는 접힘이 중간이다. 손을 떼면 가까운 단계로 붙는다.
 ///
 /// 시트 높이를 단계 높이로 두고 그 창 안에서 본문이 스크롤된다.
-/// 접힘에서는 본문이 안 스크롤된다. 펼침에서 본문이 맨 위가 아니면 스크롤된다.
+/// 펼침이 아니면(최소 · 접힘) 본문이 안 스크롤된다. 펼침에서 본문이 맨 위가 아니면 스크롤된다.
 /// 잡이 막대와 헤더는 고정된다. 목록만 스크롤된다.
 ///
 /// 잡이 막대 아래로 `header` · `content` 두 자리를 받는다. `header` 는 없어도 된다.
-/// `above` 는 시트 윗면 바로 위에 얹혀 카드를 따라 움직이고, 접힘보다 위로 올라가면 사라진다.
+/// `above` 는 시트 윗면 바로 위에 얹혀 카드를 따라 움직이고, 접힘(중간)보다 위로 올라가면 사라진다.
 ///
 /// ```swift
 /// ZStack(alignment: .bottom) {
@@ -61,16 +75,23 @@ struct MapBottomSheet<Above: View, Header: View, Content: View>: View {
 
     private let expandLimit: SheetExpandLimit
 
+    /// 접힘(3단계 화면의 중간)에서 보이는 높이의 비율. 기기 화면 전체 높이 대비다
+    private let collapsedRatio: CGFloat
+
+    /// 최소 단계에서 보이는 높이. `nil` 이면 최소가 없는 2단계 시트다
+    private let minimumHeight: CGFloat?
+
     /// 열린 메뉴의 화면 좌표. 시작점이 이 안이면 시트 손짓을 시작하지 않는다
     private let openMenuFrames: [CGRect]
 
     /// 손잡이 외에 시트를 잡을 화면 좌표. 제목 줄이 여기 들어간다
     private let grabFrames: [CGRect]
 
-    /// 이 시트가 손짓을 받는 방식. 분해 문서 `:194-200` 표를 따른다
+    /// 이 시트가 손짓을 받는 방식. 분해 문서 `2026-08-13-map-course-ui-split.md:213-220` 표를 따른다
     private let gestureKind: SheetGestureKind
 
-    /// 접힘 시트 윗면의 화면 전체(global) 좌표 y. 지도 카메라가 초점 자리를 잡는 근거다
+    /// 접힘 시트 윗면의 화면 전체(global) 좌표 y. 지도 카메라가 초점 자리를 잡는 근거다.
+    /// 3단계 화면에서도 중간 윗면이다. 단계가 바뀌어도 이 값은 안 바뀐다
     private let onCollapsedTopChange: ((CGFloat) -> Void)?
 
     /// 손짓 주인이 시트로 정해지는 순간 한 번 불린다. 열린 메뉴를 닫는 데 쓴다
@@ -142,6 +163,8 @@ extension MapBottomSheet {
     init(
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
+        collapsedRatio: CGFloat = SheetLayout.collapsedScreenRatio,
+        minimumHeight: CGFloat? = nil,
         openMenuFrames: [CGRect] = [],
         grabFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
@@ -154,6 +177,8 @@ extension MapBottomSheet {
     ) {
         self._selection = selection
         self.expandLimit = expandLimit
+        self.collapsedRatio = collapsedRatio
+        self.minimumHeight = minimumHeight
         self.openMenuFrames = openMenuFrames
         self.grabFrames = grabFrames
         self.onDragBegan = onDragBegan
@@ -171,6 +196,8 @@ extension MapBottomSheet where Above == EmptyView {
     init(
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
+        collapsedRatio: CGFloat = SheetLayout.collapsedScreenRatio,
+        minimumHeight: CGFloat? = nil,
         openMenuFrames: [CGRect] = [],
         grabFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
@@ -183,6 +210,8 @@ extension MapBottomSheet where Above == EmptyView {
         self.init(
             selection: selection,
             expandLimit: expandLimit,
+            collapsedRatio: collapsedRatio,
+            minimumHeight: minimumHeight,
             openMenuFrames: openMenuFrames,
             grabFrames: grabFrames,
             onDragBegan: onDragBegan,
@@ -201,6 +230,8 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
     init(
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
+        collapsedRatio: CGFloat = SheetLayout.collapsedScreenRatio,
+        minimumHeight: CGFloat? = nil,
         openMenuFrames: [CGRect] = [],
         grabFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
@@ -212,6 +243,8 @@ extension MapBottomSheet where Above == EmptyView, Header == EmptyView {
         self.init(
             selection: selection,
             expandLimit: expandLimit,
+            collapsedRatio: collapsedRatio,
+            minimumHeight: minimumHeight,
             openMenuFrames: openMenuFrames,
             grabFrames: grabFrames,
             onDragBegan: onDragBegan,
@@ -230,6 +263,8 @@ extension MapBottomSheet where Header == EmptyView {
     init(
         selection: Binding<SheetDetent>,
         expandLimit: SheetExpandLimit,
+        collapsedRatio: CGFloat = SheetLayout.collapsedScreenRatio,
+        minimumHeight: CGFloat? = nil,
         openMenuFrames: [CGRect] = [],
         grabFrames: [CGRect] = [],
         onDragBegan: (() -> Void)? = nil,
@@ -242,6 +277,8 @@ extension MapBottomSheet where Header == EmptyView {
         self.init(
             selection: selection,
             expandLimit: expandLimit,
+            collapsedRatio: collapsedRatio,
+            minimumHeight: minimumHeight,
             openMenuFrames: openMenuFrames,
             grabFrames: grabFrames,
             onDragBegan: onDragBegan,
@@ -263,7 +300,9 @@ private extension MapBottomSheet {
         SheetLayout(
             containerHeight: containerHeight,
             screenHeight: screenHeight,
-            expandLimit: expandLimit
+            expandLimit: expandLimit,
+            collapsedRatio: collapsedRatio,
+            minimumHeight: minimumHeight
         )
     }
 
@@ -272,7 +311,7 @@ private extension MapBottomSheet {
     /// 카드 높이는 펼침 높이로 못 박고, 오르내림은 `.offset(y:)` 하나가 맡는다.
     /// 높이를 매 프레임 바꾸면 카드 안 전체 — 헤더, 목록, 행마다의 가로 스크롤 — 가
     /// 프레임마다 레이아웃을 다시 하고 그림자 모양도 매 프레임 다시 계산된다.
-    /// `.offset` 은 배치 결과를 안 바꿔 그 비용이 없다. 접힘에서는 카드 아랫부분이
+    /// `.offset` 은 배치 결과를 안 바꿔 그 비용이 없다. 펼침이 아니면(최소 · 접힘) 카드 아랫부분이
     /// 담는 층 바닥 아래(화면 밖)에 내려가 있을 뿐이고, 보이는 픽셀은 이전과 같다.
     func sheet(layout: SheetLayout) -> some View {
         VStack(spacing: 0) {
@@ -346,7 +385,7 @@ private extension MapBottomSheet {
 
     /// 손짓 종류에 따라 스크롤이 열리는 본문.
     ///
-    /// `followsContent` 는 접힘에서 스크롤을 열어두면 목록을 쓸 때 시트가 안 펼쳐진다.
+    /// `followsContent` 는 펼침이 아닐 때(최소 · 접힘) 스크롤을 열어두면 목록을 쓸 때 시트가 안 펼쳐진다.
     /// 맨 위인지는 손짓을 시트와 스크롤 중 어디로 보낼지 가르는 근거라 매번 받아둔다
     func scrollingContent(layout: SheetLayout) -> some View {
         ScrollView {
@@ -431,12 +470,15 @@ private extension MapBottomSheet {
             visibleHeight = target
             return
         }
-        withAnimation(MapBottomSheetMetric.settle) {
+        let animation = layout.minimumHeight == nil
+            ? MapBottomSheetMetric.settle
+            : MapBottomSheetMetric.threeStepCodeSettle
+        withAnimation(animation) {
             visibleHeight = target
         }
     }
 
-    /// `above` 는 접힘일 때만 보인다. 접힘보다 위로 끌면 사라진다
+    /// `above` 는 접힘(3단계 화면의 중간) 이하일 때만 보인다. 최소에서도 보이고, 접힘보다 위로 끌면 사라진다
     func isAboveVisible(layout: SheetLayout) -> Bool {
         shownHeight(layout: layout) <= layout.collapsedHeight
     }
@@ -494,13 +536,35 @@ private extension MapBottomSheet {
         let predictedTranslation = value.predictedEndTranslation.height - dragBaseline
         let projected = visibleHeight - predictedTranslation
         let target = layout.nearestDetent(to: projected)
+        let releasedHeight = shownHeight(layout: layout)
         dragBaseline = 0
 
-        withAnimation(MapBottomSheetMetric.settle) {
+        withAnimation(settleAnimation(after: value, from: releasedHeight, to: target, layout: layout)) {
             visibleHeight = layout.height(for: target)
             dragTranslation = 0
         }
         selection = target
+    }
+
+    /// 2단계 화면은 지금 움직임 그대로다. 3단계 화면은 손 속도를 이어받는다. 정지에서 출발하면 놓는 순간 끊겨 보인다
+    func settleAnimation(
+        after value: DragGesture.Value,
+        from releasedHeight: CGFloat,
+        to target: SheetDetent,
+        layout: SheetLayout
+    ) -> Animation {
+        guard layout.minimumHeight != nil else { return MapBottomSheetMetric.settle }
+        let velocity = SheetLayout.settleVelocity(
+            fingerVelocity: value.velocity.height,
+            from: releasedHeight,
+            to: layout.height(for: target),
+            limit: MapBottomSheetMetric.threeStepDragSettleVelocityLimit
+        )
+        return .interpolatingSpring(
+            duration: MapBottomSheetMetric.threeStepDragSettleDuration,
+            bounce: 0,
+            initialVelocity: velocity
+        )
     }
 
     /// 이번 손짓의 주인을 정한다. 판정은 `SheetLayout` 이 하고 여기는 뷰 상태만 모은다
@@ -562,6 +626,7 @@ private struct MapBottomSheetPreviewRow: View {
 private struct MapBottomSheetPreviewHost: View {
     let expandLimit: SheetExpandLimit
     let rowCount: Int
+    var minimumHeight: CGFloat?
 
     @State private var selection: SheetDetent = .collapsed
 
@@ -570,7 +635,7 @@ private struct MapBottomSheetPreviewHost: View {
             Color.gray200
                 .ignoresSafeArea()
 
-            Text(selection == .collapsed ? "접힘" : "펼침")
+            Text(detentName)
                 .typography(.caption1M)
                 .foregroundStyle(Color.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -578,7 +643,8 @@ private struct MapBottomSheetPreviewHost: View {
 
             MapBottomSheet(
                 selection: $selection,
-                expandLimit: expandLimit
+                expandLimit: expandLimit,
+                minimumHeight: minimumHeight
             ) {
                 Text("떠 있는 버튼 자리")
                     .typography(.body1M)
@@ -600,6 +666,17 @@ private struct MapBottomSheetPreviewHost: View {
             }
         }
     }
+
+    private var detentName: String {
+        switch selection {
+        case .minimum:
+            return "최소"
+        case .collapsed:
+            return "접힘"
+        case .expanded:
+            return "펼침"
+        }
+    }
 }
 
 // 저장한 장소 · 게시글 상세 — 펼치면 서치바를 덮고 안전영역 위 끝까지
@@ -610,6 +687,11 @@ private struct MapBottomSheetPreviewHost: View {
 // 장소 상세 · 검색 결과 · 장소 선택 — 펼치면 서치바 아래 8 에서 멈춘다
 #Preview("펼침이 서치바 아래 8") {
     MapBottomSheetPreviewHost(expandLimit: .belowSearchBar, rowCount: 20)
+}
+
+// 지도 탭 · 코스 짜기 — 최소를 넘겨 세 단계가 된다. 최소 높이는 미리보기용 값이다
+#Preview("세 단계") {
+    MapBottomSheetPreviewHost(expandLimit: .safeAreaTop, rowCount: 20, minimumHeight: 200)
 }
 
 // 내용이 펼침 높이보다 짧을 때. 흰 카드가 펼침 자리까지 늘어난다

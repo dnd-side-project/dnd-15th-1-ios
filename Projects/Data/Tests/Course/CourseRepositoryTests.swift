@@ -1,3 +1,4 @@
+import CoreNetwork
 import Domain
 import XCTest
 
@@ -363,4 +364,67 @@ final class CourseRepositoryPastTests: XCTestCase {
 
 private func makeRepository(network: StubNetworkClient) -> CourseRepository {
     CourseRepository(remote: CourseRemoteDataSource(networkClient: network))
+}
+
+final class CourseRepositorySearchTests: XCTestCase {
+    private let searchPath = "/api/v1/date-courses/places/search"
+
+    func test_장소_검색은_검색_주소를_부르고_페이지로_옮긴다() async throws {
+        let network = StubNetworkClient()
+        network.responses["GET \(searchPath)"] = DateCoursePlaceSearchPageResponseDTO(
+            places: [candidate()],
+            page: 0,
+            size: 10,
+            hasNext: true
+        )
+        let repository = makeRepository(network: network)
+
+        let page = try await repository.searchCoursePlaces(query: "성수", page: 0)
+
+        XCTAssertEqual(network.requestedKeys, ["GET \(searchPath)"])
+        XCTAssertEqual(page.items.map(\.id), ["7"])
+        XCTAssertTrue(page.hasNext)
+    }
+
+    func test_장소_검색은_검색어와_page를_싣는다() {
+        XCTAssertEqual(
+            CourseEndpoint.placeSearch(query: "성수", page: 2).queryItems,
+            [
+                URLQueryItem(name: "query", value: "성수"),
+                URLQueryItem(name: "page", value: "2"),
+            ]
+        )
+    }
+
+    func test_장소_검색어가_없거나_비면_query를_싣지_않는다() {
+        let pageOnly = [URLQueryItem(name: "page", value: "0")]
+        XCTAssertEqual(CourseEndpoint.placeSearch(query: nil, page: 0).queryItems, pageOnly)
+        XCTAssertEqual(CourseEndpoint.placeSearch(query: "", page: 0).queryItems, pageOnly)
+    }
+
+    func test_장소_검색_실패는_CourseError로_던진다() async {
+        let network = StubNetworkClient()
+        network.errors["GET \(searchPath)"] = NetworkError.notFound(message: nil)
+        let repository = makeRepository(network: network)
+
+        await assertThrows(CourseError.notFound) {
+            try await repository.searchCoursePlaces(query: "성수", page: 0)
+        }
+    }
+
+    private func candidate() -> DateCoursePlaceCandidateResponseDTO {
+        DateCoursePlaceCandidateResponseDTO(
+            placeId: 7,
+            name: "장소명",
+            address: "주소",
+            roadAddress: nil,
+            latitude: 37.5,
+            longitude: 127.0,
+            categoryName: "카페",
+            ownershipStatus: "MINE",
+            alias: nil,
+            thumbnailUrl: nil,
+            imageUrls: []
+        )
+    }
 }

@@ -10,10 +10,19 @@ public extension PlaceClient {
             let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
             // 빈 검색어는 빈 결과다. 화면이 이미 빈 질의를 막고 있고,
             // 여기서 전체를 돌려주면 "검색 안 해도 결과가 뜬다" 는 착각을 만든다
-            guard !keyword.isEmpty else { return PlacePage(items: [], hasNext: false) }
+            guard !keyword.isEmpty else { return Page(items: [], hasNext: false) }
 
-            return PlacePage(
-                items: Place.mocks.filter { $0.name.localizedCaseInsensitiveContains(keyword) },
+            return Page(
+                items: Place.mocks
+                    .filter { $0.name.localizedCaseInsensitiveContains(keyword) }
+                    .map { place in
+                        PlaceSearchResult(
+                            place: place,
+                            // 저장 목록 가짜 데이터에 있으면 그 저장 관계를 싣는다
+                            ownership: SavedPlace.mocks.first { $0.id == place.id }?.ownership,
+                            alias: nil
+                        )
+                    },
                 hasNext: false
             )
         },

@@ -105,7 +105,7 @@ final class MapFlowFeatureTests: XCTestCase {
     func test_검색_결과에서_행을_누르면_상세가_선다() async {
         let place = Place.fixture(id: "s1", name: "검색 장소")
         var map = MapFeature.State()
-        map.mode = .searchResult(query: "카페", places: [place])
+        map.mode = .searchResult(query: "카페", results: [.unsaved(place)], isSavedOnly: false)
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
             MapFlowFeature()
         }
@@ -225,7 +225,10 @@ final class MapFlowFeatureTests: XCTestCase {
             MapFlowFeature()
         }
 
-        await store.send(.placeSearch(.delegate(.searchConfirmed(query: "음식점", places: places)))) {
+        let results = places.map(PlaceSearchResult.unsaved)
+        await store.send(
+            .placeSearch(.delegate(.searchConfirmed(query: "음식점", results: results, isSavedOnly: false)))
+        ) {
             $0.detail = nil
             $0.map.selectedPlace = nil
         }
@@ -234,7 +237,7 @@ final class MapFlowFeatureTests: XCTestCase {
             $0.placeSearch = nil
         }
         await store.receive(\.map.searchResultsApplied) {
-            $0.map.mode = .searchResult(query: "음식점", places: places)
+            $0.map.mode = .searchResult(query: "음식점", results: results, isSavedOnly: false)
             $0.map.camera = .focusing(places[0].coordinate, zoomLevel: MapCamera.multiPlaceZoom)
         }
     }
@@ -332,7 +335,7 @@ final class MapFlowSearchServerIDTests: XCTestCase {
     func test_검색결과_상세를_열면_지도의_서버id를_넘긴다() async {
         let place = Place.fixture(id: "s1", name: "검색 장소")
         var map = MapFeature.State()
-        map.mode = .searchResult(query: "카페", places: [place])
+        map.mode = .searchResult(query: "카페", results: [.unsaved(place)], isSavedOnly: false)
         map.bookmarkedPlaceIDs = ["s1"]
         map.savedPlaceIDs = ["s1": "3"]
         let store = TestStore(initialState: MapFlowFeature.State(map: map)) {
@@ -536,7 +539,7 @@ final class MapFlowPostDetailTests: XCTestCase {
     func test_게시글시트가_떠있을때_검색장소상세를_열면_게시글시트가_사라진다() async {
         let place = Place.fixture(id: "s1", name: "검색 장소")
         var map = MapFeature.State()
-        map.mode = .searchResult(query: "카페", places: [place])
+        map.mode = .searchResult(query: "카페", results: [.unsaved(place)], isSavedOnly: false)
         var state = MapFlowFeature.State(map: map)
         state.postDetail = PostDetailFeature.State(contentID: "1")
         let store = TestStore(initialState: state) {
@@ -843,7 +846,11 @@ final class MapFlowContentPinLeakTests: XCTestCase {
         var state = MapFlowFeature.State(map: map)
         state.detail = PlaceDetailFeature.State(contentPlace: place)
         state.topDetail = .place
-        state.modeBeforeContentDetail = .searchResult(query: "카페", places: [searchPlace])
+        state.modeBeforeContentDetail = .searchResult(
+            query: "카페",
+            results: [.unsaved(searchPlace)],
+            isSavedOnly: false
+        )
         state.returnsAfterDetailClose = false
         let store = TestStore(initialState: state) {
             MapFlowFeature()
@@ -856,7 +863,7 @@ final class MapFlowContentPinLeakTests: XCTestCase {
             $0.modeBeforeContentDetail = nil
         }
         await store.receive(\.map.modeRestored) {
-            $0.map.mode = .searchResult(query: "카페", places: [searchPlace])
+            $0.map.mode = .searchResult(query: "카페", results: [.unsaved(searchPlace)], isSavedOnly: false)
         }
         XCTAssertNil(store.state.map.selectedPlace)
     }
